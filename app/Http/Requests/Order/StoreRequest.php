@@ -24,6 +24,7 @@ class StoreRequest extends FormRequest
         return [
             'customer_id' => 'required|exists:customers,id',
             'customer_address_id' => 'required|exists:customer_addresses,id',
+            'sales_channel_id' => 'nullable|exists:sales_channels,id',
             'items' => 'required|array|min:1',
             'items.*.product_variant_id' => 'required|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -41,6 +42,7 @@ class StoreRequest extends FormRequest
             'customer_id.exists' => 'Customer tidak valid',
             'customer_address_id.required' => 'Alamat pengiriman harus dipilih',
             'customer_address_id.exists' => 'Alamat pengiriman tidak valid',
+            'sales_channel_id.exists' => 'Saluran penjualan tidak valid',
             'items.required' => 'Order harus memiliki minimal 1 item',
             'items.array' => 'Format items tidak valid',
             'items.min' => 'Order harus memiliki minimal 1 item',

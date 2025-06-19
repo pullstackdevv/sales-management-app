@@ -15,6 +15,7 @@ class Order extends Model
         'customer_id',
         'address_id',
         'user_id',
+        'sales_channel_id',
         'total_price',
         'shipping_cost',
         'status',
@@ -41,6 +42,11 @@ class Order extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function salesChannel()
+    {
+        return $this->belongsTo(SalesChannel::class);
     }
 
     public function items()

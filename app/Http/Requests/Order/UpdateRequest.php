@@ -35,6 +35,7 @@ class UpdateRequest extends FormRequest
             'customer_id' => 'sometimes|required|exists:customers,id',
             'address_id' => 'sometimes|required|exists:customer_addresses,id',
             'user_id' => 'sometimes|required|exists:users,id',
+            'sales_channel_id' => 'sometimes|nullable|exists:sales_channels,id',
             'total_price' => 'sometimes|required|numeric|min:0',
             'shipping_cost' => 'sometimes|required|numeric|min:0',
             'status' => 'sometimes|required|in:pending,paid,shipped,delivered,cancelled',
@@ -51,6 +52,7 @@ class UpdateRequest extends FormRequest
     public function messages()
     {
         return [
+            'sales_channel_id.exists' => 'Saluran penjualan tidak valid',
             'status.required' => 'Status harus diisi',
             'status.in' => 'Status tidak valid',
             'shipping.array' => 'Format shipping tidak valid',

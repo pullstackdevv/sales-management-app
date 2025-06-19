@@ -7,10 +7,15 @@ use App\Http\Controllers\CourierController;
 use App\Http\Controllers\CourierRateController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderItemController;
+use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\PaymentBankController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductVariantController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SalesChannelController;
+use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\StockOpnameDetailController;
@@ -59,6 +64,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Payment bank routes
     Route::apiResource('payment-banks', PaymentBankController::class);
     Route::post('payment-banks/{paymentBank}/toggle-status', [PaymentBankController::class, 'toggleStatus']);
+
+    // Sales channel routes
+    Route::apiResource('sales-channels', SalesChannelController::class);
+    Route::post('sales-channels/{salesChannel}/toggle-status', [SalesChannelController::class, 'toggleStatus']);
+    Route::get('sales-channels/options', [SalesChannelController::class, 'getOptions']);
 
     // Order routes
     Route::apiResource('orders', OrderController::class);

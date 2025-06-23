@@ -2,7 +2,8 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Inertia Laravel React</title>
+    <title>Stock Management</title>
+    <link rel="icon" href="/assets/icons/icon.svg" type="image/x-icon">
     @viteReactRefresh
     @vite('resources/js/app.jsx')
     @inertiaHead

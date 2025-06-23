@@ -2,78 +2,134 @@ import { uniqueId } from "lodash";
 
 const SidebarContent = [
   {
-    heading: "HOME",
+    name: "Dashboard",
+    icon: "solar:widget-add-line-duotone",
+    id: uniqueId(),
+    url: "/dashboard",
+  },
+  {
+    name: "Order",
+    icon: "solar:cart-outline",
+    id: uniqueId(),
     children: [
       {
-        name: "Dashboard",
-        icon: "solar:widget-add-line-duotone",
+        name: "Semua order",
+        icon: "solar:clipboard-list-outline",
         id: uniqueId(),
-        url: "/dashboard",
+        url: "/customer/data",
+      },
+      {
+        name: "Pesanan Baru",
+        icon: "solar:cart-plus-outline",
+        id: uniqueId(),
+        url: "/customer/request",
+      },
+      {
+        name: "Cancel Order",
+        icon: "bi:cart-x",
+        id: uniqueId(),
+        url: "/customer/inactive",
+      },
+      {
+        name: "On - Hold",
+        icon: "solar:pause-circle-outline",
+        id: uniqueId(),
+        url: "/customer/inactive",
       },
     ],
   },
   {
-    heading: "ORDER",
+    name: "Pengiriman",
+    icon: "flowbite:truck-outline",
+    id: uniqueId(),
     children: [
       {
-        name: "Typography",
-        icon: "solar:text-circle-outline",
+        name: "Daftar Pengiriman",
+        icon: "solar:truck-outline",
         id: uniqueId(),
-        url: "/ui/typography",
+        url: "/shipping/list",
       },
       {
-        name: "Table",
-        icon: "solar:bedside-table-3-linear",
+        name: "Status Pengiriman",
+        icon: "solar:location-outline",
         id: uniqueId(),
-        url: "/ui/table",
-      },
-      {
-        name: "Form",
-        icon: "solar:password-minimalistic-outline",
-        id: uniqueId(),
-        url: "/ui/form",
-      },
-      {
-        name: "Shadow",
-        icon: "solar:airbuds-case-charge-outline",
-        id: uniqueId(),
-        url: "/ui/shadow",
+        url: "/shipping/status",
       },
     ],
   },
   {
-    heading: "DATA CUSTOMER",
+    name: "Produk",
+    icon: "solar:box-outline",
+    id: uniqueId(),
     children: [
       {
-        name: "Login",
-        icon: "solar:login-2-linear",
+        name: "Daftar Produk",
+        icon: "solar:box-outline",
         id: uniqueId(),
-        url: "/auth/login",
+        url: "/customer/data",
       },
       {
-        name: "Register",
-        icon: "solar:shield-user-outline",
+        name: "Stok Opname",
+        icon: "solar:clipboard-check-outline",
         id: uniqueId(),
-        url: "/auth/register",
+        url: "/customer/request",
+      }
+    ],
+  },
+  {
+    name: "Data Customer",
+    icon: "flowbite:users-group-outline",
+    id: uniqueId(),
+    children: [
+      {
+        name: "Data Customer",
+        icon: "solar:user-outline",
+        id: uniqueId(),
+        url: "/customer/data",
+      },
+      {
+        name: "Request",
+        icon: "solar:question-circle-outline",
+        id: uniqueId(),
+        url: "/customer/request",
+      },
+      {
+        name: "Inactive",
+        icon: "solar:user-cross-outline",
+        id: uniqueId(),
+        url: "/customer/inactive",
       },
     ],
   },
   {
-    heading: "EXTRA",
-    children: [
-      {
-        name: "Icons",
-        icon: "solar:smile-circle-outline",
-        id: uniqueId(),
-        url: "/icons/solar",
-      },
-      {
-        name: "Sample Page",
-        icon: "solar:notes-minimalistic-outline",
-        id: uniqueId(),
-        url: "/sample-page",
-      },
-    ],
+    name: "Wallet",
+    icon: "solar:wallet-outline",
+    id: uniqueId(),
+    url: "/wallet",
+  },
+  {
+    name: "Expense",
+    icon: "solar:money-bag-outline",
+    id: uniqueId(),
+    url: "/expense",
+  },
+  {
+    name: "Report",
+    icon: "solar:chart-outline",
+    id: uniqueId(),
+    url: "/report",
+  },
+  {
+    name: "Analyzer",
+    icon: "solar:cpu-outline",
+    id: uniqueId(),
+    url: "/analyzer",
+  },
+  {
+    name: "Setting",
+    icon: "solar:settings-outline",
+    id: uniqueId(),
+    url: "/setting",
   },
 ];
 

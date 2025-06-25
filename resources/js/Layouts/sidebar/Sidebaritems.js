@@ -34,7 +34,7 @@ const SidebarContent = [
         name: "On - Hold",
         icon: "solar:pause-circle-outline",
         id: uniqueId(),
-        url: "/customer/inactive",
+        url: "/customer/onhold",
       },
     ],
   },

@@ -15,4 +15,9 @@ Route::middleware([HandleInertiaRequests::class])->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
     });
+
+    // Customer
+    Route::get('/customer/data', function () {
+        return Inertia::render('Customer/Order');
+    });
 });

@@ -15,9 +15,20 @@ Route::middleware([HandleInertiaRequests::class])->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
     });
+    Route::get('/expense', function () {
+        return Inertia::render('Expense');
+    });
+
+    // Order
+    Route::get('/order/data', function () {
+        return Inertia::render('Order/Order');
+    });
 
     // Customer
     Route::get('/customer/data', function () {
-        return Inertia::render('Customer/Order');
+        return Inertia::render('Customer/CustomerData');
+    });
+    Route::get('/customer/data/add', function () {
+        return Inertia::render('Customer/AddCustomer');
     });
 });

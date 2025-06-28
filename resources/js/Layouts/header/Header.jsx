@@ -37,7 +37,7 @@ const Header = () => {
               className="flex items-center gap-1 !px-3 !py-1 rounded-lg"
             >
               <Icon icon="ph:wallet-duotone" className="text-purple-600" />
-              <span className="text-sm font-semibold text-gray-800">Rp0</span>
+              <span className="text-sm font-semibold">Rp0</span>
               <Icon icon="mdi:chevron-down" className="text-gray-500" />
             </Button>
 

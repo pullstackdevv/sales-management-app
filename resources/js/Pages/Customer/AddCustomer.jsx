@@ -9,7 +9,6 @@ export default function AddCustomer() {
     return (
         <DashboardLayout>
             <div className="p-6">
-                {/* Judul dan Back */}
                 <div className="flex items-center gap-3 mb-6">
                     <button
                         className="text-gray-500 hover:text-gray-700"
@@ -22,10 +21,8 @@ export default function AddCustomer() {
                 </div>
 
                 <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Form Utama */}
                     <div className="w-full lg:w-3/4 bg-white p-6 rounded-lg shadow-sm">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Kategori & Nama */}
                             <div>
                                 <label className="text-sm font-medium">
                                     Kategori Customer
@@ -51,7 +48,6 @@ export default function AddCustomer() {
                                 <input className="w-full mt-1 border rounded px-3 py-2 text-sm" />
                             </div>
 
-                            {/* Kota & Kode Pos */}
                             <div className="relative">
                                 <label className="text-sm font-medium">
                                     Kota/kecamatan
@@ -72,7 +68,6 @@ export default function AddCustomer() {
                                 <input className="w-full mt-1 border rounded px-3 py-2 text-sm" />
                             </div>
 
-                            {/* Telepon */}
                             <div className="relative">
                                 <label className="text-sm font-medium">
                                     No. HP / Telepon
@@ -84,7 +79,6 @@ export default function AddCustomer() {
                                 />
                             </div>
 
-                            {/* Email */}
                             <div>
                                 <label className="text-sm font-medium">
                                     Email
@@ -92,7 +86,6 @@ export default function AddCustomer() {
                                 <input className="w-full mt-1 border rounded px-3 py-2 text-sm" />
                             </div>
 
-                            {/* ID Line */}
                             <div>
                                 <label className="text-sm font-medium">
                                     ID Line
@@ -100,7 +93,6 @@ export default function AddCustomer() {
                                 <input className="w-full mt-1 border rounded px-3 py-2 text-sm" />
                             </div>
 
-                            {/* Other Contact */}
                             <div>
                                 <label className="text-sm font-medium">
                                     Other Contact
@@ -108,7 +100,6 @@ export default function AddCustomer() {
                                 <input className="w-full mt-1 border rounded px-3 py-2 text-sm" />
                             </div>
 
-                            {/* Alamat */}
                             <div className="md:col-span-2">
                                 <label className="text-sm font-medium">
                                     Alamat Lengkap
@@ -117,7 +108,6 @@ export default function AddCustomer() {
                             </div>
                         </div>
 
-                        {/* Tombol Simpan */}
                         <div className="mt-6">
                             <button className="px-5 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
                                 Simpan!
@@ -125,7 +115,6 @@ export default function AddCustomer() {
                         </div>
                     </div>
 
-                    {/* Keterangan Kategori */}
                     <div className="lg:w-1/4 bg-white p-4 rounded-lg shadow-sm text-sm">
                         <p className="font-bold mb-2">Kategori Customer:</p>
                         <p>

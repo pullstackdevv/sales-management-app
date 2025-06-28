@@ -66,13 +66,13 @@ const SidebarContent = [
         name: "Daftar Produk",
         icon: "solar:box-outline",
         id: uniqueId(),
-        url: "/produk/data",
+        url: "/product/data",
       },
       {
         name: "Stok Opname",
         icon: "solar:clipboard-check-outline",
         id: uniqueId(),
-        url: "/produk/request",
+        url: "/stock-opname/data",
       }
     ],
   },

@@ -28,7 +28,29 @@ Route::middleware([HandleInertiaRequests::class])->group(function () {
     Route::get('/customer/data', function () {
         return Inertia::render('Customer/CustomerData');
     });
-    Route::get('/customer/data/add', function () {
+    Route::get('/customer/add', function () {
         return Inertia::render('Customer/AddCustomer');
+    });
+
+    // Produk
+    Route::get('/product/data', function () {
+        return Inertia::render('Product/ProductData');
+    });
+    Route::get('/product/add', function () {
+        return Inertia::render('Product/ProductAdd');
+    });
+    Route::get('/product/edit{id}', function () {
+        return Inertia::render('Product/ProductEdit');
+    });
+
+    // stock opname
+    Route::get('/stock-opname/data', function () {
+        return Inertia::render('StockOpname/StockOpnameData');
+    });
+    Route::get('/stock-opname/add', function () {
+        return Inertia::render('StockOpname/StockOpnameAdd');
+    });
+    Route::get('/stock-opname/edit{id}', function () {
+        return Inertia::render('StockOpname/StockOpnameEdit');
     });
 });

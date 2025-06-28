@@ -19,10 +19,8 @@ export default function ExpensePage() {
     return (
         <DashboardLayout>
             <div className="p-6">
-                {/* Title */}
                 <h1 className="text-2xl font-bold mb-4">Expense</h1>
 
-                {/* Filter Area */}
                 <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
                     <div className="flex flex-wrap gap-3 items-center">
                         <select className="border text-sm px-3 py-2 rounded-md">
@@ -63,7 +61,6 @@ export default function ExpensePage() {
                     </div>
                 </div>
 
-                {/* Info Box */}
                 <div className="bg-red-100 border border-red-200 rounded-lg p-4 text-sm mb-4">
                     <p className="font-semibold text-red-800">
                         Total Pengeluaran
@@ -74,7 +71,6 @@ export default function ExpensePage() {
                     </p>
                 </div>
 
-                {/* Table */}
                 <div className="overflow-x-auto rounded-lg border">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-blue-100 text-gray-700">
@@ -107,7 +103,6 @@ export default function ExpensePage() {
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                     <div className="bg-white w-full max-w-3xl rounded-xl shadow-xl p-6">
-                        {/* Header */}
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-semibold">
                                 Tambah Pengeluaran
@@ -120,7 +115,6 @@ export default function ExpensePage() {
                             </button>
                         </div>
 
-                        {/* Form */}
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
@@ -198,7 +192,6 @@ export default function ExpensePage() {
                                 </span>
                             </div>
 
-                            {/* Buttons */}
                             <div className="flex justify-end gap-3">
                                 <button
                                     onClick={() => setIsModalOpen(false)}

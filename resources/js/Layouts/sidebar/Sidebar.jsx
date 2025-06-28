@@ -1,5 +1,5 @@
 import { Sidebar } from "flowbite-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import NavItems from "./NavItems";
 import SidebarContent from "./Sidebaritems";
 import SimpleBar from "simplebar-react";
@@ -9,11 +9,31 @@ import { HiChevronUp, HiChevronDown } from "react-icons/hi";
 const SidebarLayout = () => {
     const [openMenus, setOpenMenus] = useState({});
 
+    useEffect(() => {
+        const savedOpenMenus = localStorage.getItem('sidebarOpenMenus');
+        if (savedOpenMenus) {
+            try {
+                setOpenMenus(JSON.parse(savedOpenMenus));
+            } catch (error) {
+                console.error('Error parsing saved open menus:', error);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('sidebarOpenMenus', JSON.stringify(openMenus));
+    }, [openMenus]);
+
     const toggleMenu = (id) => {
-        setOpenMenus((prev) => ({
-            ...prev,
-            [id]: !prev[id],
-        }));
+        setOpenMenus((prev) => {
+            if (prev[id]) {
+                const newState = { ...prev };
+                delete newState[id];
+                return newState;
+            }
+            
+            return { [id]: true };
+        });
     };
 
     return (

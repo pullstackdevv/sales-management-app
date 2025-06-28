@@ -35,10 +35,8 @@ export default function Order() {
   return (
     <DashboardLayout>
       <div className="p-6">
-        {/* Title */}
         <div className="text-xl font-semibold mb-4">Order</div>
 
-        {/* Filter Buttons */}
         <div className="flex flex-wrap gap-2 mb-6">
           {[
             'Semua Order',
@@ -58,7 +56,6 @@ export default function Order() {
           ))}
         </div>
 
-        {/* Top Bar */}
         <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
           <div className="flex gap-2">
             <select className="border text-sm px-3 py-2 rounded-md">
@@ -79,7 +76,6 @@ export default function Order() {
           </div>
         </div>
 
-        {/* Orders */}
         {orders.map((order, idx) => (
           <OrderCard key={idx} order={order} />
         ))}

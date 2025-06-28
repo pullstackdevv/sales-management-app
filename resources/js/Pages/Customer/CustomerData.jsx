@@ -30,7 +30,6 @@ export default function CustomerData() {
     return (
         <DashboardLayout>
             <div className="p-6">
-                {/* Header */}
                 <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center gap-3">
                         <button
@@ -53,7 +52,7 @@ export default function CustomerData() {
                         <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
                             Filter
                         </button>
-                        <Link href={"/customer/data/add"}>
+                        <Link href={"/customer/add"}>
                             <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
                                 <Icon
                                     icon="material-symbols:add"
@@ -65,7 +64,6 @@ export default function CustomerData() {
                     </div>
                 </div>
 
-                {/* Search */}
                 <div className="mb-4">
                     <input
                         type="text"
@@ -74,9 +72,7 @@ export default function CustomerData() {
                     />
                 </div>
 
-                {/* Table List */}
                 <div className="bg-white rounded-md shadow-sm divide-y">
-                    {/* Header Row */}
                     <div className="grid grid-cols-12 items-center px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50">
                         <div className="col-span-2">Nama</div>
                         <div className="col-span-2">Kategori</div>
@@ -85,13 +81,11 @@ export default function CustomerData() {
                         <div className="col-span-1 text-right">Aksi</div>
                     </div>
 
-                    {/* Rows */}
                     {customers.map((customer, idx) => (
                         <div
                             key={idx}
                             className="grid grid-cols-12 items-center px-4 py-3 text-sm"
                         >
-                            {/* Avatar & Name */}
                             <div className="col-span-2 flex items-center gap-3">
                                 <div
                                     className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-semibold text-white"
@@ -104,25 +98,21 @@ export default function CustomerData() {
                                 </span>
                             </div>
 
-                            {/* Category */}
                             <div className="col-span-2">
                                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                                     {customer.category}
                                 </span>
                             </div>
 
-                            {/* Phone */}
                             <div className="col-span-2 flex items-center gap-1 text-green-600">
                                 <Icon icon="ic:baseline-whatsapp" />
                                 {customer.phone}
                             </div>
 
-                            {/* Address */}
                             <div className="col-span-5 text-gray-600 text-sm whitespace-pre-line truncate">
                                 {customer.address}
                             </div>
 
-                            {/* Actions */}
                             <div className="col-span-1 flex gap-2 justify-end text-lg text-gray-500">
                                 <button className="hover:text-blue-600">
                                     <Icon icon="mdi:pencil-outline" />
@@ -139,13 +129,11 @@ export default function CustomerData() {
     );
 }
 
-// Ambil 2 huruf awal untuk avatar
 function getInitials(name) {
     const words = name.split(" ");
     return (words[0][0] + (words[1]?.[0] || "")).toUpperCase();
 }
 
-// Warna dinamis
 function getColor(index) {
     const colors = [
         "#EF4444",

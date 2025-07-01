@@ -3,7 +3,7 @@ import { Link } from "@inertiajs/react";
 const FullLogo = () => {
   return (
     <Link href="/">
-      <img src="/assets/images/logos/logo.svg" alt="logo" className="block" />
+      <img src="/assets/images/logos/mystock.jpeg" alt="logo" className="block w-40" />
     </Link>
   );
 };

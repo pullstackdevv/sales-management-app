@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\HandleInertiaRequests;
 use Inertia\Inertia;
 
-Route::get('/', function () {
+Route::get('/welcome', function () {
     return view('welcome');
 });
 
@@ -12,7 +12,7 @@ Route::middleware([HandleInertiaRequests::class])->group(function () {
     Route::get('/home', function () {
         return Inertia::render('Home'); // <--- ini wajib
     });
-    Route::get('/dashboard', function () {
+    Route::get('/', function () {
         return Inertia::render('Dashboard');
     });
     Route::get('/expense', function () {
@@ -52,5 +52,10 @@ Route::middleware([HandleInertiaRequests::class])->group(function () {
     });
     Route::get('/stock-opname/edit{id}', function () {
         return Inertia::render('StockOpname/StockOpnameEdit');
+    });
+
+    // Settings
+    Route::get('/settings', function () {
+        return Inertia::render('Settings/index');
     });
 });

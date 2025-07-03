@@ -2,6 +2,8 @@ import { useForm } from 'react-hook-form';
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { AuthAPI } from '@/api'
+import { Link } from '@inertiajs/react';
+import { route } from 'ziggy-js';
 
 export default function LoginForm() {
   const {
@@ -83,6 +85,13 @@ export default function LoginForm() {
         >
           Login
         </button>
+        <p className="text-sm text-center mt-4">
+          Belum punya akun?{' '}
+          <Link
+            href={route('auth.login')}
+            className="text-blue-600 hover:underline"
+          >Daftar</Link>
+        </p>
       </form>
     </div>
   );

@@ -19,7 +19,7 @@ class ResponseFormatter
 
     public static function fail(string $message = 'Fail', array|object $errors = [], int $statusCode = 422)
     {
-        if ($errors instanceof MessageBag || method_exists($errors, 'toArray')) {
+        if ($errors instanceof MessageBag || (!is_array($errors) && method_exists($errors, 'toArray'))) {
             $errors = self::formatValidationErrors($errors);
         }
 

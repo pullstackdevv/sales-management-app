@@ -1,6 +1,7 @@
 <?php
 
 use App\Helpers\ResponseFormatter;
+use Illuminate\Cache\RateLimiter;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,7 +20,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware
             ->group('api', [
                 EnsureFrontendRequestsAreStateful::class,
-                ThrottleRequests::class . ':api',
                 SubstituteBindings::class,
             ]);
     })
@@ -38,4 +38,5 @@ return Application::configure(basePath: dirname(__DIR__))
                 );
             }
         });
-    })->create();
+    })
+    ->create();

@@ -88,7 +88,7 @@ export default function LoginForm() {
         <p className="text-sm text-center mt-4">
           Belum punya akun?{' '}
           <Link
-            href={route('auth.login')}
+            href={route('auth.register')}
             className="text-blue-600 hover:underline"
           >Daftar</Link>
         </p>

@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AddressController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CourierController;
 use App\Http\Controllers\CourierRateController;
 use App\Http\Controllers\CustomerController;
@@ -20,6 +21,11 @@ use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\StockOpnameDetailController;
 use App\Http\Controllers\UserController;
+
+Route::prefix('auth/')->name('auth.')->group(function () {
+    Route::post('login', [AuthController::class, 'login'])
+        ->name('login');
+});
 
 // Auth routes
 Route::middleware('auth:sanctum')->group(function () {

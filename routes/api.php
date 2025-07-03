@@ -22,9 +22,10 @@ use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\StockOpnameDetailController;
 use App\Http\Controllers\UserController;
 
-Route::prefix('auth/')->name('auth.')->group(function () {
-    Route::post('login', [AuthController::class, 'login'])
-        ->name('login');
+Route::prefix('auth/')->group(function () {
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('register', [AuthController::class, 'register'])
+        ->middleware('throttle:5,1');
 });
 
 // Auth routes

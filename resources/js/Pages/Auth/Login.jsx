@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
-import axios from 'axios';
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
+import { AuthAPI } from '@/api'
 
 export default function LoginForm() {
   const {
@@ -12,13 +12,13 @@ export default function LoginForm() {
 
   const [serverErrors, setServerErrors] = useState([]);
   const [message, setMessage] = useState('');
-  const [showPwd, setShowPwd] = useState(false);   // ⇦ toggle state
+  const [showPwd, setShowPwd] = useState(false);
 
   const onSubmit = async (data) => {
     setServerErrors([]);
     setMessage('');
     try {
-      const res = await axios.post('/api/auth/login', data, { withCredentials: true });
+      const res = await AuthAPI.login(data);
       setMessage(res.data.message || 'Login berhasil!');
     } catch (err) {
       if (err.response) {
@@ -52,7 +52,7 @@ export default function LoginForm() {
           )}
         </div>
 
-        {/* password + toggle */}
+        {/* password */}
         <div className="mb-4">
           <label>Password</label>
           <div className="relative">

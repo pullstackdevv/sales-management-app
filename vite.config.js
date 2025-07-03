@@ -14,6 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       'tailwindcss/version.js': path.resolve(__dirname, 'resources/js/fake-tailwind-version.js'),
+      '@': path.resolve(__dirname, 'resources/js'),
     },
   },
   optimizeDeps: {

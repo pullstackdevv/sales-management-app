@@ -15,6 +15,17 @@ Route::middleware([HandleInertiaRequests::class])->group(function () {
     Route::get('/', function () {
         return Inertia::render('Dashboard');
     });
+
+    Route::prefix('auth')->name('auth.')->group(function () {
+        Route::get('login', function () {
+            return Inertia::render('Auth/Login');
+        })->name('login');
+
+        Route::get('register', function () {
+            return Inertia::render('Auth/Register');
+        })->name('register');
+    });
+
     Route::get('/expense', function () {
         return Inertia::render('Expense');
     });

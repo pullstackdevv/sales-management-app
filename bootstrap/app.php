@@ -1,12 +1,10 @@
 <?php
 
 use App\Helpers\ResponseFormatter;
-use Illuminate\Cache\RateLimiter;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Routing\Middleware\SubstituteBindings;
-use Illuminate\Routing\Middleware\ThrottleRequests;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 return Application::configure(basePath: dirname(__DIR__))

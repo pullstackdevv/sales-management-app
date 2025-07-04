@@ -21,6 +21,7 @@ use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\StockOpnameDetailController;
 use App\Http\Controllers\UserController;
+use Illuminate\Support\Facades\Auth;
 
 Route::prefix('auth/')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
@@ -33,6 +34,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // User routes
     Route::get('/user', function (Request $request) {
         return $request->user();
+    });
+
+    Route::get('/me', function (Request $request) {
+        return response()
+            ->json(Auth::user());
     });
     
     Route::apiResource('users', UserController::class);

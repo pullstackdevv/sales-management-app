@@ -1,22 +1,19 @@
 <?php
 
+use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Auth\Middleware\Authenticate;
 use Inertia\Inertia;
 
 Route::get('/welcome', function () {
     return view('welcome');
 });
 
-Route::middleware([HandleInertiaRequests::class])->group(function () {
-    Route::get('/home', function () {
-        return Inertia::render('Home'); // <--- ini wajib
-    });
-    Route::get('/', function () {
-        return Inertia::render('Dashboard');
-    });
-
-    Route::prefix('auth')->name('auth.')->group(function () {
+Route::middleware([RedirectIfAuthenticated::class])
+    ->prefix('auth')
+    ->name('auth.')
+    ->group(function () {
         Route::get('login', function () {
             return Inertia::render('Auth/Login');
         })->name('login');
@@ -25,6 +22,15 @@ Route::middleware([HandleInertiaRequests::class])->group(function () {
             return Inertia::render('Auth/Register');
         })->name('register');
     });
+
+Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(function () {
+    Route::get('/home', function () {
+        return Inertia::render('Home'); // <--- ini wajib
+    });
+
+    Route::get('/', function () {
+        return Inertia::render('Dashboard');
+    })->name('dashboard');
 
     Route::get('/expense', function () {
         return Inertia::render('Expense');

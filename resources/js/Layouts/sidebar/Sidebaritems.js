@@ -39,25 +39,6 @@ const SidebarContent = [
     ],
   },
   {
-    name: "Pengiriman",
-    icon: "flowbite:truck-outline",
-    id: uniqueId(),
-    children: [
-      {
-        name: "Daftar Pengiriman",
-        icon: "solar:truck-outline",
-        id: uniqueId(),
-        url: "/shipping/list",
-      },
-      {
-        name: "Status Pengiriman",
-        icon: "solar:location-outline",
-        id: uniqueId(),
-        url: "/shipping/status",
-      },
-    ],
-  },
-  {
     name: "Produk",
     icon: "solar:box-outline",
     id: uniqueId(),
@@ -80,26 +61,7 @@ const SidebarContent = [
     name: "Data Customer",
     icon: "flowbite:users-group-outline",
     id: uniqueId(),
-    children: [
-      {
-        name: "Data Customer",
-        icon: "solar:user-outline",
-        id: uniqueId(),
-        url: "/customer/data",
-      },
-      {
-        name: "Request",
-        icon: "solar:question-circle-outline",
-        id: uniqueId(),
-        url: "/customer/request",
-      },
-      {
-        name: "Inactive",
-        icon: "solar:user-cross-outline",
-        id: uniqueId(),
-        url: "/customer/inactive",
-      },
-    ],
+    url: "/customer/data",
   },
   {
     name: "Expense",

@@ -1,36 +1,22 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import TableComponent from "../../components/ui/table/TableComponent";
 import { Button } from "flowbite-react";
+import api from "@/api/axios"; // pastikan sudah buat file ini seperti penjelasan sebelumnya
 
 export default function UserSettings() {
-  const users = [
-    {
-      name: "saleparfum",
-      email: "annichaoasis@gmail.com",
-      role: "Owner",
-      priv: "7 Privileges",
-    },
-    {
-      name: "Diah",
-      email: "saleparfumadm1@gmail.com",
-      role: "Admin",
-      priv: "1 Privileges",
-    },
-    {
-      name: "Ica",
-      email: "saleparfumcs1@gmail.com",
-      role: "Admin",
-      priv: "1 Privileges",
-    },
-    {
-      name: "Luna",
-      email: "saleparfumcs@gmail.com",
-      role: "Admin",
-      priv: "6 Privileges",
-    },
-  ];
+  const [users, setUsers] = useState([]);
 
+  useEffect(() => {
+    api.get("/users/index")
+      .then((res) => {
+        setUsers(res.data.data); 
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  console.log(users);
+  
   const columns = [
     {
       key: "no",
@@ -47,14 +33,14 @@ export default function UserSettings() {
     {
       key: "priv",
       label: "Privileges",
-      render: (row) => (
-        <span className="bg-gray-200 px-2 py-1 rounded text-xs">{row.priv}</span>
+      render: () => (
+        <span className="bg-gray-200 px-2 py-1 rounded text-xs">-</span>
       ),
     },
     {
       key: "actions",
       label: "",
-      render: (_, i) => (
+      render: (row) => (
         <div className="flex gap-2 text-lg">
           <Button className="text-primary hover:text-primary/80">
             <Icon icon="mdi:pencil" />

@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "dev:all": "concurrently \"npm run dev\" \"php artisan serve\""
     },
     "devDependencies": {
         "@tailwindcss/aspect-ratio": "^0.4.2",
@@ -12,6 +13,7 @@
         "@tailwindcss/typography": "^0.5.16",
         "@vitejs/plugin-react": "^4.5.2",
         "autoprefixer": "^10.4.21",
+        "concurrently": "^9.2.0",
         "laravel-vite-plugin": "^1.2.0",
         "postcss": "^8.4.21",
         "tailwindcss": "3.4.1",

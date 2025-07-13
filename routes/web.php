@@ -14,7 +14,7 @@ Route::get('/', function () {
         return redirect()->route('dashboard');
     }
     return
-redirect()->route('auth.login');
+        redirect()->route('auth.login');
 });
 Route::middleware([RedirectIfAuthenticated::class])
     ->prefix('auth')
@@ -38,10 +38,7 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         auth()->logout();
         return redirect()->route('auth.login');
     })->name('logout');
-    Route::post('/logout', function () {
-        auth()->logout();
-        return redirect()->route('auth.login');
-    })->name('logout');
+
 
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
@@ -98,5 +95,5 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/analyzer', function () {
         return Inertia::render('Report/Analyzer');
     });
-   
+
 });

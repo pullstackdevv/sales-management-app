@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Icon } from "@iconify/react";
-import {
-    Button,
-} from "flowbite-react";
+import { Button } from "flowbite-react";
 import DashboardLayout from "../Layouts/DashboardLayout";
 
 export default function ExpensePage() {
@@ -42,9 +40,7 @@ export default function ExpensePage() {
                     </div>
 
                     <div className="flex gap-2">
-                        <Button
-                            className="text-sm border border-blue-600 text-blue-600"
-                        >
+                        <Button className="text-sm border border-blue-600 text-blue-600">
                             <Icon
                                 icon="mdi:download"
                                 className="text-lg mr-1"

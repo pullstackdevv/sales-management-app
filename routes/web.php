@@ -97,3 +97,7 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     });
 
 });
+
+Route::fallback(function () {
+    return Inertia::render('NotFound');
+});

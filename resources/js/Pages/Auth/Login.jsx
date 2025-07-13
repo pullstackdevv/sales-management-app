@@ -14,18 +14,25 @@ export default function LoginForm() {
 
   const [serverErrors, setServerErrors] = useState([]);
   const [message, setMessage] = useState('');
+  const [messageStatus, setMessageStatus] = useState('');
   const [showPwd, setShowPwd] = useState(false);
 
   const onSubmit = async (data) => {
     setServerErrors([]);
     setMessage('');
+    setMessageStatus('');
     try {
       const res = await AuthAPI.login(data);
       setMessage(res.data.message || 'Login berhasil!');
+      setMessageStatus('success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (err) {
       if (err.response) {
         setMessage(err.response.data.message || 'Login gagal');
         setServerErrors(err.response.data.errors || []);
+        setMessageStatus('error');
       }
     }
   };
@@ -36,7 +43,11 @@ export default function LoginForm() {
   return (
     <div className="max-w-md mx-auto mt-20 p-6 bg-white rounded shadow">
       <h2 className="text-xl font-bold mb-4">Login</h2>
-      {message && <div className="mb-4 text-red-500">{message}</div>}
+      {message && (
+        <div className={`mb-4 ${messageStatus === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+          {message}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* email */}
@@ -48,7 +59,7 @@ export default function LoginForm() {
             className="w-full border px-3 py-2 rounded"
           />
           {(validationErrors.email || getServerError('email')) && (
-            <div className="text-sm text-red-500">
+            <div className="text-sm ">
               {validationErrors.email?.message || getServerError('email')}
             </div>
           )}

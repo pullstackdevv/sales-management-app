@@ -30,7 +30,7 @@ Route::prefix('auth/')->group(function () {
 });
 
 // Auth routes
-Route::middleware('auth:sanctum')->group(function () {
+// Route::middleware('auth:sanctum')->group(function () {
     // User routes
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -100,4 +100,4 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('payments', [ReportController::class, 'payments']);
         Route::post('export-sales', [ReportController::class, 'exportSales']);
     });
-}); 
+// }); 

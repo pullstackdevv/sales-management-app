@@ -9,7 +9,13 @@ use Inertia\Inertia;
 Route::get('/welcome', function () {
     return view('welcome');
 });
-
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+    return
+redirect()->route('auth.login');
+});
 Route::middleware([RedirectIfAuthenticated::class])
     ->prefix('auth')
     ->name('auth.')
@@ -28,7 +34,16 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         return Inertia::render('Home'); // <--- ini wajib
     });
 
-    Route::get('/', function () {
+    Route::get('/logout', function () {
+        auth()->logout();
+        return redirect()->route('auth.login');
+    })->name('logout');
+    Route::post('/logout', function () {
+        auth()->logout();
+        return redirect()->route('auth.login');
+    })->name('logout');
+
+    Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
@@ -75,4 +90,13 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/settings', function () {
         return Inertia::render('Settings/index');
     });
+
+    // analizer
+    Route::get('/report', function () {
+        return Inertia::render('Report/index');
+    });
+    Route::get('/analyzer', function () {
+        return Inertia::render('Report/Analyzer');
+    });
+   
 });

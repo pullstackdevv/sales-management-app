@@ -5,7 +5,7 @@ const SidebarContent = [
     name: "Dashboard",
     icon: "solar:widget-add-line-duotone",
     id: uniqueId(),
-    url: "/",
+    url: "/dashboard",
   },
   {
     name: "Order",

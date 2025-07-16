@@ -13,12 +13,19 @@ class CustomerController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $customers = Customer::with(['addresses', 'orders' => function($q) {
-                $q->select('id', 'customer_id', 'total_amount', 'status', 'created_at')
-                    ->latest()
-                    ->limit(5);
-            }])
-            ->withCount(['orders', 'addresses'])
+        // $customers = Customer::with(['addresses', 'orders' => function($q) {
+        //         $q->select('id', 'customer_id', 'total_amount', 'status', 'created_at')
+        //             ->latest()
+        //             ->limit(5);
+        //     }])
+        //     ->withCount(['orders', 'addresses'])
+        //     ->when($request->search, function($query, $search) {
+        //         $query->where('name', 'like', "%{$search}%")
+        //             ->orWhere('phone', 'like', "%{$search}%")
+        //             ->orWhere('email', 'like', "%{$search}%");
+        //     })
+            $customers = Customer::with(['addresses'])
+            ->withCount(['addresses'])
             ->when($request->search, function($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")

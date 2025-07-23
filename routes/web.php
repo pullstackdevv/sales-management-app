@@ -88,6 +88,14 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         return Inertia::render('Settings/index');
     });
 
+    // Voucher
+    Route::get('/voucher/data', function () {
+        return Inertia::render('Voucher/index');
+    });
+    Route::get('/voucher/add', function () {
+        return Inertia::render('Voucher/AddVoucher');
+    });
+
     // analizer
     Route::get('/report', function () {
         return Inertia::render('Report/index');

@@ -52,6 +52,9 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/order/data', function () {
         return Inertia::render('Order/Order');
     });
+    Route::get('/order/add', function () {
+        return Inertia::render('Order/AddOrder');
+    });
 
     // Customer
     Route::get('/customer/data', function () {

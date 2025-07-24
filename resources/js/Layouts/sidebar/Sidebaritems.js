@@ -22,7 +22,7 @@ const SidebarContent = [
                 name: "Pesanan Baru",
                 icon: "solar:cart-plus-outline",
                 id: uniqueId(),
-                url: "/order/request",
+                url: "/order/add",
             },
             {
                 name: "Cancel Order",

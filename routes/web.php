@@ -107,6 +107,32 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         return Inertia::render('Report/Analyzer');
     });
 
+    // Marketplace (tanpa middleware agar bisa diakses publik)
+Route::prefix('marketplace')->group(function () {
+    Route::get('/', function () {
+        return Inertia::render('Marketplace/Homepage');
+    })->name('marketplace.home');
+
+    Route::get('/products', function () {
+        return Inertia::render('Marketplace/ProductList');
+    })->name('marketplace.products');
+
+    Route::get('/product/{id}', function ($id) {
+        return Inertia::render('Marketplace/ProductDetail', ['id' => $id]);
+    })->name('marketplace.product.detail');
+
+    Route::get('/cart', function () {
+        return Inertia::render('Marketplace/Cart');
+    })->name('marketplace.cart');
+
+    Route::get('/checkout', function () {
+        return Inertia::render('Marketplace/Checkout');
+    })->name('marketplace.checkout');
+
+    Route::get('/profile', function () {
+        return Inertia::render('Marketplace/Profile');
+    })->name('marketplace.profile');
+});
 });
 
 Route::fallback(function () {

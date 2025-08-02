@@ -16,6 +16,14 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware
+            ->web([
+                \Illuminate\Http\Middleware\HandleCors::class,
+            ])
+            ->api([
+                \Illuminate\Http\Middleware\HandleCors::class,
+                EnsureFrontendRequestsAreStateful::class,
+                SubstituteBindings::class,
+            ])
             ->group('api', [
                 EnsureFrontendRequestsAreStateful::class,
                 SubstituteBindings::class,

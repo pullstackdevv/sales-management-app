@@ -66,53 +66,53 @@ export default function ProductList() {
     const filteredProducts = products.filter(p => (activeCategory === "all" || p.category === activeCategory) && p.name.toLowerCase().includes(search.toLowerCase()));
     return (
         <MarketplaceLayout>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-6">Daftar Produk</h1>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-                    <div className="flex flex-wrap gap-2">
+            <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 sm:py-16">
+                <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-8 sm:mb-10">Daftar Produk</h1>
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 sm:mb-10 gap-6 sm:gap-8">
+                    <div className="flex flex-wrap gap-3 sm:gap-4">
                         {categories.map((cat) => (
                             <button
                                 key={cat.id}
                                 onClick={() => setActiveCategory(cat.id)}
-                                className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${activeCategory === cat.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
+                                className={`px-6 sm:px-8 py-3 sm:py-4 rounded-full text-lg sm:text-xl font-medium border transition-colors ${activeCategory === cat.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
                             >
                                 {cat.name}
                             </button>
                         ))}
                     </div>
-                    <div className="relative w-full md:w-80">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-gray-400" />
+                    <div className="relative w-full lg:w-80">
+                        <div className="absolute inset-y-0 left-0 pl-4 sm:pl-5 flex items-center pointer-events-none">
+                            <Search className="h-6 w-6 sm:h-7 sm:w-7 text-gray-400" />
                         </div>
                         <input
                             type="text"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            className="block w-full pl-12 sm:pl-14 pr-4 sm:pr-5 py-3 sm:py-4 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-lg sm:text-xl"
                             placeholder="Cari produk..."
                         />
                     </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
                     {filteredProducts.map(product => (
                         <div key={product.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden group">
                             <Link href={`/marketplace/product/${product.id}`}>
-                                <img src={product.image} alt={product.name} className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
+                                <img src={product.image} alt={product.name} className="w-full h-48 sm:h-56 object-cover group-hover:scale-105 transition-transform duration-300" />
                             </Link>
-                            <div className="p-4">
-                                <h3 className="font-medium text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
-                                <div className="flex items-center mb-2">
+                            <div className="p-5 sm:p-6">
+                                <h3 className="font-medium text-gray-900 mb-2 sm:mb-3 line-clamp-2 text-base sm:text-lg">{product.name}</h3>
+                                <div className="flex items-center mb-2 sm:mb-3">
                                     <div className="flex items-center">
                                         {[...Array(5)].map((_, i) => (
-                                            <Star key={i} className={`h-4 w-4 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                                            <Star key={i} className={`h-5 w-5 sm:h-5 sm:w-5 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
                                         ))}
                                     </div>
-                                    <span className="text-sm text-gray-500 ml-1">({product.reviewCount})</span>
+                                    <span className="text-base sm:text-lg text-gray-500 ml-2">({product.reviewCount})</span>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-lg font-bold text-gray-900">{formatPrice(product.price)}</span>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+                                    <span className="text-lg sm:text-xl font-bold text-gray-900">{formatPrice(product.price)}</span>
                                     {product.originalPrice > product.price && (
-                                        <span className="text-sm text-gray-500 line-through ml-2">{formatPrice(product.originalPrice)}</span>
+                                        <span className="text-base sm:text-lg text-gray-500 line-through">{formatPrice(product.originalPrice)}</span>
                                     )}
                                 </div>
                             </div>

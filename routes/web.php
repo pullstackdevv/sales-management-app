@@ -107,7 +107,9 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         return Inertia::render('Report/Analyzer');
     });
 
-    // Marketplace (tanpa middleware agar bisa diakses publik)
+});
+
+// Marketplace (tanpa middleware agar bisa diakses publik)
 Route::prefix('marketplace')->group(function () {
     Route::get('/', function () {
         return Inertia::render('Marketplace/Homepage');
@@ -132,7 +134,6 @@ Route::prefix('marketplace')->group(function () {
     Route::get('/profile', function () {
         return Inertia::render('Marketplace/Profile');
     })->name('marketplace.profile');
-});
 });
 
 Route::fallback(function () {

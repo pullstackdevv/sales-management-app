@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SalesChannel\StoreSalesChannelRequest;
-use App\Http\Requests\SalesChannel\UpdateSalesChannelRequest;
 use App\Models\SalesChannel;
 use Illuminate\Http\Request;
 
@@ -29,9 +27,9 @@ class SalesChannelController extends Controller
         // Filter by status
         if ($request->filled('status')) {
             if ($request->status === 'active') {
-                $query->active();
+                $query->where('is_active', true);
             } elseif ($request->status === 'inactive') {
-                $query->inactive();
+                $query->where('is_active', false);
             }
         }
 
@@ -40,29 +38,34 @@ class SalesChannelController extends Controller
         $sortOrder = $request->get('sort_order', 'desc');
         $query->orderBy($sortBy, $sortOrder);
 
-        $salesChannels = $query->paginate(10);
+        $salesChannels = $query->paginate($request->per_page ?? 10);
 
-        return view('sales-channels.index', compact('salesChannels'));
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return view('sales-channels.create');
+        return response()->json([
+            'status' => 'success',
+            'data' => $salesChannels
+        ]);
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreSalesChannelRequest $request)
+    public function store(Request $request)
     {
-        $salesChannel = SalesChannel::create($request->validated());
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => 'required|string|max:50|unique:sales_channels,code',
+            'platform' => 'required|string|max:100',
+            'description' => 'nullable|string|max:500',
+            'is_active' => 'boolean'
+        ]);
 
-        return redirect()
-            ->route('sales-channels.index')
-            ->with('success', 'Saluran penjualan berhasil ditambahkan.');
+        $salesChannel = SalesChannel::create($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Sales channel created successfully',
+            'data' => $salesChannel
+        ], 201);
     }
 
     /**
@@ -74,27 +77,32 @@ class SalesChannelController extends Controller
             $query->latest()->take(10);
         }]);
 
-        return view('sales-channels.show', compact('salesChannel'));
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(SalesChannel $salesChannel)
-    {
-        return view('sales-channels.edit', compact('salesChannel'));
+        return response()->json([
+            'status' => 'success',
+            'data' => $salesChannel
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateSalesChannelRequest $request, SalesChannel $salesChannel)
+    public function update(Request $request, SalesChannel $salesChannel)
     {
-        $salesChannel->update($request->validated());
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'code' => 'sometimes|required|string|max:50|unique:sales_channels,code,' . $salesChannel->id,
+            'platform' => 'sometimes|required|string|max:100',
+            'description' => 'nullable|string|max:500',
+            'is_active' => 'boolean'
+        ]);
 
-        return redirect()
-            ->route('sales-channels.index')
-            ->with('success', 'Saluran penjualan berhasil diperbarui.');
+        $salesChannel->update($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Sales channel updated successfully',
+            'data' => $salesChannel->fresh()
+        ]);
     }
 
     /**
@@ -104,16 +112,18 @@ class SalesChannelController extends Controller
     {
         // Check if sales channel has orders
         if ($salesChannel->orders()->exists()) {
-            return redirect()
-                ->route('sales-channels.index')
-                ->with('error', 'Tidak dapat menghapus saluran penjualan yang memiliki pesanan.');
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cannot delete sales channel that has orders'
+            ], 422);
         }
 
         $salesChannel->delete();
 
-        return redirect()
-            ->route('sales-channels.index')
-            ->with('success', 'Saluran penjualan berhasil dihapus.');
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Sales channel deleted successfully'
+        ]);
     }
 
     /**
@@ -125,11 +135,11 @@ class SalesChannelController extends Controller
             'is_active' => !$salesChannel->is_active
         ]);
 
-        $status = $salesChannel->is_active ? 'diaktifkan' : 'dinonaktifkan';
-
-        return redirect()
-            ->route('sales-channels.index')
-            ->with('success', "Saluran penjualan berhasil {$status}.");
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Sales channel status updated successfully',
+            'data' => $salesChannel->fresh()
+        ]);
     }
 
     /**
@@ -144,4 +154,4 @@ class SalesChannelController extends Controller
 
         return response()->json($salesChannels);
     }
-} 
+}

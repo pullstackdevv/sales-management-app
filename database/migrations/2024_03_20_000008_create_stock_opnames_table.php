@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('created_by')->constrained('users');
             $table->text('note')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
@@ -23,4 +24,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('stock_opnames');
     }
-}; 
+};

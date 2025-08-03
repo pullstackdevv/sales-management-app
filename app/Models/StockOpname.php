@@ -33,4 +33,9 @@ class StockOpname extends Model
     {
         return $this->hasMany(StockOpnameDetail::class);
     }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

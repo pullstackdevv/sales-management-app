@@ -17,7 +17,7 @@ class ProductVariantController extends Controller
         $variants = $product->variants()
             ->with(['product'])
             ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
+                $query->where('variant_label', 'like', "%{$search}%")
                     ->orWhere('sku', 'like', "%{$search}%");
             })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
@@ -36,15 +36,10 @@ class ProductVariantController extends Controller
     public function store(Request $request, Product $product): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'variant_label' => 'required|string|max:255',
             'sku' => 'required|string|max:50|unique:product_variants,sku',
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
-            'weight' => 'required|numeric|min:0',
-            'dimensions' => 'required|array',
-            'dimensions.length' => 'required|numeric|min:0',
-            'dimensions.width' => 'required|numeric|min:0',
-            'dimensions.height' => 'required|numeric|min:0',
             'is_active' => 'boolean'
         ]);
 
@@ -92,15 +87,10 @@ class ProductVariantController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
+            'variant_label' => 'sometimes|required|string|max:255',
             'sku' => 'sometimes|required|string|max:50|unique:product_variants,sku,' . $variant->id,
             'price' => 'sometimes|required|numeric|min:0',
             'stock' => 'sometimes|required|integer|min:0',
-            'weight' => 'sometimes|required|numeric|min:0',
-            'dimensions' => 'sometimes|required|array',
-            'dimensions.length' => 'required_with:dimensions|numeric|min:0',
-            'dimensions.width' => 'required_with:dimensions|numeric|min:0',
-            'dimensions.height' => 'required_with:dimensions|numeric|min:0',
             'is_active' => 'boolean'
         ]);
 
@@ -157,4 +147,4 @@ class ProductVariantController extends Controller
             throw $e;
         }
     }
-} 
+}

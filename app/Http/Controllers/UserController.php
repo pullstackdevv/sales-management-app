@@ -15,15 +15,15 @@ class UserController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $users = User::with('role')
+        $users = User::query()
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
-            ->when($request->role_id, function ($query, $roleId) {
-                $query->where('role_id', $roleId);
+            ->when($request->role, function ($query, $role) {
+                $query->where('role', $role);
             })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
                 $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
@@ -44,7 +44,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role_id' => 'required|exists:roles,id',
+            'role' => 'required|in:owner,admin,staff,warehouse',
             'is_active' => 'boolean'
         ]);
 
@@ -62,7 +62,7 @@ class UserController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'User created successfully',
-                'data' => $user->load(['role', 'createdBy'])
+                'data' => $user
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -75,7 +75,6 @@ class UserController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $user->load([
-                'role',
                 'orders' => function ($query) {
                     $query->with(['items', 'payments', 'shipping'])
                         ->latest();
@@ -90,7 +89,7 @@ class UserController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
             'password' => 'sometimes|required|string|min:8|confirmed',
-            'role_id' => 'sometimes|required|exists:roles,id',
+            'role' => 'sometimes|required|in:owner,admin,staff,warehouse',
             'is_active' => 'boolean'
         ]);
 
@@ -111,7 +110,7 @@ class UserController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'User updated successfully',
-                'data' => $user->fresh()->load(['role', 'createdBy'])
+                'data' => $user->fresh()
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -184,7 +183,7 @@ class UserController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'User status updated successfully',
-                'data' => $user->fresh()->load(['role', 'createdBy'])
+                'data' => $user->fresh()
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -211,11 +210,11 @@ class UserController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Password changed successfully',
-                'data' => $user->fresh()->load(['role', 'createdBy'])
+                'data' => $user->fresh()
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
         }
     }
-} 
+}

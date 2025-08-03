@@ -43,6 +43,10 @@ class AuthController extends Controller
             if (!Auth::attempt($credentials)) {
                 return ResponseFormatter::fail('Wrong email or password');
             }
+
+            $user = Auth::user();
+            $token = $user->createToken('auth_token')->plainTextToken;
+
         } catch (\Throwable $th) {
             return ResponseFormatter::error(
                 message: "Something wrong",
@@ -52,7 +56,10 @@ class AuthController extends Controller
 
         return ResponseFormatter::success(
             message: "Successfully logged in",
-            data: Auth::user(),
+            data: [
+                'user' => $user,
+                'token' => $token,
+            ],
         );
     }
 
@@ -129,6 +136,43 @@ class AuthController extends Controller
     public function update(Request $request, string $id)
     {
         //
+    }
+
+    /**
+     * Handle user logout.
+     */
+    public function logout(Request $request)
+    {
+        try {
+            $request->user()->currentAccessToken()->delete();
+
+            return ResponseFormatter::success(
+                message: "Successfully logged out"
+            );
+        } catch (\Throwable $th) {
+            return ResponseFormatter::error(
+                message: "Something wrong",
+                errors: $th,
+            );
+        }
+    }
+
+    /**
+     * Get authenticated user.
+     */
+    public function me(Request $request)
+    {
+        try {
+            return ResponseFormatter::success(
+                message: "User data retrieved successfully",
+                data: $request->user()
+            );
+        } catch (\Throwable $th) {
+            return ResponseFormatter::error(
+                message: "Something wrong",
+                errors: $th,
+            );
+        }
     }
 
     /**

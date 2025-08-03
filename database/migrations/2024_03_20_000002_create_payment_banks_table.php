@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('account_name', 100);
             $table->string('account_number', 50);
             $table->boolean('is_active')->default(true);
+            $table->foreignId('created_by')->nullable()->constrained('users');
             $table->timestamps();
             $table->softDeletes();
         });
@@ -23,4 +24,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('payment_banks');
     }
-}; 
+};

@@ -27,8 +27,8 @@ class ReportController extends Controller
             ->select(
                 DB::raw('DATE(created_at) as date'),
                 DB::raw('COUNT(*) as total_orders'),
-                DB::raw('SUM(total_amount) as total_sales'),
-                DB::raw('AVG(total_amount) as average_order_value')
+                DB::raw('SUM(total_price) as total_sales'),
+                DB::raw('AVG(total_price) as average_order_value')
             )
             ->groupBy('date')
             ->orderBy('date')
@@ -103,9 +103,8 @@ class ReportController extends Controller
             ->withSum(['orders' => function ($query) use ($validated) {
                 $query->whereBetween('created_at', [$validated['start_date'], $validated['end_date']])
                     ->where('status', '!=', 'cancelled');
-            }], 'total_amount')
-            ->with('role')
-            ->orderByDesc('orders_sum_total_amount')
+            }], 'total_price')
+            ->orderByDesc('orders_sum_total_price')
             ->get();
 
         return response()->json([
@@ -158,4 +157,4 @@ class ReportController extends Controller
             'message' => 'Export feature coming soon'
         ]);
     }
-} 
+}

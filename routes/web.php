@@ -71,7 +71,7 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/product/add', function () {
         return Inertia::render('Product/ProductAdd');
     });
-    Route::get('/product/edit{id}', function () {
+    Route::get('/product/edit/{id}', function () {
         return Inertia::render('Product/ProductEdit');
     });
 
@@ -82,7 +82,7 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/stock-opname/add', function () {
         return Inertia::render('StockOpname/StockOpnameAdd');
     });
-    Route::get('/stock-opname/edit{id}', function () {
+    Route::get('/stock-opname/edit/{id}', function () {
         return Inertia::render('StockOpname/StockOpnameEdit');
     });
 

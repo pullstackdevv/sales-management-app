@@ -1,36 +1,71 @@
 import OrderCard from '../../components/ui/card/OrderCard';
 import DashboardLayout from '../../Layouts/DashboardLayout';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '@/api/axios';
 
 export default function Order() {
-  const [orders] = useState([
-    {
-      id: '#67916',
-      channel: 'Whatsapp',
-      date: 'Rabu, 11 Jun 2025 14:11:17',
-      customer: 'Indri',
-      admin: 'saleparfum',
-      status: 'Paid',
-      total: 1199000,
-      bank: 'Mandiri (11 Jun 2025)',
-      courier: 'GrabExpress Instant',
-      resi: '',
-      products: ['MFK Hair Mist 70ml Amyris Femme (1x)'],
-    },
-    {
-      id: '#67915',
-      channel: 'Website Lain',
-      date: 'Senin, 9 Jun 2025 18:42:28',
-      customer: 'Irma Bajumi',
-      admin: 'saleparfum',
-      status: 'Paid',
-      total: 545000,
-      bank: 'BCA (9 Jun 2025)',
-      courier: 'Tiki - ONS',
-      resi: '660092977099',
-      products: ['FW Gold Fame Women Edp 80ml Product (1x)', 'Zimaya By Afnan Fatima (1x)'],
-    },
-  ]);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/orders');
+      const ordersData = response.data.data.data || [];
+      
+      // Transform API data to match OrderCard component format
+      const transformedOrders = ordersData.map(order => ({
+        id: order.order_number,
+        channel: order.sales_channel?.name || 'Website',
+        date: formatDate(order.ordered_at),
+        customer: order.customer?.name || 'N/A',
+        admin: 'Admin', // Default admin name
+        status: getStatusLabel(order.status),
+        total: parseFloat(order.total_price) + parseFloat(order.shipping_cost),
+        bank: 'Bank Info', // Default bank info
+        courier: order.shipping?.courier?.name || 'N/A',
+        resi: order.shipping?.tracking_number || '',
+        products: order.items?.map(item => 
+          `${item.product_name_snapshot} ${item.variant_label} (${item.quantity}x)`
+        ) || []
+      }));
+      
+      setOrders(transformedOrders);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const getStatusLabel = (status) => {
+    const statusMap = {
+      'pending': 'Belum Bayar',
+      'paid': 'Paid',
+      'processing': 'Diproses',
+      'shipped': 'Dikirim',
+      'delivered': 'Selesai',
+      'cancelled': 'Dibatalkan'
+    };
+    return statusMap[status] || status;
+  };
 
   return (
     <DashboardLayout>
@@ -76,9 +111,20 @@ export default function Order() {
           </div>
         </div>
 
-        {orders.map((order, idx) => (
-          <OrderCard key={idx} order={order} />
-        ))}
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-gray-600">Memuat data orders...</p>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600">Tidak ada data order</p>
+          </div>
+        ) : (
+          orders.map((order, idx) => (
+            <OrderCard key={idx} order={order} />
+          ))
+        )}
       </div>
     </DashboardLayout>
   );

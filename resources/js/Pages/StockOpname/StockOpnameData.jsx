@@ -1,18 +1,55 @@
+import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Link } from "@inertiajs/react";
-
-const stockOpnames = [
-    {
-        date: "11 Jun 25 - 13:38",
-        id: "585731",
-        productCount: 1,
-        warehouse: "Gudang Utama",
-        note: "barang hilang",
-    },
-];
+import api from "@/api/axios";
 
 export default function StockOpnamePage() {
+    const [stockOpnames, setStockOpnames] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchStockOpnames();
+    }, []);
+
+    const fetchStockOpnames = async () => {
+        try {
+            setLoading(true);
+            const response = await api.get('/stock-opnames');
+            setStockOpnames(response.data.data.data || []);
+        } catch (error) {
+            console.error('Error fetching stock opnames:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const getStatusBadge = (status) => {
+        const statusConfig = {
+            draft: { color: 'bg-gray-100 text-gray-800', text: 'Draft' },
+            completed: { color: 'bg-green-100 text-green-800', text: 'Selesai' },
+            cancelled: { color: 'bg-red-100 text-red-800', text: 'Dibatalkan' }
+        };
+        
+        const config = statusConfig[status] || statusConfig.draft;
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                {config.text}
+            </span>
+        );
+    };
+
     return (
         <DashboardLayout>
             <div className="p-6">
@@ -53,31 +90,50 @@ export default function StockOpnamePage() {
 
                 <div className="bg-white rounded-md shadow-sm divide-y overflow-auto">
                     <div className="grid grid-cols-12 px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50">
-                        <div className="col-span-3">Tanggal Stok Opname</div>
-                        <div className="col-span-3">ID Stok Opname</div>
-                        <div className="col-span-2">Produk</div>
-                        <div className="col-span-2">Gudang</div>
+                        <div className="col-span-2">Tanggal Stok Opname</div>
+                        <div className="col-span-2">ID Stok Opname</div>
+                        <div className="col-span-2">Status</div>
+                        <div className="col-span-2">Dibuat Oleh</div>
+                        <div className="col-span-2">Detail Produk</div>
                         <div className="col-span-2">Keterangan</div>
                     </div>
 
-                    {stockOpnames.map((item, index) => (
-                        <div
-                            key={index}
-                            className="grid grid-cols-12 px-4 py-3 text-sm"
-                        >
-                            <div className="col-span-3">{item.date}</div>
-                            <div className="col-span-3 font-semibold">
-                                {item.id}
-                            </div>
-                            <div className="col-span-2">
-                                {item.productCount}
-                            </div>
-                            <div className="col-span-2">{item.warehouse}</div>
-                            <div className="col-span-2 text-gray-700">
-                                {item.note}
-                            </div>
+                    {loading ? (
+                        <div className="px-4 py-8 text-center text-gray-500">
+                            <Icon icon="eos-icons:loading" className="text-2xl mx-auto mb-2" />
+                            Memuat data...
                         </div>
-                    ))}
+                    ) : stockOpnames.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-gray-500">
+                            Tidak ada data stok opname
+                        </div>
+                    ) : (
+                        stockOpnames.map((item) => (
+                            <div
+                                key={item.id}
+                                className="grid grid-cols-12 px-4 py-3 text-sm hover:bg-gray-50"
+                            >
+                                <div className="col-span-2">
+                                    {formatDate(item.opname_date)}
+                                </div>
+                                <div className="col-span-2 font-semibold">
+                                    #{item.id}
+                                </div>
+                                <div className="col-span-2">
+                                    {getStatusBadge(item.status)}
+                                </div>
+                                <div className="col-span-2">
+                                    {item.created_by?.name || 'N/A'}
+                                </div>
+                                <div className="col-span-2">
+                                    {item.details?.length || 0} produk
+                                </div>
+                                <div className="col-span-2 text-gray-700">
+                                    {item.note || '-'}
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         </DashboardLayout>

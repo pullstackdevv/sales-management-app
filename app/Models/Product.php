@@ -13,6 +13,8 @@ class Product extends Model
     protected $fillable = [
         'name',
         'sku',
+        'category',
+        'description',
         'base_price',
         'is_active',
         'created_by',
@@ -25,6 +27,11 @@ class Product extends Model
 
     // Relationships
     public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
     }

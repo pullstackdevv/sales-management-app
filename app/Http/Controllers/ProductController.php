@@ -39,10 +39,13 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'sku' => 'required|string|max:100|unique:products,sku',
             'description' => 'nullable|string',
             'category' => 'required|string|max:255',
+            'base_price' => 'required|numeric|min:0',
+            'is_active' => 'boolean',
             'variants' => 'required|array|min:1',
-            'variants.*.name' => 'required|string|max:255',
+            'variants.*.variant_label' => 'required|string|max:255',
             'variants.*.sku' => 'required|string|max:50|unique:product_variants,sku',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
@@ -54,8 +57,11 @@ class ProductController extends Controller
 
             $product = Product::create([
                 'name' => $validated['name'],
+                'sku' => $validated['sku'],
                 'description' => $validated['description'],
                 'category' => $validated['category'],
+                'base_price' => $validated['base_price'],
+                'is_active' => $validated['is_active'] ?? true,
                 'created_by' => Auth::id()
             ]);
 
@@ -91,11 +97,14 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'sku' => 'sometimes|required|string|max:100|unique:products,sku,' . $product->id,
             'description' => 'nullable|string',
             'category' => 'sometimes|required|string|max:255',
+            'base_price' => 'sometimes|required|numeric|min:0',
+            'is_active' => 'boolean',
             'variants' => 'sometimes|required|array|min:1',
             'variants.*.id' => 'sometimes|required|exists:product_variants,id',
-            'variants.*.name' => 'required|string|max:255',
+            'variants.*.variant_label' => 'required|string|max:255',
             'variants.*.sku' => 'required|string|max:50|unique:product_variants,sku',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
@@ -107,8 +116,11 @@ class ProductController extends Controller
 
             $product->update([
                 'name' => $validated['name'] ?? $product->name,
+                'sku' => $validated['sku'] ?? $product->sku,
                 'description' => $validated['description'] ?? $product->description,
                 'category' => $validated['category'] ?? $product->category,
+                'base_price' => $validated['base_price'] ?? $product->base_price,
+                'is_active' => $validated['is_active'] ?? $product->is_active,
                 'updated_by' => Auth::id()
             ]);
 
@@ -181,4 +193,4 @@ class ProductController extends Controller
             throw $e;
         }
     }
-} 
+}

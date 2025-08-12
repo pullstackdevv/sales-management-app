@@ -72,7 +72,7 @@ const SidebarContent = [
                 name: "Tambah Voucher",
                 icon: "solar:add-circle-outline",
                 id: uniqueId(),
-                url: "/voucher/add",
+                url: "/voucher/create",
             },
         ],
     },

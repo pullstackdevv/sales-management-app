@@ -207,7 +207,7 @@ const VoucherData = () => {
                                     <p className="text-2xl font-bold text-green-600">
                                         {
                                             vouchers.filter(
-                                                (v) => v.status === "active"
+                                                (v) => getVoucherStatus(v) === "active"
                                             ).length
                                         }
                                     </p>

@@ -117,7 +117,7 @@ export default function StockOpnamePage() {
                                     {formatDate(item.opname_date)}
                                 </div>
                                 <div className="col-span-2 font-semibold">
-                                    #{item.id}
+                                    {item.id}
                                 </div>
                                 <div className="col-span-2">
                                     {getStatusBadge(item.status)}

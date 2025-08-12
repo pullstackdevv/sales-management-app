@@ -17,6 +17,8 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Kaos Polos Premium',
                 'sku' => 'KP001',
+                'category' => 'Fashion',
+                'description' => 'Kaos polos premium dengan bahan cotton combed 30s yang nyaman dan berkualitas tinggi.',
                 'base_price' => 75000,
                 'is_active' => true,
                 'created_by' => 1,
@@ -24,6 +26,8 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Celana Jeans Slim Fit',
                 'sku' => 'CJ001',
+                'category' => 'Fashion',
+                'description' => 'Celana jeans slim fit dengan potongan modern dan bahan denim berkualitas.',
                 'base_price' => 250000,
                 'is_active' => true,
                 'created_by' => 1,
@@ -31,6 +35,8 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Sepatu Sneakers Casual',
                 'sku' => 'SS001',
+                'category' => 'Footwear',
+                'description' => 'Sepatu sneakers casual yang nyaman untuk aktivitas sehari-hari.',
                 'base_price' => 350000,
                 'is_active' => true,
                 'created_by' => 1,
@@ -38,6 +44,8 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Tas Ransel Laptop',
                 'sku' => 'TR001',
+                'category' => 'Accessories',
+                'description' => 'Tas ransel laptop dengan kompartemen khusus dan desain ergonomis.',
                 'base_price' => 180000,
                 'is_active' => true,
                 'created_by' => 1,
@@ -45,6 +53,8 @@ class ProductSeeder extends Seeder
             [
                 'name' => 'Jam Tangan Digital',
                 'sku' => 'JT001',
+                'category' => 'Accessories',
+                'description' => 'Jam tangan digital dengan fitur lengkap dan tahan air.',
                 'base_price' => 120000,
                 'is_active' => true,
                 'created_by' => 1,

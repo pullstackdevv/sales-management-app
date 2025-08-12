@@ -39,7 +39,7 @@ const menus = [
   { key: "api", label: "API", icon: "mdi:api" },
 ];
 
-function SettingsPage({ activeMenu: initialActiveMenu = "order" }) {
+function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
   const [activeMenu, setActiveMenu] = useState(initialActiveMenu);
 
   return (

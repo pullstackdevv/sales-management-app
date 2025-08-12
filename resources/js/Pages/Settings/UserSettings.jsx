@@ -9,17 +9,21 @@ import Swal from "sweetalert2";
 
 export default function UserSettings() {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('create'); 
   const [selectedUser, setSelectedUser] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
-    role: 'staff',
+    role: '',
     is_active: true
   });
   const [formLoading, setFormLoading] = useState(false);
@@ -29,13 +33,54 @@ export default function UserSettings() {
     fetchUsers();
   }, []);
 
+  useEffect(() => {
+    filterUsers();
+  }, [users, searchTerm, roleFilter, statusFilter]);
+
+  const filterUsers = () => {
+    let filtered = users;
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(user => 
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Role filter
+    if (roleFilter) {
+      filtered = filtered.filter(user => user.role === roleFilter);
+    }
+
+    // Status filter
+    if (statusFilter !== '') {
+      const isActive = statusFilter === 'active';
+      filtered = filtered.filter(user => user.is_active === isActive);
+    }
+
+    setFilteredUsers(filtered);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleRoleFilterChange = (e) => {
+    setRoleFilter(e.target.value);
+  };
+
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
       email: '',
       password: '',
       password_confirmation: '',
-      role: 'staff',
+      role: '',
       is_active: true
     });
     setFormError(null);
@@ -207,21 +252,63 @@ export default function UserSettings() {
     }
   };
 
+  const validateForm = () => {
+    const errors = [];
+    
+    // Name validation
+    if (!formData.name || formData.name.trim().length < 2) {
+      errors.push('Nama minimal 2 karakter');
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email || !emailRegex.test(formData.email)) {
+      errors.push('Format email tidak valid');
+    }
+    
+    // Password validation for create mode
+    if (modalType === 'create' && !formData.password) {
+      errors.push('Password wajib diisi');
+    }
+    
+    // Password strength validation
+    if (formData.password) {
+      if (formData.password.length < 8) {
+        errors.push('Password minimal 8 karakter');
+      }
+      
+      const hasUppercase = /[A-Z]/.test(formData.password);
+      const hasLowercase = /[a-z]/.test(formData.password);
+      const hasNumber = /\d/.test(formData.password);
+      
+      if (!hasUppercase || !hasLowercase || !hasNumber) {
+        errors.push('Password harus mengandung huruf besar, huruf kecil, dan angka');
+      }
+    }
+    
+    // Password confirmation validation
+    if (formData.password && formData.password !== formData.password_confirmation) {
+      errors.push('Password dan konfirmasi password tidak cocok');
+    }
+    
+    // Role validation
+    if (!formData.role) {
+      errors.push('Role wajib dipilih');
+    }
+    
+    return errors;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     
     // Clear previous errors
     setFormError(null);
     
-    // Basic validation
-    if (!formData.name || !formData.email || (modalType === 'create' && !formData.password)) {
-      setFormError('Mohon lengkapi semua field yang wajib diisi');
-      return;
-    }
-
-    // Password confirmation validation
-    if (formData.password && formData.password !== formData.password_confirmation) {
-      setFormError('Password dan konfirmasi password tidak cocok');
+    // Validate form
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setFormError(validationErrors.join(', '));
       return;
     }
 
@@ -285,19 +372,24 @@ export default function UserSettings() {
       label: "Role",
       render: (row) => {
         const roleLabels = {
-          'owner': 'Owner',
-          'admin': 'Administrator', 
-          'staff': 'Staff',
-          'warehouse': 'Staff Gudang'
+          'admin': 'Admin',
+          'manager': 'Manager', 
+          'staff': 'Staff'
         };
         return <span className="capitalize">{roleLabels[row.role] || row.role}</span>;
       }
     },
     {
-      key: "priv",
-      label: "Privileges",
-      render: () => (
-        <span className="bg-gray-200 px-2 py-1 rounded text-xs">-</span>
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <span className={`px-2 py-1 rounded text-xs font-medium ${
+          row.is_active 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {row.is_active ? 'Aktif' : 'Tidak Aktif'}
+        </span>
       ),
     },
     {
@@ -400,13 +492,49 @@ export default function UserSettings() {
 
 
       <div className="bg-white rounded-lg shadow p-6">
-        {users.length === 0 ? (
+        {/* Search and Filter */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex-1">
+            <TextInput
+              type="text"
+              placeholder="Cari berdasarkan nama atau email..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              icon={() => <Icon icon="mdi:magnify" />}
+            />
+          </div>
+          <div className="w-full sm:w-48">
+            <Select
+              value={roleFilter}
+              onChange={handleRoleFilterChange}
+            >
+              <option value="">Semua Role</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="staff">Staff</option>
+            </Select>
+          </div>
+          <div className="w-full sm:w-48">
+            <Select
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+            >
+              <option value="">Semua Status</option>
+              <option value="active">Aktif</option>
+              <option value="inactive">Tidak Aktif</option>
+            </Select>
+          </div>
+        </div>
+
+        {filteredUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8">
             <Icon icon="mdi:account-group" className="text-4xl text-gray-400 mb-3" />
-            <p className="text-gray-600 text-center">Belum ada data pengguna</p>
+            <p className="text-gray-600 text-center">
+              {users.length === 0 ? 'Belum ada data pengguna' : 'Tidak ada pengguna yang sesuai dengan filter'}
+            </p>
           </div>
         ) : (
-          <TableComponent columns={columns} data={users} />
+          <TableComponent columns={columns} data={filteredUsers} />
         )}
       </div>
 
@@ -490,10 +618,10 @@ export default function UserSettings() {
                 onChange={handleInputChange}
                 required
               >
+                <option value="">Pilih Role</option>
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
                 <option value="staff">Staff</option>
-                <option value="admin">Administrator</option>
-                <option value="warehouse">Staff Gudang</option>
-                <option value="owner">Owner</option>
               </Select>
             </div>
 

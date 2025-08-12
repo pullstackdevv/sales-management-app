@@ -90,6 +90,50 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/settings', function () {
         return Inertia::render('Settings/index');
     });
+    
+    Route::get('/settings/general', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'general']);
+    });
+    
+    Route::get('/settings/order', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'order']);
+    });
+    
+    Route::get('/settings/product', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'product']);
+    });
+    
+    Route::get('/settings/customer', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'customer']);
+    });
+    
+    Route::get('/settings/payment', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'payment']);
+    });
+    
+    Route::get('/settings/courier', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'courier']);
+    });
+    
+    Route::get('/settings/origin', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'origin']);
+    });
+    
+    Route::get('/settings/template', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'template']);
+    });
+    
+    Route::get('/settings/user', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'user']);
+    });
+    
+    Route::get('/settings/dashboard', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'dashboard']);
+    });
+    
+    Route::get('/settings/api', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'api']);
+    });
 
     // Voucher
     Route::get('/voucher/data', function () {

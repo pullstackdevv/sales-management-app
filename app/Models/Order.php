@@ -21,6 +21,7 @@ class Order extends Model
         'shipping_cost',
         'status',
         'ordered_at',
+        'updated_by',
     ];
 
     protected $casts = [

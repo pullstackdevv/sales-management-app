@@ -16,7 +16,7 @@ class PaymentBankController extends Controller
         $banks = PaymentBank::with(['createdBy'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
+                    $q->where('bank_name', 'like', "%{$search}%")
                         ->orWhere('account_number', 'like', "%{$search}%")
                         ->orWhere('account_name', 'like', "%{$search}%");
                 });
@@ -37,7 +37,7 @@ class PaymentBankController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'bank_name' => 'required|string|max:255',
             'account_number' => 'required|string|max:255',
             'account_name' => 'required|string|max:255',
             'is_active' => 'boolean'
@@ -60,33 +60,36 @@ class PaymentBankController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            throw $e;
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to delete payment bank: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    public function show(PaymentBank $bank): JsonResponse
+    public function show(PaymentBank $paymentBank): JsonResponse
     {
         return response()->json([
             'status' => 'success',
-            'data' => $bank->load('createdBy')
+            'data' => $paymentBank->load('createdBy')
         ]);
     }
 
-    public function update(Request $request, PaymentBank $bank): JsonResponse
+    public function update(Request $request, PaymentBank $paymentBank): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
+            'bank_name' => 'sometimes|required|string|max:255',
             'account_number' => 'sometimes|required|string|max:255',
             'account_name' => 'sometimes|required|string|max:255',
-            'is_active' => 'boolean'
+            'is_active' => 'sometimes|boolean'
         ]);
 
         try {
             DB::beginTransaction();
 
-            $bank->update([
+            $paymentBank->update([
                 ...$validated,
-                'updated_by' => Auth::id()
+                'updated_by' => Auth::id() ?? 1
             ]);
 
             DB::commit();
@@ -94,27 +97,31 @@ class PaymentBankController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Payment bank updated successfully',
-                'data' => $bank->fresh()->load('createdBy')
+                'data' => $paymentBank->load('createdBy')
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            throw $e;
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update payment bank: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    public function destroy(PaymentBank $bank): JsonResponse
+    public function destroy(PaymentBank $paymentBank): JsonResponse
     {
-        if ($bank->payments()->exists()) {
-            throw ValidationException::withMessages([
-                'bank' => ['Cannot delete bank that has payments.']
-            ]);
+        if ($paymentBank->payments()->exists()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cannot delete bank that has payments'
+            ], 422);
         }
 
         try {
             DB::beginTransaction();
 
-            $bank->update(['deleted_by' => Auth::id()]);
-            $bank->delete();
+            $paymentBank->update(['deleted_by' => Auth::id() ?? 1]);
+            $paymentBank->delete();
 
             DB::commit();
 
@@ -150,4 +157,4 @@ class PaymentBankController extends Controller
             throw $e;
         }
     }
-} 
+}

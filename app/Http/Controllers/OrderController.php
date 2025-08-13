@@ -54,7 +54,9 @@ class OrderController extends Controller
     {
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
-            'shipping_address_id' => 'required|exists:customer_addresses,id',
+            'address_id' => 'required|exists:customer_addresses,id',
+            'sales_channel_id' => 'nullable|exists:sales_channels,id',
+            'voucher_id' => 'nullable|exists:vouchers,id',
             'items' => 'required|array|min:1',
             'items.*.product_variant_id' => 'required|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -74,17 +76,36 @@ class OrderController extends Controller
                 return $item['quantity'] * $item['price'];
             });
 
+            // Calculate discount if voucher is provided
+            $discountAmount = 0;
+            if (isset($validated['voucher_id'])) {
+                $voucher = \App\Models\Voucher::findOrFail($validated['voucher_id']);
+                
+                if (!$voucher->canBeUsed($subtotal)) {
+                    throw ValidationException::withMessages([
+                        'voucher_id' => ['Voucher tidak dapat digunakan untuk pesanan ini.']
+                    ]);
+                }
+                
+                $discountAmount = $voucher->calculateDiscount($subtotal);
+            }
+
+            // Calculate total price
+            $totalPrice = $subtotal + $validated['shipping_cost'] - $discountAmount;
+
             // Create order
             $order = Order::create([
                 'order_number' => $orderNumber,
                 'customer_id' => $validated['customer_id'],
-                'shipping_address_id' => $validated['shipping_address_id'],
-                'subtotal' => $subtotal,
+                'address_id' => $validated['address_id'],
+                'user_id' => Auth::id(),
+                'sales_channel_id' => $validated['sales_channel_id'] ?? null,
+                'voucher_id' => $validated['voucher_id'] ?? null,
+                'total_price' => $totalPrice,
+                'discount_amount' => $discountAmount,
                 'shipping_cost' => $validated['shipping_cost'],
-                'total' => $subtotal + $validated['shipping_cost'],
                 'status' => 'pending',
-                'notes' => $validated['notes'] ?? null,
-                'created_by' => Auth::id()
+                'ordered_at' => now()
             ]);
 
             // Create order items and update stock
@@ -93,12 +114,14 @@ class OrderController extends Controller
 
                 if ($variant->stock < $item['quantity']) {
                     throw ValidationException::withMessages([
-                        'items' => ["Insufficient stock for {$variant->name}"]
+                        'items' => ["Insufficient stock for {$variant->variant_label}"]
                     ]);
                 }
 
                 $order->items()->create([
                     'product_variant_id' => $item['product_variant_id'],
+                    'product_name_snapshot' => $variant->product->name,
+                    'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
                     'subtotal' => $item['quantity'] * $item['price']
@@ -106,6 +129,11 @@ class OrderController extends Controller
 
                 // Update stock
                 $variant->decrement('stock', $item['quantity']);
+            }
+
+            // Update voucher usage count if voucher was used
+            if (isset($validated['voucher_id']) && $discountAmount > 0) {
+                $voucher->increment('used_count');
             }
 
             DB::commit();
@@ -138,21 +166,20 @@ class OrderController extends Controller
         }
 
         $validated = $request->validate([
-            'shipping_address_id' => 'sometimes|required|exists:customer_addresses,id',
+            'address_id' => 'sometimes|required|exists:customer_addresses,id',
             'items' => 'sometimes|required|array|min:1',
             'items.*.product_variant_id' => 'required|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
-            'shipping_cost' => 'sometimes|required|numeric|min:0',
-            'notes' => 'nullable|string|max:255'
+            'shipping_cost' => 'sometimes|required|numeric|min:0'
         ]);
 
         try {
             DB::beginTransaction();
 
-            // Update shipping address if provided
-            if (isset($validated['shipping_address_id'])) {
-                $order->update(['shipping_address_id' => $validated['shipping_address_id']]);
+            // Update address if provided
+            if (isset($validated['address_id'])) {
+                $order->update(['address_id' => $validated['address_id']]);
             }
 
             // Update items if provided
@@ -175,12 +202,14 @@ class OrderController extends Controller
 
                     if ($variant->stock < $item['quantity']) {
                         throw ValidationException::withMessages([
-                            'items' => ["Insufficient stock for {$variant->name}"]
+                            'items' => ["Insufficient stock for {$variant->variant_label}"]
                         ]);
                     }
 
                     $order->items()->create([
                         'product_variant_id' => $item['product_variant_id'],
+                        'product_name_snapshot' => $variant->product->name,
+                        'variant_label' => $variant->variant_label,
                         'quantity' => $item['quantity'],
                         'price' => $item['price'],
                         'subtotal' => $item['quantity'] * $item['price']
@@ -192,25 +221,25 @@ class OrderController extends Controller
 
                 // Update order totals
                 $order->update([
-                    'subtotal' => $subtotal,
-                    'total' => $subtotal + ($validated['shipping_cost'] ?? $order->shipping_cost)
+                    'total_price' => $subtotal + ($validated['shipping_cost'] ?? $order->shipping_cost)
                 ]);
             }
 
             // Update shipping cost if provided
             if (isset($validated['shipping_cost'])) {
+                // Calculate current subtotal from items
+                $currentSubtotal = $order->items->sum(function($item) {
+                    return $item->quantity * $item->price;
+                });
+                
                 $order->update([
                     'shipping_cost' => $validated['shipping_cost'],
-                    'total' => $order->subtotal + $validated['shipping_cost']
+                    'total_price' => $currentSubtotal + $validated['shipping_cost']
                 ]);
             }
 
-            // Update notes if provided
-            if (isset($validated['notes'])) {
-                $order->update(['notes' => $validated['notes']]);
-            }
-
-            $order->update(['updated_by' => Auth::id()]);
+            // Update timestamp
+            $order->touch();
 
             DB::commit();
 
@@ -267,7 +296,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
         $validated = $request->validate([
-            'status' => 'required|in:pending,processing,shipped,delivered,cancelled'
+            'status' => 'required|in:pending,paid,shipped,cancelled'
         ]);
 
         if ($order->status === $validated['status']) {
@@ -313,19 +342,92 @@ class OrderController extends Controller
             ]);
         }
 
-        $pdf = PDF::loadView('orders.shipping-label', [
-            'order' => $order->load(['customer', 'shipping.courier', 'items.productVariant.product'])
+        // Load all necessary relationships for shipping label
+        $order->load([
+            'customer', 
+            'address', 
+            'shipping.courier', 
+            'items.productVariant.product',
+            'salesChannel',
+            'voucher',
+            'createdBy'
         ]);
 
-        $filename = "shipping-label-{$order->order_number}.pdf";
-        Storage::put("public/shipping-labels/{$filename}", $pdf->output());
+        // Prepare detailed data for React printing
+        $shippingLabelData = [
+            'order' => [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'total_price' => $order->total_price,
+                'discount_amount' => $order->discount_amount,
+                'shipping_cost' => $order->shipping_cost,
+                'ordered_at' => $order->ordered_at->format('Y-m-d H:i:s'),
+                'notes' => $order->notes ?? null
+            ],
+            'customer' => [
+                'id' => $order->customer->id,
+                'name' => $order->customer->name,
+                'email' => $order->customer->email,
+                'phone' => $order->customer->phone
+            ],
+            'shipping_address' => [
+                'recipient_name' => $order->address->recipient_name,
+                'phone' => $order->address->phone,
+                'address_line_1' => $order->address->address_line_1,
+                'address_line_2' => $order->address->address_line_2,
+                'city' => $order->address->city,
+                'state' => $order->address->state,
+                'postal_code' => $order->address->postal_code,
+                'country' => $order->address->country ?? 'Indonesia'
+            ],
+            'courier' => [
+                'name' => $order->shipping->courier->name,
+                'code' => $order->shipping->courier->code,
+                'service_type' => $order->shipping->service_type ?? null,
+                'tracking_number' => $order->shipping->tracking_number ?? null,
+                'estimated_delivery' => $order->shipping->estimated_delivery ?? null
+            ],
+            'items' => $order->items->map(function ($item) {
+                return [
+                    'product_name' => $item->product_name_snapshot,
+                    'variant_label' => $item->variant_label,
+                    'quantity' => $item->quantity,
+                    'price' => $item->price,
+                    'subtotal' => $item->subtotal,
+                    'sku' => $item->productVariant->sku ?? null,
+                    'weight' => $item->productVariant->weight ?? null
+                ];
+            }),
+            'sales_channel' => $order->salesChannel ? [
+                'name' => $order->salesChannel->name,
+                'code' => $order->salesChannel->code,
+                'platform' => $order->salesChannel->platform
+            ] : null,
+            'voucher' => $order->voucher ? [
+                'code' => $order->voucher->code,
+                'name' => $order->voucher->name,
+                'type' => $order->voucher->type,
+                'value' => $order->voucher->value
+            ] : null,
+            'created_by' => [
+                'name' => $order->createdBy->name,
+                'email' => $order->createdBy->email
+            ],
+            'company_info' => [
+                'name' => config('app.name', 'Sales Management App'),
+                'address' => 'Alamat Perusahaan', // Bisa diambil dari config atau database
+                'phone' => '+62 xxx-xxxx-xxxx',
+                'email' => 'info@company.com'
+            ],
+            'generated_at' => now()->format('Y-m-d H:i:s'),
+            'barcode_data' => $order->order_number // Data untuk generate barcode di frontend
+        ];
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Shipping label generated successfully',
-            'data' => [
-                'url' => Storage::url("shipping-labels/{$filename}")
-            ]
+            'message' => 'Shipping label data retrieved successfully',
+            'data' => $shippingLabelData
         ]);
     }
 
@@ -381,4 +483,4 @@ class OrderController extends Controller
             ]
         ]);
     }
-} 
+}

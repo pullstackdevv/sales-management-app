@@ -16,6 +16,8 @@ class PaymentBank extends Model
         'account_number',
         'is_active',
         'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [

@@ -113,6 +113,8 @@ const API_ROUTES = {
     show: (id) => `/stock-opnames/${id}`,
     update: (id) => `/stock-opnames/${id}`,
     destroy: (id) => `/stock-opnames/${id}`,
+    start: (id) => `/stock-opnames/${id}/start`,
+    complete: (id) => `/stock-opnames/${id}/complete`,
     finalize: (id) => `/stock-opnames/${id}/finalize`,
   },
 };

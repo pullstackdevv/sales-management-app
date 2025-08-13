@@ -77,8 +77,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Stock opname routes
     Route::apiResource('stock-opnames', StockOpnameController::class);
+    Route::post('stock-opnames/{stockOpname}/start', [StockOpnameController::class, 'start']);
+    Route::post('stock-opnames/{stockOpname}/complete', [StockOpnameController::class, 'complete']);
     Route::post('stock-opnames/{stockOpname}/finalize', [StockOpnameController::class, 'finalize']);
-    Route::apiResource('stock-opnames.details', StockOpnameDetailController::class);
 
     // Courier routes
     Route::apiResource('couriers', CourierController::class);

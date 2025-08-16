@@ -4,15 +4,15 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-   server: {
-    host: '0.0.0.0',
-    port: 5173,
-    strictPort: true,
-    hmr: {
-      host: '192.168.19.165',
-      port: 5173,
-    }
-  },
+  //  server: {
+  //   host: '0.0.0.0',
+  //   port: 5173,
+  //   strictPort: true,
+  //   hmr: {
+  //     host: '192.168.19.165',
+  //     port: 5173,
+  //   }
+  // },
   plugins: [
     laravel({
       input: ['resources/js/app.jsx'],

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Icon } from "@iconify/react";
-import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Link } from "@inertiajs/react";
+import DashboardLayout from "../../Layouts/DashboardLayout";
 import OrderSettings from "./OrderSettings";
 import CustomerSettings from "./CustomerSettings";
 import ProductSettings from "./ProductSettings";
@@ -35,12 +35,10 @@ const menus = [
   { key: "origin", label: "Asal Pengiriman", icon: "mdi:map-marker-outline" },
   { key: "template", label: "Template", icon: "mdi:file-document-outline" },
   { key: "user", label: "User", icon: "mdi:account-outline" },
-  { key: "dashboard", label: "Dashboard", icon: "mdi:view-dashboard-outline" },
-  { key: "api", label: "API", icon: "mdi:api" },
 ];
 
-function SettingsPage() {
-  const [activeMenu, setActiveMenu] = useState("order");
+function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
+  const [activeMenu, setActiveMenu] = useState(initialActiveMenu);
 
   return (
     <DashboardLayout>
@@ -48,14 +46,18 @@ function SettingsPage() {
         <h1 className="text-2xl font-bold mb-4">Setting</h1>
         <div className="flex flex-wrap gap-2 mb-6">
           {menus.map((menu) => (
-            <Button
+            <Link
               key={menu.key}
-              className={`px-4 py-2 rounded-lg border flex items-center gap-2 ${activeMenu === menu.key ? "bg-primary text-white" : "border-primary text-primary"}`}
-              onClick={() => setActiveMenu(menu.key)}
+              href={`/settings/${menu.key}`}
+              className={`px-4 py-2 rounded-lg border flex items-center gap-2 transition-colors ${
+                activeMenu === menu.key 
+                  ? "bg-primary text-white border-primary" 
+                  : "border-primary text-primary hover:bg-primary hover:text-white"
+              }`}
             >
               <Icon icon={menu.icon} width={20} height={20} />
               {menu.label}
-            </Button>
+            </Link>
           ))}
         </div>
         {activeMenu === "general" && <GeneralSettings />}

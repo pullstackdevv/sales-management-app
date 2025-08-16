@@ -1,172 +1,69 @@
 import React, { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
+import { Link } from "@inertiajs/react";
 import TableComponent from "../../components/ui/table/TableComponent";
-import { Button, Modal, TextInput, Label, Select, Alert } from "flowbite-react";
-import { HiInformationCircle } from "react-icons/hi";
+import { Button } from "flowbite-react";
 import api from "@/api/axios";
 import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
 
 export default function UserSettings() {
   const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState('create'); 
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    password_confirmation: '',
-    role: 'staff',
-    is_active: true
-  });
-  const [formLoading, setFormLoading] = useState(false);
-  const [formError, setFormError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      password_confirmation: '',
-      role: 'staff',
-      is_active: true
-    });
-    setFormError(null);
-    setSelectedUser(null);
-  };
+  useEffect(() => {
+    filterUsers();
+  }, [users, searchTerm, roleFilter, statusFilter]);
 
-  const openCreateModal = () => {
-    resetForm();
-    setModalType('create');
-    setShowModal(true);
-  };
+  const filterUsers = () => {
+    let filtered = users;
 
-  const openEditModal = (user) => {
-    setFormData({
-      name: user.name,
-      email: user.email,
-      password: '',
-      password_confirmation: '',
-      role: typeof user.role === 'object' ? user.role.value : user.role,
-      is_active: user.is_active
-    });
-    setSelectedUser(user);
-    setModalType('edit');
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    resetForm();
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const createUser = async () => {
-    try {
-      setFormLoading(true);
-      setFormError(null);
-
-      const response = await api.post('/users', formData);
-      
-      if (response.data.status === 'success') {
-        closeModal();
-        fetchUsers();
-        Swal.fire({
-          icon: 'success',
-          title: 'Berhasil!',
-          text: 'User berhasil dibuat',
-          timer: 2000,
-          showConfirmButton: false
-        });
-      }
-    } catch (err) {
-      console.error('Error creating user:', err);
-      
-      if (err.response?.status === 422) {
-        // Validation errors
-        const errors = Object.values(err.response.data.errors).flat();
-        setFormError(errors.join(', '));
-      } else if (err.response?.status === 401) {
-        setFormError('Sesi Anda telah berakhir. Silakan login kembali.');
-        setTimeout(() => window.location.href = '/login', 2000);
-      } else if (err.response?.status === 403) {
-        setFormError('Anda tidak memiliki akses untuk membuat user.');
-      } else {
-        setFormError('Gagal membuat user. Silakan coba lagi.');
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal!',
-          text: 'Gagal membuat user'
-        });
-      }
-    } finally {
-      setFormLoading(false);
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(user => 
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-  };
 
-  const updateUser = async () => {
-    try {
-      setFormLoading(true);
-      setFormError(null);
-
-      const updateData = { ...formData };
-      // Remove password fields if empty
-      if (!updateData.password) {
-        delete updateData.password;
-        delete updateData.password_confirmation;
-      }
-
-      const response = await api.put(`/users/${selectedUser.id}`, updateData);
-      
-      if (response.data.status === 'success') {
-        closeModal();
-        fetchUsers();
-        Swal.fire({
-          icon: 'success',
-          title: 'Berhasil!',
-          text: 'User berhasil diperbarui',
-          timer: 2000,
-          showConfirmButton: false
-        });
-      }
-    } catch (err) {
-      console.error('Error updating user:', err);
-      
-      if (err.response?.status === 422) {
-        // Validation errors
-        const errors = Object.values(err.response.data.errors).flat();
-        setFormError(errors.join(', '));
-      } else if (err.response?.status === 401) {
-        setFormError('Sesi Anda telah berakhir. Silakan login kembali.');
-        setTimeout(() => window.location.href = '/login', 2000);
-      } else if (err.response?.status === 403) {
-        setFormError('Anda tidak memiliki akses untuk memperbarui user.');
-      } else {
-        setFormError('Gagal memperbarui user. Silakan coba lagi.');
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal!',
-          text: 'Gagal memperbarui user'
-        });
-      }
-    } finally {
-      setFormLoading(false);
+    // Role filter
+    if (roleFilter) {
+      filtered = filtered.filter(user => user.role === roleFilter);
     }
+
+    // Status filter
+    if (statusFilter !== '') {
+      const isActive = statusFilter === 'active';
+      filtered = filtered.filter(user => user.is_active === isActive);
+    }
+
+    setFilteredUsers(filtered);
   };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleRoleFilterChange = (e) => {
+    setRoleFilter(e.target.value);
+  };
+
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+
+
+
+
 
   const deleteUser = async (user) => {
     const result = await Swal.fire({
@@ -207,30 +104,6 @@ export default function UserSettings() {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // Clear previous errors
-    setFormError(null);
-    
-    // Basic validation
-    if (!formData.name || !formData.email || (modalType === 'create' && !formData.password)) {
-      setFormError('Mohon lengkapi semua field yang wajib diisi');
-      return;
-    }
-
-    // Password confirmation validation
-    if (formData.password && formData.password !== formData.password_confirmation) {
-      setFormError('Password dan konfirmasi password tidak cocok');
-      return;
-    }
-
-    if (modalType === 'create') {
-      createUser();
-    } else {
-      updateUser();
-    }
-  };
 
   const fetchUsers = async () => {
     try {
@@ -285,19 +158,24 @@ export default function UserSettings() {
       label: "Role",
       render: (row) => {
         const roleLabels = {
-          'owner': 'Owner',
-          'admin': 'Administrator', 
-          'staff': 'Staff',
-          'warehouse': 'Staff Gudang'
+          'admin': 'Admin',
+          'manager': 'Manager', 
+          'staff': 'Staff'
         };
         return <span className="capitalize">{roleLabels[row.role] || row.role}</span>;
       }
     },
     {
-      key: "priv",
-      label: "Privileges",
-      render: () => (
-        <span className="bg-gray-200 px-2 py-1 rounded text-xs">-</span>
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <span className={`px-2 py-1 rounded text-xs font-medium ${
+          row.is_active 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {row.is_active ? 'Aktif' : 'Tidak Aktif'}
+        </span>
       ),
     },
     {
@@ -305,13 +183,13 @@ export default function UserSettings() {
       label: "Aksi",
       render: (row) => (
         <div className="flex gap-2">
-          <button
-            onClick={() => openEditModal(row)}
+          <Link
+            href={`/settings/users/${row.id}/edit`}
             className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
             title="Edit User"
           >
             <Icon icon="mdi:pencil" className="w-4 h-4" />
-          </button>
+          </Link>
           <button
             onClick={() => deleteUser(row)}
             className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
@@ -330,14 +208,13 @@ export default function UserSettings() {
       <div>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Pengaturan User</h2>
-          <Button 
-            color="blue"
-            onClick={openCreateModal}
-            className="flex items-center gap-2"
+          <Link 
+            href="/settings/users/create"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
           >
             <Icon icon="mdi:plus" width={18} />
             Tambah User
-          </Button>
+          </Link>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-center py-8">
@@ -357,13 +234,13 @@ export default function UserSettings() {
       <div>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Pengaturan User</h2>
-          <Button 
-            className="bg-primary text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-primary/90 text-sm"
-            onClick={openCreateModal}
+          <Link 
+            href="/settings/users/create"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm"
           >
             <Icon icon="mdi:plus" width={18} />
             Tambah User
-          </Button>
+          </Link>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex flex-col items-center justify-center py-8">
@@ -387,151 +264,85 @@ export default function UserSettings() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">Pengaturan User</h2>
-        <Button 
-          color="blue"
-          onClick={openCreateModal}
-          className="flex items-center gap-2"
+        <Link 
+          href="/settings/users/create"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
         >
           <Icon icon="mdi:plus" width={18} />
           Tambah User
-        </Button>
+        </Link>
       </div>
 
 
 
       <div className="bg-white rounded-lg shadow p-6">
-        {users.length === 0 ? (
+        {/* Search and Filter */}
+        <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-900 mb-2 block">
+                Cari User
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm pr-10"
+                  placeholder="Cari berdasarkan nama atau email..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+                <Icon 
+                  icon="mdi:magnify" 
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-900 mb-2 block">
+                Role
+              </label>
+              <select
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                value={roleFilter}
+                onChange={handleRoleFilterChange}
+              >
+                <option value="">Semua Role</option>
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-900 mb-2 block">
+                Status
+              </label>
+              <select
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+              >
+                <option value="">Semua Status</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Tidak Aktif</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        {filteredUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8">
             <Icon icon="mdi:account-group" className="text-4xl text-gray-400 mb-3" />
-            <p className="text-gray-600 text-center">Belum ada data pengguna</p>
+            <p className="text-gray-600 text-center">
+              {users.length === 0 ? 'Belum ada data pengguna' : 'Tidak ada pengguna yang sesuai dengan filter'}
+            </p>
           </div>
         ) : (
-          <TableComponent columns={columns} data={users} />
+          <TableComponent columns={columns} data={filteredUsers} />
         )}
       </div>
 
-      {/* User Modal */}
-      <Modal show={showModal} onClose={closeModal} size="md">
-        <Modal.Header>
-          {modalType === 'create' ? 'Tambah User Baru' : 'Edit User'}
-        </Modal.Header>
-        <Modal.Body>
-          <form id="userForm" onSubmit={handleSubmit} className="space-y-4">
-            {formError && (
-              <Alert color="failure" icon={HiInformationCircle}>
-                {formError}
-              </Alert>
-            )}
-            <div>
-              <Label htmlFor="name" value="Nama" />
-              <TextInput
-                id="name"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-                placeholder="Masukkan nama lengkap"
-              />
-            </div>
 
-
-            <div>
-              <Label htmlFor="email" value="Email" />
-              <TextInput
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                placeholder="Masukkan alamat email"
-              />
-            </div>
-
-
-            <div>
-              <Label 
-                htmlFor="password" 
-                value={modalType === 'create' ? 'Password' : 'Password (kosongkan jika tidak ingin mengubah)'} 
-              />
-              <TextInput
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required={modalType === 'create'}
-                placeholder="Masukkan password"
-              />
-            </div>
-
-
-            <div>
-              <Label htmlFor="password_confirmation" value="Konfirmasi Password" />
-              <TextInput
-                id="password_confirmation"
-                name="password_confirmation"
-                type="password"
-                value={formData.password_confirmation}
-                onChange={handleInputChange}
-                required={modalType === 'create' || formData.password}
-                placeholder="Konfirmasi password"
-              />
-            </div>
-
-
-            <div>
-              <Label htmlFor="role" value="Role" />
-              <Select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleInputChange}
-                required
-              >
-                <option value="staff">Staff</option>
-                <option value="admin">Administrator</option>
-                <option value="warehouse">Staff Gudang</option>
-                <option value="owner">Owner</option>
-              </Select>
-            </div>
-
-
-            <div className="flex items-center gap-2">
-              <input
-                id="is_active"
-                name="is_active"
-                type="checkbox"
-                checked={formData.is_active}
-                onChange={handleInputChange}
-                className="rounded"
-              />
-              <Label htmlFor="is_active" value="User Aktif" />
-            </div>
-          </form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button 
-            type="submit"
-            disabled={formLoading}
-            color="blue"
-            form="userForm"
-          >
-            {formLoading ? (
-              <>
-                <Icon icon="mdi:loading" className="animate-spin mr-2" />
-                {modalType === 'create' ? 'Membuat...' : 'Memperbarui...'}
-              </>
-            ) : (
-              modalType === 'create' ? 'Buat User' : 'Perbarui User'
-            )}
-          </Button>
-          <Button color="gray" onClick={closeModal}>
-            Batal
-          </Button>
-        </Modal.Footer>
-      </Modal>
     </div>
   );
 }

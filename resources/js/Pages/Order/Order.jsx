@@ -2,6 +2,7 @@ import OrderCard from '../../components/ui/card/OrderCard';
 import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useState, useEffect } from 'react';
 import api from '@/api/axios';
+import { Link } from '@inertiajs/react';
 
 export default function Order() {
   const [orders, setOrders] = useState([]);
@@ -105,9 +106,12 @@ export default function Order() {
           <div className="flex gap-2">
             <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Filter</button>
             <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
-            <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+            <Link
+              href={route('orders.create')}
+              className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
               Tambah Order
-            </button>
+            </Link>
           </div>
         </div>
 

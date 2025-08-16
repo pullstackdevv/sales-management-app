@@ -25,6 +25,8 @@ use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\ExpenseController;
 use Illuminate\Support\Facades\Auth;
 
+
+
 Route::prefix('auth/')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register'])
@@ -34,6 +36,8 @@ Route::prefix('auth/')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
     });
+
+
 });
 
 // Auth routes
@@ -73,8 +77,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Stock opname routes
     Route::apiResource('stock-opnames', StockOpnameController::class);
+    Route::post('stock-opnames/{stockOpname}/start', [StockOpnameController::class, 'start']);
+    Route::post('stock-opnames/{stockOpname}/complete', [StockOpnameController::class, 'complete']);
     Route::post('stock-opnames/{stockOpname}/finalize', [StockOpnameController::class, 'finalize']);
-    Route::apiResource('stock-opnames.details', StockOpnameDetailController::class);
 
     // Courier routes
     Route::apiResource('couriers', CourierController::class);
@@ -93,7 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Order routes
     Route::apiResource('orders', OrderController::class);
     Route::post('orders/{order}/update-status', [OrderController::class, 'updateStatus']);
-    Route::post('orders/{order}/generate-shipping-label', [OrderController::class, 'generateShippingLabel']);
+    Route::get('orders/{order}/generate-shipping-label', [OrderController::class, 'generateShippingLabel']);
     
     // Shipping routes (nested under orders)
     Route::get('orders/{order}/shipping', [ShippingController::class, 'index']);

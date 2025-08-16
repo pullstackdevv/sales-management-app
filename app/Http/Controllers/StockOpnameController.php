@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\StockOpname;
+use App\Enums\StockOpnameStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,27 +37,31 @@ class StockOpnameController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'notes' => 'nullable|string|max:255',
-            'status' => 'required|in:draft,finalized',
+            'opname_date' => 'required|date',
+            'note' => 'nullable|string|max:255',
+            'status' => 'required|in:draft,in_progress,completed,finalized',
             'details' => 'required|array',
             'details.*.product_variant_id' => 'required|exists:product_variants,id',
             'details.*.system_stock' => 'required|integer|min:0',
-            'details.*.actual_stock' => 'required|integer|min:0',
-            'details.*.notes' => 'nullable|string|max:255'
+            'details.*.real_stock' => 'required|integer|min:0'
         ]);
 
         try {
             DB::beginTransaction();
 
             $stockOpname = StockOpname::create([
-                'notes' => $validated['notes'],
+                'opname_date' => $validated['opname_date'],
+                'note' => $validated['note'],
                 'status' => $validated['status'],
                 'created_by' => Auth::id()
             ]);
 
             foreach ($validated['details'] as $detail) {
                 $stockOpname->details()->create([
-                    ...$detail,
+                    'product_variant_id' => $detail['product_variant_id'],
+                    'system_stock' => $detail['system_stock'],
+                    'real_stock' => $detail['real_stock'],
+                    'difference' => $detail['real_stock'] - $detail['system_stock'],
                     'created_by' => Auth::id()
                 ]);
             }
@@ -84,28 +89,29 @@ class StockOpnameController extends Controller
 
     public function update(Request $request, StockOpname $stockOpname): JsonResponse
     {
-        if ($stockOpname->status === 'finalized') {
+        if (in_array($stockOpname->status, [StockOpnameStatus::COMPLETED, StockOpnameStatus::FINALIZED])) {
             throw ValidationException::withMessages([
-                'status' => ['Cannot update finalized stock opname.']
+                'status' => ['Cannot update completed or finalized stock opname.']
             ]);
         }
 
         $validated = $request->validate([
-            'notes' => 'nullable|string|max:255',
-            'status' => 'required|in:draft,finalized',
+            'opname_date' => 'sometimes|required|date',
+            'note' => 'nullable|string|max:255',
+            'status' => 'sometimes|required|in:draft,in_progress,completed,finalized',
             'details' => 'sometimes|required|array',
             'details.*.product_variant_id' => 'required|exists:product_variants,id',
             'details.*.system_stock' => 'required|integer|min:0',
-            'details.*.actual_stock' => 'required|integer|min:0',
-            'details.*.notes' => 'nullable|string|max:255'
+            'details.*.real_stock' => 'required|integer|min:0'
         ]);
 
         try {
             DB::beginTransaction();
 
             $stockOpname->update([
-                'notes' => $validated['notes'],
-                'status' => $validated['status'],
+                'opname_date' => $validated['opname_date'] ?? $stockOpname->opname_date,
+                'note' => $validated['note'] ?? $stockOpname->note,
+                'status' => $validated['status'] ?? $stockOpname->status,
                 'updated_by' => Auth::id()
             ]);
 
@@ -116,7 +122,10 @@ class StockOpnameController extends Controller
                 // Create new details
                 foreach ($validated['details'] as $detail) {
                     $stockOpname->details()->create([
-                        ...$detail,
+                        'product_variant_id' => $detail['product_variant_id'],
+                        'system_stock' => $detail['system_stock'],
+                        'real_stock' => $detail['real_stock'],
+                        'difference' => $detail['real_stock'] - $detail['system_stock'],
                         'created_by' => Auth::id()
                     ]);
                 }
@@ -137,9 +146,9 @@ class StockOpnameController extends Controller
 
     public function destroy(StockOpname $stockOpname): JsonResponse
     {
-        if ($stockOpname->status === 'finalized') {
+        if (in_array($stockOpname->status, [StockOpnameStatus::COMPLETED, StockOpnameStatus::FINALIZED])) {
             throw ValidationException::withMessages([
-                'status' => ['Cannot delete finalized stock opname.']
+                'status' => ['Cannot delete completed or finalized stock opname.']
             ]);
         }
 
@@ -165,11 +174,90 @@ class StockOpnameController extends Controller
         }
     }
 
+    public function start(StockOpname $stockOpname): JsonResponse
+    {
+        if ($stockOpname->status !== StockOpnameStatus::DRAFT) {
+            throw ValidationException::withMessages([
+                'status' => ['Only draft stock opname can be started.']
+            ]);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $stockOpname->update([
+                'status' => StockOpnameStatus::IN_PROGRESS,
+                'updated_by' => Auth::id()
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Stock opname started successfully',
+                'data' => $stockOpname->fresh()->load(['createdBy', 'details.productVariant'])
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    public function complete(Request $request, StockOpname $stockOpname): JsonResponse
+    {
+        if ($stockOpname->status !== StockOpnameStatus::IN_PROGRESS) {
+            throw ValidationException::withMessages([
+                'status' => ['Only in progress stock opname can be completed.']
+            ]);
+        }
+
+        $validated = $request->validate([
+            'items' => 'required|array',
+            'items.*.product_variant_id' => 'required|exists:product_variants,id',
+            'items.*.actual_stock' => 'required|integer|min:0'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Delete existing details
+            $stockOpname->details()->delete();
+
+            // Create new details from actual stock data
+            foreach ($validated['items'] as $item) {
+                $variant = \App\Models\ProductVariant::find($item['product_variant_id']);
+                $stockOpname->details()->create([
+                    'product_variant_id' => $item['product_variant_id'],
+                    'system_stock' => $variant->stock,
+                    'real_stock' => $item['actual_stock'],
+                    'difference' => $item['actual_stock'] - $variant->stock,
+                    'created_by' => Auth::id()
+                ]);
+            }
+
+            $stockOpname->update([
+                'status' => StockOpnameStatus::COMPLETED,
+                'updated_by' => Auth::id()
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Stock opname completed successfully',
+                'data' => $stockOpname->fresh()->load(['createdBy', 'details.productVariant'])
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
     public function finalize(StockOpname $stockOpname): JsonResponse
     {
-        if ($stockOpname->status === 'finalized') {
+        if ($stockOpname->status !== StockOpnameStatus::COMPLETED) {
             throw ValidationException::withMessages([
-                'status' => ['Stock opname is already finalized.']
+                'status' => ['Only completed stock opname can be finalized.']
             ]);
         }
 
@@ -179,7 +267,7 @@ class StockOpnameController extends Controller
             // Update stock for each variant
             foreach ($stockOpname->details as $detail) {
                 $variant = $detail->productVariant;
-                $difference = $detail->actual_stock - $detail->system_stock;
+                $difference = $detail->real_stock - $detail->system_stock;
 
                 if ($difference !== 0) {
                     // Create stock movement for adjustment
@@ -192,7 +280,7 @@ class StockOpnameController extends Controller
 
                     // Update variant stock
                     $variant->update([
-                        'stock' => $detail->actual_stock,
+                        'stock' => $detail->real_stock,
                         'updated_by' => Auth::id()
                     ]);
                 }
@@ -200,7 +288,7 @@ class StockOpnameController extends Controller
 
             // Update stock opname status
             $stockOpname->update([
-                'status' => 'finalized',
+                'status' => StockOpnameStatus::FINALIZED,
                 'updated_by' => Auth::id()
             ]);
 
@@ -216,4 +304,4 @@ class StockOpnameController extends Controller
             throw $e;
         }
     }
-} 
+}

@@ -15,6 +15,8 @@ class StockOpname extends Model
         'opname_date',
         'status',
         'created_by',
+        'updated_by',
+        'deleted_by',
         'note',
     ];
 

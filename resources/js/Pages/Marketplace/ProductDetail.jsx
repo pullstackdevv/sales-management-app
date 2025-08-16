@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "@inertiajs/react";
+import { Link, usePage } from "@inertiajs/react";
 import MarketplaceLayout from "../../Layouts/MarketplaceLayout";
 import { 
     Star, 
@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 
 export default function ProductDetail() {
-    const { id } = useParams();
+    const { props } = usePage();
+    const id = props.id || 1; // fallback to 1 if no id provided
     const [selectedImage, setSelectedImage] = useState(0);
     const [quantity, setQuantity] = useState(1);
     const [isWishlisted, setIsWishlisted] = useState(false);

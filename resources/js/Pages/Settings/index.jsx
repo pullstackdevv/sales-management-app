@@ -35,8 +35,6 @@ const menus = [
   { key: "origin", label: "Asal Pengiriman", icon: "mdi:map-marker-outline" },
   { key: "template", label: "Template", icon: "mdi:file-document-outline" },
   { key: "user", label: "User", icon: "mdi:account-outline" },
-  { key: "dashboard", label: "Dashboard", icon: "mdi:view-dashboard-outline" },
-  { key: "api", label: "API", icon: "mdi:api" },
 ];
 
 function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {

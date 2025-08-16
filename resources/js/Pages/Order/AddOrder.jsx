@@ -49,21 +49,9 @@ export default function AddOrder() {
                 params: { search, per_page: 50 }
             });
             setCustomers(response.data.data.data || []);
-            if (search && response.data.data.data.length === 0) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Customer tidak ditemukan',
-                    showConfirmButton: false,
-                    timer: 2000
-                });
-            }
+
         } catch (error) {
             console.error('Error fetching customers:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'Gagal memuat data customer'
-            });
         } finally {
             setLoading(prev => ({ ...prev, customers: false }));
         }
@@ -77,21 +65,9 @@ export default function AddOrder() {
                 params: { search, per_page: 50 }
             });
             setProducts(response.data.data.data || []);
-            if (search && response.data.data.data.length === 0) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'Produk tidak ditemukan',
-                    showConfirmButton: false,
-                    timer: 2000
-                });
-            }
+
         } catch (error) {
             console.error('Error fetching products:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'Gagal memuat data produk'
-            });
         } finally {
             setLoading(prev => ({ ...prev, products: false }));
         }
@@ -109,20 +85,9 @@ export default function AddOrder() {
                 // Fallback for direct array response
                 setSalesChannels(response.data || []);
             }
-            Swal.fire({
-                icon: 'success',
-                title: 'Berhasil',
-                text: 'Data sales channel berhasil dimuat',
-                showConfirmButton: false,
-                timer: 2000
-            });
+
         } catch (error) {
             console.error('Error fetching sales channels:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'Gagal memuat data sales channel'
-            });
         } finally {
             setLoading(prev => ({ ...prev, salesChannels: false }));
         }
@@ -138,19 +103,6 @@ export default function AddOrder() {
         // Auto select first address if available
         if (customer.addresses && customer.addresses.length > 0) {
             setFormData(prev => ({ ...prev, address_id: customer.addresses[0].id }));
-            Swal.fire({
-                icon: 'success',
-                title: 'Customer Dipilih',
-                text: `Customer ${customer.name} dipilih`,
-                showConfirmButton: false,
-                timer: 2000
-            });
-        } else {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Peringatan',
-                text: `Customer ${customer.name} dipilih, namun tidak memiliki alamat`
-            });
         }
     };
 
@@ -165,13 +117,7 @@ export default function AddOrder() {
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
             setOrderItems(updatedItems);
-            Swal.fire({
-                icon: 'success',
-                title: 'Quantity Ditambah',
-                text: `Quantity ${variant.name} ditambah menjadi ${updatedItems[existingItemIndex].quantity}`,
-                showConfirmButton: false,
-                timer: 1500
-            });
+
         } else {
             // Add new item
             const newItem = {
@@ -182,13 +128,6 @@ export default function AddOrder() {
                 price: variant.price
             };
             setOrderItems(prev => [...prev, newItem]);
-            Swal.fire({
-                icon: 'success',
-                title: 'Produk Ditambahkan',
-                text: `${variant.name} ditambahkan ke order`,
-                showConfirmButton: false,
-                timer: 1500
-            });
         }
     };
 
@@ -216,11 +155,6 @@ export default function AddOrder() {
 
             if (Object.keys(newErrors).length > 0) {
                 setErrors(newErrors);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Validasi Error',
-                    text: 'Mohon lengkapi semua field yang diperlukan'
-                });
                 return;
             }
 
@@ -258,11 +192,7 @@ export default function AddOrder() {
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
             }
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: error.response?.data?.message || 'Gagal membuat order'
-            });
+            console.error('Error creating order:', error.response?.data?.message || 'Gagal membuat order');
         } finally {
             setLoading(prev => ({ ...prev, submitting: false }));
         }

@@ -30,6 +30,10 @@ Route::middleware([RedirectIfAuthenticated::class])
         })->name('register');
     });
 
+Route::get('/login', function () {
+    return redirect()->route('auth.login');
+})->name('login');
+
 Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(function () {
     Route::get('/home', function () {
         return Inertia::render('Home'); // <--- ini wajib

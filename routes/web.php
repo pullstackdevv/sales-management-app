@@ -60,6 +60,14 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/order/add', function () {
         return Inertia::render('Order/AddOrder');
     })->name('orders.create');
+    
+    Route::get('/order/edit/{id}', function ($id) {
+        return Inertia::render('Order/EditOrder', ['orderId' => $id]);
+    })->name('orders.edit');
+    
+    Route::get('/order/detail/{id}', function ($id) {
+        return Inertia::render('Order/OrderDetail', ['orderId' => $id]);
+    })->name('orders.detail');
 
     // Customer
     Route::get('/customer/data', function () {

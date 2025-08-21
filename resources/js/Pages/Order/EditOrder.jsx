@@ -1,11 +1,14 @@
-// resources/js/Pages/Order/AddOrder.jsx
+// resources/js/Pages/Order/EditOrder.jsx
 import React, { useState, useEffect } from "react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { usePage } from '@inertiajs/react';
 
-export default function AddOrder() {
+export default function EditOrder() {
+    const { orderId } = usePage().props;
+
     // State management untuk form order
     const [formData, setFormData] = useState({
         customer_id: '',
@@ -23,13 +26,15 @@ export default function AddOrder() {
     const [salesChannels, setSalesChannels] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
+    const [originalOrder, setOriginalOrder] = useState(null);
     
     // Loading states
     const [loading, setLoading] = useState({
         customers: false,
         products: false,
         salesChannels: false,
-        submitting: false
+        submitting: false,
+        order: true
     });
     
     // Search states
@@ -41,6 +46,53 @@ export default function AddOrder() {
     // Error states
     const [errors, setErrors] = useState({});
 
+    // Fetch existing order data
+    const fetchOrder = async () => {
+        setLoading(prev => ({ ...prev, order: true }));
+        try {
+            const response = await axios.get(`/api/orders/${orderId}`);
+            const order = response.data.data;
+            setOriginalOrder(order);
+            
+            // Set form data
+            setFormData({
+                customer_id: order.customer_id,
+                address_id: order.address_id,
+                sales_channel_id: order.sales_channel_id,
+                shipping_cost: order.shipping_cost || 0,
+                notes: order.notes || '',
+                order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
+                payment_status: order.payment_status || 'pending'
+            });
+            
+            // Set order items
+            setOrderItems(order.items?.map(item => ({
+                product_variant_id: item.product_variant_id,
+                product_name: item.product_variant?.product?.name || 'Unknown Product',
+                variant_name: item.product_variant?.name || 'Default',
+                quantity: item.quantity,
+                price: item.price
+            })) || []);
+            
+            // Set selected customer
+            if (order.customer) {
+                setSelectedCustomer(order.customer);
+                setSearchTerms(prev => ({ ...prev, customer: order.customer.name }));
+                setCustomerAddresses(order.customer.addresses || []);
+            }
+            
+        } catch (error) {
+            console.error('Error fetching order:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Gagal memuat data order'
+            });
+        } finally {
+            setLoading(prev => ({ ...prev, order: false }));
+        }
+    };
+
     // Fetch customers dari API
     const fetchCustomers = async (search = '') => {
         setLoading(prev => ({ ...prev, customers: true }));
@@ -49,7 +101,6 @@ export default function AddOrder() {
                 params: { search, per_page: 50 }
             });
             setCustomers(response.data.data.data || []);
-
         } catch (error) {
             console.error('Error fetching customers:', error);
         } finally {
@@ -65,7 +116,6 @@ export default function AddOrder() {
                 params: { search, per_page: 50 }
             });
             setProducts(response.data.data.data || []);
-
         } catch (error) {
             console.error('Error fetching products:', error);
         } finally {
@@ -78,14 +128,11 @@ export default function AddOrder() {
         setLoading(prev => ({ ...prev, salesChannels: true }));
         try {
             const response = await axios.get('/api/sales-channels');
-            // Handle nested data structure with pagination
             if (response.data.status === 'success' && response.data.data && response.data.data.data) {
                 setSalesChannels(response.data.data.data || []);
             } else {
-                // Fallback for direct array response
                 setSalesChannels(response.data || []);
             }
-
         } catch (error) {
             console.error('Error fetching sales channels:', error);
         } finally {
@@ -117,7 +164,6 @@ export default function AddOrder() {
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
             setOrderItems(updatedItems);
-
         } else {
             // Add new item
             const newItem = {
@@ -169,30 +215,35 @@ export default function AddOrder() {
                     price: item.price
                 })),
                 shipping_cost: formData.shipping_cost,
-                notes: formData.notes
+                notes: formData.notes,
+                payment_status: formData.payment_status
             };
 
-            const response = await axios.post('/api/orders', orderData);
+            const response = await axios.put(`/api/orders/${orderId}`, orderData);
             
             if (response.data.status === 'success') {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Order Berhasil Dibuat!',
-                    text: `Order ID: ${response.data.data?.id || 'N/A'}`,
+                    title: 'Order Berhasil Diupdate!',
+                    text: `Order ID: ${orderId}`,
                     timer: 3000,
                     showConfirmButton: false
                 });
-                // Reset form or redirect
+                // Redirect back
                 setTimeout(() => {
                     window.history.back();
                 }, 1500);
             }
         } catch (error) {
-            console.error('Error creating order:', error);
+            console.error('Error updating order:', error);
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
             }
-            console.error('Error creating order:', error.response?.data?.message || 'Gagal membuat order');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.response?.data?.message || 'Gagal mengupdate order'
+            });
         } finally {
             setLoading(prev => ({ ...prev, submitting: false }));
         }
@@ -200,19 +251,21 @@ export default function AddOrder() {
 
     // Load initial data
     useEffect(() => {
-        fetchCustomers();
-        fetchSalesChannels();
-    }, []);
+        if (orderId) {
+            fetchOrder();
+            fetchSalesChannels();
+        }
+    }, [orderId]);
 
     // Handle search debouncing
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (searchTerms.customer) {
+            if (searchTerms.customer && !selectedCustomer) {
                 fetchCustomers(searchTerms.customer);
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchTerms.customer]);
+    }, [searchTerms.customer, selectedCustomer]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -222,6 +275,20 @@ export default function AddOrder() {
         }, 300);
         return () => clearTimeout(timer);
     }, [searchTerms.product]);
+
+    if (loading.order) {
+        return (
+            <DashboardLayout>
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <Icon icon="eos-icons:loading" className="w-8 h-8 animate-spin mx-auto mb-2" />
+                        <p className="text-gray-500">Memuat data order...</p>
+                    </div>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
     return (
         <DashboardLayout>
             <div className="space-y-6">
@@ -234,9 +301,9 @@ export default function AddOrder() {
                         <Icon icon="solar:arrow-left-outline" className="w-5 h-5" />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Tambah Order</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">Edit Order #{originalOrder?.order_number || orderId}</h1>
                         <p className="text-gray-600 mt-1">
-                            Buat order baru untuk customer Anda
+                            Edit order yang sudah ada
                         </p>
                     </div>
                 </div>
@@ -255,7 +322,14 @@ export default function AddOrder() {
                                     type="text"
                                     placeholder="Cari customer"
                                     value={searchTerms.customer}
-                                    onChange={(e) => setSearchTerms(prev => ({ ...prev, customer: e.target.value }))}
+                                    onChange={(e) => {
+                                        setSearchTerms(prev => ({ ...prev, customer: e.target.value }));
+                                        if (!e.target.value) {
+                                            setSelectedCustomer(null);
+                                            setFormData(prev => ({ ...prev, customer_id: '', address_id: '' }));
+                                            setCustomerAddresses([]);
+                                        }
+                                    }}
                                     className={`w-full px-3 py-2 border rounded-lg ${
                                         errors.customer_id ? 'border-red-500' : 'border-gray-300'
                                     }`}
@@ -393,11 +467,6 @@ export default function AddOrder() {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                 />
                             </div>
-
-                            <div className="flex items-center gap-2">
-                                <input type="checkbox" />
-                                <label className="text-sm">Add To Print Label</label>
-                            </div>
                         </div>
                     </div>
 
@@ -408,7 +477,7 @@ export default function AddOrder() {
                             <div className="relative">
                                 <input
                                     type="text"
-                                    placeholder="Cari produk"
+                                    placeholder="Cari produk untuk ditambahkan"
                                     value={searchTerms.product}
                                     onChange={(e) => setSearchTerms(prev => ({ ...prev, product: e.target.value }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
@@ -494,19 +563,6 @@ export default function AddOrder() {
                                                             if (updatedItems[index].quantity > 1) {
                                                                 updatedItems[index].quantity -= 1;
                                                                 setOrderItems(updatedItems);
-                                                                Swal.fire({
-                                                                    icon: 'info',
-                                                                    title: 'Quantity Dikurangi',
-                                                                    text: `Quantity ${item.variant_name} dikurangi menjadi ${updatedItems[index].quantity}`,
-                                                                    showConfirmButton: false,
-                                                                    timer: 1500
-                                                                });
-                                                            } else {
-                                                                Swal.fire({
-                                                                    icon: 'warning',
-                                                                    title: 'Peringatan',
-                                                                    text: 'Quantity minimal adalah 1. Gunakan tombol hapus untuk menghapus item.'
-                                                                });
                                                             }
                                                         }}
                                                         className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
@@ -521,13 +577,6 @@ export default function AddOrder() {
                                                             const updatedItems = [...orderItems];
                                                             updatedItems[index].quantity += 1;
                                                             setOrderItems(updatedItems);
-                                                            Swal.fire({
-                                                                icon: 'success',
-                                                                title: 'Quantity Ditambah',
-                                                                text: `Quantity ${item.variant_name} ditambah menjadi ${updatedItems[index].quantity}`,
-                                                                showConfirmButton: false,
-                                                                timer: 1500
-                                                            });
                                                         }}
                                                         className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
                                                     >
@@ -543,13 +592,6 @@ export default function AddOrder() {
                                                     onClick={() => {
                                                         const updatedItems = orderItems.filter((_, i) => i !== index);
                                                         setOrderItems(updatedItems);
-                                                        Swal.fire({
-                                                            icon: 'success',
-                                                            title: 'Item Dihapus',
-                                                            text: `${item.variant_name} dihapus dari order`,
-                                                            showConfirmButton: false,
-                                                            timer: 1500
-                                                        });
                                                     }}
                                                     className="text-red-500 hover:text-red-700 p-1"
                                                 >
@@ -622,7 +664,7 @@ export default function AddOrder() {
                                 {loading.submitting && (
                                     <Icon icon="eos-icons:loading" className="w-4 h-4 animate-spin" />
                                 )}
-                                {loading.submitting ? 'Menyimpan...' : 'Simpan Order'}
+                                {loading.submitting ? 'Menyimpan...' : 'Update Order'}
                             </button>
                         </div>
                     </div>

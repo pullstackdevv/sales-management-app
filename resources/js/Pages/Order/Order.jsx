@@ -20,7 +20,8 @@ export default function Order() {
       
       // Transform API data to match OrderCard component format
       const transformedOrders = ordersData.map(order => ({
-        id: order.order_number,
+        id: order.id,
+        number: order.order_number,
         channel: order.sales_channel?.name || 'Website',
         date: formatDate(order.ordered_at),
         customer: order.customer?.name || 'N/A',
@@ -126,7 +127,7 @@ export default function Order() {
           </div>
         ) : (
           orders.map((order, idx) => (
-            <OrderCard key={idx} order={order} />
+            <OrderCard key={idx} order={order} onOrderUpdate={fetchOrders} />
           ))
         )}
       </div>

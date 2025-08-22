@@ -68,6 +68,12 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/order/detail/{id}', function ($id) {
         return Inertia::render('Order/OrderDetail', ['orderId' => $id]);
     })->name('orders.detail');
+    
+    Route::get('/order/print-invoice/{id}', function ($id) {
+        return Inertia::render('Order/PrintInvoice', [
+            'orderId' => $id
+        ]);
+    })->name('order.print-invoice');
 
     // Customer
     Route::get('/customer/data', function () {

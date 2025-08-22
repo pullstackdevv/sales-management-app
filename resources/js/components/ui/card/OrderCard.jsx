@@ -381,10 +381,13 @@ export default function OrderCard({ order, onOrderUpdate }) {
 
             <div className="flex justify-between border-t mt-4">
                 <div className="flex items-center gap-2 mt-4">
-                    <button className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100">
+                    <Link 
+                        href={`/order/print-invoice/${order.id}`}
+                        className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
+                    >
                         <Icon icon="mdi:printer" width="16" />
                         Print
-                    </button>
+                    </Link>
                 </div>
                 <div className="≈mt-6 pt-4 flex flex-wrap justify-end gap-2">
                     {!order.resi && (

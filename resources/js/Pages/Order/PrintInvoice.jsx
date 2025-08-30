@@ -19,7 +19,6 @@ const PrintInvoice = () => {
             showCustomerInfo: true,
             showShippingInfo: true,
             showOrderDetails: true,
-            showSubtotal: true,
             showTax: true,
             showDiscount: true,
             showTotal: true,
@@ -49,7 +48,6 @@ const PrintInvoice = () => {
                     unit_price: item.price,
                     total_price: item.price * item.quantity
                 })) || [],
-                subtotal: orderData.subtotal_price || 0,
                 tax_amount: orderData.tax_amount || 0,
                 tax_rate: orderData.tax_rate || 0,
                 discount_amount: orderData.discount_amount || 0,
@@ -225,17 +223,7 @@ const PrintInvoice = () => {
                                 </label>
 
                                 <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={printSettings.showSubtotal}
-                                        onChange={() => toggleSetting('showSubtotal')}
-                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm text-gray-700">Subtotal</span>
-                                </label>
-
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input
+                                      <input
                                         type="checkbox"
                                         checked={printSettings.showTax}
                                         onChange={() => toggleSetting('showTax')}
@@ -264,7 +252,7 @@ const PrintInvoice = () => {
                                     <span className="text-sm text-gray-700">Total</span>
                                 </label>
 
-                                <label className="flex items-center space-x-2 cursor-pointer">
+                                {/* <label className="flex items-center space-x-2 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         checked={printSettings.showPaymentInfo}
@@ -272,7 +260,7 @@ const PrintInvoice = () => {
                                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                                     />
                                     <span className="text-sm text-gray-700">Informasi Pembayaran</span>
-                                </label>
+                                </label> */}
 
                                 <label className="flex items-center space-x-2 cursor-pointer">
                                     <input
@@ -329,159 +317,101 @@ const PrintInvoice = () => {
 
                 {/* Invoice Container */}
                 <div className="print-container max-w-4xl mx-auto bg-white shadow-lg rounded-lg p-8">
-                    {/* Invoice Header */}
-                    <div className="border-b-2 border-gray-300 pb-6 mb-6">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h1 className="text-3xl font-bold text-gray-800 mb-2">INVOICE</h1>
-                                <p className="text-gray-600">Invoice #{invoiceData?.invoice_number || orderId}</p>
-                                <p className="text-gray-600">Tanggal: {new Date(invoiceData?.created_at || Date.now()).toLocaleDateString('id-ID')}</p>
+                    {/* Invoice Table Format */}
+                    <div className="border-2 border-black">
+                        {/* Header Row */}
+                        <div className="grid grid-cols-3 border-b-2 border-black">
+                            <div className="border-r-2 border-black p-4 font-bold text-lg">
+                                {printSettings.showCompanyInfo ? (invoiceData?.company?.name || 'SALEPARFUM') : 'SALEPARFUM'}
                             </div>
-                            {printSettings.showCompanyInfo && (
-                                <div className="text-right">
-                                    <h2 className="text-xl font-semibold text-gray-800">{invoiceData?.company?.name || 'Nama Perusahaan'}</h2>
-                                    <p className="text-gray-600">{invoiceData?.company?.address || 'Alamat Perusahaan'}</p>
-                                    <p className="text-gray-600">{invoiceData?.company?.phone || 'No. Telepon'}</p>
-                                    <p className="text-gray-600">{invoiceData?.company?.email || 'Email'}</p>
+                            <div className="border-r-2 border-black p-4 font-bold text-lg text-center">
+                                INSTANT
+                            </div>
+                            <div className="p-4 font-bold text-lg text-center">
+                                0.5kg
+                            </div>
+                        </div>
+
+                        {/* Pengirim Row */}
+                        {printSettings.showCompanyInfo && (
+                            <div className="border-b-2 border-black p-4">
+                                <div className="font-bold">
+                                    Pengirim: {invoiceData?.company?.name || 'SALEPARFUM'} - {invoiceData?.company?.phone || '083867000077'}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Customer Information */}
-                    {printSettings.showCustomerInfo && (
-                        <div className="mb-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Kepada:</h3>
-                            <div className="bg-gray-50 p-4 rounded">
-                                <p className="font-semibold">{invoiceData?.customer?.name || 'Nama Customer'}</p>
-                                <p className="text-gray-600">{invoiceData?.customer?.email || 'Email Customer'}</p>
-                                <p className="text-gray-600">{invoiceData?.customer?.phone || 'No. Telepon Customer'}</p>
-                                {invoiceData?.customer?.address && (
-                                    <div className="mt-2">
-                                        <p className="text-gray-600">{invoiceData.customer.address.street}</p>
-                                        <p className="text-gray-600">{invoiceData.customer.address.city}, {invoiceData.customer.address.state} {invoiceData.customer.address.postal_code}</p>
-                                        <p className="text-gray-600">{invoiceData.customer.address.country}</p>
-                                    </div>
-                                )}
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Shipping Information */}
-                    {printSettings.showShippingInfo && invoiceData?.shipping && (
-                        <div className="mb-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Alamat Pengiriman:</h3>
-                            <div className="bg-gray-50 p-4 rounded">
-                                <p className="font-semibold">{invoiceData.shipping.recipient_name}</p>
-                                <p className="text-gray-600">{invoiceData.shipping.address}</p>
-                                <p className="text-gray-600">{invoiceData.shipping.city}, {invoiceData.shipping.state} {invoiceData.shipping.postal_code}</p>
-                                <p className="text-gray-600">{invoiceData.shipping.country}</p>
-                                {invoiceData.shipping.phone && (
-                                    <p className="text-gray-600">Telepon: {invoiceData.shipping.phone}</p>
-                                )}
-                                {invoiceData.shipping.shipping_method && (
-                                    <p className="text-sm text-blue-600 mt-2">Metode Pengiriman: {invoiceData.shipping.shipping_method}</p>
-                                )}
+                        {/* Kepada Row */}
+                        {printSettings.showCustomerInfo && (
+                            <div className="border-b-2 border-black p-4">
+                                <div className="font-bold">
+                                    Kepada: {invoiceData?.customer?.name || 'MILA'} ({invoiceData?.customer?.phone || '6285693468592'})
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Order Details */}
-                    {printSettings.showOrderDetails && (
-                        <div className="mb-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Detail Order:</h3>
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse border border-gray-300">
-                                    <thead>
-                                        <tr className="bg-gray-100">
-                                            <th className="border border-gray-300 px-4 py-2 text-left">Produk</th>
-                                            <th className="border border-gray-300 px-4 py-2 text-center">Qty</th>
-                                            <th className="border border-gray-300 px-4 py-2 text-right">Harga Satuan</th>
-                                            <th className="border border-gray-300 px-4 py-2 text-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {invoiceData?.items?.map((item, index) => (
-                                            <tr key={index}>
-                                                <td className="border border-gray-300 px-4 py-2">
-                                                    <div>
-                                                        <p className="font-medium">{item.product_name}</p>
-                                                        {item.description && (
-                                                            <p className="text-sm text-gray-600">{item.description}</p>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="border border-gray-300 px-4 py-2 text-center">{item.quantity}</td>
-                                                <td className="border border-gray-300 px-4 py-2 text-right">
-                                                    Rp {new Intl.NumberFormat('id-ID').format(item.unit_price)}
-                                                </td>
-                                                <td className="border border-gray-300 px-4 py-2 text-right">
-                                                    Rp {new Intl.NumberFormat('id-ID').format(item.total_price)}
-                                                </td>
-                                            </tr>
-                                        )) || (
-                                            <tr>
-                                                <td colSpan="4" className="border border-gray-300 px-4 py-8 text-center text-gray-500">
-                                                    Data item tidak tersedia
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                        {/* Alamat Row */}
+                        {(printSettings.showCustomerInfo || printSettings.showShippingInfo) && (
+                            <div className="border-b-2 border-black p-4">
+                                <div className="font-bold mb-2">Alamat:</div>
+                                <div className="text-sm leading-relaxed">
+                                     {invoiceData?.shipping?.address ? (
+                                         <>
+                                             {invoiceData.shipping.address.street}<br/>
+                                             {invoiceData.shipping.address.city}, {invoiceData.shipping.address.state} {invoiceData.shipping.address.postal_code}<br/>
+                                             {invoiceData.shipping.address.country}<br/>
+                                             {invoiceData.shipping.phone && `+${invoiceData.shipping.phone}`}
+                                         </>
+                                     ) : invoiceData?.customer?.address ? (
+                                         <>
+                                             {invoiceData.customer.address.street}<br/>
+                                             {invoiceData.customer.address.city}, {invoiceData.customer.address.state} {invoiceData.customer.address.postal_code}<br/>
+                                             {invoiceData.customer.address.country}
+                                         </>
+                                     ) : (
+                                         <>
+                                             Kahfi Signature, Jl. Moh. Kahfi I Blok 10M,<br/>
+                                             Ciganjur, Kec.Jagakarsa Kota Jakarta Selatan,<br/>
+                                             Daerah Khusus Ibukota Jakarta<br/>
+                                             12630<br/>
+                                             +62/856-9346-8592, KotaJakarta Selatan,<br/>
+                                             DKI Jakarta, 12630 12630
+                                         </>
+                                     )}
+                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Summary */}
-                    <div className="flex justify-end mb-6">
-                        <div className="w-64">
-                            <div className="bg-gray-50 p-4 rounded">
-                                {printSettings.showSubtotal && (
-                                    <div className="flex justify-between mb-2">
-                                        <span>Subtotal:</span>
-                                        <span>Rp {new Intl.NumberFormat('id-ID').format(invoiceData?.subtotal || 0)}</span>
-                                    </div>
-                                )}
-                                {printSettings.showTax && invoiceData?.tax_amount > 0 && (
-                                    <div className="flex justify-between mb-2">
-                                        <span>Pajak ({invoiceData?.tax_rate || 0}%):</span>
-                                        <span>Rp {new Intl.NumberFormat('id-ID').format(invoiceData?.tax_amount || 0)}</span>
-                                    </div>
-                                )}
-                                {printSettings.showDiscount && invoiceData?.discount_amount > 0 && (
-                                    <div className="flex justify-between mb-2 text-green-600">
-                                        <span>Diskon:</span>
-                                        <span>-Rp {new Intl.NumberFormat('id-ID').format(invoiceData?.discount_amount || 0)}</span>
-                                    </div>
-                                )}
-                                {printSettings.showTotal && (
-                                    <div className="border-t pt-2 mt-2">
-                                        <div className="flex justify-between font-bold text-lg">
-                                            <span>Total:</span>
-                                            <span>Rp {new Intl.NumberFormat('id-ID').format(invoiceData?.total_amount || 0)}</span>
+                        {/* Paket Row */}
+                        {printSettings.showOrderDetails && (
+                            <div className="border-b-2 border-black p-4">
+                                <div className="font-bold mb-2">Paket:</div>
+                                <div className="text-sm">
+                                    {invoiceData?.items?.map((item, index) => (
+                                        <div key={index} className="mb-1">
+                                            • {item.product_name} {item.description && `- ${item.description}`} (Qty: {item.quantity})
                                         </div>
-                                    </div>
-                                )}
+                                    )) || (
+                                        <div>• Tiziana Terenzi KiRKE= Extrait De Parfum - Product 100ml</div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
+
+                        {/* Total Row */}
+                        {printSettings.showTotal && (
+                            <div className="p-4">
+                                <div className="font-bold text-lg">
+                                     Total: Rp{invoiceData?.total_amount?.toLocaleString('id-ID') || '2.199.000'}
+                                 </div>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Payment Information */}
-                    {printSettings.showPaymentInfo && invoiceData?.payment_info && (
-                        <div className="mb-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Informasi Pembayaran:</h3>
-                            <div className="bg-gray-50 p-4 rounded">
-                                <p><strong>Status:</strong> {invoiceData.payment_info.status}</p>
-                                <p><strong>Metode:</strong> {invoiceData.payment_info.method}</p>
-                                {invoiceData.payment_info.due_date && (
-                                    <p><strong>Jatuh Tempo:</strong> {new Date(invoiceData.payment_info.due_date).toLocaleDateString('id-ID')}</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    
 
                     {/* Notes */}
-                    {invoiceData?.notes && (
+                    {printSettings.showNotes && invoiceData?.notes && (
                         <div className="mb-6">
                             <h3 className="text-lg font-semibold text-gray-800 mb-3">Catatan:</h3>
                             <div className="bg-gray-50 p-4 rounded">
@@ -491,12 +421,14 @@ const PrintInvoice = () => {
                     )}
 
                     {/* Footer */}
-                    <div className="border-t-2 border-gray-300 pt-6 mt-8">
-                        <div className="text-center text-gray-600">
-                            <p>Terima kasih atas kepercayaan Anda!</p>
-                            <p className="text-sm mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID')}</p>
+                    {printSettings.showFooter && (
+                        <div className="border-t-2 border-gray-300 pt-6 mt-8">
+                            <div className="text-center text-gray-600">
+                                <p>Terima kasih atas kepercayaan Anda!</p>
+                                <p className="text-sm mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID')}</p>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </>

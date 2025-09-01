@@ -14,6 +14,7 @@
         "laravel/tinker": "^2.10.1",
         "midtrans/midtrans-php": "^2.6",
         "milon/barcode": "^12.0",
+        "phpoffice/phpspreadsheet": "^5.0",
         "tightenco/ziggy": "^2.5"
     },
     "require-dev": {
@@ -77,5 +78,11 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": {
+        "packagist": {
+            "type": "composer",
+            "url": "https://mirrors.aliyun.com/composer/"
+        }
+    }
 }

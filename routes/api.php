@@ -84,7 +84,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Courier routes
     Route::apiResource('couriers', CourierController::class);
     Route::post('couriers/{courier}/toggle-status', [CourierController::class, 'toggleStatus']);
-    Route::apiResource('courier-rates', CourierRateController::class);
 
     // Payment bank routes
     Route::apiResource('payment-banks', PaymentBankController::class);
@@ -131,5 +130,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('user-performance', [ReportController::class, 'userPerformance']);
         Route::get('payments', [ReportController::class, 'payments']);
         Route::post('export-sales', [ReportController::class, 'exportSales']);
+    });
+
+    // Courier rates API routes
+    Route::prefix('courier-rates')->group(function () {
+        Route::get('/', [CourierRateController::class, 'index']);
+        Route::get('/destinations', [CourierRateController::class, 'destinations']);
+        Route::get('/service-types', [CourierRateController::class, 'serviceTypes']);
+        Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
+        Route::post('/import', [CourierRateController::class, 'import']);
+        Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
+        Route::get('/{id}', [CourierRateController::class, 'show']);
     });
 });

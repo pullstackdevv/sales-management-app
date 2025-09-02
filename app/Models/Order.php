@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,6 +23,12 @@ class Order extends Model
         'status',
         'ordered_at',
         'updated_by',
+        'guest_email',
+        'guest_phone',
+        'notes',
+        'payment_token',
+        'payment_url',
+        'payment_status',
     ];
 
     protected $casts = [
@@ -29,6 +36,7 @@ class Order extends Model
         'discount_amount' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'ordered_at' => 'datetime',
+        'payment_status' => PaymentStatus::class,
     ];
 
     // Relationships
@@ -75,5 +83,47 @@ class Order extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // Helper methods for guest checkout
+    public function isGuestOrder()
+    {
+        return is_null($this->user_id) && !is_null($this->guest_email);
+    }
+
+    public function getCustomerEmailAttribute()
+    {
+        return $this->isGuestOrder() ? $this->guest_email : $this->customer?->email;
+    }
+
+    public function getCustomerPhoneAttribute()
+    {
+        return $this->isGuestOrder() ? $this->guest_phone : $this->customer?->phone;
+    }
+
+    // Payment status helpers
+    public function isPaid()
+    {
+        return $this->payment_status === PaymentStatus::PAID;
+    }
+
+    public function isPending()
+    {
+        return $this->payment_status === PaymentStatus::PENDING;
+    }
+
+    public function isFailed()
+    {
+        return $this->payment_status === PaymentStatus::FAILED;
+    }
+
+    public function isExpired()
+    {
+        return $this->payment_status === PaymentStatus::EXPIRED;
+    }
+
+    public function isCancelled()
+    {
+        return $this->payment_status === PaymentStatus::CANCELLED;
     }
 }

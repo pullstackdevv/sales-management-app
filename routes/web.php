@@ -2,8 +2,11 @@
 
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Auth\Middleware\Authenticate;
+use App\Http\Controllers\WebOrderController;
+use App\Http\Controllers\MidtransController;
 use Inertia\Inertia;
 
 Route::get('/welcome', function () {
@@ -11,7 +14,7 @@ Route::get('/welcome', function () {
 })->name('welcome');
 
 Route::get('/', function () {
-    if (auth()->check()) {
+    if (Auth::check()) {
         return redirect()->route('dashboard');
     }
     return redirect()->route('auth.login');
@@ -40,7 +43,7 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     })->name('home.page');
 
     Route::get('/logout', function () {
-        auth()->logout();
+        Auth::logout();
         return redirect()->route('auth.login');
     })->name('logout');
 
@@ -213,6 +216,40 @@ Route::prefix('marketplace')->group(function () {
     Route::get('/profile', function () {
         return Inertia::render('Marketplace/Profile');
     })->name('marketplace.profile');
+    
+    // Web Order Routes (untuk checkout dari marketplace)
+    Route::post('/order/create', [WebOrderController::class, 'createOrder'])->name('marketplace.order.create');
+    Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->name('marketplace.order.show');
+    
+    // User Orders (hanya untuk user yang login)
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');
+    });
+});
+
+// Midtrans Payment Routes (tanpa middleware untuk callback)
+Route::prefix('payment')->name('payment.')->group(function () {
+    // Create payment
+    Route::post('/create/{orderNumber}', [MidtransController::class, 'createPayment'])->name('create');
+    
+    // Check payment status
+    Route::get('/status/{orderNumber}', [MidtransController::class, 'checkPaymentStatus'])->name('status');
+    
+    // Midtrans callback (webhook)
+    Route::post('/notification', [MidtransController::class, 'handleNotification'])->name('notification');
+    
+    // Payment result pages
+    Route::get('/finish', function () {
+        return Inertia::render('Payment/Finish');
+    })->name('finish');
+    
+    Route::get('/unfinish', function () {
+        return Inertia::render('Payment/Unfinish');
+    })->name('unfinish');
+    
+    Route::get('/error', function () {
+        return Inertia::render('Payment/Error');
+    })->name('error');
 });
 
 Route::fallback(function () {

@@ -460,7 +460,10 @@ class OrderController extends Controller
         $request->validate([
             'courier_id' => 'required|exists:couriers,id',
             'origin_city' => 'required|string',
-            'destination_city' => 'required|string'
+            'destination_city' => 'required|string',
+            'items' => 'required|array',
+            'items.*.product_variant_id' => 'required|exists:product_variants,id',
+            'items.*.quantity' => 'required|integer|min:1'
         ]);
 
         $courierRate = CourierRate::where('courier_id', $request->courier_id)
@@ -475,10 +478,36 @@ class OrderController extends Controller
             ], 404);
         }
 
+        // Calculate total weight from order items
+        $totalWeight = 0;
+        foreach ($request->items as $item) {
+            $variant = ProductVariant::find($item['product_variant_id']);
+            if ($variant && $variant->weight) {
+                $totalWeight += $variant->weight * $item['quantity'];
+            }
+        }
+
+        // Ensure minimum weight
+        $totalWeight = max($totalWeight, $courierRate->min_weight ?? 0);
+        
+        // Check maximum weight limit
+        if ($courierRate->max_weight && $totalWeight > $courierRate->max_weight) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Total weight exceeds maximum limit for this courier service'
+            ], 400);
+        }
+
+        // Calculate shipping cost
+        $shippingCost = $courierRate->base_price + ($totalWeight * $courierRate->price_per_kg);
+
         return response()->json([
             'status' => 'success',
             'data' => [
-                'rate' => $courierRate->rate,
+                'rate' => $shippingCost,
+                'base_price' => $courierRate->base_price,
+                'price_per_kg' => $courierRate->price_per_kg,
+                'total_weight' => $totalWeight,
                 'estimated_days' => $courierRate->estimated_days
             ]
         ]);

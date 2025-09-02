@@ -12,7 +12,6 @@ export default function ProductEdit() {
     category: "",
     description: "",
     base_price: 0,
-    is_active: true,
     variants: []
   });
   const [loading, setLoading] = useState(false);
@@ -34,7 +33,7 @@ export default function ProductEdit() {
         title: 'Error',
         text: 'ID produk tidak ditemukan'
       }).then(() => {
-        router.visit('/product');
+        router.visit('/product/data');
       });
     }
   }, []);
@@ -52,7 +51,6 @@ export default function ProductEdit() {
         category: productData.category || '',
         description: productData.description || '',
         base_price: productData.base_price || 0,
-        is_active: productData.is_active !== false,
         variants: productData.variants || []
       });
     } catch (error) {
@@ -62,7 +60,7 @@ export default function ProductEdit() {
         title: 'Error',
         text: 'Gagal memuat data produk'
       }).then(() => {
-        router.visit('/product');
+        router.visit('/product/data');
       });
     } finally {
       setLoadingData(false);
@@ -79,6 +77,7 @@ export default function ProductEdit() {
           variant_label: "",
           sku: "",
           price: 0,
+          weight: 0,
           stock: 0,
           is_active: true
         }
@@ -109,71 +108,31 @@ export default function ProductEdit() {
 
     try {
       const response = await api.put(`/products/${productId}`, product);
-      
-      if (response.data.status === 'success') {
-        Swal.fire({
-          icon: 'success',
-          title: 'Berhasil!',
-          text: 'Produk berhasil diperbarui!',
-          showConfirmButton: true,
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#3085d6'
-        }).then((result) => {
-          if (result.isConfirmed) {
-            window.location.href = '/product/data';
-          }
-        });
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal!',
-          text: response.data.message || 'Gagal memperbarui produk',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#d33'
-        });
-      }
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: 'Produk berhasil diperbarui!',
+        showConfirmButton: false,
+        timer: 1500
+      }).then(() => {
+        router.visit('/product/data');
+      });
     } catch (error) {
-      console.error('Error updating product:', error);
-      
       if (error.response?.status === 422) {
-        // Validation errors
         setErrors(error.response.data.errors || {});
-        const errorMessages = Object.values(error.response.data.errors || {}).flat();
-        
         Swal.fire({
           icon: 'warning',
           title: 'Validasi Error',
-          html: `<div style="text-align: left;"><ul>${errorMessages.map(msg => `<li>${msg}</li>`).join('')}</ul></div>`,
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#f39c12'
-        });
-      } else if (error.response?.status === 401) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Unauthorized',
-          text: 'Sesi Anda telah berakhir. Silakan login kembali.',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#d33'
-        }).then(() => {
-          window.location.href = '/login';
-        });
-      } else if (error.response?.status === 403) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Forbidden',
-          text: 'Anda tidak memiliki akses untuk memperbarui produk.',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#d33'
+          text: 'Mohon periksa kembali data yang diinput'
         });
       } else {
         Swal.fire({
           icon: 'error',
           title: 'Error',
-          text: error.response?.data?.message || 'Terjadi kesalahan saat memperbarui produk. Silakan coba lagi.',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#d33'
+          text: 'Terjadi kesalahan saat memperbarui produk'
         });
       }
+      console.error('Error updating product:', error);
     } finally {
       setLoading(false);
     }
@@ -215,78 +174,55 @@ export default function ProductEdit() {
                 <h2 className="text-lg font-medium mb-4">Informasi Produk</h2>
                 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Nama Produk*</label>
-                      <input
-                        type="text"
-                        className={`w-full border px-3 py-2 rounded-md ${
-                          errors.name ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                        placeholder="Masukkan nama produk..."
-                        value={product.name}
-                        onChange={(e) => setProduct({ ...product, name: e.target.value })}
-                        required
-                      />
-                      {errors.name && (
-                        <p className="text-red-500 text-xs mt-1">{errors.name[0]}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">SKU Produk*</label>
-                      <input
-                        type="text"
-                        className={`w-full border px-3 py-2 rounded-md ${
-                          errors.sku ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                        placeholder="Contoh: PRD-001"
-                        value={product.sku}
-                        onChange={(e) => setProduct({ ...product, sku: e.target.value })}
-                        required
-                      />
-                      {errors.sku && (
-                        <p className="text-red-500 text-xs mt-1">{errors.sku[0]}</p>
-                      )}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Nama Produk*</label>
+                    <input
+                      type="text"
+                      className={`w-full border px-3 py-2 rounded-md ${
+                        errors.name ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Masukkan nama produk..."
+                      value={product.name}
+                      onChange={(e) => setProduct({ ...product, name: e.target.value })}
+                      required
+                    />
+                    {errors.name && (
+                      <p className="text-red-500 text-xs mt-1">{errors.name[0]}</p>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Kategori*</label>
-                      <input
-                        type="text"
-                        className={`w-full border px-3 py-2 rounded-md ${
-                          errors.category ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                        placeholder="Contoh: Perfume"
-                        value={product.category}
-                        onChange={(e) => setProduct({ ...product, category: e.target.value })}
-                        required
-                      />
-                      {errors.category && (
-                        <p className="text-red-500 text-xs mt-1">{errors.category[0]}</p>
-                      )}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">SKU Produk*</label>
+                    <input
+                      type="text"
+                      className={`w-full border px-3 py-2 rounded-md ${
+                        errors.sku ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Masukkan SKU produk..."
+                      value={product.sku}
+                      onChange={(e) => setProduct({ ...product, sku: e.target.value })}
+                      required
+                    />
+                    {errors.sku && (
+                      <p className="text-red-500 text-xs mt-1">{errors.sku[0]}</p>
+                    )}
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Harga Dasar*</label>
-                      <input
-                        type="number"
-                        className={`w-full border px-3 py-2 rounded-md ${
-                          errors.base_price ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                        placeholder="0"
-                        value={product.base_price}
-                        onChange={(e) => setProduct({ ...product, base_price: parseFloat(e.target.value) || 0 })}
-                        min="0"
-                        step="0.01"
-                        required
-                      />
-                      {errors.base_price && (
-                        <p className="text-red-500 text-xs mt-1">{errors.base_price[0]}</p>
-                      )}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Kategori*</label>
+                    <input
+                      type="text"
+                      className={`w-full border px-3 py-2 rounded-md ${
+                        errors.category ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Contoh: Perfume"
+                      value={product.category}
+                      onChange={(e) => setProduct({ ...product, category: e.target.value })}
+                      required
+                    />
+                    {errors.category && (
+                      <p className="text-red-500 text-xs mt-1">{errors.category[0]}</p>
+                    )}
                   </div>
 
                   <div>
@@ -306,15 +242,22 @@ export default function ProductEdit() {
                   </div>
 
                   <div>
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="mr-2"
-                        checked={product.is_active}
-                        onChange={(e) => setProduct({ ...product, is_active: e.target.checked })}
-                      />
-                      <span className="text-sm font-medium">Produk aktif</span>
-                    </label>
+                    <label className="block text-sm font-medium mb-1">Harga Dasar*</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`w-full border px-3 py-2 rounded-md ${
+                        errors.base_price ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Masukkan harga dasar..."
+                      value={product.base_price}
+                      onChange={(e) => setProduct({ ...product, base_price: parseFloat(e.target.value) || 0 })}
+                      required
+                    />
+                    {errors.base_price && (
+                      <p className="text-red-500 text-xs mt-1">{errors.base_price[0]}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -362,9 +305,9 @@ export default function ProductEdit() {
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
-                            <label className="block text-sm font-medium mb-1">Label Varian*</label>
+                            <label className="block text-sm font-medium mb-1">Nama Varian*</label>
                             <input
                               type="text"
                               className={`w-full border px-3 py-2 rounded-md text-sm ${
@@ -413,6 +356,24 @@ export default function ProductEdit() {
                             />
                             {errors[`variants.${index}.price`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Berat (kg)</label>
+                            <input
+                              type="number"
+                              className={`w-full border px-3 py-2 rounded-md text-sm ${
+                                errors[`variants.${index}.weight`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                              placeholder="0.000"
+                              value={variant.weight || 0}
+                              onChange={(e) => updateVariant(index, 'weight', parseFloat(e.target.value) || 0)}
+                              min="0"
+                              step="0.001"
+                            />
+                            {errors[`variants.${index}.weight`] && (
+                              <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.weight`][0]}</p>
                             )}
                           </div>
 

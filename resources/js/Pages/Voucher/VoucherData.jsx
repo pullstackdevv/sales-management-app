@@ -34,11 +34,8 @@ const VoucherData = () => {
                 title: 'Apakah Anda yakin?',
                 text: 'Voucher yang dihapus tidak dapat dikembalikan',
                 icon: 'warning',
-                showCancelButton: true,
                 confirmButtonColor: '#ef4444',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Ya, hapus',
-                cancelButtonText: 'Batal'
+                confirmButtonText: 'Ya, hapus'
             });
 
             if (result.isConfirmed) {
@@ -207,7 +204,7 @@ const VoucherData = () => {
                                     <p className="text-2xl font-bold text-green-600">
                                         {
                                             vouchers.filter(
-                                                (v) => getVoucherStatus(v) === "active"
+                                                (v) => v.status === "active"
                                             ).length
                                         }
                                     </p>

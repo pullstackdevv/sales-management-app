@@ -39,12 +39,12 @@ const ProductList = () => {
       };
 
       const res = await productsAPI.getProducts(params);
-      // Expecting: { status: 'success', data: { data: [...], last_page, total } }
-      const payload = res.data?.data || {};
+      // Response: { status: 'success', data: { current_page: 1, data: [...], last_page, total } }
+      const payload = res.data || {};
       setProducts(payload.data || []);
       setPagination((prev) => ({
         ...prev,
-        current_page: page,
+        current_page: payload.current_page || page,
         last_page: payload.last_page || 1,
         total: payload.total || 0,
       }));
@@ -79,44 +79,28 @@ const ProductList = () => {
     }).format(price);
 
   const ProductCard = ({ product }) => (
-    <Link href={`/marketplace/products/${product.id}`} className="block">
-      <div className="bg-white border border-gray-100 hover:border-gray-200 transition-colors duration-200">
-        <div className="relative">
+    <Link href={`/marketplace/products/${product.id}`} className="block group">
+      <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
+        <div className="relative overflow-hidden">
           <img
             src={
               product.image ||
               'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300'
             }
             alt={product.name}
-            className="w-full h-64 object-cover"
+            className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
           />
+          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
         </div>
-        <div className="p-4">
-          <h3 className="text-sm text-gray-900 mb-2 line-clamp-2">
+        <div className="p-5">
+          <h3 className="text-sm font-medium text-gray-900 mb-3 line-clamp-2 leading-relaxed group-hover:text-gray-700 transition-colors">
             {product.name}
           </h3>
-          <div className="flex items-center mb-2">
-            <div className="flex items-center">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-3 w-3 ${
-                    i < Math.floor(product.rating || 4.5)
-                      ? 'text-yellow-400 fill-current'
-                      : 'text-gray-300'
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-xs text-gray-500 ml-1">
-              ({product.reviewCount || 0})
-            </span>
-          </div>
           <div className="flex items-center justify-between">
-            <span className="text-base font-medium text-gray-900">
+            <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
               {formatPrice(product.base_price ?? product.price ?? 0)}
             </span>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
+            <button className="p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110">
               <ShoppingCart className="h-4 w-4" />
             </button>
           </div>

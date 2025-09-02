@@ -76,6 +76,7 @@ class ProductSeeder extends Seeder
                             'variant_label' => $color . ' - ' . $size,
                             'sku' => $product->sku . '-' . strtoupper(substr($color, 0, 1)) . $size,
                             'price' => $product->base_price,
+                            'weight' => 0.2, // 200 grams for t-shirt
                             'stock' => rand(5, 15),
                             'is_active' => true,
                         ]);
@@ -90,6 +91,7 @@ class ProductSeeder extends Seeder
                         'variant_label' => 'Size ' . $size,
                         'sku' => $product->sku . '-' . $size,
                         'price' => $product->base_price,
+                        'weight' => 0.5, // 500 grams for jeans
                         'stock' => rand(3, 8),
                         'is_active' => true,
                     ]);
@@ -103,6 +105,7 @@ class ProductSeeder extends Seeder
                         'variant_label' => 'Size ' . $size,
                         'sku' => $product->sku . '-' . $size,
                         'price' => $product->base_price,
+                        'weight' => 0.8, // 800 grams for sneakers
                         'stock' => rand(2, 6),
                         'is_active' => true,
                     ]);

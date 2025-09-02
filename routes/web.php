@@ -173,6 +173,11 @@ Route::prefix('payment')->name('payment.')->group(function () {
     })->name('error');
 });
 
+// Add login route alias for Laravel's default authentication
+Route::get('/login', function () {
+    return redirect()->route('auth.login');
+})->name('login');
+
 Route::fallback(function () {
     return Inertia::render('NotFound');
 });

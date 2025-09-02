@@ -8,13 +8,16 @@ import Swal from "sweetalert2";
 export default function ProductAdd() {
   const [product, setProduct] = useState({
     name: "",
+    sku: "",
     category: "",
     description: "",
+    base_price: 0,
     variants: [
       {
-        name: "Default",
+        variant_label: "Default",
         sku: "",
         price: 0,
+        weight: 0,
         stock: 0,
         is_active: true
       }
@@ -30,9 +33,10 @@ export default function ProductAdd() {
       variants: [
         ...product.variants,
         {
-          name: "",
+          variant_label: "",
           sku: "",
           price: 0,
+          weight: 0,
           stock: 0,
           is_active: true
         }
@@ -70,7 +74,7 @@ export default function ProductAdd() {
         showConfirmButton: false,
         timer: 1500
       }).then(() => {
-        router.visit('/product');
+        router.visit('/product/data');
       });
     } catch (error) {
       if (error.response?.status === 422) {
@@ -132,6 +136,23 @@ export default function ProductAdd() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium mb-1">SKU Produk*</label>
+                    <input
+                      type="text"
+                      className={`w-full border px-3 py-2 rounded-md ${
+                        errors.sku ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Masukkan SKU produk..."
+                      value={product.sku}
+                      onChange={(e) => setProduct({ ...product, sku: e.target.value })}
+                      required
+                    />
+                    {errors.sku && (
+                      <p className="text-red-500 text-xs mt-1">{errors.sku[0]}</p>
+                    )}
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium mb-1">Kategori*</label>
                     <input
                       type="text"
@@ -161,6 +182,25 @@ export default function ProductAdd() {
                     ></textarea>
                     {errors.description && (
                       <p className="text-red-500 text-xs mt-1">{errors.description[0]}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Harga Dasar*</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`w-full border px-3 py-2 rounded-md ${
+                        errors.base_price ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Masukkan harga dasar..."
+                      value={product.base_price}
+                      onChange={(e) => setProduct({ ...product, base_price: parseFloat(e.target.value) || 0 })}
+                      required
+                    />
+                    {errors.base_price && (
+                      <p className="text-red-500 text-xs mt-1">{errors.base_price[0]}</p>
                     )}
                   </div>
                 </div>
@@ -196,21 +236,21 @@ export default function ProductAdd() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-sm font-medium mb-1">Nama Varian*</label>
                           <input
                             type="text"
                             className={`w-full border px-3 py-2 rounded-md text-sm ${
-                              errors[`variants.${index}.name`] ? 'border-red-500' : 'border-gray-300'
+                              errors[`variants.${index}.variant_label`] ? 'border-red-500' : 'border-gray-300'
                             }`}
                             placeholder="Contoh: Size M, Warna Merah"
-                            value={variant.name}
-                            onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                            value={variant.variant_label}
+                            onChange={(e) => updateVariant(index, 'variant_label', e.target.value)}
                             required
                           />
-                          {errors[`variants.${index}.name`] && (
-                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.name`][0]}</p>
+                          {errors[`variants.${index}.variant_label`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.variant_label`][0]}</p>
                           )}
                         </div>
 
@@ -247,6 +287,24 @@ export default function ProductAdd() {
                           />
                           {errors[`variants.${index}.price`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Berat (kg)</label>
+                          <input
+                            type="number"
+                            className={`w-full border px-3 py-2 rounded-md text-sm ${
+                              errors[`variants.${index}.weight`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            placeholder="0.000"
+                            value={variant.weight}
+                            onChange={(e) => updateVariant(index, 'weight', parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.001"
+                          />
+                          {errors[`variants.${index}.weight`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.weight`][0]}</p>
                           )}
                         </div>
 

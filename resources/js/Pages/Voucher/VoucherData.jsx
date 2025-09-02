@@ -34,11 +34,8 @@ const VoucherData = () => {
                 title: 'Apakah Anda yakin?',
                 text: 'Voucher yang dihapus tidak dapat dikembalikan',
                 icon: 'warning',
-                showCancelButton: true,
                 confirmButtonColor: '#ef4444',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Ya, hapus',
-                cancelButtonText: 'Batal'
+                confirmButtonText: 'Ya, hapus'
             });
 
             if (result.isConfirmed) {

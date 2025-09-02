@@ -48,6 +48,7 @@ class ProductController extends Controller
             'variants.*.variant_label' => 'required|string|max:255',
             'variants.*.sku' => 'required|string|max:50|unique:product_variants,sku',
             'variants.*.price' => 'required|numeric|min:0',
+            'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean'
         ]);
@@ -95,7 +96,8 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): JsonResponse
     {
-        $validated = $request->validate([
+        // Custom validation for variants SKU
+        $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'sku' => 'sometimes|required|string|max:100|unique:products,sku,' . $product->id,
             'description' => 'nullable|string',
@@ -105,11 +107,32 @@ class ProductController extends Controller
             'variants' => 'sometimes|required|array|min:1',
             'variants.*.id' => 'sometimes|required|exists:product_variants,id',
             'variants.*.variant_label' => 'required|string|max:255',
-            'variants.*.sku' => 'required|string|max:50|unique:product_variants,sku',
+            'variants.*.sku' => 'required|string|max:50',
             'variants.*.price' => 'required|numeric|min:0',
+            'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean'
         ]);
+
+        // Additional validation for variant SKU uniqueness
+        if ($request->has('variants')) {
+            foreach ($request->variants as $index => $variant) {
+                $query = ProductVariant::where('sku', $variant['sku']);
+                
+                // If variant has ID, exclude it from uniqueness check
+                if (isset($variant['id'])) {
+                    $query->where('id', '!=', $variant['id']);
+                }
+                
+                if ($query->exists()) {
+                    throw ValidationException::withMessages([
+                        "variants.{$index}.sku" => ['The SKU has already been taken.']
+                    ]);
+                }
+            }
+        }
+
+        $validated = $request->all();
 
         try {
             DB::beginTransaction();
@@ -133,12 +156,22 @@ class ProductController extends Controller
                 foreach ($validated['variants'] as $variant) {
                     if (isset($variant['id'])) {
                         $product->variants()->where('id', $variant['id'])->update([
-                            ...$variant,
+                            'variant_label' => $variant['variant_label'],
+                            'sku' => $variant['sku'],
+                            'price' => $variant['price'],
+                            'weight' => $variant['weight'] ?? null,
+                            'stock' => $variant['stock'],
+                            'is_active' => $variant['is_active'] ?? true,
                             'updated_by' => Auth::id()
                         ]);
                     } else {
                         $product->variants()->create([
-                            ...$variant,
+                            'variant_label' => $variant['variant_label'],
+                            'sku' => $variant['sku'],
+                            'price' => $variant['price'],
+                            'weight' => $variant['weight'] ?? null,
+                            'stock' => $variant['stock'],
+                            'is_active' => $variant['is_active'] ?? true,
                             'created_by' => Auth::id()
                         ]);
                     }

@@ -173,11 +173,8 @@ export default function UserSettings() {
       title: 'Konfirmasi Hapus',
       text: `Apakah Anda yakin ingin menghapus user ${user.name}?`,
       icon: 'warning',
-      showCancelButton: true,
       confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Ya, Hapus!',
-      cancelButtonText: 'Batal'
+      confirmButtonText: 'Ya, Hapus!'
     });
 
     if (!result.isConfirmed) {

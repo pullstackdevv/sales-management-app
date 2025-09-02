@@ -40,6 +40,15 @@ Route::prefix('auth/')->group(function () {
 
 });
 
+// Public courier rates API routes (for checkout)
+Route::prefix('courier-rates')->group(function () {
+    Route::get('/', [CourierRateController::class, 'index']);
+    Route::get('/destinations', [CourierRateController::class, 'destinations']);
+    Route::get('/service-types', [CourierRateController::class, 'serviceTypes']);
+    Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
+    Route::get('/{id}', [CourierRateController::class, 'show']);
+});
+
 // Auth routes
 Route::middleware('auth:sanctum')->group(function () {
     // User routes
@@ -132,14 +141,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('export-sales', [ReportController::class, 'exportSales']);
     });
 
-    // Courier rates API routes
+    // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {
-        Route::get('/', [CourierRateController::class, 'index']);
-        Route::get('/destinations', [CourierRateController::class, 'destinations']);
-        Route::get('/service-types', [CourierRateController::class, 'serviceTypes']);
-        Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
         Route::post('/import', [CourierRateController::class, 'import']);
         Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
-        Route::get('/{id}', [CourierRateController::class, 'show']);
     });
 });

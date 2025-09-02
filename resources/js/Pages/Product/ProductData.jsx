@@ -40,11 +40,8 @@ export default function ProductData() {
       title: 'Apakah Anda yakin?',
       text: 'Data produk akan dihapus permanen!',
       icon: 'warning',
-      showCancelButton: true,
       confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Ya, Hapus!',
-      cancelButtonText: 'Batal'
+      confirmButtonText: 'Ya, Hapus!'
     });
 
     if (result.isConfirmed) {

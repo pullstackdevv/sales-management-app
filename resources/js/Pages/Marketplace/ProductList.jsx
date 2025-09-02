@@ -1,125 +1,243 @@
-import { useState } from "react";
-import { Link } from "@inertiajs/react";
-import MarketplaceLayout from "../../Layouts/MarketplaceLayout";
-import { Search, Star, ShoppingCart, Heart } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Link } from '@inertiajs/react';
+import { Search, Star, ShoppingCart } from 'lucide-react';
+import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
+import { productsAPI } from '@/api/products';
 
-export default function ProductList() {
-    const [search, setSearch] = useState("");
-    const [activeCategory, setActiveCategory] = useState("all");
-    const categories = [
-        { id: "all", name: "Semua" },
-        { id: "electronics", name: "Elektronik" },
-        { id: "fashion", name: "Fashion" },
-        { id: "home", name: "Rumah Tangga" },
-        { id: "beauty", name: "Kecantikan" },
-        { id: "sports", name: "Olahraga" },
-        { id: "books", name: "Buku" },
-        { id: "food", name: "Makanan" },
-    ];
-    const products = [
-        {
-            id: 1,
-            name: "Smartphone Samsung Galaxy A54",
-            price: 3500000,
-            originalPrice: 4200000,
-            rating: 4.5,
-            reviewCount: 128,
-            image: "/assets/images/products/dash-prd-1.jpg",
-            discount: 17,
-            isWishlisted: false
-        },
-        {
-            id: 2,
-            name: "Laptop ASUS VivoBook S14",
-            price: 8500000,
-            originalPrice: 9500000,
-            rating: 4.3,
-            reviewCount: 89,
-            image: "/assets/images/products/dash-prd-2.jpg",
-            discount: 11,
-            isWishlisted: true
-        },
-        {
-            id: 3,
-            name: "Headphone Sony WH-1000XM4",
-            price: 2800000,
-            originalPrice: 3500000,
-            rating: 4.7,
-            reviewCount: 256,
-            image: "/assets/images/products/dash-prd-3.jpg",
-            discount: 20,
-            isWishlisted: false
-        },
-        {
-            id: 4,
-            name: "Smartwatch Apple Watch Series 8",
-            price: 5200000,
-            originalPrice: 6500000,
-            rating: 4.6,
-            reviewCount: 167,
-            image: "/assets/images/products/dash-prd-4.jpg",
-            discount: 20,
-            isWishlisted: false
-        }
-    ];
-    const formatPrice = (price) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
-    const filteredProducts = products.filter(p => (activeCategory === "all" || p.category === activeCategory) && p.name.toLowerCase().includes(search.toLowerCase()));
-    return (
-        <MarketplaceLayout>
-            <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 sm:py-16">
-                <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-8 sm:mb-10">Daftar Produk</h1>
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 sm:mb-10 gap-6 sm:gap-8">
-                    <div className="flex flex-wrap gap-3 sm:gap-4">
-                        {categories.map((cat) => (
-                            <button
-                                key={cat.id}
-                                onClick={() => setActiveCategory(cat.id)}
-                                className={`px-6 sm:px-8 py-3 sm:py-4 rounded-full text-lg sm:text-xl font-medium border transition-colors ${activeCategory === cat.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
-                            >
-                                {cat.name}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="relative w-full lg:w-80">
-                        <div className="absolute inset-y-0 left-0 pl-4 sm:pl-5 flex items-center pointer-events-none">
-                            <Search className="h-6 w-6 sm:h-7 sm:w-7 text-gray-400" />
-                        </div>
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="block w-full pl-12 sm:pl-14 pr-4 sm:pr-5 py-3 sm:py-4 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-lg sm:text-xl"
-                            placeholder="Cari produk..."
-                        />
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-                    {filteredProducts.map(product => (
-                        <div key={product.id} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden group">
-                            <Link href={`/marketplace/product/${product.id}`}>
-                                <img src={product.image} alt={product.name} className="w-full h-48 sm:h-56 object-cover group-hover:scale-105 transition-transform duration-300" />
-                            </Link>
-                            <div className="p-5 sm:p-6">
-                                <h3 className="font-medium text-gray-900 mb-2 sm:mb-3 line-clamp-2 text-base sm:text-lg">{product.name}</h3>
-                                <div className="flex items-center mb-2 sm:mb-3">
-                                    <div className="flex items-center">
-                                        {[...Array(5)].map((_, i) => (
-                                            <Star key={i} className={`h-5 w-5 sm:h-5 sm:w-5 ${i < Math.floor(product.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
-                                        ))}
-                                    </div>
-                                    <span className="text-base sm:text-lg text-gray-500 ml-2">({product.reviewCount})</span>
-                                </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                                    <span className="text-lg sm:text-xl font-bold text-gray-900">{formatPrice(product.price)}</span>
-                                    {product.originalPrice > product.price && (
-                                        <span className="text-base sm:text-lg text-gray-500 line-through">{formatPrice(product.originalPrice)}</span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+const ProductList = () => {
+  const [products, setProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 12,
+    total: 0,
+  });
+
+  const currentPage = pagination.current_page;
+  const setCurrentPage = (page) => {
+    setPagination((prev) => ({ ...prev, current_page: page }));
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, [pagination.current_page, selectedCategory, sortBy, searchTerm]);
+
+  const fetchProducts = async (page = pagination.current_page) => {
+    try {
+      setLoading(true);
+      const params = {
+        page,
+        per_page: 12,
+        search: searchTerm || undefined,
+        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        sort: sortBy,
+      };
+
+      const res = await productsAPI.getProducts(params);
+      // Expecting: { status: 'success', data: { data: [...], last_page, total } }
+      const payload = res.data?.data || {};
+      setProducts(payload.data || []);
+      setPagination((prev) => ({
+        ...prev,
+        current_page: page,
+        last_page: payload.last_page || 1,
+        total: payload.total || 0,
+      }));
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setError('Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (v) => {
+    setSearchTerm(v);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    setCurrentPage(1);
+  };
+
+  const handleSortChange = (sort) => {
+    setSortBy(sort);
+    setCurrentPage(1);
+  };
+
+  const formatPrice = (price) =>
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(price);
+
+  const ProductCard = ({ product }) => (
+    <Link href={`/marketplace/products/${product.id}`} className="block">
+      <div className="bg-white border border-gray-100 hover:border-gray-200 transition-colors duration-200">
+        <div className="relative">
+          <img
+            src={
+              product.image ||
+              'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300'
+            }
+            alt={product.name}
+            className="w-full h-64 object-cover"
+          />
+        </div>
+        <div className="p-4">
+          <h3 className="text-sm text-gray-900 mb-2 line-clamp-2">
+            {product.name}
+          </h3>
+          <div className="flex items-center mb-2">
+            <div className="flex items-center">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-3 w-3 ${
+                    i < Math.floor(product.rating || 4.5)
+                      ? 'text-yellow-400 fill-current'
+                      : 'text-gray-300'
+                  }`}
+                />
+              ))}
             </div>
-        </MarketplaceLayout>
+            <span className="text-xs text-gray-500 ml-1">
+              ({product.reviewCount || 0})
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-base font-medium text-gray-900">
+              {formatPrice(product.base_price ?? product.price ?? 0)}
+            </span>
+            <button className="text-gray-400 hover:text-gray-600 transition-colors">
+              <ShoppingCart className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+
+  if (loading && products.length === 0) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+        </div>
+      </MarketplaceLayout>
     );
-}
+  }
+
+  if (error) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-500 text-lg mb-4">{error}</p>
+            <button
+              onClick={() => fetchProducts(currentPage)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
+  return (
+    <MarketplaceLayout>
+      <div className="min-h-screen bg-gray-50">
+        {/* Top bar (title + search) */}
+        <div className="bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="py-8">
+              <h1 className="text-2xl font-light text-gray-900 mb-8 text-center">
+                Produk
+              </h1>
+
+              <div className="mb-8">
+                <div className="max-w-md mx-auto relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Cari produk..."
+                    value={searchTerm}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-none focus:outline-none focus:border-gray-400"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Product grid + pagination */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {loading ? 'Loading...' : `Menampilkan ${products.length} produk`}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+
+          {products.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">Tidak ada produk yang ditemukan</p>
+            </div>
+          )}
+
+          {pagination.last_page > 1 && (
+            <div className="flex justify-center items-center space-x-4 mt-12">
+              <button
+                onClick={() => {
+                  const prev = Math.max(1, pagination.current_page - 1);
+                  setCurrentPage(prev);
+                  fetchProducts(prev);
+                }}
+                disabled={pagination.current_page === 1}
+                className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ← Sebelumnya
+              </button>
+
+              <span className="text-sm text-gray-500">
+                {pagination.current_page} dari {pagination.last_page}
+              </span>
+
+              <button
+                onClick={() => {
+                  const next = Math.min(
+                    pagination.last_page,
+                    pagination.current_page + 1
+                  );
+                  setCurrentPage(next);
+                  fetchProducts(next);
+                }}
+                disabled={pagination.current_page === pagination.last_page}
+                className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Selanjutnya →
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </MarketplaceLayout>
+  );
+};
+
+export default ProductList;

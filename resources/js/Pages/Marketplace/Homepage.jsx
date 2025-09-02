@@ -1,31 +1,26 @@
-import { useState } from "react";
-import { Link } from "@inertiajs/react";
-import MarketplaceLayout from "../../Layouts/MarketplaceLayout";
+import React, { useState, useEffect } from 'react';
+import { Link } from '@inertiajs/react';
 import { 
     Star, 
     ShoppingCart, 
-    Heart, 
-    Eye,
-    ArrowRight,
-    Truck,
-    Shield,
-    Clock,
-    Tag
+    ArrowRight
 } from "lucide-react";
+import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
+import { productsAPI } from '@/api/products';
 
-export default function Homepage() {
+const Homepage = () => {
     const [activeCategory, setActiveCategory] = useState("all");
+    const [products, setProducts] = useState([]);
+    const [featuredProducts, setFeaturedProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    // Mock data - nanti akan diambil dari API
     const categories = [
-        { id: "all", name: "Semua", icon: "🏠" },
-        { id: "electronics", name: "Elektronik", icon: "📱" },
-        { id: "fashion", name: "Fashion", icon: "👕" },
-        { id: "home", name: "Rumah Tangga", icon: "🏠" },
-        { id: "beauty", name: "Kecantikan", icon: "💄" },
-        { id: "sports", name: "Olahraga", icon: "⚽" },
-        { id: "books", name: "Buku", icon: "📚" },
-        { id: "food", name: "Makanan", icon: "🍕" },
+        { id: "all", name: "Semua" },
+        { id: "electronics", name: "Elektronik" },
+        { id: "fashion", name: "Fashion" },
+        { id: "beauty", name: "Kecantikan" },
+        { id: "home", name: "Rumah Tangga" }
     ];
 
     const popularProducts = [
@@ -127,6 +122,27 @@ export default function Homepage() {
         }
     ];
 
+    useEffect(() => {
+        fetchProducts();
+    }, []);
+
+    const fetchProducts = async () => {
+        try {
+            setLoading(true);
+            const response = await productsAPI.getProducts({ per_page: 8 });
+            // Laravel API returns {status: 'success', data: paginatedResults}
+            // paginatedResults has a 'data' property with the actual products array
+            const productsData = response.data?.data || [];
+            setProducts(productsData);
+            setFeaturedProducts(productsData.slice(0, 4));
+        } catch (err) {
+            setError('Failed to load products');
+            console.error('Error fetching products:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const formatPrice = (price) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -136,264 +152,154 @@ export default function Homepage() {
     };
 
     const ProductCard = ({ product }) => {
-        const [isWishlisted, setIsWishlisted] = useState(product.isWishlisted);
-
         return (
-            <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden group">
-                <div className="relative">
-                    <img 
-                        src={product.image} 
-                        alt={product.name}
-                        className="w-full h-32 sm:h-40 md:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    {product.discount > 0 && (
-                        <div className="absolute top-1 sm:top-2 left-1 sm:left-2 bg-red-500 text-white text-xs font-bold px-1 sm:px-2 py-0.5 sm:py-1 rounded">
-                            -{product.discount}%
-                        </div>
-                    )}
-                    {product.isNew && (
-                        <div className="absolute top-1 sm:top-2 right-1 sm:right-2 bg-blue-500 text-white text-xs font-bold px-1 sm:px-2 py-0.5 sm:py-1 rounded">
-                            NEW
-                        </div>
-                    )}
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <div className="flex space-x-1 sm:space-x-2">
-                            <button className="bg-white p-1.5 sm:p-2 rounded-full hover:bg-gray-100 transition-colors">
-                                <Eye className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-gray-700" />
-                            </button>
-                            <button 
-                                className={`p-1.5 sm:p-2 rounded-full transition-colors ${
-                                    isWishlisted 
-                                        ? 'bg-red-500 text-white' 
-                                        : 'bg-white hover:bg-gray-100'
-                                }`}
-                                onClick={() => setIsWishlisted(!isWishlisted)}
-                            >
-                                <Heart className={`h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 ${isWishlisted ? 'text-white' : 'text-gray-700'}`} />
-                            </button>
-                            <button className="bg-white p-1.5 sm:p-2 rounded-full hover:bg-gray-100 transition-colors">
-                                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-gray-700" />
-                            </button>
-                        </div>
+            <Link href={`/marketplace/products/${product.id}`} className="block">
+                <div className="bg-white border border-gray-100 hover:border-gray-200 transition-colors duration-200 overflow-hidden">
+                    <div className="relative">
+                        <img 
+                            src={product.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300'} 
+                            alt={product.name}
+                            className="w-full h-48 object-cover"
+                        />
                     </div>
-                </div>
-                <div className="p-2 sm:p-3 md:p-4">
-                    <h3 className="font-medium text-gray-900 mb-1 sm:mb-2 line-clamp-2 text-xs sm:text-sm md:text-base">{product.name}</h3>
-                    <div className="flex items-center mb-1 sm:mb-2">
-                        <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => (
-                                <Star 
-                                    key={i} 
-                                    className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                                        i < Math.floor(product.rating) 
-                                            ? 'text-yellow-400 fill-current' 
-                                            : 'text-gray-300'
-                                    }`} 
-                                />
-                            ))}
+                    <div className="p-4">
+                        <h3 className="text-sm text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
+                        <div className="flex items-center mb-2">
+                            <div className="flex items-center">
+                                {[...Array(5)].map((_, i) => (
+                                    <Star 
+                                        key={i} 
+                                        className={`h-3 w-3 ${
+                                            i < Math.floor(product.rating || 4.5) 
+                                                ? 'text-yellow-400 fill-current' 
+                                                : 'text-gray-300'
+                                        }`} 
+                                    />
+                                ))}
+                            </div>
+                            <span className="text-xs text-gray-500 ml-1">({product.reviewCount || 0})</span>
                         </div>
-                        <span className="text-xs sm:text-sm text-gray-500 ml-1">({product.reviewCount})</span>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center">
-                            <span className="text-sm sm:text-base md:text-lg font-bold text-gray-900">
-                                {formatPrice(product.price)}
+                        <div className="flex items-center justify-between">
+                            <span className="text-base font-medium text-gray-900">
+                                {formatPrice(product.base_price || product.price)}
                             </span>
-                            {product.originalPrice > product.price && (
-                                <span className="text-xs sm:text-sm text-gray-500 line-through sm:ml-2">
-                                    {formatPrice(product.originalPrice)}
-                                </span>
-                            )}
+                            <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <ShoppingCart className="h-4 w-4" />
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </Link>
         );
     };
 
+    if (loading) {
+        return (
+            <MarketplaceLayout>
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            </MarketplaceLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <MarketplaceLayout>
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                    <div className="text-center">
+                        <p className="text-red-500 text-lg mb-4">{error}</p>
+                        <button 
+                            onClick={fetchProducts}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            </MarketplaceLayout>
+        );
+    }
+
     return (
         <MarketplaceLayout>
-            {/* Hero Banner */}
-            <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-center">
-                        <div className="text-center lg:text-left">
-                            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold mb-3 sm:mb-4 leading-tight">
-                                Temukan Produk Terbaik
-                            </h1>
-                            <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 text-blue-100 leading-relaxed">
-                                Ribuan produk berkualitas dengan harga terbaik dan pengiriman cepat ke seluruh Indonesia
-                            </p>
-                            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-md mx-auto lg:mx-0">
-                                <Link 
-                                    href="/marketplace/products"
-                                    className="bg-white text-blue-600 px-6 sm:px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-flex items-center justify-center text-sm sm:text-base"
-                                >
-                                    Mulai Belanja
-                                    <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
-                                </Link>
-                                <Link 
-                                    href="/marketplace/promotions"
-                                    className="border-2 border-white text-white px-6 sm:px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors inline-flex items-center justify-center text-sm sm:text-base"
-                                >
-                                    Lihat Promosi
-                                </Link>
-                            </div>
-                        </div>
-                        <div className="hidden lg:block">
-                            <img 
-                                src="/assets/images/backgrounds/welcome-bg.png" 
-                                alt="Hero" 
-                                className="w-full h-auto"
-                            />
-                        </div>
+            {/* Hero Section */}
+            <div className="bg-gray-50 border-b border-gray-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                    <div className="text-center">
+                        <h1 className="text-3xl font-light text-gray-900 mb-4">
+                            Koleksi Produk Terbaik
+                        </h1>
+                        <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+                            Temukan produk berkualitas dengan harga terbaik
+                        </p>
+                        <Link 
+                            href="/marketplace/products" 
+                            className="inline-flex items-center px-6 py-3 border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition-colors"
+                        >
+                            Lihat Semua Produk
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                        </Link>
                     </div>
                 </div>
             </div>
 
-            {/* Features */}
-            <div className="bg-white py-8 sm:py-12">
+            {/* Categories Section */}
+            <div className="py-16 bg-white border-b border-gray-100">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-                        <div className="text-center">
-                            <div className="bg-blue-100 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                                <Truck className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Pengiriman Cepat</h3>
-                            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">Gratis ongkir untuk pembelian di atas Rp 100.000</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="bg-green-100 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                                <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Garansi 100%</h3>
-                            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">Produk original dengan garansi resmi</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="bg-yellow-100 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                                <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-600" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">24/7 Support</h3>
-                            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">Customer service siap membantu Anda</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="bg-red-100 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                                <Tag className="h-6 w-6 sm:h-8 sm:w-8 text-red-600" />
-                            </div>
-                            <h3 className="font-semibold text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Harga Terbaik</h3>
-                            <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">Harga kompetitif dengan diskon menarik</p>
-                        </div>
+                    <div className="text-center mb-12">
+                        <h2 className="text-2xl font-light text-gray-900 mb-4">
+                            Kategori
+                        </h2>
                     </div>
-                </div>
-            </div>
-
-            {/* Categories */}
-            <div className="bg-gray-50 py-8 sm:py-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center mb-6 sm:mb-8">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 sm:mb-4">Kategori Populer</h2>
-                        <p className="text-gray-600 text-sm sm:text-base">Temukan produk sesuai kategori favorit Anda</p>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3 sm:gap-4">
-                        {categories.map((category) => (
-                            <button
-                                key={category.id}
-                                onClick={() => setActiveCategory(category.id)}
-                                className={`p-3 sm:p-4 rounded-lg text-center transition-colors ${
-                                    activeCategory === category.id
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-white hover:bg-gray-50 text-gray-700'
-                                }`}
+                    <div className="flex justify-center space-x-8">
+                        {categories.slice(1).map((category) => (
+                            <Link 
+                                key={category.id} 
+                                href={`/marketplace/products?category=${category.id}`}
+                                className="text-gray-600 hover:text-gray-900 transition-colors text-sm"
                             >
-                                <div className="text-xl sm:text-2xl mb-1 sm:mb-2">{category.icon}</div>
-                                <div className="text-xs sm:text-sm font-medium leading-tight">{category.name}</div>
-                            </button>
+                                {category.name}
+                            </Link>
                         ))}
                     </div>
                 </div>
             </div>
 
             {/* Popular Products */}
-            <div className="bg-white py-8 sm:py-12">
+            <div className="py-16 bg-white">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8 gap-3 sm:gap-0">
-                        <div className="text-center sm:text-left">
-                            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Produk Populer</h2>
-                            <p className="text-gray-600 text-sm sm:text-base">Produk terlaris dengan rating tinggi</p>
-                        </div>
-                        <Link 
-                            href="/marketplace/products"
-                            className="text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center sm:justify-start text-sm sm:text-base"
-                        >
-                            Lihat Semua
-                            <ArrowRight className="ml-1 h-4 w-4" />
-                        </Link>
+                    <div className="text-center mb-12">
+                        <h2 className="text-2xl font-light text-gray-900 mb-4">Produk Populer</h2>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                        {popularProducts.map((product) => (
-                            <ProductCard key={product.id} product={product} />
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Promotions */}
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-8 sm:py-12 lg:py-16">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-center">
-                        <div className="text-center lg:text-left">
-                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
-                                Flash Sale! 🔥
-                            </h2>
-                            <p className="text-base sm:text-lg lg:text-xl mb-6 text-purple-100 leading-relaxed">
-                                Diskon hingga 70% untuk produk elektronik dan fashion. Buruan sebelum kehabisan!
-                            </p>
-                            <div className="flex items-center justify-center lg:justify-start space-x-3 sm:space-x-4 mb-6">
-                                <div className="text-center">
-                                    <div className="bg-white bg-opacity-20 rounded-lg p-2 sm:p-3">
-                                        <span className="text-lg sm:text-2xl font-bold">02</span>
+                    {loading ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
+                            {[...Array(4)].map((_, index) => (
+                                <div key={index} className="bg-white border border-gray-100 animate-pulse">
+                                    <div className="bg-gray-200 h-48"></div>
+                                    <div className="p-4">
+                                        <div className="bg-gray-200 h-4 rounded mb-2"></div>
+                                        <div className="bg-gray-200 h-3 rounded mb-2"></div>
+                                        <div className="bg-gray-200 h-4 rounded"></div>
                                     </div>
-                                    <span className="text-xs sm:text-sm mt-1 block">Hari</span>
                                 </div>
-                                <div className="text-center">
-                                    <div className="bg-white bg-opacity-20 rounded-lg p-2 sm:p-3">
-                                        <span className="text-lg sm:text-2xl font-bold">18</span>
-                                    </div>
-                                    <span className="text-xs sm:text-sm mt-1 block">Jam</span>
-                                </div>
-                                <div className="text-center">
-                                    <div className="bg-white bg-opacity-20 rounded-lg p-2 sm:p-3">
-                                        <span className="text-lg sm:text-2xl font-bold">45</span>
-                                    </div>
-                                    <span className="text-xs sm:text-sm mt-1 block">Menit</span>
-                                </div>
-                                <div className="text-center">
-                                    <div className="bg-white bg-opacity-20 rounded-lg p-2 sm:p-3">
-                                        <span className="text-lg sm:text-2xl font-bold">30</span>
-                                    </div>
-                                    <span className="text-xs sm:text-sm mt-1 block">Detik</span>
-                                </div>
-                            </div>
-                            <div className="flex justify-center lg:justify-start">
-                                <Link 
-                                    href="/marketplace/promotions"
-                                    className="bg-white text-purple-600 px-6 sm:px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-flex items-center text-sm sm:text-base"
-                                >
-                                    Lihat Promosi
-                                    <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
-                                </Link>
-                            </div>
+                            ))}
                         </div>
-                        <div className="hidden lg:block">
-                            <img 
-                                src="/assets/images/backgrounds/welcome-bg2.png" 
-                                alt="Promotion" 
-                                className="w-full h-auto"
-                            />
+                    ) : error ? (
+                        <div className="text-center py-12">
+                            <p className="text-gray-600">{error}</p>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
+                            {featuredProducts.slice(0, 4).map((product) => (
+                                <ProductCard key={product.id} product={product} />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </MarketplaceLayout>
     );
-}
+};
+
+export default Homepage;

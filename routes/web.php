@@ -198,7 +198,7 @@ Route::prefix('marketplace')->group(function () {
         return Inertia::render('Marketplace/ProductList');
     })->name('marketplace.products');
 
-    Route::get('/product/{id}', function ($id) {
+    Route::get('/products/{id}', function ($id) {
         return Inertia::render('Marketplace/ProductDetail', ['id' => $id]);
     })->name('marketplace.product.detail');
 

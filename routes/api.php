@@ -16,6 +16,8 @@ use App\Http\Controllers\ProductVariantController;
 use App\Http\Controllers\ReportController;
 // use App\Http\Controllers\RoleController; // Not needed - using enum in User model
 use App\Http\Controllers\SalesChannelController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\AnalyzerController;
 use App\Http\Controllers\ShippingController;
 use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\StockOpnameController;
@@ -40,7 +42,30 @@ Route::prefix('auth/')->group(function () {
 
 });
 
-// Auth routes
+// Public courier rates API routes (for checkout)
+Route::prefix('courier-rates')->group(function () {
+    Route::get('/', [CourierRateController::class, 'index']);
+    Route::get('/destinations', [CourierRateController::class, 'destinations']);
+    Route::get('/service-types', [CourierRateController::class, 'serviceTypes']);
+    Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
+    Route::get('/{id}', [CourierRateController::class, 'show']);
+});
+
+// Dashboard, Analyzer, and Reports routes (using token authentication)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('dashboard', [DashboardController::class, 'index']);
+    Route::get('analyzer', [AnalyzerController::class, 'index']);
+    Route::prefix('reports')->group(function () {
+        Route::get('/', [ReportController::class, 'index']);
+        Route::get('sales', [ReportController::class, 'sales']);
+        Route::get('stock', [ReportController::class, 'stock']);
+        Route::get('user-performance', [ReportController::class, 'userPerformance']);
+        Route::get('payments', [ReportController::class, 'payments']);
+        Route::post('export-sales', [ReportController::class, 'exportSales']);
+    });
+});
+
+// Other authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
     // User routes
     Route::get('/user', function (Request $request) {
@@ -123,23 +148,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('expense-summary', [ExpenseController::class, 'getSummary']);
     Route::post('expenses/export-excel', [ExpenseController::class, 'exportExcel']);
 
-    // Report routes
-    Route::prefix('reports')->group(function () {
-        Route::get('sales', [ReportController::class, 'sales']);
-        Route::get('stock', [ReportController::class, 'stock']);
-        Route::get('user-performance', [ReportController::class, 'userPerformance']);
-        Route::get('payments', [ReportController::class, 'payments']);
-        Route::post('export-sales', [ReportController::class, 'exportSales']);
-    });
+    // Other authenticated routes remain here
 
-    // Courier rates API routes
+    // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {
-        Route::get('/', [CourierRateController::class, 'index']);
-        Route::get('/destinations', [CourierRateController::class, 'destinations']);
-        Route::get('/service-types', [CourierRateController::class, 'serviceTypes']);
-        Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
         Route::post('/import', [CourierRateController::class, 'import']);
         Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
-        Route::get('/{id}', [CourierRateController::class, 'show']);
     });
 });

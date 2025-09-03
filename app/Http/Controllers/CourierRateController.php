@@ -31,7 +31,7 @@ class CourierRateController extends Controller
                 'province' => 'nullable|string|max:100',
                 'city' => 'nullable|string|max:100',
                 'district' => 'nullable|string|max:100',
-                'service_type' => 'nullable|string|in:ECO,REG,ONS,SDS,TRC,T15,T25,T60',
+                'service_type' => 'nullable|string|in:REG,ONS',
                 'origin_city' => 'nullable|string|max:100',
                 'min_price' => 'nullable|numeric|min:0',
                 'max_price' => 'nullable|numeric|min:0',
@@ -199,21 +199,19 @@ class CourierRateController extends Controller
     public function serviceTypes(): JsonResponse
     {
         try {
+            // Only show REG and ONS service types
+            $allowedServiceTypes = ['REG', 'ONS'];
+            
             $serviceTypes = CourierRate::select('service_type')
                 ->distinct()
+                ->whereIn('service_type', $allowedServiceTypes)
                 ->orderBy('service_type')
                 ->pluck('service_type')
                 ->toArray();
 
             $serviceDescriptions = [
-                'ECO' => 'Economy Service',
                 'REG' => 'Regular Service',
-                'ONS' => 'One Night Service',
-                'SDS' => 'Same Day Service',
-                'TRC' => 'Trucking Service',
-                'T15' => 'Trucking 15kg',
-                'T25' => 'Trucking 25kg',
-                'T60' => 'Trucking 60kg'
+                'ONS' => 'One Night Service'
             ];
 
             $services = collect($serviceTypes)->map(function ($type) use ($serviceDescriptions) {
@@ -276,9 +274,16 @@ class CourierRateController extends Controller
             $query->where('origin_city', 'like', '%' . $request->origin_city . '%');
         }
 
-        // Service type filter
+        // Service type filter - restrict to REG and ONS only
+        $allowedServiceTypes = ['REG', 'ONS'];
         if ($request->has('service_type')) {
-            $query->where('service_type', $request->service_type);
+            // Only allow REG and ONS service types
+            if (in_array($request->service_type, $allowedServiceTypes)) {
+                $query->where('service_type', $request->service_type);
+            }
+        } else {
+            // If no service_type specified, only show REG and ONS
+            $query->whereIn('service_type', $allowedServiceTypes);
         }
 
         // Price filters

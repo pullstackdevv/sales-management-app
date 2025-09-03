@@ -123,11 +123,13 @@ export default function ProductData() {
 
         <div className="bg-white rounded-md shadow-sm divide-y">
           <div className="grid grid-cols-12 items-center px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50">
-            <div className="col-span-4">Produk & Harga</div>
+            <div className="col-span-1">Gambar</div>
+            <div className="col-span-3">Produk & Harga</div>
             <div className="col-span-1">Stok</div>
             <div className="col-span-1">Varian</div>
             <div className="col-span-2">Kategori</div>
-            <div className="col-span-2">Status</div>
+            <div className="col-span-1">Status</div>
+            <div className="col-span-1">Storefront</div>
             <div className="col-span-2 text-right">Aksi</div>
           </div>
 
@@ -153,7 +155,25 @@ export default function ProductData() {
               return (
                 <div key={product.id}>
                   <div className="grid grid-cols-12 items-center px-4 py-3 text-sm hover:bg-gray-50">
-                    <div className="col-span-4">
+                    <div className="col-span-1">
+                      {product.image ? (
+                        <img 
+                          src={`/storage/${product.image}`} 
+                          alt={product.name}
+                          className="w-12 h-12 object-cover rounded-md"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className={`w-12 h-12 bg-gray-200 rounded-md flex items-center justify-center ${product.image ? 'hidden' : 'flex'}`}
+                      >
+                        <Icon icon="mdi:image-outline" className="text-gray-400" />
+                      </div>
+                    </div>
+                    <div className="col-span-3">
                       <p className="text-blue-600 font-medium">{product.name}</p>
                       <p className="text-gray-600">
                         {product.variants?.length > 0 ? formatCurrency(minPrice) : 'Belum ada harga'}
@@ -183,9 +203,18 @@ export default function ProductData() {
                         {product.category || 'Tanpa kategori'}
                       </span>
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1">
                       <span className="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">
                         Aktif
+                      </span>
+                    </div>
+                    <div className="col-span-1">
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        product.is_storefront 
+                          ? 'bg-green-100 text-green-600' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {product.is_storefront ? 'Ya' : 'Tidak'}
                       </span>
                     </div>
                     <div className="col-span-2 flex justify-end gap-2 text-lg text-gray-500">

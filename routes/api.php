@@ -108,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('customers/{customer}/addresses/{address}/set-default', [AddressController::class, 'setDefault']);
 
     // Product routes
+    Route::get('products/storefront', [ProductController::class, 'storefront']);
     Route::apiResource('products', ProductController::class);
     Route::apiResource('products.variants', ProductVariantController::class);
 

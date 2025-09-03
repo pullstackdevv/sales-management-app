@@ -11,7 +11,10 @@ export default function ProductAdd() {
     sku: "",
     category: "",
     description: "",
+    image: "",
     base_price: 0,
+    is_active: true,
+    is_storefront: true,
     variants: [
       {
         variant_label: "Default",
@@ -66,7 +69,38 @@ export default function ProductAdd() {
     setErrors({});
 
     try {
-      const response = await api.post('/products', product);
+      const formData = new FormData();
+      
+      // Append basic product data
+      formData.append('name', product.name);
+      formData.append('sku', product.sku);
+      formData.append('description', product.description);
+      formData.append('category', product.category);
+      formData.append('base_price', product.base_price);
+      formData.append('is_active', product.is_active ? '1' : '0');
+      formData.append('is_storefront', product.is_storefront ? '1' : '0');
+      
+      // Append image file if exists
+      if (product.image) {
+        formData.append('image', product.image);
+      }
+      
+      // Append variants data
+      product.variants.forEach((variant, index) => {
+        formData.append(`variants[${index}][variant_label]`, variant.variant_label);
+        formData.append(`variants[${index}][sku]`, variant.sku);
+        formData.append(`variants[${index}][price]`, variant.price);
+        formData.append(`variants[${index}][weight]`, variant.weight);
+        formData.append(`variants[${index}][stock]`, variant.stock);
+        formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
+      });
+
+      const response = await api.post('/products', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
       Swal.fire({
         icon: 'success',
         title: 'Berhasil!',
@@ -182,6 +216,24 @@ export default function ProductAdd() {
                     ></textarea>
                     {errors.description && (
                       <p className="text-red-500 text-xs mt-1">{errors.description[0]}</p>
+                    )}
+                  </div>
+
+                    <div>
+                    <label className="block text-sm font-medium mb-1">Gambar Produk</label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg,image/gif"
+                      className={`w-full border px-3 py-2 rounded-md ${
+                        errors.image ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      onChange={(e) => setProduct({ ...product, image: e.target.files[0] })}
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Format yang didukung: JPEG, PNG, JPG, GIF. Maksimal 2MB.
+                    </p>
+                    {errors.image && (
+                      <p className="text-red-500 text-xs mt-1">{errors.image[0]}</p>
                     )}
                   </div>
 
@@ -346,6 +398,37 @@ export default function ProductAdd() {
 
             {/* Sidebar */}
             <div className="space-y-4">
+              <div className="bg-white p-4 rounded-lg shadow-sm border">
+                <h2 className="font-medium mb-4">Pengaturan</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="mr-2"
+                        checked={product.is_active}
+                        onChange={(e) => setProduct({ ...product, is_active: e.target.checked })}
+                      />
+                      <span className="text-sm">Produk aktif</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">Produk dapat dikelola dan dijual</p>
+                  </div>
+                  
+                  <div>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="mr-2"
+                        checked={product.is_storefront}
+                        onChange={(e) => setProduct({ ...product, is_storefront: e.target.checked })}
+                      />
+                      <span className="text-sm">Tampil di halaman depan</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">Produk akan dapat dilihat dan dibeli oleh customer</p>
+                  </div>
+                </div>
+              </div>
+              
               <div className="bg-white p-4 rounded-lg shadow-sm border">
                 <h2 className="font-medium mb-4">Aksi</h2>
                 <div className="space-y-3">

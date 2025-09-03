@@ -3,15 +3,77 @@ import { Link } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import api from "@/api/axios";
+import { showSuccess, showError, showConfirm } from '@/utils/sweetalert';
 
 export default function CustomerData() {
     const [customers, setCustomers] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const loadCustomers = async () => {
+        try {
+            const response = await api.get("/customers");
+            setCustomers(response.data.data.data);
+        } catch (error) {
+            console.error('Error loading customers:', error);
+            
+            let errorMessage = 'Gagal memuat data customer';
+            
+            if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+                const specificError = error.response.data.errors.find(err => err.message);
+                if (specificError) {
+                    errorMessage = specificError.message;
+                }
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            }
+            
+            showError(errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        api.get("/customers").then((response) => {
-            setCustomers(response.data.data.data); // Adjust if nesting differs
-        });
+        loadCustomers();
     }, []);
+
+    const handleEdit = (customerId) => {
+        window.location.href = `/customer/edit/${customerId}`;
+    };
+
+    const handleDelete = async (customer) => {
+        const confirmed = await showConfirm(
+            'Hapus Customer',
+            `Apakah Anda yakin ingin menghapus customer "${customer.name}"?`,
+            'Ya, Hapus',
+            'Batal'
+        );
+
+        if (confirmed) {
+            try {
+                const response = await api.delete(`/customers/${customer.id}`);
+                if (response.data.status === 'success') {
+                    showSuccess('Customer berhasil dihapus!');
+                    loadCustomers(); // Reload the list
+                }
+            } catch (error) {
+                console.error('Error deleting customer:', error);
+                
+                let errorMessage = 'Gagal menghapus customer';
+                
+                if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+                    const specificError = error.response.data.errors.find(err => err.message);
+                    if (specificError) {
+                        errorMessage = specificError.message;
+                    }
+                } else if (error.response?.data?.message) {
+                    errorMessage = error.response.data.message;
+                }
+                
+                showError(errorMessage);
+            }
+        }
+    };
 
     return (
         <DashboardLayout>
@@ -119,10 +181,18 @@ export default function CustomerData() {
                                 </div>
 
                                 <div className="col-span-1 flex gap-2 justify-end text-lg text-gray-500">
-                                    <button className="hover:text-blue-600">
+                                    <button 
+                                        className="hover:text-blue-600"
+                                        onClick={() => handleEdit(customer.id)}
+                                        title="Edit Customer"
+                                    >
                                         <Icon icon="mdi:pencil-outline" />
                                     </button>
-                                    <button className="hover:text-red-600">
+                                    <button 
+                                        className="hover:text-red-600"
+                                        onClick={() => handleDelete(customer)}
+                                        title="Hapus Customer"
+                                    >
                                         <Icon icon="mdi:trash-outline" />
                                     </button>
                                 </div>

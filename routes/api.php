@@ -28,6 +28,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\XenditController;
 use App\Http\Controllers\MidtransController;
+use App\Http\Controllers\WilayahController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -43,6 +44,16 @@ Route::prefix('auth/')->group(function () {
     });
 
 
+});
+
+// Public wilayah API routes (for address selection)
+Route::prefix('wilayah')->group(function () {
+    Route::get('provinces', [WilayahController::class, 'getProvinces']);
+    Route::get('regencies/{provinceCode}', [WilayahController::class, 'getRegencies']);
+    Route::get('regencies', [WilayahController::class, 'getAllRegencies']);
+    Route::get('search-regencies', [WilayahController::class, 'searchRegencies']);
+    Route::get('districts/{regencyCode}', [WilayahController::class, 'getDistricts']);
+    Route::get('villages/{districtCode}', [WilayahController::class, 'getVillages']);
 });
 
 // Public courier rates API routes (for checkout)

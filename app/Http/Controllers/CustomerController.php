@@ -48,9 +48,13 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:customers',
+            'email' => 'required|string|email|max:255|unique:customers,email,NULL,id,deleted_at,NULL',
             'phone' => 'required|string|max:20',
+            'line_id' => 'nullable|string|max:255',
+            'other_contact' => 'nullable|string|max:255',
+            'category' => 'nullable|string|max:255',
             'address' => 'nullable|array',
+            'address.label' => 'required_with:address|string|max:255',
             'address.name' => 'required_with:address|string|max:255',
             'address.phone' => 'required_with:address|string|max:20',
             'address.province' => 'required_with:address|string|max:255',
@@ -58,8 +62,9 @@ class CustomerController extends Controller
             'address.district' => 'required_with:address|string|max:255',
             'address.postal_code' => 'required_with:address|string|max:10',
             'address.address' => 'required_with:address|string',
-            'address.is_default' => 'boolean',
-            'is_active' => 'boolean'
+            'address.address_detail' => 'required_with:address|string',
+            'address.recipient_name' => 'required_with:address|string|max:255',
+            'address.is_default' => 'boolean'
         ]);
 
         try {
@@ -69,7 +74,9 @@ class CustomerController extends Controller
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'phone' => $validated['phone'],
-                'is_active' => $validated['is_active'] ?? true,
+                'line_id' => $validated['line_id'] ?? null,
+                'other_contact' => $validated['other_contact'] ?? null,
+                'category' => $validated['category'] ?? null,
                 'created_by' => Auth::id()
             ]);
 
@@ -77,8 +84,7 @@ class CustomerController extends Controller
             if (isset($validated['address'])) {
                 $customer->addresses()->create([
                     ...$validated['address'],
-                    'is_default' => true,
-                    'created_by' => Auth::id()
+                    'is_default' => true
                 ]);
             }
 
@@ -109,22 +115,54 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function edit(Customer $customer): JsonResponse
+    {
+        return response()->json([
+            'status' => 'success',
+            'data' => $customer->load('addresses')
+        ]);
+    }
+
     public function update(Request $request, Customer $customer): JsonResponse
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|string|email|max:255|unique:customers,email,' . $customer->id,
+            'email' => 'sometimes|nullable|string|email|max:255|unique:customers,email,' . $customer->id . ',id,deleted_at,NULL',
             'phone' => 'sometimes|required|string|max:20',
-            'is_active' => 'boolean'
+            'line_id' => 'sometimes|nullable|string|max:255',
+            'other_contact' => 'sometimes|nullable|string|max:255',
+            'category' => 'sometimes|required|string|max:255',
+            'address' => 'sometimes|nullable|array',
+            'address.label' => 'required_with:address|string|max:255',
+            'address.name' => 'required_with:address|string|max:255',
+            'address.phone' => 'required_with:address|string|max:20',
+            'address.province' => 'required_with:address|string|max:255',
+            'address.city' => 'required_with:address|string|max:255',
+            'address.district' => 'required_with:address|string|max:255',
+            'address.postal_code' => 'required_with:address|string|max:10',
+            'address.address' => 'required_with:address|string',
+            'address.address_detail' => 'required_with:address|string',
+            'address.recipient_name' => 'required_with:address|string|max:255',
+            'address.is_default' => 'boolean'
         ]);
 
         try {
             DB::beginTransaction();
 
-            $customer->update([
-                ...$validated,
-                'updated_by' => Auth::id()
-            ]);
+            // Update customer basic info
+            $customerData = collect($validated)->except('address')->toArray();
+            $customerData['updated_by'] = Auth::id();
+            $customer->update($customerData);
+
+            // Update or create address if provided
+            if (isset($validated['address'])) {
+                // Delete existing addresses and create new one
+                $customer->addresses()->delete();
+                $customer->addresses()->create([
+                    ...$validated['address'],
+                    'is_default' => true
+                ]);
+            }
 
             DB::commit();
 
@@ -191,4 +229,4 @@ class CustomerController extends Controller
             throw $e;
         }
     }
-} 
+}

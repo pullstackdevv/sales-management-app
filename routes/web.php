@@ -86,6 +86,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/customer/add', function () {
         return Inertia::render('Customer/AddCustomer');
     })->name('customers.create');
+    
+    Route::get('/customer/edit/{id}', function ($id) {
+        return Inertia::render('Customer/EditCustomer', ['customerId' => $id]);
+    })->name('customers.edit');
 
     // Produk
     Route::get('/product/data', function () {

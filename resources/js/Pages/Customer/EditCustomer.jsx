@@ -5,8 +5,9 @@ import { Link } from "@inertiajs/react";
 import api from "../../api/axios";
 import Swal from "sweetalert2";
 
-export default function AddCustomer() {
+export default function EditCustomer({ customerId }) {
     const [loading, setLoading] = useState(false);
+    const [loadingData, setLoadingData] = useState(true);
     const [searchingCity, setSearchingCity] = useState(false);
     
     // Form states
@@ -40,6 +41,59 @@ export default function AddCustomer() {
     
     // Validation errors
     const [errors, setErrors] = useState({});
+    
+    // Load customer data
+    useEffect(() => {
+        const loadCustomer = async () => {
+            try {
+                const response = await api.get(`/customers/${customerId}`);
+                if (response.data.status === 'success') {
+                    const customerData = response.data.data;
+                    
+                    // Set form data
+                    setFormData({
+                        name: customerData.name || "",
+                        email: customerData.email || "",
+                        phone: customerData.phone || "",
+                        line_id: customerData.line_id || "",
+                        other_contact: customerData.other_contact || "",
+                        category: customerData.category || "Pelanggan"
+                    });
+                    
+                    // Set address data if exists
+                    if (customerData.addresses && customerData.addresses.length > 0) {
+                        const address = customerData.addresses[0];
+                        setAddressData({
+                            label: address.label || "Rumah",
+                            recipient_name: address.recipient_name || customerData.name,
+                            phone: address.phone || customerData.phone,
+                            province: address.province || "",
+                            city: address.city || "",
+                            district: address.district || "",
+                            postal_code: address.postal_code || "",
+                            address_detail: address.address_detail || "",
+                            is_default: address.is_default || true
+                        });
+                        setCityQuery(address.city || "");
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading customer:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal!',
+                    text: 'Gagal memuat data customer',
+                    confirmButtonColor: '#3B82F6'
+                });
+            } finally {
+                setLoadingData(false);
+            }
+        };
+        
+        if (customerId) {
+            loadCustomer();
+        }
+    }, [customerId]);
     
     // Handle input changes
     const handleInputChange = (field, value) => {
@@ -241,8 +295,8 @@ export default function AddCustomer() {
                 other_contact: formData.other_contact || null,
                 category: formData.category,
                 address: {
-                    name: addressData.label, // Add the required 'name' field
-                    address: addressData.address_detail, // Add the required 'address' field
+                    name: addressData.label,
+                    address: addressData.address_detail,
                     label: addressData.label,
                     recipient_name: addressData.recipient_name || formData.name,
                     phone: addressData.phone || formData.phone,
@@ -255,73 +309,47 @@ export default function AddCustomer() {
                 }
             };
             
-            const response = await api.post('/customers', customerData);
+            const response = await api.put(`/customers/${customerId}`, customerData);
             
             if (response.data.status === 'success') {
                 await Swal.fire({
                     icon: 'success',
                     title: 'Berhasil!',
-                    text: 'Customer berhasil ditambahkan',
+                    text: 'Customer berhasil diperbarui',
                     confirmButtonColor: '#3B82F6'
                 });
                 
-                // Redirect to customer list or reset form
+                // Redirect to customer list
                 window.location.href = '/customer/data';
             } else {
-                throw new Error(response.data.message || 'Gagal menambahkan customer');
+                throw new Error(response.data.message || 'Gagal memperbarui customer');
             }
         } catch (error) {
-            console.error('Error adding customer:', error);
-            console.log('Full error object:', error);
-            console.log('Error response:', error.response);
-            console.log('Error response data:', error.response?.data);
-            console.log('Error response status:', error.response?.status);
+            console.error('Error updating customer:', error);
             
-            let errorMessage = 'Terjadi kesalahan saat menambahkan customer';
-            
-            // Debug: Log the structure of error response
-            if (error.response?.data) {
-                console.log('Response data structure:', {
-                    status: error.response.data.status,
-                    message: error.response.data.message,
-                    errors: error.response.data.errors,
-                    data: error.response.data.data
-                });
-            }
+            let errorMessage = 'Terjadi kesalahan saat memperbarui customer';
             
             // Check errors array first for specific messages
              if (error.response?.data?.errors) {
-                 console.log('Processing errors array/object:', error.response.data.errors);
                 // Handle specific error format from API
                 const apiErrors = error.response.data.errors;
                 
                 if (Array.isArray(apiErrors)) {
-                    console.log('Errors is array:', apiErrors);
                     // Handle array format errors
                     const specificError = apiErrors.find(err => err.message);
-                    console.log('Found specific error:', specificError);
                     if (specificError) {
                         errorMessage = specificError.message;
-                        console.log('Using specific error message:', specificError.message);
                     } else {
                         errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
-                        console.log('No specific error found, using generic message');
                     }
                 } else {
-                    console.log('Errors is object:', apiErrors);
                     // Handle object format validation errors
                     setErrors(apiErrors);
                     errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
-                    console.log('Set form errors and using generic message');
                  }
              } else if (error.response?.data?.message) {
-                 console.log('No errors array found, using message from response:', error.response.data.message);
                  errorMessage = error.response.data.message;
-             } else {
-                 console.log('No specific error structure found, using generic message');
              }
-            
-            console.log('Final error message to display:', errorMessage);
             
             Swal.fire({
                 icon: 'error',
@@ -334,6 +362,21 @@ export default function AddCustomer() {
         }
     };
 
+    if (loadingData) {
+        return (
+            <DashboardLayout>
+                <div className="p-6">
+                    <div className="flex items-center justify-center h-64">
+                        <div className="flex items-center gap-3">
+                            <Icon icon="mdi:loading" className="animate-spin text-2xl text-blue-600" />
+                            <span className="text-lg">Memuat data customer...</span>
+                        </div>
+                    </div>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
     return (
         <DashboardLayout>
             <div className="p-6">
@@ -345,7 +388,7 @@ export default function AddCustomer() {
                         <Icon icon="material-symbols:arrow-back" width={24} />
                     </button>
 
-                    <h1 className="text-2xl font-semibold">Tambah Customer</h1>
+                    <h1 className="text-2xl font-semibold">Edit Customer</h1>
                 </div>
 
                 <div className="flex flex-col lg:flex-row gap-6">
@@ -465,7 +508,7 @@ export default function AddCustomer() {
                                     </label>
                                     <input 
                                         type="tel"
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm pl-10 ${
+                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
                                             errors.phone ? 'border-red-500' : 'border-gray-300'
                                         }`}
                                         value={formData.phone}
@@ -474,10 +517,6 @@ export default function AddCustomer() {
                                             setAddressData(prev => ({ ...prev, phone: e.target.value }));
                                         }}
                                         placeholder="08xxxxxxxxxx"
-                                    />
-                                    <Icon
-                                        icon="ph:phone-light"
-                                        className="absolute left-3 top-9 text-gray-400"
                                     />
                                     {errors.phone && (
                                         <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
@@ -495,7 +534,7 @@ export default function AddCustomer() {
                                         }`}
                                         value={formData.email}
                                         onChange={(e) => handleInputChange('email', e.target.value)}
-                                        placeholder="email@example.com"
+                                        placeholder="customer@email.com"
                                     />
                                     {errors.email && (
                                         <p className="text-red-500 text-xs mt-1">{errors.email}</p>
@@ -504,14 +543,14 @@ export default function AddCustomer() {
 
                                 <div>
                                     <label className="text-sm font-medium">
-                                        ID Line
+                                        Line ID
                                     </label>
                                     <input 
                                         type="text"
                                         className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
                                         value={formData.line_id}
                                         onChange={(e) => handleInputChange('line_id', e.target.value)}
-                                        placeholder="ID Line"
+                                        placeholder="Line ID"
                                     />
                                 </div>
 
@@ -557,7 +596,7 @@ export default function AddCustomer() {
                                 {loading && (
                                     <Icon icon="mdi:loading" className="animate-spin" />
                                 )}
-                                {loading ? 'Menyimpan...' : 'Simpan Customer'}
+                                {loading ? 'Menyimpan...' : 'Perbarui Customer'}
                             </button>
                             <button 
                                 type="button"
@@ -594,7 +633,7 @@ export default function AddCustomer() {
                             </div>
                             <p className="text-blue-700">
                                 Field yang bertanda <span className="text-red-500">*</span> wajib diisi.
-                                Alamat akan otomatis tersimpan sebagai alamat default customer.
+                                Perubahan alamat akan memperbarui alamat default customer.
                             </p>
                         </div>
                     </div>

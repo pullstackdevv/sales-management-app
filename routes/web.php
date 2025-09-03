@@ -183,6 +183,14 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/voucher/create', function () {
         return Inertia::render('Voucher/AddVoucher');
     })->name('vouchers.create');
+    
+    Route::get('/voucher/edit/{id}', function ($id) {
+        return Inertia::render('Voucher/EditVoucher', ['voucherId' => $id]);
+    })->name('vouchers.edit');
+    
+    Route::get('/voucher/view/{id}', function ($id) {
+        return Inertia::render('Voucher/ViewVoucher', ['voucherId' => $id]);
+    })->name('vouchers.view');
 
     // analizer
     Route::get('/report', function () {

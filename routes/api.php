@@ -25,6 +25,9 @@ use App\Http\Controllers\StockOpnameDetailController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\WebOrderController;
+use App\Http\Controllers\XenditController;
+use App\Http\Controllers\MidtransController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -154,5 +157,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
         Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
+    });
+});
+
+// Payment Gateway Routes (public access for webhooks and order payment)
+Route::prefix('payment')->name('payment.')->group(function () {
+    // Web Order Payment Routes (can be used by guests)
+    Route::post('/create/{orderNumber}', [WebOrderController::class, 'createPayment'])->name('web.create');
+    Route::get('/status/{orderNumber}', [WebOrderController::class, 'checkPaymentStatus'])->name('web.status');
+    
+    // Xendit specific routes
+    Route::prefix('xendit')->name('xendit.')->group(function () {
+        Route::post('/webhook', [XenditController::class, 'handleWebhook'])->name('webhook');
+        Route::get('/status/{orderNumber}', [XenditController::class, 'checkPaymentStatus'])->name('status');
+    });
+    
+    // Midtrans specific routes (existing routes from web.php can be moved here if needed)
+    Route::prefix('midtrans')->name('midtrans.')->group(function () {
+        Route::post('/webhook', [MidtransController::class, 'handleNotification'])->name('webhook');
+        Route::get('/status/{orderNumber}', [MidtransController::class, 'checkPaymentStatus'])->name('status');
     });
 });

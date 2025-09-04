@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Enums\PaymentStatus;
+use App\Traits\AuditableOrder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
-    use HasFactory;
+    use HasFactory, AuditableOrder;
 
     protected $fillable = [
         'order_number',

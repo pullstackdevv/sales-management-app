@@ -4,7 +4,7 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import axios from "axios";
 import Swal from "sweetalert2";
-import { usePage } from '@inertiajs/react';
+import { usePage, router } from '@inertiajs/react';
 
 export default function EditOrder() {
     const { orderId } = usePage().props;
@@ -17,7 +17,7 @@ export default function EditOrder() {
         shipping_cost: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
-        payment_status: 'pending'
+        status: 'pending'
     });
 
     const [orderItems, setOrderItems] = useState([]);
@@ -59,26 +59,46 @@ export default function EditOrder() {
                 customer_id: order.customer_id,
                 address_id: order.address_id,
                 sales_channel_id: order.sales_channel_id,
-                shipping_cost: order.shipping_cost || 0,
+                shipping_cost: parseFloat(order.shipping_cost) || 0,
                 notes: order.notes || '',
                 order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
-                payment_status: order.payment_status || 'pending'
+                status: order.status || 'pending'
             });
             
-            // Set order items
+            // Set order items with complete variant details
             setOrderItems(order.items?.map(item => ({
                 product_variant_id: item.product_variant_id,
-                product_name: item.product_variant?.product?.name || 'Unknown Product',
-                variant_name: item.product_variant?.name || 'Default',
+                product_name: item.product_variant?.product?.name || item.product_name_snapshot || 'Unknown Product',
+                product_sku: item.product_variant?.product?.sku || '',
+                product_category: item.product_variant?.product?.category || '',
+                variant_name: item.product_variant?.name || item.product_variant?.variant_label || item.variant_label || 'Default',
+                variant_sku: item.product_variant?.sku || '',
+                variant_weight: item.product_variant?.weight || 0,
+                variant_stock: item.product_variant?.stock || 0,
                 quantity: item.quantity,
                 price: item.price
             })) || []);
             
-            // Set selected customer
+            // Set selected customer and fetch fresh customer data with addresses
             if (order.customer) {
                 setSelectedCustomer(order.customer);
                 setSearchTerms(prev => ({ ...prev, customer: order.customer.name }));
-                setCustomerAddresses(order.customer.addresses || []);
+                
+                // Fetch fresh customer data to ensure addresses are loaded
+                try {
+                    const customerResponse = await axios.get(`/api/customers/${order.customer_id}`);
+                    if (customerResponse.data.status === 'success') {
+                        const customerData = customerResponse.data.data;
+                        setCustomerAddresses(customerData.addresses || []);
+                        setSelectedCustomer(customerData);
+                    } else {
+                        // Fallback to order customer data
+                        setCustomerAddresses(order.customer.addresses || []);
+                    }
+                } catch (customerError) {
+                    console.warn('Failed to fetch fresh customer data, using order data:', customerError);
+                    setCustomerAddresses(order.customer.addresses || []);
+                }
             }
             
         } catch (error) {
@@ -160,16 +180,44 @@ export default function EditOrder() {
         );
 
         if (existingItemIndex >= 0) {
+            // Check stock before updating quantity
+            const currentItem = orderItems[existingItemIndex];
+            if (currentItem.quantity >= variant.stock) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Stok Tidak Mencukupi',
+                    text: `Stok maksimal untuk ${variant.name || variant.variant_label} adalah ${variant.stock}`,
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
             // Update quantity if item already exists
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
             setOrderItems(updatedItems);
         } else {
-            // Add new item
+            // Check if variant has stock before adding
+            if (variant.stock <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Stok Habis',
+                    text: `Produk ${variant.name || variant.variant_label} sedang habis`,
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
+            // Add new item with complete variant details
             const newItem = {
                 product_variant_id: variant.id,
                 product_name: product.name,
-                variant_name: variant.name,
+                product_sku: product.sku,
+                product_category: product.category,
+                variant_name: variant.name || variant.variant_label,
+                variant_sku: variant.sku,
+                variant_weight: variant.weight,
+                variant_stock: variant.stock,
                 quantity: 1,
                 price: variant.price
             };
@@ -183,7 +231,7 @@ export default function EditOrder() {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + formData.shipping_cost;
+        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0);
     };
 
     // Handle form submission
@@ -204,6 +252,15 @@ export default function EditOrder() {
                 return;
             }
 
+            // Calculate totals for debugging
+            const subtotal = calculateSubtotal();
+            const total = calculateTotal();
+            console.log('=== EditOrder Debug ===');
+            console.log('Subtotal:', subtotal);
+            console.log('Shipping Cost:', formData.shipping_cost);
+            console.log('Total:', total);
+            console.log('Order Items:', orderItems);
+
             // Prepare data for API
             const orderData = {
                 customer_id: parseInt(formData.customer_id),
@@ -216,34 +273,54 @@ export default function EditOrder() {
                 })),
                 shipping_cost: formData.shipping_cost,
                 notes: formData.notes,
-                payment_status: formData.payment_status
+                status: formData.status
             };
 
+            console.log('Order Data to be sent:', orderData);
             const response = await axios.put(`/api/orders/${orderId}`, orderData);
             
             if (response.data.status === 'success') {
                 Swal.fire({
                     icon: 'success',
                     title: 'Order Berhasil Diupdate!',
-                    text: `Order ID: ${orderId}`,
+                    text: `Nomor Order: ${response.data.data?.order_number || 'N/A'}`,
                     timer: 3000,
                     showConfirmButton: false
                 });
-                // Redirect back
-                setTimeout(() => {
-                    window.history.back();
-                }, 1500);
+                // Redirect back to orders page with forced refresh
+                router.visit('/order/data', {
+                    preserveState: false,
+                    preserveScroll: false
+                });
             }
         } catch (error) {
             console.error('Error updating order:', error);
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
+                
+                // Check if it's a stock validation error
+                const stockError = error.response.data.errors.items;
+                if (stockError && Array.isArray(stockError)) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Stok Tidak Mencukupi',
+                        text: stockError[0],
+                        confirmButtonText: 'OK'
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error Validasi',
+                        text: error.response?.data?.message || 'Gagal mengupdate order'
+                    });
+                }
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.response?.data?.message || 'Gagal mengupdate order'
+                });
             }
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: error.response?.data?.message || 'Gagal mengupdate order'
-            });
         } finally {
             setLoading(prev => ({ ...prev, submitting: false }));
         }
@@ -378,7 +455,7 @@ export default function EditOrder() {
                                 <option value="">Pilih alamat pengiriman</option>
                                 {customerAddresses.map((address) => (
                                     <option key={address.id} value={address.id}>
-                                        {address.label} - {address.address}, {address.city}
+                                        {address.label} - {address.recipient_name} | {address.address_detail}, {address.district}, {address.city}, {address.province} {address.postal_code} | {address.phone}
                                     </option>
                                 ))}
                             </select>
@@ -506,9 +583,14 @@ export default function EditOrder() {
                                             <div className="mt-2 space-y-1">
                                                 {product.variants?.map((variant) => (
                                                     <div key={variant.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                                        <div>
-                                                            <span className="text-sm font-medium">{variant.name}</span>
-                                                            <span className="text-sm text-gray-500 ml-2">Stok: {variant.stock}</span>
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium">{variant.name || variant.variant_label}</span>
+                                                                {variant.sku && (
+                                                                    <span className="text-xs text-gray-400 bg-gray-200 px-1 rounded">{variant.sku}</span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID')}</span>
@@ -567,7 +649,7 @@ export default function EditOrder() {
                                                         }}
                                                         className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
                                                     >
-                                                        <Icon icon="solar:minus-outline" className="w-4 h-4" />
+                                                        <span className="text-lg font-bold">−</span>
                                                     </button>
                                                     
                                                     <span className="w-12 text-center font-medium">{item.quantity}</span>
@@ -575,12 +657,25 @@ export default function EditOrder() {
                                                     <button
                                                         onClick={() => {
                                                             const updatedItems = [...orderItems];
-                                                            updatedItems[index].quantity += 1;
-                                                            setOrderItems(updatedItems);
+                                                            const currentItem = updatedItems[index];
+                                                            const maxStock = currentItem.variant_stock || 0;
+                                                            
+                                                            if (currentItem.quantity < maxStock) {
+                                                                updatedItems[index].quantity += 1;
+                                                                setOrderItems(updatedItems);
+                                                            } else {
+                                                                Swal.fire({
+                                                                    icon: 'warning',
+                                                                    title: 'Stok Tidak Mencukupi',
+                                                                    text: `Stok maksimal untuk ${currentItem.variant_name} adalah ${maxStock}`,
+                                                                    confirmButtonText: 'OK'
+                                                                });
+                                                            }
                                                         }}
-                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
+                                                        disabled={item.quantity >= (item.variant_stock || 0)}
+                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                                                     >
-                                                        <Icon icon="solar:add-outline" className="w-4 h-4" />
+                                                        <span className="text-lg font-bold">+</span>
                                                     </button>
                                                 </div>
                                                 
@@ -592,6 +687,13 @@ export default function EditOrder() {
                                                     onClick={() => {
                                                         const updatedItems = orderItems.filter((_, i) => i !== index);
                                                         setOrderItems(updatedItems);
+                                                        Swal.fire({
+                                                            icon: 'success',
+                                                            title: 'Item Dihapus',
+                                                            text: `${item.variant_name} dihapus dari order`,
+                                                            showConfirmButton: false,
+                                                            timer: 1500
+                                                        });
                                                     }}
                                                     className="text-red-500 hover:text-red-700 p-1"
                                                 >
@@ -628,22 +730,43 @@ export default function EditOrder() {
                             </div>
                         </div>
 
-                        {/* Payment */}
+                        {/* Order Status */}
                         <div className="bg-white p-4 rounded-lg border">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Status Pembayaran
+                                Status Order
                             </label>
                             <select 
-                                value={formData.payment_status}
-                                onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value }))}
+                                value={formData.status}
+                                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                             >
-                                <option value="pending">Menunggu Pembayaran</option>
-                                <option value="paid">Sudah Dibayar</option>
-                                <option value="shipped">Sudah Dikirim</option>
-                                <option value="cancelled">Dibatalkan</option>
+                                <option value="pending">Pending</option>
+                                <option value="paid">Paid</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
+
+                        {/* Error Display */}
+                        {errors.items && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                <div className="flex items-start gap-2">
+                                    <Icon icon="mdi:alert-circle" className="w-5 h-5 text-red-500 mt-0.5" />
+                                    <div>
+                                        <h4 className="text-red-800 font-medium mb-1">Error Validasi</h4>
+                                        {Array.isArray(errors.items) ? (
+                                            <ul className="text-red-700 text-sm space-y-1">
+                                                {errors.items.map((error, index) => (
+                                                    <li key={index}>• {error}</li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-red-700 text-sm">{errors.items}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Submit */}
                         <div className="flex justify-end gap-4">

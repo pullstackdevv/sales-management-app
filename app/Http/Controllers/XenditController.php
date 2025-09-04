@@ -198,7 +198,7 @@ class XenditController extends Controller
 
             // Update order status based on payment status
             if ($paymentStatus === PaymentStatus::PAID) {
-                $order->update(['status' => 'paid']);
+                $order->update(['status' => 'processing']); // Change to processing when paid
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
             }
@@ -224,73 +224,53 @@ class XenditController extends Controller
     {
         try {
             $order = Order::where('order_number', $orderNumber)->first();
-
-            if (!$order) {
-                return ResponseFormatter::error(
-                    'Order not found',
-                    [],
-                    404
-                );
+            
+            if (!$order || !$order->payment_token) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Order not found or payment token missing'
+                ], 404);
             }
 
-            if (!$order->payment_token) {
-                return ResponseFormatter::error(
-                    'No payment invoice found for this order',
-                    [],
-                    400
-                );
-            }
+            $response = Http::withHeaders([
+                'Authorization' => 'Basic ' . base64_encode(config('services.xendit.secret_key') . ':'),
+                'Content-Type' => 'application/json'
+            ])->get("https://api.xendit.co/v2/invoices/{$order->payment_token}");
 
-            // Get invoice status from Xendit
-            $response = Http::withBasicAuth($this->secretKey, '')
-                ->get($this->baseUrl . '/v2/invoices/' . $order->payment_token);
-
-            if (!$response->successful()) {
-                Log::error('Failed to get invoice status from Xendit', [
-                    'status' => $response->status(),
-                    'response' => $response->body()
-                ]);
+            if ($response->successful()) {
+                $invoiceData = $response->json();
+                $status = $invoiceData['status'];
                 
-                return ResponseFormatter::error(
-                    'Failed to check payment status',
-                    ['error' => $response->json()],
-                    500
-                );
-            }
-
-            $invoiceData = $response->json();
-            $status = $invoiceData['status'] ?? null;
-
-            // Map to our payment status
-            $paymentStatus = $this->mapXenditStatus($status);
-
-            // Update order if status changed
-            if ($order->payment_status !== $paymentStatus) {
-                $order->update(['payment_status' => $paymentStatus]);
-
-                // Update order status based on payment status
-                if ($paymentStatus === PaymentStatus::PAID) {
-                    $order->update(['status' => 'paid']);
-                } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
-                    $order->update(['status' => 'cancelled']);
+                // Map Xendit status to our payment status
+                $paymentStatus = $this->mapXenditStatus($status);
+                
+                // Update order if status changed
+                if ($order->payment_status !== $paymentStatus) {
+                    $order->update([
+                        'payment_status' => $paymentStatus,
+                        'status' => $paymentStatus === 'paid' ? 'processing' : $order->status
+                    ]);
                 }
+                
+                return response()->json([
+                    'status' => 'success',
+                    'payment_status' => $paymentStatus,
+                    'xendit_status' => $status,
+                    'order' => $order->fresh()
+                ]);
             }
-
-            return ResponseFormatter::success(
-                'Payment status retrieved successfully',
-                [
-                    'order' => $order->fresh(),
-                    'xendit_invoice' => $invoiceData,
-                ]
-            );
-
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch payment status from Xendit'
+            ], 500);
+            
         } catch (\Exception $e) {
-            Log::error('Payment status check failed: ' . $e->getMessage());
-            return ResponseFormatter::error(
-                'Failed to check payment status',
-                ['error' => $e->getMessage()],
-                500
-            );
+            Log::error('Error checking payment status: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Internal server error'
+            ], 500);
         }
     }
 

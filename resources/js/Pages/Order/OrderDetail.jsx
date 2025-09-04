@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import DashboardLayout from '@/Layouts/DashboardLayout.jsx';
-import { ChevronLeft, MessageCircle, Copy, Settings, Eye, Truck } from 'lucide-react';
+import { ChevronLeft, MessageCircle, Copy, Settings, Eye, Truck, ExternalLink, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import api from '@/api/axios';
+import PaymentHistoryModal from '../../components/ui/modal/PaymentHistoryModal';
+import OrderHistoryModal from '../../components/ui/modal/OrderHistoryModal';
 
 export default function OrderDetail({ auth, order }) {
     const [orderData, setOrderData] = useState(order || null);
     const [loading, setLoading] = useState(!order);
+    const [checkingPayment, setCheckingPayment] = useState(false);
+    const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+    const [showOrderHistory, setShowOrderHistory] = useState(false);
 
     useEffect(() => {
         if (!order && window.location.pathname.includes('/order/detail/')) {
@@ -53,11 +59,42 @@ export default function OrderDetail({ auth, order }) {
         router.visit(`/order/edit/${orderData.id}`);
     };
 
+    const handleCheckPaymentStatus = async () => {
+        if (!orderData.payment_url) {
+            toast.error('Order ini tidak memiliki payment URL');
+            return;
+        }
+
+        try {
+            setCheckingPayment(true);
+            const response = await api.get(`/payment/xendit/status/${orderData.order_number}`);
+            
+            if (response.data.status === 'success') {
+                // Refresh order data
+                await fetchOrderDetail(orderData.id);
+                toast.success('Status pembayaran berhasil diperbarui');
+            } else {
+                toast.error('Gagal mengecek status pembayaran');
+            }
+        } catch (error) {
+            console.error('Error checking payment status:', error);
+            toast.error('Terjadi kesalahan saat mengecek status pembayaran');
+        } finally {
+            setCheckingPayment(false);
+        }
+    };
+
+    const isWebOrder = () => {
+        return orderData.payment_url && orderData.payment_url.trim() !== '';
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'pending': return 'bg-yellow-100 text-yellow-800';
             case 'paid': return 'bg-green-100 text-green-800';
-            case 'shipped': return 'bg-blue-100 text-blue-800';
+            case 'processing': return 'bg-blue-100 text-blue-800';
+            case 'shipped': return 'bg-purple-100 text-purple-800';
+            case 'delivered': return 'bg-emerald-100 text-emerald-800';
             case 'cancelled': return 'bg-red-100 text-red-800';
             default: return 'bg-gray-100 text-gray-800';
         }
@@ -65,9 +102,11 @@ export default function OrderDetail({ auth, order }) {
 
     const getStatusLabel = (status) => {
         switch (status) {
-            case 'pending': return 'Menunggu';
-            case 'paid': return 'Lunas';
+            case 'pending': return 'Belum Bayar';
+            case 'paid': return 'Dibayar';
+            case 'processing': return 'Diproses';
             case 'shipped': return 'Dikirim';
+            case 'delivered': return 'Diterima';
             case 'cancelled': return 'Dibatalkan';
             default: return status;
         }
@@ -153,6 +192,14 @@ export default function OrderDetail({ auth, order }) {
                                     </button>
                                     
                                     <button
+                                        onClick={() => setShowOrderHistory(true)}
+                                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                        <span>Riwayat Order</span>
+                                    </button>
+                                    
+                                    <button
                                         onClick={handleManageOrder}
                                         className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                     >
@@ -226,16 +273,58 @@ export default function OrderDetail({ auth, order }) {
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(orderData.payment_status)}`}>
                                                     {getStatusLabel(orderData.payment_status)}
                                                 </span>
-                                                <span className="text-sm text-gray-600">
-                                                    {new Date(orderData.created_at).toLocaleDateString('id-ID')} - {orderData.payments?.[0]?.payment_bank?.name || 'Bank'}
-                                                </span>
+                                                <div className="text-sm text-gray-600">
+                                                    <div>{new Date(orderData.created_at).toLocaleDateString('id-ID')}</div>
+                                                    {orderData.payments?.[0]?.payment_bank ? (
+                                                        <div className="mt-1 p-2 bg-gray-50 rounded border">
+                                                            <div className="font-semibold text-gray-800">{orderData.payments[0].payment_bank.bank_name}</div>
+                                                            <div className="text-xs text-gray-600">No. Rekening: {orderData.payments[0].payment_bank.account_number}</div>
+                                                            <div className="text-xs text-gray-600">Atas Nama: {orderData.payments[0].payment_bank.account_name}</div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-gray-500">Manual Transfer</div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <button className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm">
-                                                <Eye className="w-4 h-4" />
-                                                <span>Lihat Riwayat</span>
-                                            </button>
+                                            <div className="flex items-center space-x-2">
+                                                {isWebOrder() && (
+                                                    <>
+                                                        <button 
+                                                            onClick={handleCheckPaymentStatus}
+                                                            disabled={checkingPayment}
+                                                            className="flex items-center space-x-1 text-green-600 hover:text-green-800 text-sm disabled:opacity-50"
+                                                        >
+                                                            <RefreshCw className={`w-4 h-4 ${checkingPayment ? 'animate-spin' : ''}`} />
+                                                            <span>{checkingPayment ? 'Mengecek...' : 'Cek Status'}</span>
+                                                        </button>
+                                                        <a 
+                                                            href={orderData.payment_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm"
+                                                        >
+                                                            <ExternalLink className="w-4 h-4" />
+                                                            <span>Payment URL</span>
+                                                        </a>
+                                                    </>
+                                                )}
+                                                <button 
+                                                    onClick={() => setShowPaymentHistory(true)}
+                                                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm transition-colors"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                    <span>Lihat Riwayat</span>
+                                                </button>
+                                            </div>
                                         </div>
                                         <p className="text-lg font-bold mt-2">Rp{orderData.total_price?.toLocaleString('id-ID')}</p>
+                                        {isWebOrder() && (
+                                            <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                                                <p className="text-xs text-blue-700">
+                                                    <span className="font-medium">Web Order:</span> Order ini dibuat melalui website dengan payment gateway
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -333,6 +422,33 @@ export default function OrderDetail({ auth, order }) {
                     </div>
                 </div>
             </div>
+
+            {/* Payment History Modal */}
+            {orderData && (
+                <PaymentHistoryModal
+                    isOpen={showPaymentHistory}
+                    onClose={() => setShowPaymentHistory(false)}
+                    order={{
+                        id: orderData.id,
+                        number: orderData.order_number,
+                        date: orderData.ordered_at,
+                        status: orderData.status,
+                        payment_url: orderData.payment_url,
+                        payment_bank: orderData.payments?.[0]?.payment_bank,
+                        courier: orderData.shipping?.courier?.name || 'N/A',
+                        resi: orderData.shipping?.tracking_number || ''
+                    }}
+                />
+            )}
+
+            {/* Order History Modal */}
+            {orderData && (
+                <OrderHistoryModal
+                    isOpen={showOrderHistory}
+                    onClose={() => setShowOrderHistory(false)}
+                    orderId={orderData.id}
+                />
+            )}
         </DashboardLayout>
     );
 }

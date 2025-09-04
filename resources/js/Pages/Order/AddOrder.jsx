@@ -14,7 +14,7 @@ export default function AddOrder() {
         shipping_cost: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
-        payment_status: 'pending'
+        status: 'pending'
     });
 
     const [orderItems, setOrderItems] = useState([]);
@@ -113,17 +113,44 @@ export default function AddOrder() {
         );
 
         if (existingItemIndex >= 0) {
+            // Check stock before updating quantity
+            const currentItem = orderItems[existingItemIndex];
+            if (currentItem.quantity >= variant.stock) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Stok Tidak Mencukupi',
+                    text: `Stok maksimal untuk ${variant.name || variant.variant_label} adalah ${variant.stock}`,
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
             // Update quantity if item already exists
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
             setOrderItems(updatedItems);
 
         } else {
-            // Add new item
+            // Check if variant has stock before adding
+            if (variant.stock <= 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Stok Habis',
+                    text: `Produk ${variant.name || variant.variant_label} sedang habis`,
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
+            // Add new item with complete variant details
             const newItem = {
                 product_variant_id: variant.id,
                 product_name: product.name,
-                variant_name: variant.name,
+                product_sku: product.sku,
+                product_category: product.category,
+                variant_name: variant.name || variant.variant_label,
+                variant_sku: variant.sku,
+                variant_stock: variant.stock,
                 quantity: 1,
                 price: variant.price
             };
@@ -137,7 +164,7 @@ export default function AddOrder() {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + formData.shipping_cost;
+        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0);
     };
 
     // Handle form submission
@@ -169,7 +196,8 @@ export default function AddOrder() {
                     price: item.price
                 })),
                 shipping_cost: formData.shipping_cost,
-                notes: formData.notes
+                notes: formData.notes,
+                status: formData.status
             };
 
             const response = await axios.post('/api/orders', orderData);
@@ -178,7 +206,7 @@ export default function AddOrder() {
                 Swal.fire({
                     icon: 'success',
                     title: 'Order Berhasil Dibuat!',
-                    text: `Order ID: ${response.data.data?.id || 'N/A'}`,
+                    text: `Nomor Order: ${response.data.data?.order_number || 'N/A'}`,
                     timer: 3000,
                     showConfirmButton: false
                 });
@@ -191,8 +219,30 @@ export default function AddOrder() {
             console.error('Error creating order:', error);
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
+                
+                // Check if it's a stock validation error
+                const stockError = error.response.data.errors.items;
+                if (stockError && Array.isArray(stockError)) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Stok Tidak Mencukupi',
+                        text: stockError[0],
+                        confirmButtonText: 'OK'
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error Validasi',
+                        text: error.response?.data?.message || 'Gagal membuat order'
+                    });
+                }
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.response?.data?.message || 'Gagal membuat order'
+                });
             }
-            console.error('Error creating order:', error.response?.data?.message || 'Gagal membuat order');
         } finally {
             setLoading(prev => ({ ...prev, submitting: false }));
         }
@@ -304,7 +354,7 @@ export default function AddOrder() {
                                 <option value="">Pilih alamat pengiriman</option>
                                 {customerAddresses.map((address) => (
                                     <option key={address.id} value={address.id}>
-                                        {address.label} - {address.address}, {address.city}
+                                        {address.label} - {address.recipient_name} | {address.address_detail}, {address.district}, {address.city}, {address.province} {address.postal_code} | {address.phone}
                                     </option>
                                 ))}
                             </select>
@@ -437,9 +487,14 @@ export default function AddOrder() {
                                             <div className="mt-2 space-y-1">
                                                 {product.variants?.map((variant) => (
                                                     <div key={variant.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                                        <div>
-                                                            <span className="text-sm font-medium">{variant.name}</span>
-                                                            <span className="text-sm text-gray-500 ml-2">Stok: {variant.stock}</span>
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium">{variant.name || variant.variant_label}</span>
+                                                                {variant.sku && (
+                                                                    <span className="text-xs text-gray-400 bg-gray-200 px-1 rounded">{variant.sku}</span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID')}</span>
@@ -482,8 +537,21 @@ export default function AddOrder() {
                                         <div key={`${item.product_variant_id}-${index}`} className="flex items-center justify-between p-3 border rounded-lg">
                                             <div className="flex-1">
                                                 <h4 className="font-medium">{item.product_name}</h4>
-                                                <p className="text-sm text-gray-500">{item.variant_name}</p>
-                                                <p className="text-sm font-medium text-blue-600">Rp {item.price?.toLocaleString('id-ID')}</p>
+                                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                    <span>{item.variant_name}</span>
+                                                    {item.variant_sku && (
+                                                        <span className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">{item.variant_sku}</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
+                                                    {item.product_category && <span>Kategori: {item.product_category}</span>}
+                                                    {item.variant_stock !== undefined && (
+                                                        <span className={item.variant_stock > 0 ? 'text-green-600' : 'text-red-500'}>
+                                                            Stok: {item.variant_stock}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm font-medium text-blue-600 mt-1">Rp {item.price?.toLocaleString('id-ID')}</p>
                                             </div>
                                             
                                             <div className="flex items-center gap-3">
@@ -494,24 +562,11 @@ export default function AddOrder() {
                                                             if (updatedItems[index].quantity > 1) {
                                                                 updatedItems[index].quantity -= 1;
                                                                 setOrderItems(updatedItems);
-                                                                Swal.fire({
-                                                                    icon: 'info',
-                                                                    title: 'Quantity Dikurangi',
-                                                                    text: `Quantity ${item.variant_name} dikurangi menjadi ${updatedItems[index].quantity}`,
-                                                                    showConfirmButton: false,
-                                                                    timer: 1500
-                                                                });
-                                                            } else {
-                                                                Swal.fire({
-                                                                    icon: 'warning',
-                                                                    title: 'Peringatan',
-                                                                    text: 'Quantity minimal adalah 1. Gunakan tombol hapus untuk menghapus item.'
-                                                                });
                                                             }
                                                         }}
                                                         className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
                                                     >
-                                                        <Icon icon="solar:minus-outline" className="w-4 h-4" />
+                                                        <span className="text-lg font-bold">−</span>
                                                     </button>
                                                     
                                                     <span className="w-12 text-center font-medium">{item.quantity}</span>
@@ -519,19 +574,25 @@ export default function AddOrder() {
                                                     <button
                                                         onClick={() => {
                                                             const updatedItems = [...orderItems];
-                                                            updatedItems[index].quantity += 1;
-                                                            setOrderItems(updatedItems);
-                                                            Swal.fire({
-                                                                icon: 'success',
-                                                                title: 'Quantity Ditambah',
-                                                                text: `Quantity ${item.variant_name} ditambah menjadi ${updatedItems[index].quantity}`,
-                                                                showConfirmButton: false,
-                                                                timer: 1500
-                                                            });
+                                                            const currentItem = updatedItems[index];
+                                                            const maxStock = currentItem.variant_stock || 0;
+                                                            
+                                                            if (currentItem.quantity < maxStock) {
+                                                                updatedItems[index].quantity += 1;
+                                                                setOrderItems(updatedItems);
+                                                            } else {
+                                                                Swal.fire({
+                                                                    icon: 'warning',
+                                                                    title: 'Stok Tidak Mencukupi',
+                                                                    text: `Stok maksimal untuk ${currentItem.variant_name} adalah ${maxStock}`,
+                                                                    confirmButtonText: 'OK'
+                                                                });
+                                                            }
                                                         }}
-                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
+                                                        disabled={item.quantity >= (item.variant_stock || 0)}
+                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                                                     >
-                                                        <Icon icon="solar:add-outline" className="w-4 h-4" />
+                                                        <span className="text-lg font-bold">+</span>
                                                     </button>
                                                 </div>
                                                 
@@ -586,22 +647,43 @@ export default function AddOrder() {
                             </div>
                         </div>
 
-                        {/* Payment */}
+                        {/* Order Status */}
                         <div className="bg-white p-4 rounded-lg border">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Status Pembayaran
+                                Status Order
                             </label>
                             <select 
-                                value={formData.payment_status}
-                                onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value }))}
+                                value={formData.status}
+                                onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                             >
-                                <option value="pending">Menunggu Pembayaran</option>
-                                <option value="paid">Sudah Dibayar</option>
-                                <option value="shipped">Sudah Dikirim</option>
-                                <option value="cancelled">Dibatalkan</option>
+                                <option value="pending">Pending</option>
+                                <option value="paid">Paid</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
+
+                        {/* Error Display */}
+                        {errors.items && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                <div className="flex items-start gap-2">
+                                    <Icon icon="mdi:alert-circle" className="w-5 h-5 text-red-500 mt-0.5" />
+                                    <div>
+                                        <h4 className="text-red-800 font-medium mb-1">Error Validasi</h4>
+                                        {Array.isArray(errors.items) ? (
+                                            <ul className="text-red-700 text-sm space-y-1">
+                                                {errors.items.map((error, index) => (
+                                                    <li key={index}>• {error}</li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-red-700 text-sm">{errors.items}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Submit */}
                         <div className="flex justify-end gap-4">

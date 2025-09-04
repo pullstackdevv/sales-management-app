@@ -11,7 +11,7 @@ export default function AddCustomer() {
     
     // Form states
     const [formData, setFormData] = useState({
-        name: "",
+        full_name: "",
         email: "",
         phone: "",
         line_id: "",
@@ -20,17 +20,21 @@ export default function AddCustomer() {
     });
     
     // Address states
-    const [addressData, setAddressData] = useState({
-        label: "Rumah",
-        recipient_name: "",
-        phone: "",
-        province: "",
-        city: "",
-        district: "",
-        postal_code: "",
-        address_detail: "",
-        is_default: true
-    });
+    const [addresses, setAddresses] = useState([
+        {
+            id: Date.now(),
+            label: "Rumah",
+            recipient_name: "",
+            recipient_phone: "",
+            province: "",
+            city: "",
+            district: "",
+            postal_code: "",
+            address_detail: "",
+            is_default: true
+        }
+    ]);
+    const [activeAddressIndex, setActiveAddressIndex] = useState(0);
     
     // City search states
     const [cityQuery, setCityQuery] = useState("");
@@ -51,12 +55,62 @@ export default function AddCustomer() {
     };
     
     // Handle address changes
-    const handleAddressChange = (field, value) => {
-        setAddressData(prev => ({ ...prev, [field]: value }));
+    const handleAddressChange = (field, value, index = activeAddressIndex) => {
+        setAddresses(prev => prev.map((addr, i) => 
+            i === index ? { ...addr, [field]: value } : addr
+        ));
         // Clear error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }));
         }
+    };
+
+    // Add new address
+    const addAddress = () => {
+        const newAddress = {
+            id: Date.now(),
+            label: "Alamat " + (addresses.length + 1),
+            recipient_name: formData.full_name,
+            recipient_phone: formData.phone,
+            province: "",
+            city: "",
+            district: "",
+            postal_code: "",
+            address_detail: "",
+            is_default: false
+        };
+        setAddresses(prev => [...prev, newAddress]);
+        setActiveAddressIndex(addresses.length);
+    };
+
+    // Remove address
+    const removeAddress = (index) => {
+        if (addresses.length === 1) return; // Don't allow removing the last address
+        
+        const addressToRemove = addresses[index];
+        const newAddresses = addresses.filter((_, i) => i !== index);
+        
+        // If removing default address, make first address default
+        if (addressToRemove.is_default && newAddresses.length > 0) {
+            newAddresses[0].is_default = true;
+        }
+        
+        setAddresses(newAddresses);
+        
+        // Adjust active index
+        if (activeAddressIndex >= newAddresses.length) {
+            setActiveAddressIndex(newAddresses.length - 1);
+        } else if (activeAddressIndex > index) {
+            setActiveAddressIndex(activeAddressIndex - 1);
+        }
+    };
+
+    // Set default address
+    const setDefaultAddress = (index) => {
+        setAddresses(prev => prev.map((addr, i) => ({
+            ...addr,
+            is_default: i === index
+        })));
     };
     
     // Load all regencies on component mount
@@ -151,12 +205,9 @@ export default function AddCustomer() {
     // Select city from dropdown
     const selectCity = (city) => {
         setCityQuery(`${city.name}, ${city.regency_name}`);
-        setAddressData(prev => ({
-            ...prev,
-            city: city.name,
-            district: city.name,
-            province: city.province_name
-        }));
+        handleAddressChange('city', city.name);
+        handleAddressChange('district', city.name);
+        handleAddressChange('province', city.province_name);
         setShowCityDropdown(false);
         setCityResults([]);
         
@@ -183,8 +234,8 @@ export default function AddCustomer() {
         const newErrors = {};
         
         // Required fields validation
-        if (!formData.name.trim()) {
-            newErrors.name = 'Nama lengkap wajib diisi';
+        if (!formData.full_name.trim()) {
+            newErrors.full_name = 'Nama lengkap wajib diisi';
         }
         
         if (!formData.phone.trim()) {
@@ -193,18 +244,27 @@ export default function AddCustomer() {
             newErrors.phone = 'Format nomor telepon tidak valid (contoh: 081234567890)';
         }
         
-        if (!addressData.city.trim()) {
-            newErrors.city = 'Kota/Kecamatan wajib diisi';
-        }
+        // Validate all addresses
+        addresses.forEach((address, index) => {
+            if (!address.city.trim()) {
+                newErrors[`city_${index}`] = 'Kota/Kecamatan wajib diisi';
+            }
+            
+            if (!address.postal_code.trim()) {
+                newErrors[`postal_code_${index}`] = 'Kode pos wajib diisi';
+            } else if (!/^[0-9]{5}$/.test(address.postal_code)) {
+                newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
+            }
+            
+            if (!address.address_detail.trim()) {
+                newErrors[`address_detail_${index}`] = 'Alamat lengkap wajib diisi';
+            }
+        });
         
-        if (!addressData.postal_code.trim()) {
-            newErrors.postal_code = 'Kode pos wajib diisi';
-        } else if (!/^[0-9]{5}$/.test(addressData.postal_code)) {
-            newErrors.postal_code = 'Kode pos harus 5 digit angka';
-        }
-        
-        if (!addressData.address_detail.trim()) {
-            newErrors.address_detail = 'Alamat lengkap wajib diisi';
+        // Check if at least one address is set as default
+        const hasDefaultAddress = addresses.some(addr => addr.is_default);
+        if (!hasDefaultAddress && addresses.length > 0) {
+            addresses[0].is_default = true; // Auto-set first address as default
         }
         
         // Email validation (optional but must be valid if provided)
@@ -234,25 +294,23 @@ export default function AddCustomer() {
         
         try {
             const customerData = {
-                name: formData.name,
+                name: formData.full_name,
                 email: formData.email || null,
                 phone: formData.phone,
                 line_id: formData.line_id || null,
                 other_contact: formData.other_contact || null,
                 category: formData.category,
-                address: {
-                    name: addressData.label, // Add the required 'name' field
-                    address: addressData.address_detail, // Add the required 'address' field
-                    label: addressData.label,
-                    recipient_name: addressData.recipient_name || formData.name,
-                    phone: addressData.phone || formData.phone,
-                    province: addressData.province,
-                    city: addressData.city,
-                    district: addressData.district,
-                    postal_code: addressData.postal_code,
-                    address_detail: addressData.address_detail,
-                    is_default: addressData.is_default
-                }
+                addresses: addresses.map(address => ({
+                    label: address.label,
+                    recipient_name: address.recipient_name || formData.full_name,
+                    recipient_phone: address.recipient_phone || formData.phone,
+                    province: address.province,
+                    city: address.city,
+                    district: address.district,
+                    postal_code: address.postal_code,
+                    address_detail: address.address_detail,
+                    is_default: address.is_default
+                }))
             };
             
             const response = await api.post('/customers', customerData);
@@ -379,85 +437,25 @@ export default function AddCustomer() {
                                     <input 
                                         type="text"
                                         className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                            errors.name ? 'border-red-500' : 'border-gray-300'
+                                            errors.full_name ? 'border-red-500' : 'border-gray-300'
                                         }`}
-                                        value={formData.name}
+                                        value={formData.full_name}
                                         onChange={(e) => {
-                                            handleInputChange('name', e.target.value);
-                                            setAddressData(prev => ({ ...prev, recipient_name: e.target.value }));
+                                            handleInputChange('full_name', e.target.value);
+                                            // Update recipient_name for all addresses
+                                            setAddresses(prev => prev.map(addr => ({
+                                                ...addr,
+                                                recipient_name: addr.recipient_name || e.target.value
+                                            })));
                                         }}
                                         placeholder="Masukkan nama lengkap"
                                     />
-                                    {errors.name && (
-                                        <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+                                    {errors.full_name && (
+                                        <p className="text-red-500 text-xs mt-1">{errors.full_name}</p>
                                     )}
                                 </div>
 
-                                <div className="relative city-search-container">
-                                    <label className="text-sm font-medium">
-                                        Kota/Kecamatan <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm pr-10 ${
-                                            errors.city ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        placeholder="Cari Kota/Kecamatan..."
-                                        value={cityQuery}
-                                        onChange={handleCitySearch}
-                                        onFocus={() => setShowCityDropdown(true)}
-                                    />
-                                    {searchingCity ? (
-                                        <Icon
-                                            icon="mdi:loading"
-                                            className="absolute right-3 top-9 text-gray-400 animate-spin"
-                                        />
-                                    ) : (
-                                        <Icon
-                                            icon="mdi:magnify"
-                                            className="absolute right-3 top-9 text-gray-400"
-                                        />
-                                    )}
-                                    
-                                    {/* City dropdown */}
-                                    {showCityDropdown && cityResults.length > 0 && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                            {cityResults.map((city, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                                    onClick={() => selectCity(city)}
-                                                >
-                                                    <div className="font-medium">{city.name}</div>
-                                                    <div className="text-gray-500 text-xs">
-                                                        {city.type}, {city.regency_name}, {city.province_name}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                    {errors.city && (
-                                        <p className="text-red-500 text-xs mt-1">{errors.city}</p>
-                                    )}
-                                </div>
-                                
-                                <div>
-                                    <label className="text-sm font-medium">
-                                        Kode Pos <span className="text-red-500">*</span>
-                                    </label>
-                                    <input 
-                                        type="text"
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                            errors.postal_code ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        value={addressData.postal_code}
-                                        onChange={(e) => handleAddressChange('postal_code', e.target.value)}
-                                        placeholder="Masukkan kode pos"
-                                    />
-                                    {errors.postal_code && (
-                                        <p className="text-red-500 text-xs mt-1">{errors.postal_code}</p>
-                                    )}
-                                </div>
+
 
                                 <div className="relative">
                                     <label className="text-sm font-medium">
@@ -471,7 +469,11 @@ export default function AddCustomer() {
                                         value={formData.phone}
                                         onChange={(e) => {
                                             handleInputChange('phone', e.target.value);
-                                            setAddressData(prev => ({ ...prev, phone: e.target.value }));
+                                            // Update recipient_phone for all addresses
+                                            setAddresses(prev => prev.map(addr => ({
+                                                ...addr,
+                                                recipient_phone: addr.recipient_phone || e.target.value
+                                            })));
                                         }}
                                         placeholder="08xxxxxxxxxx"
                                     />
@@ -528,21 +530,191 @@ export default function AddCustomer() {
                                     />
                                 </div>
 
-                                <div className="md:col-span-2">
-                                    <label className="text-sm font-medium">
-                                        Alamat Lengkap <span className="text-red-500">*</span>
-                                    </label>
-                                    <textarea 
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm min-h-[80px] ${
-                                            errors.address_detail ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        value={addressData.address_detail}
-                                        onChange={(e) => handleAddressChange('address_detail', e.target.value)}
-                                        placeholder="Masukkan alamat lengkap (nama jalan, nomor rumah, RT/RW, dll)"
-                                    />
-                                    {errors.address_detail && (
-                                        <p className="text-red-500 text-xs mt-1">{errors.address_detail}</p>
-                                    )}
+                            </div>
+                            
+                            {/* Multi-Address Management */}
+                            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mt-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="text-md font-semibold text-gray-900">Kelola Alamat</h4>
+                                    <button
+                                        type="button"
+                                        onClick={addAddress}
+                                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        + Tambah Alamat
+                                    </button>
+                                </div>
+                                
+                                {/* Address Tabs */}
+                                {addresses.length > 1 && (
+                                    <div className="flex space-x-2 mb-4 border-b">
+                                        {addresses.map((address, index) => (
+                                            <button
+                                                key={index}
+                                                type="button"
+                                                onClick={() => setActiveAddressIndex(index)}
+                                                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                                    activeAddressIndex === index
+                                                        ? 'border-blue-500 text-blue-600'
+                                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                                }`}
+                                            >
+                                                {address.label || `Alamat ${index + 1}`}
+                                                {address.is_default && (
+                                                    <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 rounded">
+                                                        Default
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {/* Address Actions */}
+                                {addresses.length > 0 && (
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex space-x-2">
+                                            <input
+                                                type="text"
+                                                value={addresses[activeAddressIndex]?.label || ''}
+                                                onChange={(e) => handleAddressChange('label', e.target.value)}
+                                                placeholder="Label alamat (contoh: Rumah, Kantor)"
+                                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            />
+                                            {!addresses[activeAddressIndex]?.is_default && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDefaultAddress(activeAddressIndex)}
+                                                    className="px-3 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors"
+                                                >
+                                                    Set Default
+                                                </button>
+                                            )}
+                                        </div>
+                                        {addresses.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeAddress(activeAddressIndex)}
+                                                className="px-3 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors"
+                                            >
+                                                Hapus Alamat
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {/* Additional Address Form Fields */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            Nama Penerima
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
+                                            value={addresses[activeAddressIndex]?.recipient_name || ''}
+                                            onChange={(e) => handleAddressChange('recipient_name', e.target.value)}
+                                            placeholder="Nama penerima"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            No. HP Penerima
+                                        </label>
+                                        <input 
+                                            type="tel"
+                                            className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
+                                            value={addresses[activeAddressIndex]?.recipient_phone || ''}
+                                            onChange={(e) => handleAddressChange('recipient_phone', e.target.value)}
+                                            placeholder="08xxxxxxxxxx"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="relative city-search-container">
+                                        <label className="text-sm font-medium">
+                                            Kota/Kecamatan <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm pr-10 ${
+                                                errors.city ? 'border-red-500' : 'border-gray-300'
+                                            }`}
+                                            placeholder="Cari Kota/Kecamatan..."
+                                            value={cityQuery}
+                                            onChange={handleCitySearch}
+                                            onFocus={() => setShowCityDropdown(true)}
+                                        />
+                                        {searchingCity ? (
+                                            <Icon
+                                                icon="mdi:loading"
+                                                className="absolute right-3 top-9 text-gray-400 animate-spin"
+                                            />
+                                        ) : (
+                                            <Icon
+                                                icon="mdi:magnify"
+                                                className="absolute right-3 top-9 text-gray-400"
+                                            />
+                                        )}
+                                        
+                                        {/* City dropdown */}
+                                        {showCityDropdown && cityResults.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                                {cityResults.map((city, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                        onClick={() => selectCity(city)}
+                                                    >
+                                                        <div className="font-medium">{city.name}</div>
+                                                        <div className="text-gray-500 text-xs">
+                                                            {city.type}, {city.regency_name}, {city.province_name}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {errors.city && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.city}</p>
+                                        )}
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-medium">
+                                            Kode Pos <span className="text-red-500">*</span>
+                                        </label>
+                                        <input 
+                                            type="text"
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
+                                                errors.postal_code ? 'border-red-500' : 'border-gray-300'
+                                            }`}
+                                            value={addresses[activeAddressIndex]?.postal_code || ''}
+                                            onChange={(e) => handleAddressChange('postal_code', e.target.value)}
+                                            placeholder="Masukkan kode pos"
+                                        />
+                                        {errors.postal_code && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.postal_code}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="text-sm font-medium">
+                                            Alamat Lengkap <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea 
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm min-h-[80px] ${
+                                                errors.address_detail ? 'border-red-500' : 'border-gray-300'
+                                            }`}
+                                            value={addresses[activeAddressIndex]?.address_detail || ''}
+                                            onChange={(e) => handleAddressChange('address_detail', e.target.value)}
+                                            placeholder="Masukkan alamat lengkap (nama jalan, nomor rumah, RT/RW, dll)"
+                                        />
+                                        {errors.address_detail && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.address_detail}</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </form>

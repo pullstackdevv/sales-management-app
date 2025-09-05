@@ -9,6 +9,8 @@ use App\Models\CourierRate;
 use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\Shipping;
+use App\Models\StockMovement;
+use App\Enums\StockMovementType;
 use App\Http\Requests\Order\StoreRequest;
 use App\Http\Requests\Order\UpdateRequest;
 use Illuminate\Http\Request;
@@ -73,7 +75,12 @@ class OrderController extends Controller
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'required|numeric|min:0',
             'notes' => 'nullable|string|max:255',
-            'status' => 'nullable|in:pending,paid,shipped,cancelled'
+            'status' => 'nullable|in:pending,paid,shipped,cancelled',
+            'courier_id' => 'nullable|exists:couriers,id',
+            'payment_bank_id' => 'nullable|exists:payment_banks,id',
+            'payment_status' => 'nullable|in:pending,paid',
+            'amount_paid' => 'nullable|numeric|min:0',
+            'proof_image' => 'nullable|string'
         ]);
 
         try {
@@ -131,6 +138,35 @@ class OrderController extends Controller
 
                 // Update stock
                 $variant->decrement('stock', $item['quantity']);
+                
+                // Record stock movement
+                $this->recordStockMovement(
+                    $item['product_variant_id'],
+                    StockMovementType::OUT,
+                    $item['quantity'],
+                    "Order #{$order->id} - {$order->customer->name}"
+                );
+            }
+
+            // Create payment record if payment data is provided
+            if (isset($validated['payment_bank_id']) && isset($validated['amount_paid'])) {
+                $order->payments()->create([
+                    'payment_bank_id' => $validated['payment_bank_id'],
+                    'amount_paid' => $validated['amount_paid'],
+                    'paid_at' => now(),
+                    'proof_image' => $validated['proof_image'] ?? '',
+                    'verified_by' => null, // Will be set when admin verifies
+                    'verified_at' => null
+                ]);
+            }
+
+            // Create shipping record if courier is provided
+            if (isset($validated['courier_id'])) {
+                $order->shipping()->create([
+                    'courier_id' => $validated['courier_id'],
+                    'tracking_number' => '', // Will be filled when shipped
+                    'shipped_at' => now()
+                ]);
             }
 
             // Note: Voucher logic removed for manual orders
@@ -172,7 +208,12 @@ class OrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'sometimes|required|numeric|min:0',
-            'status' => 'sometimes|required|in:pending,paid,shipped,cancelled'
+            'status' => 'sometimes|required|in:pending,paid,shipped,cancelled',
+            'courier_id' => 'nullable|exists:couriers,id',
+            'payment_bank_id' => 'nullable|exists:payment_banks,id',
+            'payment_status' => 'nullable|in:pending,paid',
+            'amount_paid' => 'nullable|numeric|min:0',
+            'proof_image' => 'nullable|string'
         ]);
 
         try {
@@ -192,6 +233,15 @@ class OrderController extends Controller
                 foreach ($order->items as $item) {
                     $variant = $item->productVariant;
                     $variant->increment('stock', $item->quantity);
+                    
+                    // Record stock movement for item removal
+                    $this->recordStockMovement(
+                        $item->product_variant_id,
+                        StockMovementType::IN,
+                        $item->quantity,
+                        "Order #{$order->id} items updated - Stock returned"
+                    );
+                    
                     $item->delete();
                 }
 
@@ -221,6 +271,14 @@ class OrderController extends Controller
 
                     // Update stock
                     $variant->decrement('stock', $item['quantity']);
+                    
+                    // Record stock movement
+                    $this->recordStockMovement(
+                        $item['product_variant_id'],
+                        StockMovementType::OUT,
+                        $item['quantity'],
+                        "Order #{$order->id} updated - {$order->customer->name}"
+                    );
                 }
 
                 // Store subtotal for later total calculation (as variable, not database field)
@@ -246,6 +304,33 @@ class OrderController extends Controller
             // Update status if provided
             if (isset($validated['status'])) {
                 $order->update(['status' => $validated['status']]);
+            }
+
+            // Update or create payment record if payment data is provided
+            if (isset($validated['payment_bank_id']) && isset($validated['amount_paid'])) {
+                $order->payments()->updateOrCreate(
+                    ['order_id' => $order->id],
+                    [
+                        'payment_bank_id' => $validated['payment_bank_id'],
+                        'amount_paid' => $validated['amount_paid'],
+                        'paid_at' => now(),
+                        'proof_image' => $validated['proof_image'] ?? '',
+                        'verified_by' => null,
+                        'verified_at' => null
+                    ]
+                );
+            }
+
+            // Update or create shipping record if courier is provided
+            if (isset($validated['courier_id'])) {
+                $order->shipping()->updateOrCreate(
+                    ['order_id' => $order->id],
+                    [
+                        'courier_id' => $validated['courier_id'],
+                        'tracking_number' => $order->shipping->tracking_number ?? '',
+                        'shipped_at' => $order->shipping->shipped_at ?? now()
+                    ]
+                );
             }
 
             // Update timestamp
@@ -335,6 +420,14 @@ class OrderController extends Controller
                 foreach ($order->items as $item) {
                     $variant = $item->productVariant;
                     $variant->increment('stock', $item->quantity);
+                    
+                    // Record stock movement for cancellation
+                    $this->recordStockMovement(
+                        $item->product_variant_id,
+                        StockMovementType::IN,
+                        $item->quantity,
+                        "Order #{$order->id} cancelled - Stock returned"
+                    );
                 }
             }
 
@@ -349,6 +442,20 @@ class OrderController extends Controller
             DB::rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Record stock movement for order operations
+     */
+    private function recordStockMovement($productVariantId, $type, $quantity, $note)
+    {
+        StockMovement::create([
+            'product_variant_id' => $productVariantId,
+            'type' => $type,
+            'quantity' => $quantity,
+            'note' => $note,
+            'created_by' => Auth::id()
+        ]);
     }
 
     public function generateShippingLabel(Order $order): JsonResponse

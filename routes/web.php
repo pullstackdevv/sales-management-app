@@ -113,8 +113,11 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         return Inertia::render('StockOpname/StockOpnameAdd');
     })->name('stock-opname.create');
     
-    Route::get('/stock-opname/edit/{id}', function () {
-        return Inertia::render('StockOpname/StockOpnameEdit');
+    Route::get('/stock-opname/edit/{id}', function ($id) {
+        $stockOpname = \App\Models\StockOpname::with(['details.productVariant.product'])->findOrFail($id);
+        return Inertia::render('StockOpname/StockOpnameEdit', [
+            'stockOpname' => $stockOpname
+        ]);
     })->name('stock-opname.edit');
 
     // Settings

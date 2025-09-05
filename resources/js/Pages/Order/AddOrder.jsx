@@ -14,13 +14,18 @@ export default function AddOrder() {
         shipping_cost: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
-        status: 'pending'
+        status: 'pending',
+        payment_status: 'pending',
+        payment_bank_id: '',
+        courier: ''
     });
 
     const [orderItems, setOrderItems] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [salesChannels, setSalesChannels] = useState([]);
+    const [paymentBanks, setPaymentBanks] = useState([]);
+    const [couriers, setCouriers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     
@@ -29,6 +34,8 @@ export default function AddOrder() {
         customers: false,
         products: false,
         salesChannels: false,
+        paymentBanks: false,
+        couriers: false,
         submitting: false
     });
     
@@ -90,6 +97,50 @@ export default function AddOrder() {
             console.error('Error fetching sales channels:', error);
         } finally {
             setLoading(prev => ({ ...prev, salesChannels: false }));
+        }
+    };
+
+    // Fetch payment banks dari API
+    const fetchPaymentBanks = async () => {
+        setLoading(prev => ({ ...prev, paymentBanks: true }));
+        try {
+            console.log('🏦 Fetching payment banks...');
+            const response = await axios.get('/api/payment-banks');
+            console.log('🏦 Payment banks response:', response.data);
+            if (response.data.status === 'success' && response.data.data) {
+                // Handle paginated response - access the actual data array
+                const banksData = response.data.data.data || response.data.data;
+                setPaymentBanks(Array.isArray(banksData) ? banksData : []);
+                console.log('🏦 Payment banks set to state:', banksData);
+            } else {
+                setPaymentBanks(Array.isArray(response.data) ? response.data : []);
+                console.log('🏦 Payment banks fallback set to state:', response.data);
+            }
+        } catch (error) {
+            console.error('🏦 Error fetching payment banks:', error);
+            setPaymentBanks([]);
+        } finally {
+            setLoading(prev => ({ ...prev, paymentBanks: false }));
+        }
+    };
+
+    // Fetch couriers dari API
+    const fetchCouriers = async () => {
+        setLoading(prev => ({ ...prev, couriers: true }));
+        try {
+            const response = await axios.get('/api/couriers');
+            if (response.data.status === 'success') {
+                const couriersData = response.data.data?.data || response.data.data || [];
+                const activeCouriers = Array.isArray(couriersData) ? couriersData.filter(courier => courier.is_active) : [];
+                setCouriers(activeCouriers);
+            } else {
+                setCouriers([]);
+            }
+        } catch (error) {
+            console.error('Error fetching couriers:', error);
+            setCouriers([]);
+        } finally {
+            setLoading(prev => ({ ...prev, couriers: false }));
         }
     };
 
@@ -197,7 +248,10 @@ export default function AddOrder() {
                 })),
                 shipping_cost: formData.shipping_cost,
                 notes: formData.notes,
-                status: formData.status
+                status: formData.status,
+                payment_status: formData.payment_status,
+                payment_bank_id: formData.payment_bank_id || null,
+                courier_id: formData.courier
             };
 
             const response = await axios.post('/api/orders', orderData);
@@ -252,17 +306,19 @@ export default function AddOrder() {
     useEffect(() => {
         fetchCustomers();
         fetchSalesChannels();
+        fetchPaymentBanks();
+        fetchCouriers();
     }, []);
 
     // Handle search debouncing
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (searchTerms.customer) {
+            if (searchTerms.customer && !selectedCustomer) {
                 fetchCustomers(searchTerms.customer);
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchTerms.customer]);
+    }, [searchTerms.customer, selectedCustomer]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -305,7 +361,14 @@ export default function AddOrder() {
                                     type="text"
                                     placeholder="Cari customer"
                                     value={searchTerms.customer}
-                                    onChange={(e) => setSearchTerms(prev => ({ ...prev, customer: e.target.value }))}
+                                    onChange={(e) => {
+                                        setSearchTerms(prev => ({ ...prev, customer: e.target.value }));
+                                        if (!e.target.value) {
+                                            setSelectedCustomer(null);
+                                            setFormData(prev => ({ ...prev, customer_id: '', address_id: '' }));
+                                            setCustomerAddresses([]);
+                                        }
+                                    }}
                                     className={`w-full px-3 py-2 border rounded-lg ${
                                         errors.customer_id ? 'border-red-500' : 'border-gray-300'
                                     }`}
@@ -420,6 +483,24 @@ export default function AddOrder() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Kurir
+                                </label>
+                                <select
+                                    value={formData.courier}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="">Pilih kurir</option>
+                                    {couriers.map((courier) => (
+                                    <option key={courier.id} value={courier.id}>
+                                        {courier.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Ongkos Kirim
                                 </label>
                                 <input
@@ -429,6 +510,50 @@ export default function AddOrder() {
                                     onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Status Pembayaran
+                                </label>
+                                <select 
+                                    value={formData.payment_status}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value, payment_bank_id: e.target.value === 'pending' ? '' : prev.payment_bank_id }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Bank Pembayaran
+                                </label>
+                                <select 
+                                    value={formData.payment_bank_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    disabled={formData.payment_status !== 'paid'}
+                                >
+                                    <option value="">Pilih bank</option>
+                                    {(() => {
+                                        console.log('🏦 All payment banks:', paymentBanks);
+                                        const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
+                                        console.log('🏦 Active banks:', activeBanks);
+                                        return activeBanks.map((bank) => (
+                                            <option key={bank.id} value={bank.id}>
+                                                {bank.bank_name} - {bank.account_number} ({bank.account_name})
+                                            </option>
+                                        ));
+                                    })()}
+                                </select>
+                                {loading.paymentBanks && (
+                                    <p className="text-gray-500 text-xs mt-1">Memuat payment banks...</p>
+                                )}
+                                {formData.payment_status !== 'paid' && (
+                                    <p className="text-gray-500 text-xs mt-1">Bank pembayaran hanya diperlukan untuk status 'paid'</p>
+                                )}
                             </div>
 
                             <div>

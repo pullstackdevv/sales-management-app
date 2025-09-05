@@ -17,13 +17,18 @@ export default function EditOrder() {
         shipping_cost: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
-        status: 'pending'
+        status: 'pending',
+        payment_status: 'pending',
+        payment_bank_id: '',
+        courier: ''
     });
 
     const [orderItems, setOrderItems] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [salesChannels, setSalesChannels] = useState([]);
+    const [paymentBanks, setPaymentBanks] = useState([]);
+    const [couriers, setCouriers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     const [originalOrder, setOriginalOrder] = useState(null);
@@ -33,6 +38,8 @@ export default function EditOrder() {
         customers: false,
         products: false,
         salesChannels: false,
+        paymentBanks: false,
+        couriers: false,
         submitting: false,
         order: true
     });
@@ -62,7 +69,10 @@ export default function EditOrder() {
                 shipping_cost: parseFloat(order.shipping_cost) || 0,
                 notes: order.notes || '',
                 order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
-                status: order.status || 'pending'
+                status: order.status || 'pending',
+                payment_status: order.payment_status || 'pending',
+                payment_bank_id: order.payment_bank_id || '',
+                courier: order.shipping?.courier_id || ''
             });
             
             // Set order items with complete variant details
@@ -157,6 +167,50 @@ export default function EditOrder() {
             console.error('Error fetching sales channels:', error);
         } finally {
             setLoading(prev => ({ ...prev, salesChannels: false }));
+        }
+    };
+
+    // Fetch payment banks dari API
+    const fetchPaymentBanks = async () => {
+        setLoading(prev => ({ ...prev, paymentBanks: true }));
+        try {
+            console.log('🏦 [EditOrder] Fetching payment banks...');
+            const response = await axios.get('/api/payment-banks');
+            console.log('🏦 [EditOrder] Payment banks response:', response.data);
+            if (response.data.status === 'success' && response.data.data) {
+                // Handle paginated response - access the actual data array
+                const banksData = response.data.data.data || response.data.data;
+                setPaymentBanks(Array.isArray(banksData) ? banksData : []);
+                console.log('🏦 [EditOrder] Payment banks set to state:', banksData);
+            } else {
+                setPaymentBanks(Array.isArray(response.data) ? response.data : []);
+                console.log('🏦 [EditOrder] Payment banks fallback set to state:', response.data);
+            }
+        } catch (error) {
+            console.error('🏦 [EditOrder] Error fetching payment banks:', error);
+            setPaymentBanks([]);
+        } finally {
+            setLoading(prev => ({ ...prev, paymentBanks: false }));
+        }
+    };
+
+    // Fetch couriers dari API
+    const fetchCouriers = async () => {
+        setLoading(prev => ({ ...prev, couriers: true }));
+        try {
+            const response = await axios.get('/api/couriers');
+            if (response.data.status === 'success') {
+                const couriersData = response.data.data?.data || response.data.data || [];
+                const activeCouriers = Array.isArray(couriersData) ? couriersData.filter(courier => courier.is_active) : [];
+                setCouriers(activeCouriers);
+            } else {
+                setCouriers([]);
+            }
+        } catch (error) {
+            console.error('Error fetching couriers:', error);
+            setCouriers([]);
+        } finally {
+            setLoading(prev => ({ ...prev, couriers: false }));
         }
     };
 
@@ -273,7 +327,10 @@ export default function EditOrder() {
                 })),
                 shipping_cost: formData.shipping_cost,
                 notes: formData.notes,
-                status: formData.status
+                status: formData.status,
+                payment_status: formData.payment_status,
+                payment_bank_id: formData.payment_bank_id || null,
+                courier_id: formData.courier
             };
 
             console.log('Order Data to be sent:', orderData);
@@ -331,6 +388,8 @@ export default function EditOrder() {
         if (orderId) {
             fetchOrder();
             fetchSalesChannels();
+            fetchPaymentBanks();
+            fetchCouriers();
         }
     }, [orderId]);
 
@@ -530,6 +589,71 @@ export default function EditOrder() {
                                     onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Kurir
+                                </label>
+                                <select
+                                    value={formData.courier}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="">Pilih kurir</option>
+                                    {couriers.map((courier) => (
+                                    <option key={courier.id} value={courier.id}>
+                                        {courier.name} - {courier.description}
+                                        </option>
+                                    ))}
+                                </select>
+                                {loading.couriers && (
+                                    <p className="text-gray-500 text-xs mt-1">Memuat data kurir...</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Status Pembayaran
+                                </label>
+                                <select
+                                    value={formData.payment_status}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value, payment_bank_id: e.target.value === 'pending' ? '' : prev.payment_bank_id }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Bank Pembayaran
+                                </label>
+                                <select
+                                    value={formData.payment_bank_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    disabled={formData.payment_status !== 'paid'}
+                                >
+                                    <option value="">Pilih bank</option>
+                                    {(() => {
+                                        console.log('🏦 [EditOrder] All payment banks:', paymentBanks);
+                                        const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
+                                        console.log('🏦 [EditOrder] Active banks:', activeBanks);
+                                        return activeBanks.map((bank) => (
+                                            <option key={bank.id} value={bank.id}>
+                                                {bank.bank_name} - {bank.account_name}
+                                            </option>
+                                        ));
+                                    })()}
+                                </select>
+                                {loading.paymentBanks && (
+                                    <p className="text-gray-500 text-xs mt-1">Memuat data bank...</p>
+                                )}
+                                {formData.payment_status !== 'paid' && (
+                                    <p className="text-gray-500 text-xs mt-1">Bank pembayaran hanya diperlukan untuk status 'paid'</p>
+                                )}
                             </div>
 
                             <div>

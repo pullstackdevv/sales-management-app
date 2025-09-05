@@ -117,6 +117,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Stock opname routes
     Route::apiResource('stock-opnames', StockOpnameController::class);
+    Route::patch('stock-opnames/{stockOpname}/status', [StockOpnameController::class, 'updateStatus']);
     Route::post('stock-opnames/{stockOpname}/start', [StockOpnameController::class, 'start']);
     Route::post('stock-opnames/{stockOpname}/complete', [StockOpnameController::class, 'complete']);
     Route::post('stock-opnames/{stockOpname}/finalize', [StockOpnameController::class, 'finalize']);

@@ -4,6 +4,8 @@ import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
+import StockHistoryModal from "@/Components/StockHistoryModal";
+import StockAdjustmentModal from "@/Components/StockAdjustmentModal";
 
 export default function ProductEdit() {
   const [product, setProduct] = useState({
@@ -21,6 +23,16 @@ export default function ProductEdit() {
   const [loadingData, setLoadingData] = useState(true);
   const [errors, setErrors] = useState({});
   const [productId, setProductId] = useState(null);
+  
+  // Modal states
+  const [stockHistoryModal, setStockHistoryModal] = useState({
+    isOpen: false,
+    variant: null
+  });
+  const [stockAdjustmentModal, setStockAdjustmentModal] = useState({
+    isOpen: false,
+    variant: null
+  });
 
   // Get product ID from URL
   useEffect(() => {
@@ -104,6 +116,42 @@ export default function ProductEdit() {
     const newVariants = [...product.variants];
     newVariants[index] = { ...newVariants[index], [field]: value };
     setProduct({ ...product, variants: newVariants });
+  };
+
+  // Modal functions
+  const openStockHistoryModal = (variant) => {
+    setStockHistoryModal({
+      isOpen: true,
+      variant: { ...variant, product }
+    });
+  };
+
+  const closeStockHistoryModal = () => {
+    setStockHistoryModal({
+      isOpen: false,
+      variant: null
+    });
+  };
+
+  const openStockAdjustmentModal = (variant) => {
+    setStockAdjustmentModal({
+      isOpen: true,
+      variant: { ...variant, product }
+    });
+  };
+
+  const closeStockAdjustmentModal = () => {
+    setStockAdjustmentModal({
+      isOpen: false,
+      variant: null
+    });
+  };
+
+  const handleStockAdjustmentSuccess = () => {
+    // Refresh product data after stock adjustment
+    if (productId) {
+      fetchProduct(productId);
+    }
   };
 
   // Submit form
@@ -450,17 +498,35 @@ export default function ProductEdit() {
 
                           <div>
                             <label className="block text-sm font-medium mb-1">Stok*</label>
-                            <input
-                              type="number"
-                              className={`w-full border px-3 py-2 rounded-md text-sm ${
-                                errors[`variants.${index}.stock`] ? 'border-red-500' : 'border-gray-300'
-                              }`}
-                              placeholder="0"
-                              value={variant.stock || 0}
-                              onChange={(e) => updateVariant(index, 'stock', parseInt(e.target.value) || 0)}
-                              min="0"
-                              required
-                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                className={`flex-1 border px-3 py-2 rounded-md text-sm ${
+                                  errors[`variants.${index}.stock`] ? 'border-red-500' : 'border-gray-300'
+                                }`}
+                                placeholder="0"
+                                value={variant.stock || 0}
+                                onChange={(e) => updateVariant(index, 'stock', parseInt(e.target.value) || 0)}
+                                min="0"
+                                required
+                              />
+                              <button
+                                type="button"
+                                onClick={() => openStockHistoryModal(variant)}
+                                className="px-3 py-2 text-blue-600 hover:text-blue-800 border border-blue-300 rounded hover:bg-blue-50 transition-colors"
+                                title="Lihat Riwayat Stok"
+                              >
+                                <Icon icon="material-symbols:history" className="text-lg" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openStockAdjustmentModal(variant)}
+                                className="px-3 py-2 text-green-600 hover:text-green-800 border border-green-300 rounded hover:bg-green-50 transition-colors"
+                                title="Penyesuaian Stok"
+                              >
+                                <Icon icon="material-symbols:inventory" className="text-lg" />
+                              </button>
+                            </div>
                             {errors[`variants.${index}.stock`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.stock`][0]}</p>
                             )}
@@ -562,6 +628,21 @@ export default function ProductEdit() {
           </div>
         </form>
       </div>
+      
+      {/* Stock History Modal */}
+      <StockHistoryModal
+        isOpen={stockHistoryModal.isOpen}
+        onClose={closeStockHistoryModal}
+        variant={stockHistoryModal.variant}
+      />
+      
+      {/* Stock Adjustment Modal */}
+      <StockAdjustmentModal
+        isOpen={stockAdjustmentModal.isOpen}
+        onClose={closeStockAdjustmentModal}
+        variant={stockAdjustmentModal.variant}
+        onSuccess={handleStockAdjustmentSuccess}
+      />
     </DashboardLayout>
   );
 }

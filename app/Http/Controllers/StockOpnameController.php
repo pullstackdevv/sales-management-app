@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\StockOpname;
 use App\Enums\StockOpnameStatus;
+use App\Enums\StockMovementType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,7 +40,7 @@ class StockOpnameController extends Controller
         $validated = $request->validate([
             'opname_date' => 'required|date',
             'note' => 'nullable|string|max:255',
-            'status' => 'required|in:draft,in_progress,completed,finalized',
+            'status' => 'required|in:draft,finalized',
             'details' => 'required|array',
             'details.*.product_variant_id' => 'required|exists:product_variants,id',
             'details.*.system_stock' => 'required|integer|min:0',
@@ -83,22 +84,22 @@ class StockOpnameController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $stockOpname->load(['createdBy', 'details.productVariant'])
+            'data' => $stockOpname->load(['createdBy', 'details.productVariant.product'])
         ]);
     }
 
     public function update(Request $request, StockOpname $stockOpname): JsonResponse
     {
-        if (in_array($stockOpname->status, [StockOpnameStatus::COMPLETED, StockOpnameStatus::FINALIZED])) {
+        if ($stockOpname->status === StockOpnameStatus::FINALIZED) {
             throw ValidationException::withMessages([
-                'status' => ['Cannot update completed or finalized stock opname.']
+                'status' => ['Cannot update finalized stock opname.']
             ]);
         }
 
         $validated = $request->validate([
             'opname_date' => 'sometimes|required|date',
             'note' => 'nullable|string|max:255',
-            'status' => 'sometimes|required|in:draft,in_progress,completed,finalized',
+            'status' => 'sometimes|required|in:draft,finalized',
             'details' => 'sometimes|required|array',
             'details.*.product_variant_id' => 'required|exists:product_variants,id',
             'details.*.system_stock' => 'required|integer|min:0',
@@ -146,9 +147,9 @@ class StockOpnameController extends Controller
 
     public function destroy(StockOpname $stockOpname): JsonResponse
     {
-        if (in_array($stockOpname->status, [StockOpnameStatus::COMPLETED, StockOpnameStatus::FINALIZED])) {
+        if ($stockOpname->status === StockOpnameStatus::FINALIZED) {
             throw ValidationException::withMessages([
-                'status' => ['Cannot delete completed or finalized stock opname.']
+                'status' => ['Cannot delete finalized stock opname.']
             ]);
         }
 
@@ -174,69 +175,26 @@ class StockOpnameController extends Controller
         }
     }
 
-    public function start(StockOpname $stockOpname): JsonResponse
+    public function updateStatus(Request $request, StockOpname $stockOpname): JsonResponse
     {
-        if ($stockOpname->status !== StockOpnameStatus::DRAFT) {
-            throw ValidationException::withMessages([
-                'status' => ['Only draft stock opname can be started.']
-            ]);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $stockOpname->update([
-                'status' => StockOpnameStatus::IN_PROGRESS,
-                'updated_by' => Auth::id()
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Stock opname started successfully',
-                'data' => $stockOpname->fresh()->load(['createdBy', 'details.productVariant'])
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-
-    public function complete(Request $request, StockOpname $stockOpname): JsonResponse
-    {
-        if ($stockOpname->status !== StockOpnameStatus::IN_PROGRESS) {
-            throw ValidationException::withMessages([
-                'status' => ['Only in progress stock opname can be completed.']
-            ]);
-        }
-
         $validated = $request->validate([
-            'items' => 'required|array',
-            'items.*.product_variant_id' => 'required|exists:product_variants,id',
-            'items.*.actual_stock' => 'required|integer|min:0'
+            'status' => 'required|in:draft,finalized'
         ]);
 
+        $newStatus = StockOpnameStatus::from($validated['status']);
+
+        // Validate status transition
+        if ($stockOpname->status === StockOpnameStatus::FINALIZED) {
+            throw ValidationException::withMessages([
+                'status' => ['Cannot change status of finalized stock opname.']
+            ]);
+        }
+
         try {
             DB::beginTransaction();
 
-            // Delete existing details
-            $stockOpname->details()->delete();
-
-            // Create new details from actual stock data
-            foreach ($validated['items'] as $item) {
-                $variant = \App\Models\ProductVariant::find($item['product_variant_id']);
-                $stockOpname->details()->create([
-                    'product_variant_id' => $item['product_variant_id'],
-                    'system_stock' => $variant->stock,
-                    'real_stock' => $item['actual_stock'],
-                    'difference' => $item['actual_stock'] - $variant->stock,
-                    'created_by' => Auth::id()
-                ]);
-            }
-
             $stockOpname->update([
-                'status' => StockOpnameStatus::COMPLETED,
+                'status' => $newStatus,
                 'updated_by' => Auth::id()
             ]);
 
@@ -244,7 +202,7 @@ class StockOpnameController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Stock opname completed successfully',
+                'message' => 'Stock opname status updated successfully',
                 'data' => $stockOpname->fresh()->load(['createdBy', 'details.productVariant'])
             ]);
         } catch (\Exception $e) {
@@ -252,12 +210,14 @@ class StockOpnameController extends Controller
             throw $e;
         }
     }
+
+
 
     public function finalize(StockOpname $stockOpname): JsonResponse
     {
-        if ($stockOpname->status !== StockOpnameStatus::COMPLETED) {
+        if ($stockOpname->status !== StockOpnameStatus::DRAFT) {
             throw ValidationException::withMessages([
-                'status' => ['Only completed stock opname can be finalized.']
+                'status' => ['Only draft stock opname can be finalized.']
             ]);
         }
 
@@ -272,9 +232,11 @@ class StockOpnameController extends Controller
                 if ($difference !== 0) {
                     // Create stock movement for adjustment
                     $variant->stockMovements()->create([
-                        'type' => 'adjustment',
+                        'type' => StockMovementType::ADJUSTMENT,
                         'quantity' => abs($difference),
-                        'notes' => 'Stock adjustment from stock opname #' . $stockOpname->id,
+                        'note' => 'Stock adjustment from stock opname #' . $stockOpname->id . ' - ' . 
+                                 ($difference > 0 ? 'Stock increase' : 'Stock decrease') . 
+                                 ' of ' . abs($difference) . ' units',
                         'created_by' => Auth::id()
                     ]);
 

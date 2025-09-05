@@ -4,6 +4,8 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
+import StockHistoryModal from "@/Components/StockHistoryModal";
+import StockAdjustmentModal from "@/Components/StockAdjustmentModal";
 
 export default function ProductData() {
   const [products, setProducts] = useState([]);
@@ -12,6 +14,10 @@ export default function ProductData() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [pagination, setPagination] = useState(null);
+  
+  // Modal states
+  const [stockHistoryModal, setStockHistoryModal] = useState({ isOpen: false, variant: null });
+  const [stockAdjustmentModal, setStockAdjustmentModal] = useState({ isOpen: false, variant: null });
 
   // Fetch products from API
   const fetchProducts = async (searchTerm = "", categoryFilter = "", page = 1) => {
@@ -71,6 +77,27 @@ export default function ProductData() {
     const searchTerm = e.target.value;
     setSearch(searchTerm);
     fetchProducts(searchTerm, category);
+  };
+
+  // Modal handlers
+  const openStockHistoryModal = (variant) => {
+    setStockHistoryModal({ isOpen: true, variant });
+  };
+
+  const closeStockHistoryModal = () => {
+    setStockHistoryModal({ isOpen: false, variant: null });
+  };
+
+  const openStockAdjustmentModal = (variant) => {
+    setStockAdjustmentModal({ isOpen: true, variant });
+  };
+
+  const closeStockAdjustmentModal = () => {
+    setStockAdjustmentModal({ isOpen: false, variant: null });
+  };
+
+  const handleStockAdjustmentSuccess = () => {
+    fetchProducts(search, category); // Refresh data
   };
 
   useEffect(() => {
@@ -256,6 +283,7 @@ export default function ProductData() {
                               <th className="px-3 py-2">Harga</th>
                               <th className="px-3 py-2">Stok</th>
                               <th className="px-3 py-2">Status</th>
+                              <th className="px-3 py-2">Aksi</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -265,11 +293,15 @@ export default function ProductData() {
                                 <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
                                 <td className="px-3 py-2">{formatCurrency(variant.price)}</td>
                                 <td className="px-3 py-2">
-                                  <span className={`font-semibold ${
-                                    variant.stock === 0 ? 'text-red-500' : 'text-green-600'
-                                  }`}>
+                                  <button
+                                    onClick={() => openStockHistoryModal({ ...variant, product })}
+                                    className={`font-semibold hover:underline cursor-pointer ${
+                                      variant.stock === 0 ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'
+                                    }`}
+                                    title="Klik untuk melihat riwayat stok"
+                                  >
                                     {variant.stock}
-                                  </span>
+                                  </button>
                                 </td>
                                 <td className="px-3 py-2">
                                   {variant.is_active ? (
@@ -277,6 +309,16 @@ export default function ProductData() {
                                   ) : (
                                     <span className="text-gray-500 text-xs">Nonaktif</span>
                                   )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <button
+                                    onClick={() => openStockAdjustmentModal({ ...variant, product })}
+                                    className="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 border border-blue-300 rounded hover:bg-blue-50 transition-colors"
+                                    title="Tambah/Kurangi Stok"
+                                  >
+                                    <Icon icon="material-symbols:inventory" className="inline mr-1" />
+                                    Stok
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -293,6 +335,21 @@ export default function ProductData() {
           )}
         </div>
       </div>
+      
+      {/* Stock History Modal */}
+      <StockHistoryModal
+        isOpen={stockHistoryModal.isOpen}
+        onClose={closeStockHistoryModal}
+        variant={stockHistoryModal.variant}
+      />
+      
+      {/* Stock Adjustment Modal */}
+      <StockAdjustmentModal
+        isOpen={stockAdjustmentModal.isOpen}
+        onClose={closeStockAdjustmentModal}
+        variant={stockAdjustmentModal.variant}
+        onSuccess={handleStockAdjustmentSuccess}
+      />
     </DashboardLayout>
   );
 }

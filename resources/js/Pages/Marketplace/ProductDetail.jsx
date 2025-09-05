@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { router } from '@inertiajs/react';
 import { Icon } from '@iconify/react';
 import { 
     ShoppingCart,
@@ -8,18 +8,19 @@ import {
     User,
     MapPin,
     Store,
-    Plus,
-    Minus,
-    Star
 } from 'lucide-react';
 import { productsAPI } from '@/api/products';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { checkoutSession } from '@/utils/checkoutSession';
 
 export default function ProductDetail() {
+    console.log('ProductDetail component loaded');
+    alert('ProductDetail component loaded');
     const { id } = usePage().props;
+    console.log('Product ID from props:', id);
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -182,10 +183,36 @@ export default function ProductDetail() {
     };
 
     const buyNow = () => {
+        console.log('buyNow called');
+        console.log('currentProduct:', currentProduct);
+        console.log('selectedVariant:', selectedVariant);
+        console.log('quantity:', quantity);
+        
         if (currentProduct.is_active !== false && selectedVariant && getCurrentStock() > 0) {
-            setShowOrderModal(true);
-            fetchCustomers();
-            fetchSalesChannels();
+            // Initialize checkout session with product data
+            const checkoutData = {
+                product: currentProduct,
+                variant: selectedVariant,
+                quantity: quantity,
+                price: getCurrentPrice()
+            };
+            
+            console.log('Initializing checkout session with:', checkoutData);
+            checkoutSession.initWithProduct(checkoutData);
+            
+            // Verify data was saved
+            const savedData = checkoutSession.get();
+            console.log('Data saved to session storage:', savedData);
+            
+            // Navigate to checkout flow
+            console.log('Navigating to checkout.product');
+            router.visit(route('checkout.product'));
+        } else {
+            console.log('buyNow conditions not met:', {
+                isActive: currentProduct.is_active,
+                hasVariant: !!selectedVariant,
+                stock: getCurrentStock()
+            });
         }
     };
 

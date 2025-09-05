@@ -62,17 +62,21 @@ export default function EditOrder() {
             setOriginalOrder(order);
             
             // Set form data
+            const paymentBankId = (order.payments && order.payments[0] && order.payments[0].payment_bank_id) ? order.payments[0].payment_bank_id.toString() : '';
+            console.log('🏦 [EditOrder] Setting payment_bank_id from order:', paymentBankId, 'Order payments:', order.payments);
+            console.log('📊 [EditOrder] Setting sales_channel_id from order:', order.sales_channel_id, 'Sales channel:', order.sales_channel);
+            
             setFormData({
                 customer_id: order.customer_id,
                 address_id: order.address_id,
-                sales_channel_id: order.sales_channel_id,
+                sales_channel_id: order.sales_channel_id ? order.sales_channel_id.toString() : '',
                 shipping_cost: parseFloat(order.shipping_cost) || 0,
                 notes: order.notes || '',
                 order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
                 status: order.status || 'pending',
                 payment_status: order.payment_status || 'pending',
-                payment_bank_id: order.payment_bank_id || '',
-                courier: order.shipping?.courier_id || ''
+                payment_bank_id: paymentBankId,
+                courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : ''
             });
             
             // Set order items with complete variant details
@@ -330,8 +334,15 @@ export default function EditOrder() {
                 status: formData.status,
                 payment_status: formData.payment_status,
                 payment_bank_id: formData.payment_bank_id || null,
-                courier_id: formData.courier
+                courier_id: formData.courier || null
             };
+            
+            console.log('EditOrder - Sending data:', {
+                courier_raw: formData.courier,
+                courier_id: formData.courier || null,
+                payment_bank_raw: formData.payment_bank_id,
+                payment_bank_id: formData.payment_bank_id || null
+            });
 
             console.log('Order Data to be sent:', orderData);
             const response = await axios.put(`/api/orders/${orderId}`, orderData);
@@ -717,7 +728,7 @@ export default function EditOrder() {
                                                             <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID')}</span>
+                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
                                                                 disabled={variant.stock <= 0}
@@ -758,7 +769,7 @@ export default function EditOrder() {
                                             <div className="flex-1">
                                                 <h4 className="font-medium">{item.product_name}</h4>
                                                 <p className="text-sm text-gray-500">{item.variant_name}</p>
-                                                <p className="text-sm font-medium text-blue-600">Rp {item.price?.toLocaleString('id-ID')}</p>
+                                                <p className="text-sm font-medium text-blue-600">Rp {item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                             </div>
                                             
                                             <div className="flex items-center gap-3">
@@ -804,7 +815,7 @@ export default function EditOrder() {
                                                 </div>
                                                 
                                                 <div className="text-right">
-                                                    <p className="font-medium">Rp {(item.quantity * item.price)?.toLocaleString('id-ID')}</p>
+                                                    <p className="font-medium">Rp {(item.quantity * item.price)?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                                 </div>
                                                 
                                                 <button
@@ -840,17 +851,17 @@ export default function EditOrder() {
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Subtotal ({orderItems.length} item)</span>
-                                <span className="text-sm font-medium">Rp {calculateSubtotal().toLocaleString('id-ID')}</span>
+                                <span className="text-sm font-medium">Rp {calculateSubtotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Ongkos Kirim</span>
-                                <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID')}</span>
+                                <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                             
                             <div className="flex justify-between pt-4 border-t font-semibold text-lg">
                                 <span>TOTAL</span>
-                                <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
+                                <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                         </div>
 

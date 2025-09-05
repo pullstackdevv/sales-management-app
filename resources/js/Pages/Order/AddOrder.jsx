@@ -251,8 +251,15 @@ export default function AddOrder() {
                 status: formData.status,
                 payment_status: formData.payment_status,
                 payment_bank_id: formData.payment_bank_id || null,
-                courier_id: formData.courier
+                courier_id: formData.courier || null
             };
+            
+            console.log('AddOrder - Sending data:', {
+                courier_raw: formData.courier,
+                courier_id: formData.courier || null,
+                payment_bank_raw: formData.payment_bank_id,
+                payment_bank_id: formData.payment_bank_id || null
+            });
 
             const response = await axios.post('/api/orders', orderData);
             
@@ -622,7 +629,7 @@ export default function AddOrder() {
                                                             <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID')}</span>
+                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
                                                                 disabled={variant.stock <= 0}
@@ -676,7 +683,7 @@ export default function AddOrder() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm font-medium text-blue-600 mt-1">Rp {item.price?.toLocaleString('id-ID')}</p>
+                                                <p className="text-sm font-medium text-blue-600 mt-1">Rp {item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                             </div>
                                             
                                             <div className="flex items-center gap-3">
@@ -722,7 +729,7 @@ export default function AddOrder() {
                                                 </div>
                                                 
                                                 <div className="text-right">
-                                                    <p className="font-medium">Rp {(item.quantity * item.price)?.toLocaleString('id-ID')}</p>
+                                                    <p className="font-medium">Rp {(item.quantity * item.price)?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                                 </div>
                                                 
                                                 <button
@@ -758,17 +765,17 @@ export default function AddOrder() {
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Subtotal ({orderItems.length} item)</span>
-                                <span className="text-sm font-medium">Rp {calculateSubtotal().toLocaleString('id-ID')}</span>
+                                <span className="text-sm font-medium">Rp {calculateSubtotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Ongkos Kirim</span>
-                                <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID')}</span>
+                                <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                             
                             <div className="flex justify-between pt-4 border-t font-semibold text-lg">
                                 <span>TOTAL</span>
-                                <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
+                                <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                         </div>
 

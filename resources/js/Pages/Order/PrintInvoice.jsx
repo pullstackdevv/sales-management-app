@@ -409,7 +409,7 @@ const PrintInvoice = () => {
                         {printSettings.showTotal && (
                             <div className="p-4">
                                 <div className="font-bold text-lg">
-                                     Total: Rp{invoiceData?.total_amount?.toLocaleString('id-ID') || '2.199.000'}
+                                     Total: Rp{invoiceData?.total_amount?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '2.199.000'}
                                  </div>
                             </div>
                         )}

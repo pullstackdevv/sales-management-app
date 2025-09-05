@@ -27,7 +27,7 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $orders = Order::with(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy'])
+        $orders = Order::with(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('order_number', 'like', "%{$search}%")
@@ -114,6 +114,7 @@ class OrderController extends Controller
                 'discount_amount' => $discountAmount,
                 'shipping_cost' => $validated['shipping_cost'],
                 'status' => $validated['status'] ?? 'pending',
+                'payment_status' => $validated['payment_status'] ?? 'pending',
                 'ordered_at' => now()
             ]);
 
@@ -133,6 +134,7 @@ class OrderController extends Controller
                     'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
+                    'base_price' => $variant->product->base_price,
                     'subtotal' => $item['quantity'] * $item['price']
                 ]);
 
@@ -149,14 +151,29 @@ class OrderController extends Controller
             }
 
             // Create payment record if payment data is provided
-            if (isset($validated['payment_bank_id']) && isset($validated['amount_paid'])) {
+            if (isset($validated['payment_bank_id']) && ($validated['payment_status'] ?? 'pending') === 'paid') {
                 $order->payments()->create([
                     'payment_bank_id' => $validated['payment_bank_id'],
-                    'amount_paid' => $validated['amount_paid'],
+                    'amount_paid' => $validated['amount_paid'] ?? $totalPrice,
                     'paid_at' => now(),
                     'proof_image' => $validated['proof_image'] ?? '',
                     'verified_by' => null, // Will be set when admin verifies
                     'verified_at' => null
+                ]);
+                
+                // Update order status and payment status when payment is made
+                $order->update([
+                    'status' => 'paid',
+                    'payment_status' => 'paid'
+                ]);
+            } else {
+                // Remove payment record if payment_bank_id is not provided or payment_status is not paid
+                $order->payments()->delete();
+                
+                // Update order status back to pending if no payment
+                $order->update([
+                    'status' => 'pending',
+                    'payment_status' => 'pending'
                 ]);
             }
 
@@ -177,7 +194,7 @@ class OrderController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order created successfully',
-                'data' => $order->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy'])
+                'data' => $order->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -189,20 +206,15 @@ class OrderController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $order->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy'])
+            'data' => $order->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
         ]);
     }
 
     public function update(Request $request, Order $order): JsonResponse
     {
-        if ($order->status !== 'pending') {
-            throw ValidationException::withMessages([
-                'order' => ['Can only update pending orders.']
-            ]);
-        }
-
         $validated = $request->validate([
             'address_id' => 'sometimes|required|exists:customer_addresses,id',
+            'sales_channel_id' => 'nullable|exists:sales_channels,id',
             'items' => 'sometimes|required|array|min:1',
             'items.*.product_variant_id' => 'required|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -216,6 +228,21 @@ class OrderController extends Controller
             'proof_image' => 'nullable|string'
         ]);
 
+        // Batasi edit order berdasarkan status dan payment gateway
+        if ($order->payments()->exists()) {
+            // Jika order memiliki payment gateway, hanya izinkan update status ke shipped/delivered
+            if (in_array($order->status, ['paid', 'pending', 'cancelled'])) {
+                $allowedStatusUpdates = ['shipped', 'delivered'];
+                if (isset($validated['status']) && !in_array($validated['status'], $allowedStatusUpdates)) {
+                    throw ValidationException::withMessages([
+                        'status' => ['Orders with payment gateway can only be updated to shipped or delivered status.']
+                    ]);
+                }
+                // Hanya izinkan update status, tidak boleh edit field lain
+                $validated = array_intersect_key($validated, array_flip(['status']));
+            }
+        }
+
         try {
             DB::beginTransaction();
             
@@ -225,6 +252,11 @@ class OrderController extends Controller
             // Update address if provided
             if (isset($validated['address_id'])) {
                 $order->update(['address_id' => $validated['address_id']]);
+            }
+
+            // Update sales channel if provided
+            if (isset($validated['sales_channel_id'])) {
+                $order->update(['sales_channel_id' => $validated['sales_channel_id']]);
             }
 
             // Update items if provided
@@ -266,6 +298,7 @@ class OrderController extends Controller
                         'variant_label' => $variant->variant_label,
                         'quantity' => $item['quantity'],
                         'price' => $item['price'],
+                        'base_price' => $variant->product->base_price,
                         'subtotal' => $item['quantity'] * $item['price']
                     ]);
 
@@ -307,18 +340,24 @@ class OrderController extends Controller
             }
 
             // Update or create payment record if payment data is provided
-            if (isset($validated['payment_bank_id']) && isset($validated['amount_paid'])) {
+            if (isset($validated['payment_bank_id']) && ($validated['payment_status'] ?? 'pending') === 'paid') {
                 $order->payments()->updateOrCreate(
                     ['order_id' => $order->id],
                     [
                         'payment_bank_id' => $validated['payment_bank_id'],
-                        'amount_paid' => $validated['amount_paid'],
+                        'amount_paid' => $validated['amount_paid'] ?? $finalTotal,
                         'paid_at' => now(),
                         'proof_image' => $validated['proof_image'] ?? '',
                         'verified_by' => null,
                         'verified_at' => null
                     ]
                 );
+                
+                // Update order status and payment status when payment is made
+                $order->update([
+                    'status' => 'paid',
+                    'payment_status' => 'paid'
+                ]);
             }
 
             // Update or create shipping record if courier is provided
@@ -341,7 +380,7 @@ class OrderController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order updated successfully',
-                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy'])
+                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

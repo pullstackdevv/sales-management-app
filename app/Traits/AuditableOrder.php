@@ -138,7 +138,7 @@ trait AuditableOrder
         return match ($fieldName) {
             'status' => ucfirst(str_replace('_', ' ', $value)),
             'payment_status' => ucfirst(str_replace('_', ' ', $value)),
-            'total_amount', 'discount_amount', 'shipping_cost' => 'Rp ' . number_format($value, 0, ',', '.'),
+            'total_amount', 'discount_amount', 'shipping_cost', 'total_price' => 'Rp ' . number_format($value, 0, ',', '.'),
             'courier_id' => $this->getCourierName($value),
             default => $value
         };

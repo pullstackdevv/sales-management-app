@@ -194,7 +194,7 @@ class MidtransController extends Controller
 
             // Update order status based on payment status
             if ($paymentStatus === PaymentStatus::PAID) {
-                $order->update(['status' => 'confirmed']);
+                $order->update(['status' => 'paid']);
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
             }
@@ -247,7 +247,7 @@ class MidtransController extends Controller
 
                 // Update order status based on payment status
                 if ($paymentStatus === PaymentStatus::PAID) {
-                    $order->update(['status' => 'confirmed']);
+                    $order->update(['status' => 'paid']);
                 } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                     $order->update(['status' => 'cancelled']);
                 }

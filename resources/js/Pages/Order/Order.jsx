@@ -125,7 +125,7 @@ export default function Order() {
           // Add fields needed for order source detection
           payment_url: order.payment_url,
           payment_status: order.payment_status, // Add payment status for display
-          sales_channel: order.sales_channel?.name,
+          sales_channel: order.sales_channel?.name || 'Website',
           // Add shipping object with ID for update operations
           shipping: order.shipping,
           // Add payment bank details for detailed display

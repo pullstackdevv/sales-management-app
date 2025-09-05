@@ -42,45 +42,9 @@ export default function OrderCard({ order, onOrderUpdate }) {
 
     // Helper function to determine order source
     const getOrderSource = (order) => {
-        // Check if order has payment_url (web order with payment gateway)
-        if (order.payment_url) {
-            return {
-                type: 'web',
-                label: 'Web Order',
-                icon: 'mdi:web',
-                bgColor: 'bg-blue-100',
-                textColor: 'text-blue-700',
-                borderColor: 'border-blue-200'
-            };
-        }
+    
         
-        // Check sales channel for marketplace orders
-        if (order.sales_channel) {
-            const channel = order.sales_channel.toLowerCase();
-            if (channel.includes('shopee') || channel.includes('tokopedia') || 
-                channel.includes('lazada') || channel.includes('bukalapak')) {
-                return {
-                    type: 'marketplace',
-                    label: order.sales_channel,
-                    icon: 'mdi:store',
-                    bgColor: 'bg-purple-100',
-                    textColor: 'text-purple-700',
-                    borderColor: 'border-purple-200'
-                };
-            }
-            if (channel.includes('website')) {
-                return {
-                    type: 'website',
-                    label: 'Website',
-                    icon: 'mdi:web',
-                    bgColor: 'bg-green-100',
-                    textColor: 'text-green-700',
-                    borderColor: 'border-green-200'
-                };
-            }
-        }
-        
-        // Default to manual admin order (no payment_url)
+        // Default to manual admin order
         return {
             type: 'manual',
             label: 'Manual',
@@ -374,7 +338,7 @@ export default function OrderCard({ order, onOrderUpdate }) {
                             {orderSource.label}
                         </span>
                     </div>
-                    dari App - {localOrder.channel} ({localOrder.date})
+                    dari App - {localOrder.sales_channel} ({localOrder.date})
                 </div>
 
                 <div className="mt-2 md:mt-0 w-40 flex">
@@ -435,7 +399,7 @@ export default function OrderCard({ order, onOrderUpdate }) {
                     </div>
                     <div className="border rounded-md p-3">
                         <div className="text-xl font-bold text-gray-800">
-                            Rp{localOrder.total.toLocaleString("id-ID")}
+                            Rp{localOrder.total.toLocaleString("id-ID", { maximumFractionDigits: 0 })}
                         </div>
                         <div className="flex gap-2 mt-2">
                             <div className="relative" ref={dropdownRef}>

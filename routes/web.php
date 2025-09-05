@@ -213,6 +213,23 @@ Route::prefix('marketplace')->group(function () {
         return Inertia::render('Marketplace/Checkout');
     })->name('marketplace.checkout');
 
+    // New Checkout Flow Routes
+    Route::get('/checkout/product', function () {
+        return Inertia::render('Checkout/ProductCheckout');
+    })->name('checkout.product');
+
+    Route::get('/checkout/customer-data', function () {
+        return Inertia::render('Checkout/CustomerDataCheckout');
+    })->name('checkout.customer-data');
+
+    Route::get('/checkout/payment-method', function () {
+        return Inertia::render('Checkout/PaymentMethodCheckout');
+    })->name('checkout.payment-method');
+
+    Route::get('/checkout/payment-process', function () {
+        return Inertia::render('Checkout/PaymentProcessCheckout');
+    })->name('checkout.payment-process');
+
     Route::get('/profile', function () {
         return Inertia::render('Marketplace/Profile');
     })->name('marketplace.profile');

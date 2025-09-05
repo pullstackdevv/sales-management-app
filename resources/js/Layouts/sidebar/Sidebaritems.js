@@ -24,18 +24,18 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/order/add",
             },
-            {
-                name: "Cancel Order",
-                icon: "bi:cart-x",
-                id: uniqueId(),
-                url: "/order/inactive",
-            },
-            {
-                name: "On - Hold",
-                icon: "solar:pause-circle-outline",
-                id: uniqueId(),
-                url: "/order/onhold",
-            },
+            // {
+            //     name: "Cancel Order",
+            //     icon: "bi:cart-x",
+            //     id: uniqueId(),
+            //     url: "/order/inactive",
+            // },
+            // {
+            //     name: "On - Hold",
+            //     icon: "solar:pause-circle-outline",
+            //     id: uniqueId(),
+            //     url: "/order/onhold",
+            // },
         ],
     },
     {

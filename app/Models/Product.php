@@ -15,14 +15,17 @@ class Product extends Model
         'sku',
         'category',
         'description',
+        'image',
         'base_price',
         'is_active',
+        'is_storefront',
         'created_by',
     ];
 
     protected $casts = [
         'base_price' => 'decimal:2',
         'is_active' => 'boolean',
+        'is_storefront' => 'boolean',
     ];
 
     // Relationships

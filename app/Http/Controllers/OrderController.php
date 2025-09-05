@@ -14,6 +14,7 @@ use App\Http\Requests\Order\UpdateRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,15 @@ class OrderController extends Controller
             })
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
+            })
+            ->when($request->source, function ($query, $source) {
+                if ($source === 'Manual') {
+                    // Manual orders don't have payment_url
+                    $query->whereNull('payment_url');
+                } elseif ($source === 'Web Order') {
+                    // Web orders have payment_url
+                    $query->whereNotNull('payment_url');
+                }
             })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
                 $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
@@ -62,7 +72,8 @@ class OrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'required|numeric|min:0',
-            'notes' => 'nullable|string|max:255'
+            'notes' => 'nullable|string|max:255',
+            'status' => 'nullable|in:pending,paid,shipped,cancelled'
         ]);
 
         try {
@@ -76,22 +87,13 @@ class OrderController extends Controller
                 return $item['quantity'] * $item['price'];
             });
 
-            // Calculate discount if voucher is provided
+            // For manual orders (no payment gateway), vouchers are not used
+            // Vouchers are only for web orders with payment gateway
             $discountAmount = 0;
-            if (isset($validated['voucher_id'])) {
-                $voucher = \App\Models\Voucher::findOrFail($validated['voucher_id']);
-                
-                if (!$voucher->canBeUsed($subtotal)) {
-                    throw ValidationException::withMessages([
-                        'voucher_id' => ['Voucher tidak dapat digunakan untuk pesanan ini.']
-                    ]);
-                }
-                
-                $discountAmount = $voucher->calculateDiscount($subtotal);
-            }
+            // Note: Manual orders don't use vouchers, only web orders do
 
-            // Calculate total price
-            $totalPrice = $subtotal + $validated['shipping_cost'] - $discountAmount;
+            // Calculate total price (manual orders: subtotal + shipping_cost)
+            $totalPrice = $subtotal + $validated['shipping_cost'];
 
             // Create order
             $order = Order::create([
@@ -104,7 +106,7 @@ class OrderController extends Controller
                 'total_price' => $totalPrice,
                 'discount_amount' => $discountAmount,
                 'shipping_cost' => $validated['shipping_cost'],
-                'status' => 'pending',
+                'status' => $validated['status'] ?? 'pending',
                 'ordered_at' => now()
             ]);
 
@@ -114,7 +116,7 @@ class OrderController extends Controller
 
                 if ($variant->stock < $item['quantity']) {
                     throw ValidationException::withMessages([
-                        'items' => ["Insufficient stock for {$variant->variant_label}"]
+                        'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, diminta: {$item['quantity']}"]
                     ]);
                 }
 
@@ -131,10 +133,8 @@ class OrderController extends Controller
                 $variant->decrement('stock', $item['quantity']);
             }
 
-            // Update voucher usage count if voucher was used
-            if (isset($validated['voucher_id']) && $discountAmount > 0) {
-                $voucher->increment('used_count');
-            }
+            // Note: Voucher logic removed for manual orders
+            // Vouchers are only handled in web orders with payment gateway
 
             DB::commit();
 
@@ -171,11 +171,15 @@ class OrderController extends Controller
             'items.*.product_variant_id' => 'required|exists:product_variants,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
-            'shipping_cost' => 'sometimes|required|numeric|min:0'
+            'shipping_cost' => 'sometimes|required|numeric|min:0',
+            'status' => 'sometimes|required|in:pending,paid,shipped,cancelled'
         ]);
 
         try {
             DB::beginTransaction();
+            
+            // Initialize subtotal variable
+            $calculatedSubtotal = null;
 
             // Update address if provided
             if (isset($validated['address_id'])) {
@@ -202,7 +206,7 @@ class OrderController extends Controller
 
                     if ($variant->stock < $item['quantity']) {
                         throw ValidationException::withMessages([
-                            'items' => ["Insufficient stock for {$variant->variant_label}"]
+                            'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, diminta: {$item['quantity']}"]
                         ]);
                     }
 
@@ -219,23 +223,29 @@ class OrderController extends Controller
                     $variant->decrement('stock', $item['quantity']);
                 }
 
-                // Update order totals
-                $order->update([
-                    'total_price' => $subtotal + ($validated['shipping_cost'] ?? $order->shipping_cost)
-                ]);
+                // Store subtotal for later total calculation (as variable, not database field)
+                $calculatedSubtotal = $subtotal;
             }
 
             // Update shipping cost if provided
             if (isset($validated['shipping_cost'])) {
-                // Calculate current subtotal from items
-                $currentSubtotal = $order->items->sum(function($item) {
-                    return $item->quantity * $item->price;
-                });
-                
-                $order->update([
-                    'shipping_cost' => $validated['shipping_cost'],
-                    'total_price' => $currentSubtotal + $validated['shipping_cost']
-                ]);
+                $order->shipping_cost = $validated['shipping_cost'];
+            }
+            
+            // Calculate final total_price once at the end
+            $finalSubtotal = $calculatedSubtotal ?? $order->items->sum(function($item) {
+                return $item->quantity * $item->price;
+            });
+            
+            $finalTotal = $finalSubtotal + $order->shipping_cost;
+            
+            $order->update([
+                'total_price' => $finalTotal
+            ]);
+
+            // Update status if provided
+            if (isset($validated['status'])) {
+                $order->update(['status' => $validated['status']]);
             }
 
             // Update timestamp
@@ -296,12 +306,19 @@ class OrderController extends Controller
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
         $validated = $request->validate([
-            'status' => 'required|in:pending,paid,shipped,cancelled'
+            'status' => 'required|in:pending,paid,shipped,delivered,cancelled'
         ]);
 
         if ($order->status === $validated['status']) {
             throw ValidationException::withMessages([
                 'status' => ['Order is already in this status.']
+            ]);
+        }
+
+        // Validasi: status cancelled hanya bisa diterapkan pada order manual input
+        if ($validated['status'] === 'cancelled' && !is_null($order->payment_url)) {
+            throw ValidationException::withMessages([
+                'status' => ['Status dibatalkan hanya dapat diterapkan pada order manual input.']
             ]);
         }
 
@@ -511,5 +528,83 @@ class OrderController extends Controller
                 'estimated_days' => $courierRate->estimated_days
             ]
         ]);
+    }
+
+    /**
+     * Update shipping information for an order
+     */
+    public function updateShipping(Request $request, Order $order): JsonResponse
+    {
+        $request->validate([
+            'courier_id' => 'required|exists:couriers,id',
+            'tracking_number' => 'required|string|max:100'
+        ]);
+
+        // Check if order already has shipping record
+        if ($order->shipping) {
+            // Update existing shipping record
+            $order->shipping->update([
+                'courier_id' => $request->courier_id,
+                'tracking_number' => $request->tracking_number,
+                'shipped_at' => now()
+            ]);
+            $shipping = $order->shipping;
+        } else {
+            // Create new shipping record
+            $shipping = $order->shipping()->create([
+                'courier_id' => $request->courier_id,
+                'tracking_number' => $request->tracking_number,
+                'shipped_at' => now()
+            ]);
+        }
+
+        // Load courier relationship for response
+        $shipping->load('courier');
+
+        // Update order status to shipped if not already
+        if ($order->status !== 'shipped' && $order->status !== 'delivered') {
+            $order->update(['status' => 'shipped']);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Shipping information updated successfully',
+            'data' => [
+                'shipping' => [
+                    'id' => $shipping->id,
+                    'courier_id' => $shipping->courier_id,
+                    'courier' => [
+                        'id' => $shipping->courier->id,
+                        'name' => $shipping->courier->name
+                    ],
+                    'tracking_number' => $shipping->tracking_number,
+                    'shipped_at' => $shipping->shipped_at->toISOString()
+                ],
+                'order' => [
+                    'id' => $order->id,
+                    'status' => $order->status
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * Get audit history for an order.
+     */
+    public function auditHistory(Order $order): JsonResponse
+    {
+        try {
+            $auditHistory = $order->getAuditHistory();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $auditHistory
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to retrieve audit history: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

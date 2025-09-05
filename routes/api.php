@@ -25,6 +25,10 @@ use App\Http\Controllers\StockOpnameDetailController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\WebOrderController;
+use App\Http\Controllers\XenditController;
+use App\Http\Controllers\MidtransController;
+use App\Http\Controllers\WilayahController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -40,6 +44,16 @@ Route::prefix('auth/')->group(function () {
     });
 
 
+});
+
+// Public wilayah API routes (for address selection)
+Route::prefix('wilayah')->group(function () {
+    Route::get('provinces', [WilayahController::class, 'getProvinces']);
+    Route::get('regencies/{provinceCode}', [WilayahController::class, 'getRegencies']);
+    Route::get('regencies', [WilayahController::class, 'getAllRegencies']);
+    Route::get('search-regencies', [WilayahController::class, 'searchRegencies']);
+    Route::get('districts/{regencyCode}', [WilayahController::class, 'getDistricts']);
+    Route::get('villages/{districtCode}', [WilayahController::class, 'getVillages']);
 });
 
 // Public courier rates API routes (for checkout)
@@ -94,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('customers/{customer}/addresses/{address}/set-default', [AddressController::class, 'setDefault']);
 
     // Product routes
+    Route::get('products/storefront', [ProductController::class, 'storefront']);
     Route::apiResource('products', ProductController::class);
     Route::apiResource('products.variants', ProductVariantController::class);
 
@@ -122,7 +137,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Order routes
     Route::apiResource('orders', OrderController::class);
     Route::post('orders/{order}/update-status', [OrderController::class, 'updateStatus']);
+    Route::put('orders/{order}/shipping', [OrderController::class, 'updateShipping']);
     Route::get('orders/{order}/generate-shipping-label', [OrderController::class, 'generateShippingLabel']);
+    Route::get('orders/{order}/audit-history', [OrderController::class, 'auditHistory']);
     
     // Shipping routes (nested under orders)
     Route::get('orders/{order}/shipping', [ShippingController::class, 'index']);
@@ -154,5 +171,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
         Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
+    });
+});
+
+// Payment Gateway Routes (public access for webhooks and order payment)
+Route::prefix('payment')->name('payment.')->group(function () {
+    // Web Order Payment Routes (can be used by guests)
+    Route::post('/create/{orderNumber}', [WebOrderController::class, 'createPayment'])->name('web.create');
+    Route::get('/status/{orderNumber}', [WebOrderController::class, 'checkPaymentStatus'])->name('web.status');
+    
+    // Xendit specific routes
+    Route::prefix('xendit')->name('xendit.')->group(function () {
+        Route::post('/webhook', [XenditController::class, 'handleWebhook'])->name('webhook');
+        Route::get('/status/{orderNumber}', [XenditController::class, 'checkPaymentStatus'])->name('status');
+    });
+    
+    // Midtrans specific routes (existing routes from web.php can be moved here if needed)
+    Route::prefix('midtrans')->name('midtrans.')->group(function () {
+        Route::post('/webhook', [MidtransController::class, 'handleNotification'])->name('webhook');
+        Route::get('/status/{orderNumber}', [MidtransController::class, 'checkPaymentStatus'])->name('status');
     });
 });

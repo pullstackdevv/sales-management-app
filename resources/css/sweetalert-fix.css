@@ -64,6 +64,23 @@
   line-height: 1.25rem !important;
 }
 
+/* Hide buttons when showConfirmButton is false */
+.swal2-popup.swal2-show .swal2-actions:empty {
+  display: none !important;
+}
+
+.swal2-popup .swal2-actions .swal2-confirm[style*="display: none"] {
+  display: none !important;
+}
+
+.swal2-popup .swal2-actions .swal2-cancel[style*="display: none"] {
+  display: none !important;
+}
+
+.swal2-popup .swal2-actions .swal2-deny[style*="display: none"] {
+  display: none !important;
+}
+
 /* Fix for button focus states */
 .swal2-popup .swal2-actions button:focus {
   outline: 2px solid #3b82f6 !important;

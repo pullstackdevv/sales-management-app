@@ -86,6 +86,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/customer/add', function () {
         return Inertia::render('Customer/AddCustomer');
     })->name('customers.create');
+    
+    Route::get('/customer/edit/{id}', function ($id) {
+        return Inertia::render('Customer/EditCustomer', ['customerId' => $id]);
+    })->name('customers.edit');
 
     // Produk
     Route::get('/product/data', function () {
@@ -179,6 +183,14 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/voucher/create', function () {
         return Inertia::render('Voucher/AddVoucher');
     })->name('vouchers.create');
+    
+    Route::get('/voucher/edit/{id}', function ($id) {
+        return Inertia::render('Voucher/EditVoucher', ['voucherId' => $id]);
+    })->name('vouchers.edit');
+    
+    Route::get('/voucher/view/{id}', function ($id) {
+        return Inertia::render('Voucher/ViewVoucher', ['voucherId' => $id]);
+    })->name('vouchers.view');
 
     // analizer
     Route::get('/report', function () {

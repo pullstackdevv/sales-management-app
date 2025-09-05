@@ -20,7 +20,7 @@ class MidtransController extends Controller
     {
         try {
             $order = Order::where('order_number', $orderNumber)
-                ->with(['customer', 'address', 'items.product', 'items.variant'])
+                ->with(['customer', 'address', 'items.productVariant.product'])
                 ->first();
 
             if (!$order) {

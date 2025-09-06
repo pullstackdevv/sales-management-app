@@ -29,6 +29,8 @@ use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\XenditController;
 use App\Http\Controllers\MidtransController;
 use App\Http\Controllers\WilayahController;
+use App\Http\Controllers\ProductSettingController;
+use App\Http\Controllers\OriginSettingController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -166,6 +168,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('expense-categories', [ExpenseController::class, 'getCategories']);
     Route::get('expense-summary', [ExpenseController::class, 'getSummary']);
     Route::post('expenses/export-excel', [ExpenseController::class, 'exportExcel']);
+
+    // Settings routes
+    Route::apiResource('product-settings', ProductSettingController::class);
+    Route::apiResource('origin-settings', OriginSettingController::class);
 
     // Other authenticated routes remain here
 

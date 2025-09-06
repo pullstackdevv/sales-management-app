@@ -62,6 +62,7 @@ export default function Analyzer() {
 
     return (
         <DashboardLayout>
+             <div className="text-gray-800" style={{maxWidth: '99%'}}>
             <h1 className="text-xl font-bold mb-6">Analyzer</h1>
 
             {/* Loading State */}
@@ -205,6 +206,7 @@ export default function Analyzer() {
                     />
                 </div>
             )}
+            </div>
         </DashboardLayout>
     );
 }

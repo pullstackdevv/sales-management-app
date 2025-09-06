@@ -11,6 +11,7 @@ export default function AddOrder() {
         customer_id: '',
         address_id: '',
         sales_channel_id: '',
+        origin_setting_id: '',
         shipping_cost: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
@@ -26,6 +27,7 @@ export default function AddOrder() {
     const [salesChannels, setSalesChannels] = useState([]);
     const [paymentBanks, setPaymentBanks] = useState([]);
     const [couriers, setCouriers] = useState([]);
+    const [origins, setOrigins] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     
@@ -36,6 +38,7 @@ export default function AddOrder() {
         salesChannels: false,
         paymentBanks: false,
         couriers: false,
+        origins: false,
         submitting: false
     });
     
@@ -141,6 +144,25 @@ export default function AddOrder() {
             setCouriers([]);
         } finally {
             setLoading(prev => ({ ...prev, couriers: false }));
+        }
+    };
+
+    // Fetch origins dari API
+    const fetchOrigins = async () => {
+        setLoading(prev => ({ ...prev, origins: true }));
+        try {
+            const response = await axios.get('/api/origin-settings');
+            if (response.data.success) {
+                const activeOrigins = response.data.data.filter(origin => origin.is_active);
+                setOrigins(activeOrigins);
+            } else {
+                setOrigins([]);
+            }
+        } catch (error) {
+            console.error('Error fetching origins:', error);
+            setOrigins([]);
+        } finally {
+            setLoading(prev => ({ ...prev, origins: false }));
         }
     };
 
@@ -315,6 +337,7 @@ export default function AddOrder() {
         fetchSalesChannels();
         fetchPaymentBanks();
         fetchCouriers();
+        fetchOrigins();
     }, []);
 
     // Handle search debouncing
@@ -445,9 +468,25 @@ export default function AddOrder() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Pengiriman Dari
                                 </label>
-                                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                                    <option>SP | Kemayoran Kota Jakarta Pusat</option>
+                                <select 
+                                    value={formData.origin_setting_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, origin_setting_id: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    required
+                                >
+                                    <option value="">Pilih asal pengiriman...</option>
+                                    {origins.map((origin) => (
+                                        <option key={origin.id} value={origin.id}>
+                                            {origin.store_name} | {origin.origin_address}
+                                        </option>
+                                    ))}
                                 </select>
+                                {loading.origins && (
+                                    <p className="text-gray-500 text-xs mt-1">Memuat origins...</p>
+                                )}
+                                {errors.origin_setting_id && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.origin_setting_id}</p>
+                                )}
                             </div>
 
                             <div>

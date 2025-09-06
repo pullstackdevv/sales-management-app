@@ -14,6 +14,7 @@ export default function EditOrder() {
         customer_id: '',
         address_id: '',
         sales_channel_id: '',
+        origin_setting_id: '',
         shipping_cost: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
@@ -29,6 +30,7 @@ export default function EditOrder() {
     const [salesChannels, setSalesChannels] = useState([]);
     const [paymentBanks, setPaymentBanks] = useState([]);
     const [couriers, setCouriers] = useState([]);
+    const [origins, setOrigins] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     const [originalOrder, setOriginalOrder] = useState(null);
@@ -40,6 +42,7 @@ export default function EditOrder() {
         salesChannels: false,
         paymentBanks: false,
         couriers: false,
+        origins: false,
         submitting: false,
         order: true
     });
@@ -215,6 +218,25 @@ export default function EditOrder() {
             setCouriers([]);
         } finally {
             setLoading(prev => ({ ...prev, couriers: false }));
+        }
+    };
+
+    // Fetch origins dari API
+    const fetchOrigins = async () => {
+        setLoading(prev => ({ ...prev, origins: true }));
+        try {
+            const response = await axios.get('/api/origin-settings');
+            if (response.data.success) {
+                const activeOrigins = response.data.data.filter(origin => origin.is_active);
+                setOrigins(activeOrigins);
+            } else {
+                setOrigins([]);
+            }
+        } catch (error) {
+            console.error('Error fetching origins:', error);
+            setOrigins([]);
+        } finally {
+            setLoading(prev => ({ ...prev, origins: false }));
         }
     };
 
@@ -401,6 +423,7 @@ export default function EditOrder() {
             fetchSalesChannels();
             fetchPaymentBanks();
             fetchCouriers();
+            fetchOrigins();
         }
     }, [orderId]);
 
@@ -546,8 +569,18 @@ export default function EditOrder() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Pengiriman Dari
                                 </label>
-                                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                                    <option>SP | Kemayoran Kota Jakarta Pusat</option>
+                                <select 
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    value={formData.origin_setting_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, origin_setting_id: e.target.value }))}
+                                    disabled={loading.origins}
+                                >
+                                    <option value="">Pilih Pengiriman Dari</option>
+                                    {origins.map(origin => (
+                                        <option key={origin.id} value={origin.id}>
+                                            {origin.store_name} - {origin.origin_address}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 

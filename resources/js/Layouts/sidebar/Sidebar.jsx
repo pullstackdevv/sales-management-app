@@ -1,100 +1,62 @@
-import { Sidebar } from "flowbite-react";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { Icon } from "@iconify/react";
 import NavItems from "./NavItems";
 import SidebarContent from "./Sidebaritems";
-import SimpleBar from "simplebar-react";
-import { Icon } from "@iconify/react";
-import { HiChevronUp, HiChevronDown, HiChevronLeft } from "react-icons/hi";
+import MobileSidebar from "./MobileSidebar";
 
 const SidebarLayout = ({ isOpen, onClose, onOpen }) => {
-    const [openMenus, setOpenMenus] = useState({});
+    const [openDropdowns, setOpenDropdowns] = useState({});
 
-    useEffect(() => {
-        const savedOpenMenus = localStorage.getItem("sidebarOpenMenus");
-        if (savedOpenMenus) {
-            try {
-                setOpenMenus(JSON.parse(savedOpenMenus));
-            } catch (error) {
-                console.error("Error parsing saved open menus:", error);
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem("sidebarOpenMenus", JSON.stringify(openMenus));
-    }, [openMenus]);
-
-    const toggleMenu = (id) => {
-        setOpenMenus((prev) => {
-            if (prev[id]) {
-                const newState = { ...prev };
-                delete newState[id];
-                return newState;
-            }
-
-            return { [id]: true };
-        });
+    const toggleDropdown = (itemId) => {
+        setOpenDropdowns(prev => ({
+            ...prev,
+            [itemId]: !prev[itemId]
+        }));
     };
 
     return (
         <>
-            {/* Toggle button, always visible */}
-            <div
-                className={`fixed top-24 z-50 -translate-y-1/2 transition-all duration-300 ${
-                    isOpen ? "left-72 ml-4" : "left-4"
-                }`}
-            >
-                    <button
-                        className="bg-white rounded-full p-1 hover:bg-gray-100 transition"
-                        onClick={isOpen ? onClose : onOpen}
-                    >
-                        <HiChevronLeft
-                            size={24}
-                            className={`transition-transform duration-300 ${
-                                !isOpen ? "rotate-180" : ""
-                            }`}
-                        />
-                    </button>
-            </div>
+            {/* Mobile Sidebar Component */}
+            <MobileSidebar isOpen={isOpen} onClose={onClose} />
 
-            {/* Sidebar */}
-            <Sidebar
-                className={`fixed menu-sidebar bg-white rtl:pe-4 rtl:ps-0 transition-transform duration-300 ${
-                    isOpen ? "translate-x-0" : "-translate-x-full"
-                }`}
-                aria-label="Sidebar"
+            {/* Desktop Sidebar */}
+            <div
+                className={`hidden lg:flex fixed left-0 top-0 h-full bg-white shadow-lg z-30 transition-all duration-300 ${
+                    isOpen ? "w-64" : "w-0"
+                } overflow-hidden`}
             >
-                <SimpleBar className="h-[calc(100vh_-_230px)] pt-20">
-                    <div className="px-2 mt-2 space-y-1">
-                        {SidebarContent.map((item) => (
-                            <div key={item.id}>
-                                {item.children?.length > 0 ? (
-                                    <>
-                                        <button
-                                            className="flex items-center w-full gap-3 px-3 py-2 rounded-xl text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors duration-150"
-                                            onClick={() => toggleMenu(item.id)}
-                                            type="button"
-                                        >
-                                            <span>
-                                                <Icon
-                                                    height={20}
-                                                    className="text-gray-500 group-hover:text-primary"
-                                                    icon={item.icon}
-                                                />
-                                            </span>
-                                            <span className="truncate text-sm font-medium flex-1 text-left">
-                                                {item.name}
-                                            </span>
-                                            <span>
-                                                {openMenus[item.id] ? (
-                                                    <HiChevronUp />
-                                                ) : (
-                                                    <HiChevronDown />
-                                                )}
-                                            </span>
-                                        </button>
-                                        {openMenus[item.id] && (
-                                            <div className="ml-6 space-y-1">
+                <div className="flex flex-col w-64 h-full">
+                    {/* Sidebar Content */}
+                    <div className="flex-1 overflow-y-auto pt-20 px-4 pb-4">
+                        <div className="space-y-2">
+                            {SidebarContent.map((item) => (
+                                <div key={item.id}>
+                                    {/* Render menu utama */}
+                                    {!item.children ? (
+                                        <NavItems item={item} />
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {/* Render parent menu dengan children - clickable dropdown */}
+                                            <button
+                                                onClick={() => toggleDropdown(item.id)}
+                                                className="w-full px-3 py-2 text-gray-600 font-medium text-sm hover:bg-gray-100 rounded-lg transition-colors duration-150"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <Icon icon={item.icon} height={20} className="text-gray-500" />
+                                                        <span>{item.name}</span>
+                                                    </div>
+                                                    <Icon 
+                                                        icon={openDropdowns[item.id] ? "mdi:chevron-up" : "mdi:chevron-down"} 
+                                                        height={16} 
+                                                        className="text-gray-400 transition-transform duration-200" 
+                                                    />
+                                                </div>
+                                            </button>
+                                            {/* Render submenu dengan animasi */}
+                                            <div className={`ml-6 space-y-1 transition-all duration-200 overflow-hidden ${
+                                                openDropdowns[item.id] ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                                            }`}>
                                                 {item.children.map((child) => (
                                                     <NavItems
                                                         item={child}
@@ -102,16 +64,14 @@ const SidebarLayout = ({ isOpen, onClose, onOpen }) => {
                                                     />
                                                 ))}
                                             </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <NavItems item={item} />
-                                )}
-                            </div>
-                        ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </SimpleBar>
-            </Sidebar>
+                </div>
+            </div>
         </>
     );
 };

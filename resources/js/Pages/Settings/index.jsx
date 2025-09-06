@@ -29,11 +29,11 @@ const menus = [
   { key: "general", label: "General", icon: "mdi:cog" },
   { key: "order", label: "Order", icon: "mdi:clipboard-list-outline" },
   { key: "product", label: "Product", icon: "mdi:package-variant" },
-  { key: "customer", label: "Customer", icon: "mdi:account-group-outline" },
+  // { key: "customer", label: "Customer", icon: "mdi:account-group-outline" },
   { key: "payment", label: "Payment", icon: "mdi:credit-card-outline" },
   { key: "courier", label: "Courier", icon: "mdi:truck-outline" },
   { key: "origin", label: "Asal Pengiriman", icon: "mdi:map-marker-outline" },
-  { key: "template", label: "Template", icon: "mdi:file-document-outline" },
+  // { key: "template", label: "Template", icon: "mdi:file-document-outline" },
   { key: "user", label: "User", icon: "mdi:account-outline" },
 ];
 
@@ -63,11 +63,11 @@ function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
         {activeMenu === "general" && <GeneralSettings />}
         {activeMenu === "order" && <OrderSettings />}
         {activeMenu === "product" && <ProductSettings />}
-        {activeMenu === "customer" && <CustomerSettings />}
+        {/* {activeMenu === "customer" && <CustomerSettings />} */}
         {activeMenu === "payment" && <PaymentSettings />}
         {activeMenu === "courier" && <CourierSettings />}
         {activeMenu === "origin" && <OriginSettings />}
-        {activeMenu === "template" && <TemplateSettings />}
+        {/* {activeMenu === "template" && <TemplateSettings />} */}
         {activeMenu === "user" && <UserSettings />}
         {activeMenu === "dashboard" && <DashboardSettings />}
         {activeMenu === "api" && <ApiSettings />}

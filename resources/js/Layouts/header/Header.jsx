@@ -3,7 +3,7 @@ import { Button, Navbar } from "flowbite-react";
 import { Icon } from "@iconify/react";
 import FullLogo from "../shared/logo/FullLogo";
 
-const Header = () => {
+const Header = ({ onHamburgerClick, isSidebarOpen }) => {
   const [isSticky, setIsSticky] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -32,9 +32,28 @@ const Header = () => {
         <Navbar fluid className="py-3 px-4 lg:px-6">
           {/* Left - Logo & Hamburger */}
           <div className="flex items-center gap-4">
-            {/* <button className="text-blue-600 " onClick={() => setIsOpen(true)}>
-              <Icon icon="solar:hamburger-menu-line-duotone" height={24} />
-            </button> */}
+            {/* Hamburger Menu Button */}
+            <button 
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors" 
+              onClick={onHamburgerClick}
+            >
+              <Icon 
+                icon={isSidebarOpen ? "mdi:close" : "mdi:menu"} 
+                className="text-2xl text-gray-700" 
+              />
+            </button>
+            
+            {/* Desktop Sidebar Toggle */}
+            <button 
+              className="hidden lg:block p-2 rounded-lg hover:bg-gray-100 transition-colors" 
+              onClick={onHamburgerClick}
+            >
+              <Icon 
+                icon={isSidebarOpen ? "mdi:menu-open" : "mdi:menu"} 
+                className="text-xl text-gray-700" 
+              />
+            </button>
+            
             <FullLogo />
           </div>
 

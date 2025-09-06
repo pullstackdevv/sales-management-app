@@ -1,14 +1,21 @@
 import { Icon } from "@iconify/react";
 import { Link, usePage } from "@inertiajs/react";
 
-const NavItems = ({ item }) => {
+const NavItems = ({ item, onClick }) => {
   const { url } = usePage();
   const currentPath = url || "/";
   const isActive = currentPath === item.url;
 
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    }
+  };
+
   return (
     <Link
       href={item.url}
+      onClick={handleClick}
       className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors duration-150 ${
         isActive
           ? "bg-primary text-white shadow-lg"

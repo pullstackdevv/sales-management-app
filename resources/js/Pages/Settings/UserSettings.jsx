@@ -20,7 +20,15 @@ export default function UserSettings() {
     password: '',
     password_confirmation: '',
     role: 'staff',
-    is_active: true
+    is_active: true,
+    permissions: {
+      orders: { view: false, create: false, edit: false, delete: false },
+      products: { view: false, create: false, edit: false, delete: false },
+      customers: { view: false, create: false, edit: false, delete: false },
+      reports: { view: false, create: false, edit: false, delete: false },
+      settings: { view: false, create: false, edit: false, delete: false },
+      users: { view: false, create: false, edit: false, delete: false }
+    }
   });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -36,7 +44,15 @@ export default function UserSettings() {
       password: '',
       password_confirmation: '',
       role: 'staff',
-      is_active: true
+      is_active: true,
+      permissions: {
+        orders: { view: false, create: false, edit: false, delete: false },
+        products: { view: false, create: false, edit: false, delete: false },
+        customers: { view: false, create: false, edit: false, delete: false },
+        reports: { view: false, create: false, edit: false, delete: false },
+        settings: { view: false, create: false, edit: false, delete: false },
+        users: { view: false, create: false, edit: false, delete: false }
+      }
     });
     setFormError(null);
     setSelectedUser(null);
@@ -55,7 +71,15 @@ export default function UserSettings() {
       password: '',
       password_confirmation: '',
       role: typeof user.role === 'object' ? user.role.value : user.role,
-      is_active: user.is_active
+      is_active: user.is_active,
+      permissions: user.permissions || {
+        orders: { view: false, create: false, edit: false, delete: false },
+        products: { view: false, create: false, edit: false, delete: false },
+        customers: { view: false, create: false, edit: false, delete: false },
+        reports: { view: false, create: false, edit: false, delete: false },
+        settings: { view: false, create: false, edit: false, delete: false },
+        users: { view: false, create: false, edit: false, delete: false }
+      }
     });
     setSelectedUser(user);
     setModalType('edit');
@@ -72,6 +96,52 @@ export default function UserSettings() {
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handlePermissionChange = (module, action, checked) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        [module]: {
+          ...prev.permissions[module],
+          [action]: checked
+        }
+      }
+    }));
+  };
+
+  const handleRoleChange = (e) => {
+    const role = e.target.value;
+    let defaultPermissions = {
+      orders: { view: false, create: false, edit: false, delete: false },
+      products: { view: false, create: false, edit: false, delete: false },
+      customers: { view: false, create: false, edit: false, delete: false },
+      reports: { view: false, create: false, edit: false, delete: false },
+      settings: { view: false, create: false, edit: false, delete: false },
+      users: { view: false, create: false, edit: false, delete: false }
+    };
+
+    // Set default permissions based on role
+    if (role === 'owner' || role === 'admin') {
+      Object.keys(defaultPermissions).forEach(module => {
+        defaultPermissions[module] = { view: true, create: true, edit: true, delete: true };
+      });
+    } else if (role === 'staff') {
+      defaultPermissions.orders = { view: true, create: true, edit: true, delete: false };
+      defaultPermissions.products = { view: true, create: false, edit: true, delete: false };
+      defaultPermissions.customers = { view: true, create: true, edit: true, delete: false };
+      defaultPermissions.reports = { view: true, create: false, edit: false, delete: false };
+    } else if (role === 'warehouse') {
+      defaultPermissions.orders = { view: true, create: false, edit: true, delete: false };
+      defaultPermissions.products = { view: true, create: true, edit: true, delete: false };
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      role: role,
+      permissions: defaultPermissions
     }));
   };
 
@@ -291,11 +361,39 @@ export default function UserSettings() {
       }
     },
     {
-      key: "priv",
-      label: "Privileges",
-      render: () => (
-        <span className="bg-gray-200 px-2 py-1 rounded text-xs">-</span>
-      ),
+      key: "permissions",
+      label: "Permissions",
+      render: (row) => {
+        const permissions = row.permissions || {};
+        const activePermissions = [];
+        
+        Object.keys(permissions).forEach(module => {
+          const modulePerms = permissions[module] || {};
+          const activeActions = Object.keys(modulePerms).filter(action => modulePerms[action]);
+          if (activeActions.length > 0) {
+            activePermissions.push(`${module}: ${activeActions.join(', ')}`);
+          }
+        });
+        
+        return (
+          <div className="max-w-xs">
+            {activePermissions.length > 0 ? (
+              <div className="text-xs space-y-1">
+                {activePermissions.slice(0, 2).map((perm, idx) => (
+                  <div key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded truncate">
+                    {perm}
+                  </div>
+                ))}
+                {activePermissions.length > 2 && (
+                  <div className="text-gray-500">+{activePermissions.length - 2} more</div>
+                )}
+              </div>
+            ) : (
+              <span className="bg-gray-200 px-2 py-1 rounded text-xs">No permissions</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "actions",
@@ -355,8 +453,9 @@ export default function UserSettings() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Pengaturan User</h2>
           <Button 
-            className="bg-primary text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-primary/90 text-sm"
+            color="blue"
             onClick={openCreateModal}
+            className="flex items-center gap-2"
           >
             <Icon icon="mdi:plus" width={18} />
             Tambah User
@@ -408,7 +507,7 @@ export default function UserSettings() {
       </div>
 
       {/* User Modal */}
-      <Modal show={showModal} onClose={closeModal} size="md">
+      <Modal show={showModal} onClose={closeModal} size="lg">
         <Modal.Header>
           {modalType === 'create' ? 'Tambah User Baru' : 'Edit User'}
         </Modal.Header>
@@ -484,7 +583,7 @@ export default function UserSettings() {
                 id="role"
                 name="role"
                 value={formData.role}
-                onChange={handleInputChange}
+                onChange={handleRoleChange}
                 required
               >
                 <option value="staff">Staff</option>
@@ -494,6 +593,30 @@ export default function UserSettings() {
               </Select>
             </div>
 
+            {/* Permissions Section */}
+            <div>
+              <Label value="Permissions" className="mb-3 block" />
+              <div className="space-y-4 max-h-60 overflow-y-auto border rounded-lg p-4">
+                {Object.keys(formData.permissions).map(module => (
+                  <div key={module} className="border-b pb-3 last:border-b-0">
+                    <h4 className="font-medium capitalize mb-2 text-gray-700">{module}</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.keys(formData.permissions[module]).map(action => (
+                        <label key={action} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={formData.permissions[module][action]}
+                            onChange={(e) => handlePermissionChange(module, action, e.target.checked)}
+                            className="rounded"
+                          />
+                          <span className="capitalize">{action}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="flex items-center gap-2">
               <input

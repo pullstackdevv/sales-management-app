@@ -5,6 +5,11 @@ import { AuthAPI } from '@/api'
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
+// Logo Component
+const Logo = () => (
+  <img src="/assets/images/logos/mystock.png" alt="logo" className="block w-60 mx-auto mb-6" />
+);
+
 export default function LoginForm() {
   const {
     register,
@@ -41,69 +46,94 @@ export default function LoginForm() {
     serverErrors.find((e) => e.field === field)?.message;
 
   return (
-    <div className="max-w-md mx-auto mt-20 p-6 bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-4">Login</h2>
-      {message && (
-        <div className={`mb-4 ${messageStatus === 'success' ? 'text-green-600' : 'text-red-500'}`}>
-          {message}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit(onSubmit)}>
-        {/* email */}
-        <div className="mb-4">
-          <label>Email</label>
-          <input
-            type="email"
-            {...register('email', { required: 'Email wajib diisi' })}
-            className="w-full border px-3 py-2 rounded"
-          />
-          {(validationErrors.email || getServerError('email')) && (
-            <div className="text-sm ">
-              {validationErrors.email?.message || getServerError('email')}
-            </div>
-          )}
-        </div>
-
-        {/* password */}
-        <div className="mb-4">
-          <label>Password</label>
-          <div className="relative">
-            <input
-              type={showPwd ? 'text' : 'password'}
-              {...register('password', { required: 'Password wajib diisi' })}
-              className="w-full border px-3 py-2 rounded pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPwd(!showPwd)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500"
-              tabIndex={-1}
-            >
-              <Icon icon={showPwd ? 'fluent:eye-off-16-regular' : 'fluent:eye-16-regular'} className="w-5 h-5" />
-            </button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+          {/* Logo */}
+          <Logo />
+          
+          {/* Title */}
+          <div className="text-center mb-8">
+            {/* <h1 className="text-3xl font-bold text-gray-800 mb-2">Sales Management</h1> */}
+            {/* <p className="text-gray-600">Masuk ke akun Anda</p> */}
           </div>
-          {(validationErrors.password || getServerError('password')) && (
-            <div className="text-sm text-red-500">
-              {validationErrors.password?.message || getServerError('password')}
+          {message && (
+            <div className={`mb-6 p-4 rounded-lg text-center font-medium ${
+              messageStatus === 'success' 
+                ? 'bg-green-50 text-green-700 border border-green-200' 
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}>
+              <Icon 
+                icon={messageStatus === 'success' ? 'fluent:checkmark-circle-16-filled' : 'fluent:error-circle-16-filled'} 
+                className="inline w-5 h-5 mr-2" 
+              />
+              {message}
             </div>
           )}
-        </div>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-        >
-          Login
-        </button>
-        <p className="text-sm text-center mt-4">
-          Belum punya akun?{' '}
-          <Link
-            href={route('auth.register')}
-            className="text-blue-600 hover:underline"
-          >Daftar</Link>
-        </p>
-      </form>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <Icon icon="fluent:mail-16-regular" className="inline w-4 h-4 mr-2" />
+                Email
+              </label>
+              <input
+                type="email"
+                {...register('email', { required: 'Email wajib diisi' })}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 bg-gray-50 focus:bg-white"
+                placeholder="Masukkan email Anda"
+              />
+              {(validationErrors.email || getServerError('email')) && (
+                <div className="text-sm text-red-500 mt-1 flex items-center">
+                  <Icon icon="fluent:error-circle-16-regular" className="w-4 h-4 mr-1" />
+                  {validationErrors.email?.message || getServerError('email')}
+                </div>
+              )}
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <Icon icon="fluent:lock-closed-16-regular" className="inline w-4 h-4 mr-2" />
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPwd ? 'text' : 'password'}
+                  {...register('password', { required: 'Password wajib diisi' })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 bg-gray-50 focus:bg-white pr-12"
+                  placeholder="Masukkan password Anda"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(!showPwd)}
+                  className="absolute inset-y-0 right-0 flex items-center px-4 text-gray-500 hover:text-gray-700 transition duration-200"
+                  tabIndex={-1}
+                >
+                  <Icon icon={showPwd ? 'fluent:eye-off-16-regular' : 'fluent:eye-16-regular'} className="w-5 h-5" />
+                </button>
+              </div>
+              {(validationErrors.password || getServerError('password')) && (
+                <div className="text-sm text-red-500 mt-1 flex items-center">
+                  <Icon icon="fluent:error-circle-16-regular" className="w-4 h-4 mr-1" />
+                  {validationErrors.password?.message || getServerError('password')}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              <Icon icon="fluent:arrow-right-16-filled" className="inline w-5 h-5 mr-2" />
+              Login
+            </button>
+            
+            
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

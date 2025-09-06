@@ -35,6 +35,8 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
       },
     },
+    // Ensure manifest is in the correct location
+    manifestPath: 'manifest.json',
   },
   resolve: {
     alias: {

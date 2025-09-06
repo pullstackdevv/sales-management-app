@@ -267,6 +267,44 @@ class UserController extends Controller
             throw $e;
         }
     }
+    
+    /**
+     * Change password for current authenticated user (Web/Inertia)
+     */
+    public function changePasswordWeb(Request $request)
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed'
+        ]);
+
+        $user = Auth::user();
+
+        // Verify current password
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            return back()->withErrors([
+                'current_password' => 'Password saat ini tidak benar'
+            ]);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $user->update([
+                'password' => Hash::make($validated['new_password']),
+                'updated_by' => Auth::id()
+            ]);
+
+            DB::commit();
+
+            return back()->with('success', 'Password berhasil diubah');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors([
+                'new_password' => 'Terjadi kesalahan saat mengubah password'
+            ]);
+        }
+    }
 
 
 

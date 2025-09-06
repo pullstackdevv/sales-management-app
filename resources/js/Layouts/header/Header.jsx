@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
 import { Button, Navbar } from "flowbite-react";
 import { Icon } from "@iconify/react";
+import { usePage } from "@inertiajs/react";
 import FullLogo from "../shared/logo/FullLogo";
+import ChangePasswordModal from "../../components/ChangePasswordModal";
 
 const Header = ({ onHamburgerClick, isSidebarOpen }) => {
   const [isSticky, setIsSticky] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
-  // Dummy user, ganti dengan data user dari context/store jika ada
-  const user = { name: "Admin", email: "admin@gmail.com" };
+  // Ambil data user yang sedang login dari Inertia props
+  const { auth } = usePage().props;
+  const user = auth?.user || { name: "Guest", email: "guest@example.com" };
 
   useEffect(() => {
     const handleScroll = () => setIsSticky(window.scrollY > 50);
@@ -82,15 +86,26 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
                   .toUpperCase()}
               </div>
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white rounded shadow-lg z-50">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded shadow-lg z-50">
                   <div className="px-4 py-2 border-b">
                     <div className="font-semibold">{user.name}</div>
                     <div className="text-xs text-gray-500">{user.email}</div>
                   </div>
                   <button
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-500"
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                    onClick={() => {
+                      setShowChangePasswordModal(true);
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    <Icon icon="solar:lock-password-outline" className="w-4 h-4" />
+                    Ganti Password
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-500 flex items-center gap-2"
                     onClick={handleLogout}
                   >
+                    <Icon icon="solar:logout-outline" className="w-4 h-4" />
                     Logout
                   </button>
                 </div>
@@ -99,6 +114,12 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
           </div>
         </Navbar>
       </header>
+      
+      {/* Change Password Modal */}
+      <ChangePasswordModal 
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+      />
     </>
   );
 };

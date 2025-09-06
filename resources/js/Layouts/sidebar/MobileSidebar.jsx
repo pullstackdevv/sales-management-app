@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import NavItems from "./NavItems";
 import SidebarContent from "./Sidebaritems";
 import SimpleBar from "simplebar-react";
+import PermissionGuard from "../../components/PermissionGuard";
 
 const MobileSidebar = ({ isOpen, onClose }) => {
   return (
@@ -38,28 +39,30 @@ const MobileSidebar = ({ isOpen, onClose }) => {
           <div className="flex-1 overflow-y-auto">
             <div className="px-4 py-4 space-y-2">
               {SidebarContent.map((item) => (
-                <div key={item.id}>
-                  {/* Render menu utama */}
-                  {!item.children ? (
-                    <NavItems item={item} onClick={onClose} />
-                  ) : (
-                    <div className="space-y-1">
-                      {/* Render parent menu dengan children */}
-                      <div className="px-3 py-2 text-gray-600 font-medium text-sm">
-                        <div className="flex items-center gap-3">
-                          <Icon icon={item.icon} height={20} className="text-gray-500" />
-                          <span>{item.name}</span>
+                <PermissionGuard key={item.id} permission={item.permission}>
+                  <div>
+                    {/* Render menu utama */}
+                    {!item.children ? (
+                      <NavItems item={item} onClick={onClose} />
+                    ) : (
+                      <div className="space-y-1">
+                        {/* Render parent menu dengan children */}
+                        <div className="px-3 py-2 text-gray-600 font-medium text-sm">
+                          <div className="flex items-center gap-3">
+                            <Icon icon={item.icon} height={20} className="text-gray-500" />
+                            <span>{item.name}</span>
+                          </div>
+                        </div>
+                        {/* Render submenu */}
+                        <div className="ml-6 space-y-1">
+                          {item.children.map((child) => (
+                            <NavItems item={child} key={child.id} onClick={onClose} />
+                          ))}
                         </div>
                       </div>
-                      {/* Render submenu */}
-                      <div className="ml-6 space-y-1">
-                        {item.children.map((child) => (
-                          <NavItems item={child} key={child.id} onClick={onClose} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </PermissionGuard>
               ))}
             </div>
           </div>

@@ -12,13 +12,15 @@ import {
     CreditCard,
     UserCircle
 } from "lucide-react";
+import { AuthProvider } from "../contexts/AuthContext";
 
 export default function MarketplaceLayout({ children }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0); // Ini akan diambil dari state management
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <AuthProvider>
+            <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <header className="bg-white shadow-sm sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -184,6 +186,7 @@ export default function MarketplaceLayout({ children }) {
                     </div>
                 </div>
             </footer>
-        </div>
+            </div>
+        </AuthProvider>
     );
-} 
+}

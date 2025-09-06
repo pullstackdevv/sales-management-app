@@ -212,6 +212,9 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
     Route::get('/analyzer', function () {
         return Inertia::render('Report/Analyzer');
     })->name('reports.analyzer');
+    
+    // Change Password Route
+    Route::post('/change-password', [\App\Http\Controllers\UserController::class, 'changePasswordWeb'])->name('change-password');
 
 });
 

@@ -20,14 +20,15 @@ export default function RoleSettings() {
   });
   
   const [availablePermissions] = useState([
-    'products.view', 'products.create', 'products.edit', 'products.delete',
-    'orders.view', 'orders.create', 'orders.edit', 'orders.delete',
-    'stock.view', 'stock.create', 'stock.edit', 'stock.delete',
-    'reports.view', 'reports.create', 'reports.edit', 'reports.delete',
-    'settings.view', 'settings.create', 'settings.edit', 'settings.delete',
-    'customers.view', 'customers.create', 'customers.edit', 'customers.delete',
-    'expenses.view', 'expenses.create', 'expenses.edit', 'expenses.delete',
-    'users.view', 'users.create', 'users.edit', 'users.delete'
+    'dashboard',
+    'orders',
+    'products',
+    'customers',
+    'stock',
+    'vouchers',
+    'expenses',
+    'reports',
+    'settings'
   ]);
   
   const [formLoading, setFormLoading] = useState(false);
@@ -96,7 +97,13 @@ export default function RoleSettings() {
       });
       
       if (response.data.status === 'success') {
-        toast.success('Role berhasil diperbarui!');
+        await Swal.fire({
+          icon: 'success',
+          title: 'Berhasil!',
+          text: response.data.message || 'Role permission berhasil diupdate!',
+          timer: 2000,
+          showConfirmButton: false
+        });
         fetchRoles();
         closeModal();
       } else {
@@ -104,6 +111,11 @@ export default function RoleSettings() {
       }
     } catch (err) {
       console.error('Error updating role:', err);
+
+      if (err.response) {
+        console.log('Error response data:', err.response.data);
+      }
+
       if (err.response?.status === 401) {
         setFormError('Sesi Anda telah berakhir. Silakan login kembali.');
       } else if (err.response?.status === 403) {
@@ -111,10 +123,22 @@ export default function RoleSettings() {
       } else if (err.response?.data?.errors) {
         const errors = Object.values(err.response.data.errors).flat();
         setFormError(errors.join(', '));
+      } else if (err.response?.data?.status === 'success') {
+        // 🚀 tangani success di catch (kalau interceptor bikin error padahal success)
+        await Swal.fire({
+          icon: 'success',
+          title: 'Berhasil!',
+          text: response.data.message || 'Role permission berhasil diupdate!',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        fetchRoles();
+        closeModal();
       } else {
         setFormError('Terjadi kesalahan saat memperbarui role.');
       }
-    } finally {
+    }
+ finally {
       setFormLoading(false);
     }
   };
@@ -185,8 +209,8 @@ export default function RoleSettings() {
             {permissions.length > 0 ? (
               <div className="text-xs space-y-1">
                 {permissions.slice(0, 3).map((perm, idx) => (
-                  <div key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded truncate">
-                    {perm.replace(/\./g, ' ').replace(/_/g, ' ')}
+                  <div key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded truncate capitalize">
+                    {perm}
                   </div>
                 ))}
                 {permissions.length > 3 && (
@@ -311,8 +335,8 @@ export default function RoleSettings() {
                         onChange={() => handlePermissionChange(permission)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm text-gray-700">
-                        {permission.replace(/\./g, ' ').replace(/_/g, ' ')}
+                      <span className="text-sm text-gray-700 capitalize">
+                        {permission}
                       </span>
                     </label>
                   ))}

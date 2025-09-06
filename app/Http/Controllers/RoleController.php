@@ -94,12 +94,6 @@ class RoleController extends Controller
     public function update(Request $request, string $roleName): JsonResponse
     {
         $role = Role::where('name', $roleName)->firstOrFail();
-        
-        if ($role->is_system && $request->name !== $role->name) {
-            throw ValidationException::withMessages([
-                'name' => ['Cannot rename system role.']
-            ]);
-        }
 
         $validated = $request->validate([
             'description' => 'nullable|string|max:255',
@@ -110,8 +104,9 @@ class RoleController extends Controller
         try {
             DB::beginTransaction();
 
+            // Hanya update field yang diizinkan
             $role->update([
-                'description' => $validated['description'],
+                'description' => $validated['description'] ?? $role->description,
                 'permissions' => $validated['permissions']
             ]);
 
@@ -133,6 +128,7 @@ class RoleController extends Controller
             throw $e;
         }
     }
+
 
     public function destroy(Role $role): JsonResponse
     {

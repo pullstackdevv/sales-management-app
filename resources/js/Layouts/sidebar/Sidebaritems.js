@@ -6,11 +6,13 @@ const SidebarContent = [
         icon: "solar:widget-add-line-duotone",
         id: uniqueId(),
         url: "/dashboard",
+        permission: "dashboard",
     },
     {
         name: "Order",
         icon: "solar:cart-outline",
         id: uniqueId(),
+        permission: "orders",
         children: [
             {
                 name: "Semua order",
@@ -42,6 +44,7 @@ const SidebarContent = [
         name: "Produk",
         icon: "solar:box-outline",
         id: uniqueId(),
+        permission: "products",
         children: [
             {
                 name: "Daftar Produk",
@@ -49,18 +52,21 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/product/data",
             },
-            {
-                name: "Stok Opname",
-                icon: "solar:clipboard-check-outline",
-                id: uniqueId(),
-                url: "/stock-opname/data",
-            },
+
         ],
+    },
+    {
+        name: "Stock Management",
+        icon: "solar:clipboard-check-outline",
+        id: uniqueId(),
+        url: "/stock-opname/data",
+        permission: "stock",
     },
     {
         name: "Voucher",
         icon: "solar:ticket-outline",
         id: uniqueId(),
+        permission: "vouchers",
         children: [
             {
                 name: "Daftar Voucher",
@@ -81,30 +87,35 @@ const SidebarContent = [
         icon: "flowbite:users-group-outline",
         id: uniqueId(),
         url: "/customer/data",
+        permission: "customers",
     },
     {
         name: "Expense",
         icon: "solar:money-bag-outline",
         id: uniqueId(),
         url: "/expense",
+        permission: "expenses",
     },
     {
         name: "Report",
         icon: "solar:chart-outline",
         id: uniqueId(),
         url: "/report",
+        permission: "reports",
     },
     {
         name: "Analyzer",
         icon: "solar:cpu-outline",
         id: uniqueId(),
         url: "/analyzer",
+        permission: "reports",
     },
     {
         name: "Setting",
         icon: "solar:settings-outline",
         id: uniqueId(),
         url: "/settings",
+        permission: "settings",
     },
 ];
 

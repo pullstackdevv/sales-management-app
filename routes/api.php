@@ -102,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
     
     // Customer address routes
+    Route::get('customers/{customer}/addresses', [AddressController::class, 'index']);
     Route::post('customers/{customer}/addresses', [AddressController::class, 'store']);
     Route::put('customers/{customer}/addresses/{address}', [AddressController::class, 'update']);
     Route::delete('customers/{customer}/addresses/{address}', [AddressController::class, 'destroy']);

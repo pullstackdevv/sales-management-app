@@ -7,6 +7,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Auth\Middleware\Authenticate;
 use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\MidtransController;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 Route::get('/welcome', function () {
@@ -228,6 +229,27 @@ Route::prefix('marketplace')->group(function () {
         return Inertia::render('Marketplace/Checkout');
     })->name('marketplace.checkout');
 
+    // New Checkout Flow Routes
+    Route::get('/checkout/product', function () {
+        return Inertia::render('Checkout/ProductCheckout');
+    })->name('checkout.product');
+
+    Route::get('/checkout/customer-data', function () {
+        return Inertia::render('Checkout/CustomerDataCheckout');
+    })->name('checkout.customer-data');
+
+    Route::get('/checkout/payment-method', function () {
+        return Inertia::render('Checkout/PaymentMethodCheckout');
+    })->name('checkout.payment-method');
+
+    Route::get('/checkout/payment-process', function () {
+        return Inertia::render('Checkout/PaymentProcessCheckout');
+    })->name('checkout.payment-process');
+
+    Route::get('/checkout/payment-status/{orderNumber}', function ($orderNumber) {
+        return Inertia::render('Checkout/PaymentStatusCheckout', ['orderNumber' => $orderNumber]);
+    })->name('checkout.payment-status');
+
     Route::get('/profile', function () {
         return Inertia::render('Marketplace/Profile');
     })->name('marketplace.profile');
@@ -265,6 +287,15 @@ Route::prefix('payment')->name('payment.')->group(function () {
     Route::get('/error', function () {
         return Inertia::render('Payment/Error');
     })->name('error');
+    
+    // Payment success redirect
+    Route::get('/success', function (Request $request) {
+        $orderNumber = $request->query('order');
+        if ($orderNumber) {
+            return redirect()->route('checkout.payment-status', ['orderNumber' => $orderNumber]);
+        }
+        return redirect()->route('marketplace.index');
+    })->name('success');
 });
 
 Route::fallback(function () {

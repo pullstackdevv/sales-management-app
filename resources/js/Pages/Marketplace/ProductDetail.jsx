@@ -1,32 +1,87 @@
-import { useState } from "react";
-import { Link } from "@inertiajs/react";
-import MarketplaceLayout from "../../Layouts/MarketplaceLayout";
+import React, { useState, useEffect } from 'react';
+import { router } from '@inertiajs/react';
+import { Icon } from '@iconify/react';
 import { 
-    Star, 
-    ShoppingCart, 
-    Heart, 
-    Eye,
-    ArrowLeft,
-    Truck,
-    Shield,
-    Clock,
-    Package,
-    Share2,
-    MessageCircle,
-    ThumbsUp,
-    ThumbsDown,
+    ShoppingCart,
     CheckCircle,
-    Star as StarFilled
-} from "lucide-react";
+    X,
+    User,
+    MapPin,
+    Store,
+} from 'lucide-react';
+import { productsAPI } from '@/api/products';
+import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
+import { usePage } from '@inertiajs/react';
+import axios from 'axios';
+import Swal from 'sweetalert2';
+import { checkoutSession } from '@/utils/checkoutSession';
 
-export default function ProductDetail({ id }) {
-    const [selectedImage, setSelectedImage] = useState(0);
+export default function ProductDetail() {
+    const { id } = usePage().props;
+    console.log('Product ID from props:', id);
+    const [product, setProduct] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [quantity, setQuantity] = useState(1);
-    const [isWishlisted, setIsWishlisted] = useState(false);
     const [activeTab, setActiveTab] = useState('description');
+    const [selectedVariant, setSelectedVariant] = useState(null);
+    
+    // Order states
+    const [showOrderModal, setShowOrderModal] = useState(false);
+    const [orderFormData, setOrderFormData] = useState({
+        customer_id: '',
+        address_id: '',
+        sales_channel_id: '',
+        shipping_cost: 0,
+        notes: '',
+        order_date: new Date().toISOString().split('T')[0],
+        payment_status: 'pending'
+    });
+    const [customers, setCustomers] = useState([]);
+    const [salesChannels, setSalesChannels] = useState([]);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [customerAddresses, setCustomerAddresses] = useState([]);
+    const [searchCustomer, setSearchCustomer] = useState('');
+    const [orderLoading, setOrderLoading] = useState({
+        customers: false,
+        salesChannels: false,
+        submitting: false
+    });
+    const [orderErrors, setOrderErrors] = useState({});
+
+    useEffect(() => {
+        if (id) {
+            fetchProduct();
+        }
+    }, [id]);
+
+    const fetchProduct = async () => {
+        try {
+            setLoading(true);
+            const response = await productsAPI.getProduct(id);
+            console.log('API response:', response);
+            
+            // Laravel API returns {status: 'success', data: product}
+            // Extract the actual product data from the nested structure
+            let productData = response;
+            if (response.data && response.data.data) {
+                productData = response.data.data;
+            } else if (response.data) {
+                productData = response.data;
+            }
+            
+            console.log('Extracted product data:', productData);
+            setProduct(productData);
+        } catch (err) {
+            setError('Failed to load product details');
+            console.error('Error fetching product:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Mock product data - nanti akan diambil dari API
-    const product = {
+    const mockProduct = {
         id: 1,
         name: "Smartphone Samsung Galaxy A54 5G",
         price: 3500000,
@@ -89,6 +144,36 @@ export default function ProductDetail({ id }) {
         ]
     };
 
+    // Use fetched product or fallback to mock data
+    const currentProduct = product || mockProduct;
+
+    // Set default variant when product loads
+    useEffect(() => {
+        if (currentProduct && currentProduct.variants && currentProduct.variants.length > 0 && !selectedVariant) {
+            setSelectedVariant(currentProduct.variants[0]);
+        }
+    }, [currentProduct, selectedVariant]);
+
+    // Get current price and stock based on selected variant
+    const getCurrentPrice = () => {
+        if (selectedVariant) {
+            return selectedVariant.price;
+        }
+        return currentProduct.base_price || currentProduct.price;
+    };
+
+    const getCurrentStock = () => {
+        if (selectedVariant) {
+            return selectedVariant.stock;
+        }
+        return currentProduct.stock;
+    };
+
+    const getMaxQuantity = () => {
+        const stock = getCurrentStock();
+        return stock ? parseInt(stock) : 999;
+    };
+
     const formatPrice = (price) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -97,211 +182,355 @@ export default function ProductDetail({ id }) {
         }).format(price);
     };
 
-    const discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+    const discount = currentProduct.originalPrice ? Math.round(((currentProduct.originalPrice - (currentProduct.base_price || currentProduct.price)) / currentProduct.originalPrice) * 100) : 0;
 
     const addToCart = () => {
-        // Logic untuk menambah ke keranjang
-        console.log('Added to cart:', { product: product.id, quantity });
+        if (currentProduct.is_active !== false && selectedVariant && getCurrentStock() > 0) {
+            const variantInfo = selectedVariant ? ` (${selectedVariant.variant_label})` : '';
+            alert(`${currentProduct.name}${variantInfo} sebanyak ${quantity} berhasil ditambahkan ke keranjang!`);
+        }
     };
 
     const buyNow = () => {
-        // Logic untuk beli langsung
-        console.log('Buy now:', { product: product.id, quantity });
+        console.log('buyNow called');
+        console.log('currentProduct:', currentProduct);
+        console.log('selectedVariant:', selectedVariant);
+        console.log('quantity:', quantity);
+        
+        if (currentProduct.is_active !== false && selectedVariant && getCurrentStock() > 0) {
+            // Initialize checkout session with product data
+            // Pass parameters correctly to initWithProduct function
+            console.log('Initializing checkout session with product:', currentProduct.name);
+            checkoutSession.initWithProduct(currentProduct, selectedVariant, quantity);
+            
+            // Verify data was saved
+            const savedData = checkoutSession.get();
+            console.log('Data saved to session storage:', savedData);
+            
+            // Navigate to checkout flow
+            console.log('Navigating to checkout.product');
+            router.visit(route('checkout.product'));
+        } else {
+            console.log('buyNow conditions not met:', {
+                isActive: currentProduct.is_active,
+                hasVariant: !!selectedVariant,
+                stock: getCurrentStock()
+            });
+        }
     };
+
+    // Fetch customers dari API
+    const fetchCustomers = async (search = '') => {
+        setOrderLoading(prev => ({ ...prev, customers: true }));
+        try {
+            const response = await axios.get('/api/customers', {
+                params: { search, per_page: 50 }
+            });
+            setCustomers(response.data.data.data || []);
+        } catch (error) {
+            console.error('Error fetching customers:', error);
+        } finally {
+            setOrderLoading(prev => ({ ...prev, customers: false }));
+        }
+    };
+
+    // Fetch sales channels dari API
+    const fetchSalesChannels = async () => {
+        setOrderLoading(prev => ({ ...prev, salesChannels: true }));
+        try {
+            const response = await axios.get('/api/sales-channels');
+            if (response.data.status === 'success' && response.data.data && response.data.data.data) {
+                setSalesChannels(response.data.data.data || []);
+            } else {
+                setSalesChannels(response.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching sales channels:', error);
+        } finally {
+            setOrderLoading(prev => ({ ...prev, salesChannels: false }));
+        }
+    };
+
+    // Handle customer selection
+    const handleCustomerSelect = (customer) => {
+        setSelectedCustomer(customer);
+        setOrderFormData(prev => ({ ...prev, customer_id: customer.id }));
+        setCustomerAddresses(customer.addresses || []);
+        setSearchCustomer(customer.name);
+        
+        // Auto select first address if available
+        if (customer.addresses && customer.addresses.length > 0) {
+            setOrderFormData(prev => ({ ...prev, address_id: customer.addresses[0].id }));
+        }
+    };
+
+    // Handle order submission
+    const handleOrderSubmit = async () => {
+        setOrderLoading(prev => ({ ...prev, submitting: true }));
+        setOrderErrors({});
+
+        try {
+            // Validation
+            const newErrors = {};
+            if (!orderFormData.customer_id) newErrors.customer_id = 'Customer harus dipilih';
+            if (!orderFormData.address_id) newErrors.address_id = 'Alamat harus dipilih';
+            if (!orderFormData.sales_channel_id) newErrors.sales_channel_id = 'Sales channel harus dipilih';
+            if (!selectedVariant) newErrors.variant = 'Variant harus dipilih';
+
+            if (Object.keys(newErrors).length > 0) {
+                setOrderErrors(newErrors);
+                return;
+            }
+
+            // Prepare data for API
+            const orderData = {
+                customer_id: parseInt(orderFormData.customer_id),
+                address_id: parseInt(orderFormData.address_id),
+                sales_channel_id: parseInt(orderFormData.sales_channel_id),
+                items: [{
+                    product_variant_id: selectedVariant.id,
+                    quantity: quantity,
+                    price: selectedVariant.price
+                }],
+                shipping_cost: orderFormData.shipping_cost,
+                notes: orderFormData.notes
+            };
+
+            const response = await axios.post('/api/orders', orderData);
+            
+            if (response.data.status === 'success') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Order Berhasil Dibuat!',
+                    text: `Order ID: ${response.data.data?.id || 'N/A'}`,
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+                setShowOrderModal(false);
+                // Reset form
+                setOrderFormData({
+                    customer_id: '',
+                    address_id: '',
+                    sales_channel_id: '',
+                    shipping_cost: 0,
+                    notes: '',
+                    order_date: new Date().toISOString().split('T')[0],
+                    payment_status: 'pending'
+                });
+                setSelectedCustomer(null);
+                setCustomerAddresses([]);
+                setSearchCustomer('');
+            }
+        } catch (error) {
+            console.error('Error creating order:', error);
+            if (error.response?.data?.errors) {
+                setOrderErrors(error.response.data.errors);
+            }
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Membuat Order',
+                text: error.response?.data?.message || 'Terjadi kesalahan saat membuat order'
+            });
+        } finally {
+            setOrderLoading(prev => ({ ...prev, submitting: false }));
+        }
+    };
+
+    // Handle search debouncing for customers
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (searchCustomer && showOrderModal) {
+                fetchCustomers(searchCustomer);
+            }
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchCustomer, showOrderModal]);
+
+    if (loading) {
+        return (
+            <MarketplaceLayout>
+                <div className="bg-gray-50 min-h-screen flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            </MarketplaceLayout>
+        );
+    }
+
+    if (error || !currentProduct) {
+        return (
+            <MarketplaceLayout>
+                <div className="bg-gray-50 min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                        <p className="text-red-500 text-lg mb-4">{error || 'Product not found'}</p>
+                        <Link 
+                            href="/marketplace"
+                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                        >
+                            Back to Marketplace
+                        </Link>
+                    </div>
+                </div>
+            </MarketplaceLayout>
+        );
+    }
 
     return (
         <MarketplaceLayout>
-            <div className="bg-gray-50 min-h-screen py-12 sm:py-16">
-                <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-                    {/* Breadcrumb */}
-                    <div className="mb-10 sm:mb-12">
-                        <Link 
-                            href="/marketplace"
-                            className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-6 sm:mb-8 text-lg sm:text-xl"
-                        >
-                            <ArrowLeft className="h-6 w-6 sm:h-7 sm:w-7 mr-3" />
-                            Kembali ke Beranda
-                        </Link>
-                    </div>
+            <div className="min-h-screen bg-gray-50 py-6">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 sm:gap-12 lg:gap-16 mb-16 sm:mb-20">
-                        {/* Product Images */}
-                        <div className="space-y-6 sm:space-y-8">
-                            <div className="aspect-w-1 aspect-h-1 w-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                        {/* Product Image */}
+                        <div className="space-y-4">
+                            <div className="aspect-square w-full rounded-sm overflow-hidden bg-white border border-gray-100">
                                 <img 
-                                    src={product.images[selectedImage]} 
-                                    alt={product.name}
-                                    className="w-full h-80 sm:h-96 lg:h-[28rem] object-cover rounded-lg"
+                                    src={currentProduct.image || 'https://via.placeholder.com/600x600?text=No+Image'} 
+                                    alt={currentProduct.name}
+                                    className="w-full h-full object-cover"
                                 />
-                            </div>
-                            <div className="grid grid-cols-4 gap-3 sm:gap-4">
-                                {product.images.map((image, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => setSelectedImage(index)}
-                                        className={`aspect-w-1 aspect-h-1 w-full rounded-lg overflow-hidden border-2 ${
-                                            selectedImage === index 
-                                                ? 'border-blue-500' 
-                                                : 'border-gray-200'
-                                        }`}
-                                    >
-                                        <img 
-                                            src={image} 
-                                            alt={`${product.name} ${index + 1}`}
-                                            className="w-full h-20 sm:h-24 object-cover"
-                                        />
-                                    </button>
-                                ))}
                             </div>
                         </div>
 
                         {/* Product Info */}
-                        <div className="space-y-8 sm:space-y-10">
+                        <div className="space-y-6">
                             <div>
-                                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4 sm:mb-6">
-                                    {product.name}
+                                <h1 className="text-2xl font-normal text-gray-800 leading-tight">
+                                    {currentProduct.name}
                                 </h1>
-                                <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 mb-6 sm:mb-8">
-                                    <div className="flex items-center">
-                                        {[...Array(5)].map((_, i) => (
-                                            <Star 
-                                                key={i} 
-                                                className={`h-6 w-6 sm:h-7 sm:w-7 ${
-                                                    i < Math.floor(product.rating) 
-                                                        ? 'text-yellow-400 fill-current' 
-                                                        : 'text-gray-300'
-                                                }`} 
-                                            />
-                                        ))}
-                                        <span className="ml-3 text-lg sm:text-xl text-gray-600">
-                                            {product.rating} ({product.reviewCount} ulasan)
-                                        </span>
-                                    </div>
-                                    <span className="text-lg sm:text-xl text-gray-500">
-                                        • {product.soldCount} terjual
-                                    </span>
-                                </div>
                             </div>
 
                             {/* Price */}
-                            <div className="space-y-3 sm:space-y-4">
-                                <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                                    <span className="text-4xl sm:text-5xl font-bold text-gray-900">
-                                        {formatPrice(product.price)}
+                            <div className="space-y-3">
+                                <div className="flex items-center space-x-3">
+                                    <span className="text-2xl font-medium text-gray-900">
+                                        {formatPrice(getCurrentPrice())}
                                     </span>
-                                    {product.originalPrice > product.price && (
-                                        <>
-                                            <span className="text-xl sm:text-2xl text-gray-500 line-through">
-                                                {formatPrice(product.originalPrice)}
-                                            </span>
-                                            <span className="bg-red-100 text-red-800 text-lg sm:text-xl font-medium px-4 py-2 rounded">
-                                                -{discount}%
-                                            </span>
-                                        </>
-                                    )}
                                 </div>
-                                <p className="text-lg sm:text-xl text-gray-600">
-                                    Stok: {product.stock} tersedia
+                                <p className={`text-sm ${
+                                    currentProduct.is_active !== false && getCurrentStock() > 0 ? 'text-green-600' : 'text-red-500'
+                                }`}>
+                                    {currentProduct.is_active !== false && getCurrentStock() > 0 ? `Stok: ${getCurrentStock()}` : 'Tidak Tersedia'}
                                 </p>
                             </div>
 
+                            {/* Variants */}
+                            {currentProduct.variants && currentProduct.variants.length > 0 && (
+                                <div className="space-y-3">
+                                    <label className="text-sm font-normal text-gray-600">
+                                        Pilih Variant
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {currentProduct.variants.map((variant) => (
+                                            <button
+                                                key={variant.id}
+                                                onClick={() => {
+                                                    setSelectedVariant(variant);
+                                                    setQuantity(1); // Reset quantity when variant changes
+                                                }}
+                                                disabled={!variant.is_active || variant.stock <= 0}
+                                                className={`p-3 text-left border rounded-sm text-sm transition-all duration-200 ${
+                                                    selectedVariant?.id === variant.id
+                                                        ? 'border-gray-700 bg-gray-50'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                } ${
+                                                    !variant.is_active || variant.stock <= 0
+                                                        ? 'opacity-50 cursor-not-allowed'
+                                                        : 'cursor-pointer'
+                                                }`}
+                                            >
+                                                <div className="font-normal text-gray-800">
+                                                    {variant.variant_label}
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {variant.stock > 0 ? `Stok: ${variant.stock}` : 'Habis'}
+                                                </div>
+                                                <div className="text-xs text-gray-600 mt-1">
+                                                    {formatPrice(variant.price)}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Quantity */}
-                            <div className="space-y-3 sm:space-y-4">
-                                <label className="text-lg sm:text-xl font-medium text-gray-700">
+                            <div className="space-y-3">
+                                <label className="text-sm font-normal text-gray-600">
                                     Jumlah
                                 </label>
-                                <div className="flex items-center space-x-4 sm:space-x-6">
-                                    <div className="flex items-center border border-gray-300 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                    <div className="flex items-center border border-gray-200 rounded-sm bg-white">
                                         <button
                                             onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                            disabled={quantity <= 1}
-                                            className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            disabled={quantity <= 1 || currentProduct.is_active === false || getCurrentStock() <= 0}
+                                            className="p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
                                         >
-                                            <span className="text-xl sm:text-2xl">-</span>
+                                            <span className="text-sm">-</span>
                                         </button>
-                                        <span className="px-6 sm:px-8 py-3 sm:py-4 text-lg sm:text-xl font-medium">
+                                        <span className="px-4 py-2 text-sm font-normal min-w-[40px] text-center">
                                             {quantity}
                                         </span>
                                         <button
-                                            onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                                            disabled={quantity >= product.stock}
-                                            className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            onClick={() => setQuantity(Math.min(getMaxQuantity(), quantity + 1))}
+                                            disabled={currentProduct.is_active === false || getCurrentStock() <= 0 || quantity >= getMaxQuantity()}
+                                            className="p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
                                         >
-                                            <span className="text-xl sm:text-2xl">+</span>
+                                            <span className="text-sm">+</span>
                                         </button>
                                     </div>
-                                    <span className="text-lg sm:text-xl text-gray-500">
-                                        Maksimal {product.stock}
-                                    </span>
+                                    {getCurrentStock() > 0 && (
+                                        <span className="text-xs text-gray-400">
+                                            Maksimal {getCurrentStock()}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="space-y-4 sm:space-y-6">
-                                <div className="flex space-x-4 sm:space-x-6">
-                                    <button
-                                        onClick={addToCart}
-                                        className="flex-1 bg-blue-600 text-white py-4 sm:py-5 px-6 sm:px-8 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center text-lg sm:text-xl"
-                                    >
-                                        <ShoppingCart className="h-6 w-6 sm:h-7 sm:w-7 mr-3" />
-                                        Tambah ke Keranjang
-                                    </button>
-                                    <button
-                                        onClick={() => setIsWishlisted(!isWishlisted)}
-                                        className={`p-4 sm:p-5 rounded-lg border transition-colors ${
-                                            isWishlisted 
-                                                ? 'bg-red-500 text-white border-red-500' 
-                                                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        <Heart className="h-6 w-6 sm:h-7 sm:w-7" />
-                                    </button>
-                                    <button className="p-4 sm:p-5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
-                                        <Share2 className="h-6 w-6 sm:h-7 sm:w-7" />
-                                    </button>
-                                </div>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={addToCart}
+                                    disabled={currentProduct.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
+                                    className={`w-full py-2.5 px-4 border text-sm font-normal transition-all duration-200 flex items-center justify-center ${
+                                        currentProduct.is_active !== false && getCurrentStock() > 0 && selectedVariant
+                                            ? 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 bg-white' 
+                                            : 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                                    }`}
+                                >
+                                    <ShoppingCart className="h-4 w-4 mr-2" />
+                                    Tambah ke Keranjang
+                                </button>
                                 <button
                                     onClick={buyNow}
-                                    className="w-full bg-green-600 text-white py-4 sm:py-5 px-6 sm:px-8 rounded-lg font-medium hover:bg-green-700 transition-colors text-lg sm:text-xl"
+                                    disabled={currentProduct.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
+                                    className={`w-full py-2.5 px-4 text-sm font-normal transition-all duration-200 ${
+                                        currentProduct.is_active !== false && getCurrentStock() > 0 && selectedVariant
+                                            ? 'bg-gray-800 text-white hover:bg-gray-900' 
+                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }`}
                                 >
                                     Beli Sekarang
                                 </button>
                             </div>
 
-                            {/* Features */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 pt-8 sm:pt-10 border-t border-gray-200">
-                                <div className="flex items-center space-x-3 sm:space-x-4">
-                                    <Truck className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600" />
-                                    <span className="text-lg sm:text-xl text-gray-600">Gratis Ongkir</span>
-                                </div>
-                                <div className="flex items-center space-x-3 sm:space-x-4">
-                                    <Shield className="h-6 w-6 sm:h-7 sm:w-7 text-green-600" />
-                                    <span className="text-lg sm:text-xl text-gray-600">Garansi Resmi</span>
-                                </div>
-                                <div className="flex items-center space-x-3 sm:space-x-4">
-                                    <Clock className="h-6 w-6 sm:h-7 sm:w-7 text-yellow-600" />
-                                    <span className="text-lg sm:text-xl text-gray-600">Pengiriman Cepat</span>
-                                </div>
-                            </div>
+
                         </div>
                     </div>
 
-                    {/* Product Details Tabs */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                        <div className="border-b border-gray-200">
-                            <nav className="flex space-x-6 sm:space-x-8 px-4 sm:px-6">
+                    {/* Product Details */}
+                    <div className="bg-white rounded-sm border border-gray-100">
+                        <div className="border-b border-gray-100">
+                            <nav className="flex space-x-6 px-4">
                                 {[
-                                    { id: 'description', label: 'Deskripsi' },
-                                    { id: 'specifications', label: 'Spesifikasi' },
-                                    { id: 'reviews', label: 'Ulasan' }
+                                    { id: 'description', label: 'Deskripsi' }
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`py-5 sm:py-6 px-1 border-b-2 font-medium text-lg sm:text-xl ${
+                                        className={`py-3 px-1 border-b-2 text-sm font-normal ${
                                             activeTab === tab.id
-                                                ? 'border-blue-500 text-blue-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                                ? 'border-gray-700 text-gray-800'
+                                                : 'border-transparent text-gray-500 hover:text-gray-600'
                                         }`}
                                     >
                                         {tab.label}
@@ -310,105 +539,242 @@ export default function ProductDetail({ id }) {
                             </nav>
                         </div>
 
-                        <div className="p-6 sm:p-8">
+                        <div className="p-4">
                             {activeTab === 'description' && (
-                                <div className="space-y-6 sm:space-y-8">
-                                    <p className="text-gray-700 leading-relaxed text-lg sm:text-xl">
-                                        {product.description}
+                                <div className="prose max-w-none">
+                                    <p className="text-gray-600 leading-relaxed text-sm">
+                                        {currentProduct.description || 'Deskripsi produk tidak tersedia.'}
                                     </p>
-                                    <div>
-                                        <h4 className="font-semibold text-gray-900 mb-4 sm:mb-6 text-xl sm:text-2xl">Fitur Utama:</h4>
-                                        <ul className="space-y-3 sm:space-y-4">
-                                            {product.features.map((feature, index) => (
-                                                <li key={index} className="flex items-center space-x-3 sm:space-x-4">
-                                                    <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
-                                                    <span className="text-gray-700 text-lg sm:text-xl">{feature}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'specifications' && (
-                                <div className="space-y-6 sm:space-y-8">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-                                        {Object.entries(product.specifications).map(([key, value]) => (
-                                            <div key={key} className="border-b border-gray-100 pb-3 sm:pb-4">
-                                                <dt className="text-lg sm:text-xl font-medium text-gray-500">{key}</dt>
-                                                <dd className="text-lg sm:text-xl text-gray-900 mt-2">{value}</dd>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'reviews' && (
-                                <div className="space-y-8 sm:space-y-10">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-                                        <h3 className="text-xl sm:text-2xl font-semibold text-gray-900">
-                                            Ulasan ({product.reviews.length})
-                                        </h3>
-                                        <button className="text-blue-600 hover:text-blue-700 text-lg sm:text-xl font-medium">
-                                            Tulis Ulasan
-                                        </button>
-                                    </div>
-                                    
-                                    <div className="space-y-8 sm:space-y-10">
-                                        {product.reviews.map((review) => (
-                                            <div key={review.id} className="border-b border-gray-200 pb-8 sm:pb-10">
-                                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
-                                                    <div>
-                                                        <h4 className="font-medium text-gray-900 text-lg sm:text-xl">
-                                                            {review.user}
-                                                        </h4>
-                                                        <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 mt-2">
-                                                            <div className="flex items-center">
-                                                                {[...Array(5)].map((_, i) => (
-                                                                    <Star 
-                                                                        key={i} 
-                                                                        className={`h-5 w-5 sm:h-6 sm:w-6 ${
-                                                                            i < review.rating 
-                                                                                ? 'text-yellow-400 fill-current' 
-                                                                                : 'text-gray-300'
-                                                                        }`} 
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                            <span className="text-lg sm:text-xl text-gray-500">
-                                                                {new Date(review.date).toLocaleDateString('id-ID')}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center space-x-3 sm:space-x-4">
-                                                        <button className="text-gray-400 hover:text-gray-600">
-                                                            <ThumbsUp className="h-5 w-5 sm:h-6 sm:w-6" />
-                                                        </button>
-                                                        <button className="text-gray-400 hover:text-gray-600">
-                                                            <ThumbsDown className="h-5 w-5 sm:h-6 sm:w-6" />
-                                                        </button>
-                                                        <button className="text-gray-400 hover:text-gray-600">
-                                                            <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <p className="text-gray-700 leading-relaxed text-lg sm:text-xl">
-                                                    {review.comment}
-                                                </p>
-                                                <div className="flex items-center space-x-3 sm:space-x-4 mt-4 sm:mt-6">
-                                                    <span className="text-lg sm:text-xl text-gray-500">
-                                                        {review.helpful} orang merasa ulasan ini membantu
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {currentProduct.features && currentProduct.features.length > 0 && (
+                                        <div className="mt-6">
+                                            <h4 className="font-normal text-gray-800 mb-3 text-base">Fitur Utama:</h4>
+                                            <ul className="space-y-2">
+                                                {currentProduct.features.map((feature, index) => (
+                                                    <li key={index} className="flex items-center space-x-2">
+                                                        <CheckCircle className="h-4 w-4 text-gray-400" />
+                                                        <span className="text-gray-600 text-sm">{feature}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Order Modal */}
+            {showOrderModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <h2 className="text-xl font-semibold text-gray-900">Buat Order</h2>
+                            <button
+                                onClick={() => setShowOrderModal(false)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            {/* Product Summary */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                                <h3 className="font-medium text-gray-900 mb-2">Produk yang Dipesan</h3>
+                                <div className="flex items-center space-x-3">
+                                    <img 
+                                        src={currentProduct.image || 'https://via.placeholder.com/60x60?text=No+Image'} 
+                                        alt={currentProduct.name}
+                                        className="w-12 h-12 object-cover rounded"
+                                    />
+                                    <div className="flex-1">
+                                        <p className="font-medium text-sm">{currentProduct.name}</p>
+                                        {selectedVariant && (
+                                            <p className="text-xs text-gray-500">{selectedVariant.variant_label}</p>
+                                        )}
+                                        <p className="text-xs text-gray-600">
+                                            {formatPrice(getCurrentPrice())} x {quantity} = {formatPrice(getCurrentPrice() * quantity)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Customer Selection */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    <User className="inline h-4 w-4 mr-1" />
+                                    Customer
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Cari customer..."
+                                        value={searchCustomer}
+                                        onChange={(e) => setSearchCustomer(e.target.value)}
+                                        className={`w-full px-3 py-2 border rounded-lg ${
+                                            orderErrors.customer_id ? 'border-red-500' : 'border-gray-300'
+                                        }`}
+                                    />
+                                    {orderLoading.customers && (
+                                        <div className="absolute right-3 top-3">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Customer dropdown */}
+                                    {searchCustomer && customers.length > 0 && !selectedCustomer && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                            {customers.map((customer) => (
+                                                <div
+                                                    key={customer.id}
+                                                    onClick={() => handleCustomerSelect(customer)}
+                                                    className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                                                >
+                                                    <div className="font-medium text-sm">{customer.name}</div>
+                                                    <div className="text-xs text-gray-500">{customer.email}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                {orderErrors.customer_id && (
+                                    <p className="text-red-500 text-xs">{orderErrors.customer_id}</p>
+                                )}
+                            </div>
+
+                            {/* Address Selection */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    <MapPin className="inline h-4 w-4 mr-1" />
+                                    Alamat Pengiriman
+                                </label>
+                                <select
+                                    value={orderFormData.address_id}
+                                    onChange={(e) => setOrderFormData(prev => ({ ...prev, address_id: e.target.value }))}
+                                    className={`w-full px-3 py-2 border rounded-lg ${
+                                        orderErrors.address_id ? 'border-red-500' : 'border-gray-300'
+                                    }`}
+                                    disabled={!selectedCustomer || customerAddresses.length === 0}
+                                >
+                                    <option value="">Pilih alamat pengiriman</option>
+                                    {customerAddresses.map((address) => (
+                                        <option key={address.id} value={address.id}>
+                                            {address.label} - {address.address}, {address.city}
+                                        </option>
+                                    ))}
+                                </select>
+                                {!selectedCustomer && (
+                                    <p className="text-gray-500 text-xs">Pilih customer terlebih dahulu</p>
+                                )}
+                                {selectedCustomer && customerAddresses.length === 0 && (
+                                    <p className="text-yellow-600 text-xs">Customer belum memiliki alamat</p>
+                                )}
+                                {orderErrors.address_id && (
+                                    <p className="text-red-500 text-xs">{orderErrors.address_id}</p>
+                                )}
+                            </div>
+
+                            {/* Sales Channel */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    <Store className="inline h-4 w-4 mr-1" />
+                                    Sales Channel
+                                </label>
+                                <select 
+                                    value={orderFormData.sales_channel_id}
+                                    onChange={(e) => setOrderFormData(prev => ({ ...prev, sales_channel_id: e.target.value }))}
+                                    className={`w-full px-3 py-2 border rounded-lg ${
+                                        orderErrors.sales_channel_id ? 'border-red-500' : 'border-gray-300'
+                                    }`}
+                                >
+                                    <option value="">Pilih sales channel</option>
+                                    {salesChannels.map((channel) => (
+                                        <option key={channel.id} value={channel.id}>
+                                            {channel.name} ({channel.code})
+                                        </option>
+                                    ))}
+                                </select>
+                                {orderLoading.salesChannels && (
+                                    <p className="text-gray-500 text-xs">Memuat sales channels...</p>
+                                )}
+                                {orderErrors.sales_channel_id && (
+                                    <p className="text-red-500 text-xs">{orderErrors.sales_channel_id}</p>
+                                )}
+                            </div>
+
+                            {/* Shipping Cost */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Ongkos Kirim
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="0"
+                                    value={orderFormData.shipping_cost}
+                                    onChange={(e) => setOrderFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                />
+                            </div>
+
+                            {/* Notes */}
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Catatan
+                                </label>
+                                <textarea
+                                    rows="3"
+                                    placeholder="Catatan untuk order ini..."
+                                    value={orderFormData.notes}
+                                    onChange={(e) => setOrderFormData(prev => ({ ...prev, notes: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                />
+                            </div>
+
+                            {/* Order Summary */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                                <h3 className="font-medium text-gray-900 mb-2">Ringkasan Order</h3>
+                                <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between">
+                                        <span>Subtotal:</span>
+                                        <span>{formatPrice(getCurrentPrice() * quantity)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Ongkos Kirim:</span>
+                                        <span>{formatPrice(orderFormData.shipping_cost)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-medium text-base border-t pt-1">
+                                        <span>Total:</span>
+                                        <span>{formatPrice((getCurrentPrice() * quantity) + orderFormData.shipping_cost)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200">
+                            <button
+                                onClick={() => setShowOrderModal(false)}
+                                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleOrderSubmit}
+                                disabled={orderLoading.submitting}
+                                className={`px-6 py-2 rounded-lg transition-colors ${
+                                    orderLoading.submitting
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-gray-800 text-white hover:bg-gray-900'
+                                }`}
+                            >
+                                {orderLoading.submitting ? 'Memproses...' : 'Buat Order'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </MarketplaceLayout>
     );
 }

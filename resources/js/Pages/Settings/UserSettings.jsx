@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import TableComponent from "../../components/ui/table/TableComponent";
-import { Button, Modal, TextInput, Label, Select, Alert } from "flowbite-react";
-import { HiInformationCircle } from "react-icons/hi";
+import { Button } from "flowbite-react";
 import api from "@/api/axios";
 import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
@@ -19,22 +18,19 @@ export default function UserSettings() {
     email: '',
     password: '',
     password_confirmation: '',
-    role: 'staff',
-    is_active: true,
-    permissions: {
-      orders: { view: false, create: false, edit: false, delete: false },
-      products: { view: false, create: false, edit: false, delete: false },
-      customers: { view: false, create: false, edit: false, delete: false },
-      reports: { view: false, create: false, edit: false, delete: false },
-      settings: { view: false, create: false, edit: false, delete: false },
-      users: { view: false, create: false, edit: false, delete: false }
-    }
+    role_id: '',
+    is_active: true
   });
+  
+  const [roles, setRoles] = useState([]);
+  const [roleDescriptions, setRoleDescriptions] = useState({});
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
+    fetchRoleDescriptions();
   }, []);
 
   const resetForm = () => {
@@ -43,16 +39,8 @@ export default function UserSettings() {
       email: '',
       password: '',
       password_confirmation: '',
-      role: 'staff',
-      is_active: true,
-      permissions: {
-        orders: { view: false, create: false, edit: false, delete: false },
-        products: { view: false, create: false, edit: false, delete: false },
-        customers: { view: false, create: false, edit: false, delete: false },
-        reports: { view: false, create: false, edit: false, delete: false },
-        settings: { view: false, create: false, edit: false, delete: false },
-        users: { view: false, create: false, edit: false, delete: false }
-      }
+      role_id: roles.length > 0 ? roles.find(r => r.role === 'staff')?.role || roles[0]?.role || '' : '',
+      is_active: true
     });
     setFormError(null);
     setSelectedUser(null);
@@ -70,16 +58,8 @@ export default function UserSettings() {
       email: user.email,
       password: '',
       password_confirmation: '',
-      role: typeof user.role === 'object' ? user.role.value : user.role,
-      is_active: user.is_active,
-      permissions: user.permissions || {
-        orders: { view: false, create: false, edit: false, delete: false },
-        products: { view: false, create: false, edit: false, delete: false },
-        customers: { view: false, create: false, edit: false, delete: false },
-        reports: { view: false, create: false, edit: false, delete: false },
-        settings: { view: false, create: false, edit: false, delete: false },
-        users: { view: false, create: false, edit: false, delete: false }
-      }
+      role_id: user.role?.name || user.role_id || '',
+      is_active: user.is_active
     });
     setSelectedUser(user);
     setModalType('edit');
@@ -99,49 +79,13 @@ export default function UserSettings() {
     }));
   };
 
-  const handlePermissionChange = (module, action, checked) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        [module]: {
-          ...prev.permissions[module],
-          [action]: checked
-        }
-      }
-    }));
-  };
+
 
   const handleRoleChange = (e) => {
-    const role = e.target.value;
-    let defaultPermissions = {
-      orders: { view: false, create: false, edit: false, delete: false },
-      products: { view: false, create: false, edit: false, delete: false },
-      customers: { view: false, create: false, edit: false, delete: false },
-      reports: { view: false, create: false, edit: false, delete: false },
-      settings: { view: false, create: false, edit: false, delete: false },
-      users: { view: false, create: false, edit: false, delete: false }
-    };
-
-    // Set default permissions based on role
-    if (role === 'owner' || role === 'admin') {
-      Object.keys(defaultPermissions).forEach(module => {
-        defaultPermissions[module] = { view: true, create: true, edit: true, delete: true };
-      });
-    } else if (role === 'staff') {
-      defaultPermissions.orders = { view: true, create: true, edit: true, delete: false };
-      defaultPermissions.products = { view: true, create: false, edit: true, delete: false };
-      defaultPermissions.customers = { view: true, create: true, edit: true, delete: false };
-      defaultPermissions.reports = { view: true, create: false, edit: false, delete: false };
-    } else if (role === 'warehouse') {
-      defaultPermissions.orders = { view: true, create: false, edit: true, delete: false };
-      defaultPermissions.products = { view: true, create: true, edit: true, delete: false };
-    }
-
+    const roleId = e.target.value;
     setFormData(prev => ({
       ...prev,
-      role: role,
-      permissions: defaultPermissions
+      role_id: roleId
     }));
   };
 
@@ -333,6 +277,29 @@ export default function UserSettings() {
     }
   };
 
+  const fetchRoles = async () => {
+    try {
+      const response = await api.get("/roles");
+      if (response.data.status === 'success') {
+        const rolesData = response.data.data.data || response.data.data;
+        setRoles(Array.isArray(rolesData) ? rolesData : []);
+      }
+    } catch (err) {
+      console.error('Error fetching roles:', err);
+    }
+  };
+
+  const fetchRoleDescriptions = async () => {
+    try {
+      const response = await api.get("/users/role-permissions");
+      if (response.data.status === 'success') {
+        setRoleDescriptions(response.data.data || {});
+      }
+    } catch (err) {
+      console.error('Error fetching role descriptions:', err);
+    }
+  };
+
 
   
   const columns = [
@@ -351,50 +318,11 @@ export default function UserSettings() {
       key: "role", 
       label: "Role",
       render: (row) => {
-        const roleLabels = {
-          'owner': 'Owner',
-          'admin': 'Administrator', 
-          'staff': 'Staff',
-          'warehouse': 'Staff Gudang'
-        };
-        return <span className="capitalize">{roleLabels[row.role] || row.role}</span>;
+        const roleName = row.role?.name || 'Unknown';
+        return <span className="capitalize">{roleName}</span>;
       }
     },
-    {
-      key: "permissions",
-      label: "Permissions",
-      render: (row) => {
-        const permissions = row.permissions || {};
-        const activePermissions = [];
-        
-        Object.keys(permissions).forEach(module => {
-          const modulePerms = permissions[module] || {};
-          const activeActions = Object.keys(modulePerms).filter(action => modulePerms[action]);
-          if (activeActions.length > 0) {
-            activePermissions.push(`${module}: ${activeActions.join(', ')}`);
-          }
-        });
-        
-        return (
-          <div className="max-w-xs">
-            {activePermissions.length > 0 ? (
-              <div className="text-xs space-y-1">
-                {activePermissions.slice(0, 2).map((perm, idx) => (
-                  <div key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded truncate">
-                    {perm}
-                  </div>
-                ))}
-                {activePermissions.length > 2 && (
-                  <div className="text-gray-500">+{activePermissions.length - 2} more</div>
-                )}
-              </div>
-            ) : (
-              <span className="bg-gray-200 px-2 py-1 rounded text-xs">No permissions</span>
-            )}
-          </div>
-        );
-      },
-    },
+
     {
       key: "actions",
       label: "Aksi",
@@ -419,239 +347,263 @@ export default function UserSettings() {
     },
   ];
 
-  // Loading state
-  if (loading) {
-    return (
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Pengaturan User</h2>
-          <Button 
-            color="blue"
-            onClick={openCreateModal}
-            className="flex items-center gap-2"
-          >
-            <Icon icon="mdi:plus" width={18} />
-            Tambah User
-          </Button>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-center py-8">
-            <div className="flex items-center gap-3">
-              <Icon icon="mdi:loading" className="animate-spin text-2xl text-primary" />
-              <span className="text-gray-600">Memuat data pengguna...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Pengaturan User</h2>
-          <Button 
-            color="blue"
-            onClick={openCreateModal}
-            className="flex items-center gap-2"
-          >
-            <Icon icon="mdi:plus" width={18} />
-            Tambah User
-          </Button>
-        </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex flex-col items-center justify-center py-8">
-            <Icon icon="mdi:alert-circle" className="text-4xl text-red-500 mb-3" />
-            <p className="text-red-600 text-center mb-4">{error}</p>
-            <Button 
-              onClick={fetchUsers}
-              color="blue"
-              className="flex items-center gap-2"
-            >
-              <Icon icon="mdi:refresh" />
-              Coba Lagi
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold">Pengaturan User</h2>
-        <Button 
-          color="blue"
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Pengaturan User</h2>
+          <p className="text-gray-600 mt-1">Kelola data pengguna dan permission</p>
+        </div>
+        <button
           onClick={openCreateModal}
-          className="flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
         >
-          <Icon icon="mdi:plus" width={18} />
+          <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
           Tambah User
-        </Button>
+        </button>
       </div>
 
-
-
-      <div className="bg-white rounded-lg shadow p-6">
-        {users.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Icon icon="mdi:account-group" className="text-4xl text-gray-400 mb-3" />
-            <p className="text-gray-600 text-center">Belum ada data pengguna</p>
-          </div>
-        ) : (
-          <TableComponent columns={columns} data={users} />
-        )}
-      </div>
-
-      {/* User Modal */}
-      <Modal show={showModal} onClose={closeModal} size="lg">
-        <Modal.Header>
-          {modalType === 'create' ? 'Tambah User Baru' : 'Edit User'}
-        </Modal.Header>
-        <Modal.Body>
-          <form id="userForm" onSubmit={handleSubmit} className="space-y-4">
-            {formError && (
-              <Alert color="failure" icon={HiInformationCircle}>
-                {formError}
-              </Alert>
-            )}
-            <div>
-              <Label htmlFor="name" value="Nama" />
-              <TextInput
-                id="name"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-                placeholder="Masukkan nama lengkap"
-              />
-            </div>
-
-
-            <div>
-              <Label htmlFor="email" value="Email" />
-              <TextInput
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                placeholder="Masukkan alamat email"
-              />
-            </div>
-
-
-            <div>
-              <Label 
-                htmlFor="password" 
-                value={modalType === 'create' ? 'Password' : 'Password (kosongkan jika tidak ingin mengubah)'} 
-              />
-              <TextInput
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required={modalType === 'create'}
-                placeholder="Masukkan password"
-              />
-            </div>
-
-
-            <div>
-              <Label htmlFor="password_confirmation" value="Konfirmasi Password" />
-              <TextInput
-                id="password_confirmation"
-                name="password_confirmation"
-                type="password"
-                value={formData.password_confirmation}
-                onChange={handleInputChange}
-                required={modalType === 'create' || formData.password}
-                placeholder="Konfirmasi password"
-              />
-            </div>
-
-
-            <div>
-              <Label htmlFor="role" value="Role" />
-              <Select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleRoleChange}
-                required
-              >
-                <option value="staff">Staff</option>
-                <option value="admin">Administrator</option>
-                <option value="warehouse">Staff Gudang</option>
-                <option value="owner">Owner</option>
-              </Select>
-            </div>
-
-            {/* Permissions Section */}
-            <div>
-              <Label value="Permissions" className="mb-3 block" />
-              <div className="space-y-4 max-h-60 overflow-y-auto border rounded-lg p-4">
-                {Object.keys(formData.permissions).map(module => (
-                  <div key={module} className="border-b pb-3 last:border-b-0">
-                    <h4 className="font-medium capitalize mb-2 text-gray-700">{module}</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.keys(formData.permissions[module]).map(action => (
-                        <label key={action} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={formData.permissions[module][action]}
-                            onChange={(e) => handlePermissionChange(module, action, e.target.checked)}
-                            className="rounded"
-                          />
-                          <span className="capitalize">{action}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <p className="font-medium">Error!</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total User</p>
+                  <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Icon icon="solar:users-group-rounded-outline" className="w-6 h-6 text-blue-600" />
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="is_active"
-                name="is_active"
-                type="checkbox"
-                checked={formData.is_active}
-                onChange={handleInputChange}
-                className="rounded"
-              />
-              <Label htmlFor="is_active" value="User Aktif" />
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">User Aktif</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {users.filter(u => u.is_active).length}
+                  </p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-full">
+                  <Icon icon="solar:check-circle-outline" className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
             </div>
-          </form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button 
-            type="submit"
-            disabled={formLoading}
-            color="blue"
-            form="userForm"
-          >
-            {formLoading ? (
-              <>
-                <Icon icon="mdi:loading" className="animate-spin mr-2" />
-                {modalType === 'create' ? 'Membuat...' : 'Memperbarui...'}
-              </>
-            ) : (
-              modalType === 'create' ? 'Buat User' : 'Perbarui User'
-            )}
-          </Button>
-          <Button color="gray" onClick={closeModal}>
-            Batal
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </div>
-  );
-}
+
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">User Nonaktif</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {users.filter(u => !u.is_active).length}
+                  </p>
+                </div>
+                <div className="p-3 bg-red-100 rounded-full">
+                  <Icon icon="solar:close-circle-outline" className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Users Table */}
+          <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+            <div className="p-6">
+              <h3 className="font-semibold mb-4">Data Pengguna</h3>
+              {users.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Icon icon="solar:users-group-rounded-outline" className="text-4xl text-gray-400 mb-3" />
+                  <p className="text-gray-600 text-center">Belum ada data pengguna</p>
+                </div>
+              ) : (
+                <TableComponent columns={columns} data={users} />
+              )}
+            </div>
+          </div>
+        </>
+       )}
+
+      {/* Custom Modal for Add/Edit User */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50" 
+            onClick={closeModal}
+          ></div>
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold">
+                {modalType === 'create' ? 'Tambah User Baru' : 'Edit User'}
+              </h3>
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <Icon icon="solar:close-circle-outline" className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    <p className="font-medium">Error!</p>
+                    <p className="text-sm">{formError}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium mb-1">Nama *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Masukkan nama lengkap"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Masukkan alamat email"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    {modalType === 'create' ? 'Password *' : 'Password (kosongkan jika tidak ingin mengubah)'}
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    required={modalType === 'create'}
+                    placeholder="Masukkan password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Konfirmasi Password *</label>
+                  <input
+                    type="password"
+                    name="password_confirmation"
+                    value={formData.password_confirmation}
+                    onChange={handleInputChange}
+                    required={modalType === 'create' || formData.password}
+                    placeholder="Konfirmasi password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Role *</label>
+                  <select
+                    name="role_id"
+                    value={formData.role_id}
+                    onChange={handleRoleChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Pilih Role</option>
+                    {roles.map((role, index) => (
+                      <option key={index} value={role.role}>
+                        {role.role}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {/* Role Description */}
+                  {formData.role_id && (() => {
+                    const selectedRole = roles.find(r => r.role === formData.role_id);
+                    const roleDesc = roleDescriptions[selectedRole?.role];
+                    return selectedRole && (
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm font-medium text-blue-800 mb-1">
+                          {roleDesc?.description || selectedRole.description}
+                        </p>
+                        {(selectedRole.permissions || roleDesc?.permissions) && (selectedRole.permissions || roleDesc.permissions).length > 0 && (
+                          <div className="text-xs text-blue-600">
+                            <strong>Akses:</strong>
+                            <ul className="list-disc list-inside mt-1 space-y-1">
+                              {(selectedRole.permissions || roleDesc.permissions).map((permission, index) => (
+                                <li key={index}>{permission.replace(/\./g, ' ').replace(/_/g, ' ')}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="is_active"
+                      checked={formData.is_active}
+                      onChange={handleInputChange}
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">User Aktif</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={formLoading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {formLoading ? (
+                      <>
+                        <Icon icon="solar:loading-outline" className="animate-spin mr-2" />
+                        {modalType === 'create' ? 'Membuat...' : 'Memperbarui...'}
+                      </>
+                    ) : (
+                      modalType === 'create' ? 'Buat User' : 'Perbarui User'
+                    )}
+                  </button>
+                </div>
+              </form>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ }

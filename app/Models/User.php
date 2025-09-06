@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Enums\UserRole;
 
 class User extends Authenticatable
 {
@@ -24,7 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',
+        'role_id',
         'is_active',
     ];
 
@@ -49,11 +48,16 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
-            'role' => UserRole::class,
+
         ];
     }
 
     // Relationships
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
     public function products()
     {
         return $this->hasMany(Product::class, 'created_by');
@@ -81,21 +85,75 @@ class User extends Authenticatable
 
     public function isOwner(): bool
     {
-        return $this->role === UserRole::OWNER;
+        return $this->role && $this->role->name === 'owner';
     }
 
     public function isAdmin(): bool
     {
-        return $this->role === UserRole::ADMIN;
+        return $this->role && $this->role->name === 'admin';
     }
 
     public function isStaff(): bool
     {
-        return $this->role === UserRole::STAFF;
+        return $this->role && $this->role->name === 'staff';
     }
 
     public function isWarehouse(): bool
     {
-        return $this->role === UserRole::WAREHOUSE;
+        return $this->role && $this->role->name === 'warehouse';
+    }
+
+    // Permission methods based on role
+    public function hasPermission(string $permission): bool
+    {
+        if (!$this->is_active) {
+            return false;
+        }
+
+        // Owner has all permissions
+        if ($this->isOwner()) {
+            return true;
+        }
+
+        // Get role-based permissions
+        $rolePermissions = $this->getRolePermissions();
+        
+        // Check if permission matches any role permission pattern
+        foreach ($rolePermissions as $rolePermission) {
+            if ($rolePermission === '*' || $this->matchesPermissionPattern($permission, $rolePermission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function matchesPermissionPattern(string $permission, string $pattern): bool
+    {
+        // Convert pattern to regex (e.g., 'orders.*' becomes '/^orders\..+$/')
+        if (str_ends_with($pattern, '.*')) {
+            $prefix = str_replace('.*', '', $pattern);
+            return str_starts_with($permission, $prefix . '.');
+        }
+        
+        return $permission === $pattern;
+    }
+
+    public function getRolePermissions(): array
+    {
+        if (!$this->role) {
+            return [];
+        }
+
+        return $this->role->permissions ?? [];
+    }
+
+    public function getRoleDescription(): string
+    {
+        if (!$this->role) {
+            return 'Tidak ada akses';
+        }
+
+        return $this->role->description ?? 'Tidak ada deskripsi';
     }
 }

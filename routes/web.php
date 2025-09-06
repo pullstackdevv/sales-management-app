@@ -166,6 +166,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         return Inertia::render('Settings/index', ['activeMenu' => 'user']);
     })->name('settings.user');
     
+    Route::get('/settings/role', function () {
+        return Inertia::render('Settings/index', ['activeMenu' => 'role']);
+    })->name('settings.role');
+    
     Route::get('/settings/dashboard', function () {
         return Inertia::render('Settings/index', ['activeMenu' => 'dashboard']);
     })->name('settings.dashboard');

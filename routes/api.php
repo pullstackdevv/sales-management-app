@@ -14,7 +14,7 @@ use App\Http\Controllers\PaymentBankController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductVariantController;
 use App\Http\Controllers\ReportController;
-// use App\Http\Controllers\RoleController; // Not needed - using enum in User model
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesChannelController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AnalyzerController;
@@ -98,8 +98,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
+    Route::get('users/role-permissions', [UserController::class, 'getRolePermissions']);
 
-    // Role routes - using enum in User model, no separate roles table needed
+    // Role routes
+    Route::get('roles', [RoleController::class, 'index']);
+    Route::get('roles/permissions', [RoleController::class, 'getPermissions']);
+    Route::put('roles/{roleName}', [RoleController::class, 'update']);
 
     // Customer routes
     Route::apiResource('customers', CustomerController::class);

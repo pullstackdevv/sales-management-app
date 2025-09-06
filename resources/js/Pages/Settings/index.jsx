@@ -7,6 +7,7 @@ import CustomerSettings from "./CustomerSettings";
 import ProductSettings from "./ProductSettings";
 import TemplateSettings from "./TemplateSettings";
 import UserSettings from "./UserSettings";
+import RoleSettings from "./RoleSettings";
 import OriginSettings from "./OriginSettings";
 import CourierSettings from "./CourierSettings";
 import PaymentSettings from "./PaymentSettings";
@@ -35,6 +36,7 @@ const menus = [
   { key: "origin", label: "Asal Pengiriman", icon: "mdi:map-marker-outline" },
   // { key: "template", label: "Template", icon: "mdi:file-document-outline" },
   { key: "user", label: "User", icon: "mdi:account-outline" },
+  { key: "role", label: "Role Settings", icon: "mdi:shield-account-outline" },
 ];
 
 function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
@@ -69,6 +71,7 @@ function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
         {activeMenu === "origin" && <OriginSettings />}
         {/* {activeMenu === "template" && <TemplateSettings />} */}
         {activeMenu === "user" && <UserSettings />}
+        {activeMenu === "role" && <RoleSettings />}
         {activeMenu === "dashboard" && <DashboardSettings />}
         {activeMenu === "api" && <ApiSettings />}
       </div>

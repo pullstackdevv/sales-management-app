@@ -22,11 +22,23 @@ class RoleController extends Controller
             }, function ($query) {
                 $query->latest();
             })
-            ->paginate($request->per_page ?? 10);
+            ->get();
+
+        // Transform data for frontend
+        $transformedRoles = $roles->map(function ($role) {
+            return [
+                'role' => $role->name,
+                'description' => $role->description,
+                'permissions' => $role->permissions ?? [],
+                'is_active' => $role->is_active,
+                'is_system' => $role->is_system,
+                'users_count' => $role->users_count
+            ];
+        });
 
         return response()->json([
             'status' => 'success',
-            'data' => $roles
+            'data' => $transformedRoles
         ]);
     }
 
@@ -36,26 +48,27 @@ class RoleController extends Controller
             'name' => 'required|string|max:255|unique:roles,name',
             'description' => 'nullable|string|max:255',
             'permissions' => 'required|array',
-            'permissions.*' => 'required|string|exists:permissions,name',
+            'permissions.*' => 'required|string',
             'is_active' => 'boolean'
         ]);
 
         try {
             DB::beginTransaction();
 
-            $role = Role::create([
-                ...$validated,
-                'created_by' => Auth::id()
-            ]);
-
-            $role->syncPermissions($validated['permissions']);
+            $role = Role::create($validated);
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Role created successfully',
-                'data' => $role->load(['permissions', 'createdBy'])
+                'data' => [
+                    'role' => $role->name,
+                    'description' => $role->description,
+                    'permissions' => $role->permissions ?? [],
+                    'is_active' => $role->is_active,
+                    'is_system' => $role->is_system
+                ]
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -67,15 +80,21 @@ class RoleController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $role->load(['permissions', 'users' => function ($query) {
-                $query->withCount(['orders', 'verifiedPayments', 'stockMovements', 'stockOpnames'])
-                    ->latest();
-            }])
+            'data' => [
+                'role' => $role->name,
+                'description' => $role->description,
+                'permissions' => $role->permissions ?? [],
+                'is_active' => $role->is_active,
+                'is_system' => $role->is_system,
+                'users_count' => $role->users()->count()
+            ]
         ]);
     }
 
-    public function update(Request $request, Role $role): JsonResponse
+    public function update(Request $request, string $roleName): JsonResponse
     {
+        $role = Role::where('name', $roleName)->firstOrFail();
+        
         if ($role->is_system && $request->name !== $role->name) {
             throw ValidationException::withMessages([
                 'name' => ['Cannot rename system role.']
@@ -83,31 +102,31 @@ class RoleController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255|unique:roles,name,' . $role->id,
             'description' => 'nullable|string|max:255',
-            'permissions' => 'sometimes|required|array',
-            'permissions.*' => 'required|string|exists:permissions,name',
-            'is_active' => 'boolean'
+            'permissions' => 'required|array',
+            'permissions.*' => 'required|string'
         ]);
 
         try {
             DB::beginTransaction();
 
             $role->update([
-                ...$validated,
-                'updated_by' => Auth::id()
+                'description' => $validated['description'],
+                'permissions' => $validated['permissions']
             ]);
-
-            if (isset($validated['permissions'])) {
-                $role->syncPermissions($validated['permissions']);
-            }
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Role updated successfully',
-                'data' => $role->fresh()->load(['permissions', 'createdBy'])
+                'data' => [
+                    'role' => $role->name,
+                    'description' => $role->description,
+                    'permissions' => $role->permissions ?? [],
+                    'is_active' => $role->is_active,
+                    'is_system' => $role->is_system
+                ]
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -132,7 +151,6 @@ class RoleController extends Controller
         try {
             DB::beginTransaction();
 
-            $role->update(['deleted_by' => Auth::id()]);
             $role->delete();
 
             DB::commit();
@@ -159,8 +177,7 @@ class RoleController extends Controller
             DB::beginTransaction();
 
             $role->update([
-                'is_active' => !$role->is_active,
-                'updated_by' => Auth::id()
+                'is_active' => !$role->is_active
             ]);
 
             DB::commit();
@@ -168,11 +185,25 @@ class RoleController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Role status updated successfully',
-                'data' => $role->fresh()->load(['permissions', 'createdBy'])
+                'data' => [
+                    'role' => $role->name,
+                    'description' => $role->description,
+                    'permissions' => $role->permissions ?? [],
+                    'is_active' => $role->is_active,
+                    'is_system' => $role->is_system
+                ]
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
         }
     }
-} 
+
+    public function getPermissions(): JsonResponse
+    {
+        return response()->json([
+            'status' => 'success',
+            'data' => Role::getAllPermissions()
+        ]);
+    }
+}

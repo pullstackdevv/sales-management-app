@@ -1,8 +1,8 @@
 RewriteEngine On
 
-# Handle assets requests directly
-RewriteCond %{REQUEST_URI} ^/assets/ [NC]
-RewriteRule ^assets/(.*)$ /public/build/assets/$1 [L]
+# Handle Vite build assets directly
+RewriteCond %{REQUEST_URI} ^/build/ [NC]
+RewriteRule ^build/(.*)$ /public/build/$1 [L]
 
 # Handle other requests
 RewriteCond %{REQUEST_URI} !^/public/ [NC]

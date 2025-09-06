@@ -242,6 +242,10 @@ Route::prefix('marketplace')->group(function () {
         return Inertia::render('Checkout/PaymentProcessCheckout');
     })->name('checkout.payment-process');
 
+    Route::get('/checkout/payment-status/{orderNumber}', function ($orderNumber) {
+        return Inertia::render('Checkout/PaymentStatusCheckout', ['orderNumber' => $orderNumber]);
+    })->name('checkout.payment-status');
+
     Route::get('/profile', function () {
         return Inertia::render('Marketplace/Profile');
     })->name('marketplace.profile');

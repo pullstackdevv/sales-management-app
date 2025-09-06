@@ -76,6 +76,7 @@ export const checkoutSession = {
       product: {
         id: product.id,
         name: product.name,
+        description: product.description,
         price: variant ? variant.price : product.price,
         image: product.image,
         variant: variant,

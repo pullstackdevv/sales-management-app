@@ -61,8 +61,19 @@ export default function ProductDetail() {
         try {
             setLoading(true);
             const response = await productsAPI.getProduct(id);
+            console.log('API response:', response);
+            
             // Laravel API returns {status: 'success', data: product}
-            setProduct(response.data || response);
+            // Extract the actual product data from the nested structure
+            let productData = response;
+            if (response.data && response.data.data) {
+                productData = response.data.data;
+            } else if (response.data) {
+                productData = response.data;
+            }
+            
+            console.log('Extracted product data:', productData);
+            setProduct(productData);
         } catch (err) {
             setError('Failed to load product details');
             console.error('Error fetching product:', err);
@@ -190,15 +201,9 @@ export default function ProductDetail() {
         
         if (currentProduct.is_active !== false && selectedVariant && getCurrentStock() > 0) {
             // Initialize checkout session with product data
-            const checkoutData = {
-                product: currentProduct,
-                variant: selectedVariant,
-                quantity: quantity,
-                price: getCurrentPrice()
-            };
-            
-            console.log('Initializing checkout session with:', checkoutData);
-            checkoutSession.initWithProduct(checkoutData);
+            // Pass parameters correctly to initWithProduct function
+            console.log('Initializing checkout session with product:', currentProduct.name);
+            checkoutSession.initWithProduct(currentProduct, selectedVariant, quantity);
             
             // Verify data was saved
             const savedData = checkoutSession.get();

@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle, Clock, AlertCircle, CreditCard } from 'lucide-r
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
 import axios from 'axios';
+import api from '@/api/axios';
 
 const PaymentProcessCheckout = () => {
   const [checkoutData, setCheckoutData] = useState(null);
@@ -90,7 +91,7 @@ const PaymentProcessCheckout = () => {
       };
       
       // Create order dan payment
-      const response = await axios.post('/api/orders/create-with-payment', orderData);
+      const response = await api.post('/api/orders/create-with-payment', orderData);
       
       if (response.data.success) {
         const { order, payment } = response.data.data;

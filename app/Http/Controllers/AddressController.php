@@ -11,6 +11,16 @@ use Illuminate\Http\Request;
 
 class AddressController extends Controller
 {
+    public function index(Customer $customer): JsonResponse
+    {
+        $addresses = $customer->addresses()->orderBy('is_default', 'desc')->orderBy('created_at', 'desc')->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $addresses
+        ]);
+    }
+
     public function store(StoreRequest $request, Customer $customer): JsonResponse
     {
         // If this is the first address, set it as default
@@ -104,4 +114,4 @@ class AddressController extends Controller
             'data' => $address
         ]);
     }
-} 
+}

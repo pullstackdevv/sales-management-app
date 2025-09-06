@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
@@ -35,27 +36,69 @@ class ProductController extends Controller
         ]);
     }
 
+    public function storefront(Request $request): JsonResponse
+    {
+        $products = Product::with(['variants'])
+            ->where('is_storefront', true)
+            ->where('is_active', true)
+            ->when($request->search, function($query, $search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            })
+            ->when($request->category, function($query, $category) {
+                $query->where('category', $category);
+            })
+            ->when($request->sort_by, function ($query, $sortBy) use ($request) {
+                $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
+            }, function ($query) {
+                $query->latest();
+            })
+            ->paginate($request->per_page ?? 10);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $products
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'sku' => 'required|string|max:100|unique:products,sku',
             'description' => 'nullable|string',
             'category' => 'required|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'base_price' => 'required|numeric|min:0',
+            'is_active' => 'boolean',
+            'is_storefront' => 'boolean',
             'variants' => 'required|array|min:1',
-            'variants.*.name' => 'required|string|max:255',
+            'variants.*.variant_label' => 'required|string|max:255',
             'variants.*.sku' => 'required|string|max:50|unique:product_variants,sku',
             'variants.*.price' => 'required|numeric|min:0',
+            'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean'
         ]);
+
+        // Handle image upload
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('products', 'public');
+        }
 
         try {
             DB::beginTransaction();
 
             $product = Product::create([
                 'name' => $validated['name'],
+                'sku' => $validated['sku'],
                 'description' => $validated['description'],
                 'category' => $validated['category'],
+                'image' => $imagePath,
+                'base_price' => $validated['base_price'],
+                'is_active' => $validated['is_active'] ?? true,
+                'is_storefront' => $validated['is_storefront'] ?? true,
                 'created_by' => Auth::id()
             ]);
 
@@ -89,26 +132,66 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): JsonResponse
     {
+        // Custom validation for variants SKU
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'sku' => 'sometimes|required|string|max:100|unique:products,sku,' . $product->id,
             'description' => 'nullable|string',
             'category' => 'sometimes|required|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'base_price' => 'sometimes|required|numeric|min:0',
+            'is_active' => 'boolean',
+            'is_storefront' => 'boolean',
             'variants' => 'sometimes|required|array|min:1',
             'variants.*.id' => 'sometimes|required|exists:product_variants,id',
-            'variants.*.name' => 'required|string|max:255',
-            'variants.*.sku' => 'required|string|max:50|unique:product_variants,sku',
+            'variants.*.variant_label' => 'required|string|max:255',
+            'variants.*.sku' => 'required|string|max:50',
             'variants.*.price' => 'required|numeric|min:0',
+            'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean'
         ]);
+
+        // Additional validation for variant SKU uniqueness
+        if ($request->has('variants')) {
+            foreach ($request->variants as $index => $variant) {
+                $query = ProductVariant::where('sku', $variant['sku']);
+                
+                // If variant has ID, exclude it from uniqueness check
+                if (isset($variant['id'])) {
+                    $query->where('id', '!=', $variant['id']);
+                }
+                
+                if ($query->exists()) {
+                    throw ValidationException::withMessages([
+                        "variants.{$index}.sku" => ['The SKU has already been taken.']
+                    ]);
+                }
+            }
+        }
+
+        // Handle image upload
+        $imagePath = $product->image; // Keep existing image by default
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($product->image && Storage::disk('public')->exists($product->image)) {
+                Storage::disk('public')->delete($product->image);
+            }
+            $imagePath = $request->file('image')->store('products', 'public');
+        }
 
         try {
             DB::beginTransaction();
 
             $product->update([
                 'name' => $validated['name'] ?? $product->name,
+                'sku' => $validated['sku'] ?? $product->sku,
                 'description' => $validated['description'] ?? $product->description,
                 'category' => $validated['category'] ?? $product->category,
+                'image' => $imagePath,
+                'base_price' => $validated['base_price'] ?? $product->base_price,
+                'is_active' => $validated['is_active'] ?? $product->is_active,
+                'is_storefront' => $validated['is_storefront'] ?? $product->is_storefront,
                 'updated_by' => Auth::id()
             ]);
 
@@ -121,12 +204,22 @@ class ProductController extends Controller
                 foreach ($validated['variants'] as $variant) {
                     if (isset($variant['id'])) {
                         $product->variants()->where('id', $variant['id'])->update([
-                            ...$variant,
+                            'variant_label' => $variant['variant_label'],
+                            'sku' => $variant['sku'],
+                            'price' => $variant['price'],
+                            'weight' => $variant['weight'] ?? null,
+                            'stock' => $variant['stock'],
+                            'is_active' => $variant['is_active'] ?? true,
                             'updated_by' => Auth::id()
                         ]);
                     } else {
                         $product->variants()->create([
-                            ...$variant,
+                            'variant_label' => $variant['variant_label'],
+                            'sku' => $variant['sku'],
+                            'price' => $variant['price'],
+                            'weight' => $variant['weight'] ?? null,
+                            'stock' => $variant['stock'],
+                            'is_active' => $variant['is_active'] ?? true,
                             'created_by' => Auth::id()
                         ]);
                     }
@@ -163,6 +256,11 @@ class ProductController extends Controller
 
             DB::beginTransaction();
 
+            // Delete product image if exists
+            if ($product->image && Storage::disk('public')->exists($product->image)) {
+                Storage::disk('public')->delete($product->image);
+            }
+
             // Delete all variants
             $product->variants()->delete();
             
@@ -181,4 +279,4 @@ class ProductController extends Controller
             throw $e;
         }
     }
-} 
+}

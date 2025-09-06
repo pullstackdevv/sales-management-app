@@ -15,6 +15,9 @@ class StockOpnameDetail extends Model
         'system_stock',
         'real_stock',
         'difference',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     // Relationships

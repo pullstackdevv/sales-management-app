@@ -13,18 +13,28 @@ class Product extends Model
     protected $fillable = [
         'name',
         'sku',
+        'category',
+        'description',
+        'image',
         'base_price',
         'is_active',
+        'is_storefront',
         'created_by',
     ];
 
     protected $casts = [
         'base_price' => 'decimal:2',
         'is_active' => 'boolean',
+        'is_storefront' => 'boolean',
     ];
 
     // Relationships
     public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
     }

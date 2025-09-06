@@ -15,6 +15,8 @@ class StockOpname extends Model
         'opname_date',
         'status',
         'created_by',
+        'updated_by',
+        'deleted_by',
         'note',
     ];
 
@@ -32,5 +34,10 @@ class StockOpname extends Model
     public function details()
     {
         return $this->hasMany(StockOpnameDetail::class);
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

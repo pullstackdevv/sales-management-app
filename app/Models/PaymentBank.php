@@ -15,6 +15,9 @@ class PaymentBank extends Model
         'account_name',
         'account_number',
         'is_active',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [
@@ -25,5 +28,10 @@ class PaymentBank extends Model
     public function payments()
     {
         return $this->hasMany(OrderPayment::class);
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

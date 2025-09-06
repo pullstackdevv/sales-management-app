@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Stock Management</title>
-    <link rel="icon" href="/assets/icons/icon.svg" type="image/x-icon">
-    @viteReactRefresh
-    @vite('resources/js/app.jsx')
-    @inertiaHead
-  </head>
-  <body class="antialiased" theme="light">
-    @inertia
-    <script src="http://localhost:8097"></script>
-  </body>
+
+<head>
+  <meta charset="utf-8">
+  <title>Stock Management</title>
+  <link rel="icon" href="/assets/icons/icon.svg" type="image/x-icon">
+  @routes
+  @viteReactRefresh
+  @vite('resources/js/app.jsx')
+  @inertiaHead
+</head>
+
+<body class="antialiased" theme="light">
+  @inertia
+  <script src="http://localhost:8097"></script>
+</body>
+
 </html>

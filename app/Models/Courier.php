@@ -13,6 +13,7 @@ class Courier extends Model
     protected $fillable = [
         'name',
         'is_active',
+        'created_by',
     ];
 
     protected $casts = [
@@ -28,5 +29,10 @@ class Courier extends Model
     public function shippings()
     {
         return $this->hasMany(Shipping::class);
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

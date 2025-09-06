@@ -3,22 +3,34 @@ import Header from "./header/Header";
 import SidebarLayout from "./sidebar/Sidebar";
 
 export default function DashboardLayout({ children }) {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Ubah default sesuai kebutuhan
 
     return (
         <div className="flex min-h-screen bg-gray-50">
-            {/* Sidebar - pastikan ukurannya konsisten */}
-            <SidebarLayout />
+            {/* Sidebar */}
+            <SidebarLayout
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                onOpen={() => setIsSidebarOpen(true)}
+            />
 
             {/* Main Area */}
             <div className="flex-1 flex flex-col min-h-screen">
-                {/* Header/Navbar - beri tinggi tetap, misalnya h-16 (64px) */}
+                {/* Header/Navbar */}
                 <div className="fixed w-full z-10">
-                    <Header onHamburgerClick={() => setIsOpen(true)} />
+                    <Header
+                        onHamburgerClick={() =>
+                            setIsSidebarOpen((prev) => !prev)
+                        }
+                    />
                 </div>
 
                 {/* Page content */}
-                <main className="flex-1 mt-16 p-12 ml-64 bg-gray-100 overflow-auto">
+                <main
+                    className={`flex-1 mt-16 p-12 transition-all duration-300 ${
+                        isSidebarOpen ? "ml-64" : "ml-0"
+                    } bg-gray-100 overflow-auto`}
+                >
                     {children}
                 </main>
 

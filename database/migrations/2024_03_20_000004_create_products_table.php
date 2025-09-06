@@ -12,6 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('name', 150);
             $table->string('sku', 100);
+            $table->string('category', 100);
+            $table->text('description')->nullable();
             $table->decimal('base_price', 12, 2);
             $table->boolean('is_active')->default(true);
             $table->foreignId('created_by')->constrained('users');
@@ -24,4 +26,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('products');
     }
-}; 
+};

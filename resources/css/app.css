@@ -1,8 +1,9 @@
+/* Import SweetAlert2 fix */
+@import './sweetalert-fix.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

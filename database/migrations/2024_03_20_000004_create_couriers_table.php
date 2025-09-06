@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name', 100);
             $table->boolean('is_active')->default(true);
+            $table->foreignId('created_by')->nullable()->constrained('users');
             $table->timestamps();
             $table->softDeletes();
         });
@@ -21,4 +22,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('couriers');
     }
-}; 
+};

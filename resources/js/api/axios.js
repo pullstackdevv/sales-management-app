@@ -1,29 +1,25 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? '/api' 
-    : 'https://mystock.thebee.id/api',
-  withCredentials: true,
-  headers: {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  },
+    baseURL: '/api',
+    withCredentials: true,
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+    },
 });
 
 // Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
+api.interceptors.request.use((config) => {
     const token = localStorage.getItem('auth_token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
-  },
-  (error) => {
+}, (error) => {
     return Promise.reject(error);
-  }
-);
+});
 
 // Response interceptor to handle auth errors
 api.interceptors.response.use(
@@ -41,13 +37,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-// Get CSRF cookie before making requests
-const getCsrfCookie = async () => {
-  const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? '' 
-    : 'https://mystock.thebee.id';
-  await axios.get(`${baseURL}/sanctum/csrf-cookie`, { withCredentials: true });
-};
 
 export default api;

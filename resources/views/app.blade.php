@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="utf-8">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Stock Management</title>
   <link rel="icon" href="{{ asset('assets/icons/icon.svg') }}" type="image/x-icon">
   @routes

@@ -15,8 +15,7 @@ export default function PaymentStatusCheckout({ orderNumber }) {
     try {
       if (showRefreshing) setRefreshing(true);
       
-      const authToken = localStorage.getItem('auth_token');
-      const response =  await api.get(`/api/payment/xendit/status/${orderNumber}`);
+      const response = await api.get(`/payment/xendit/status/${orderNumber}`);
 
       if (response.data.status === 'success') {
         setPaymentData(response.data);
@@ -94,7 +93,7 @@ export default function PaymentStatusCheckout({ orderNumber }) {
   };
 
   const handleBackToHome = () => {
-    router.visit(route('marketplace.index'));
+    router.visit(route('marketplace.home'));
   };
 
   const handleRefresh = () => {

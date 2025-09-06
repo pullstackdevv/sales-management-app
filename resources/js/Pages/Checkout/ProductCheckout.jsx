@@ -50,7 +50,7 @@ const ProductCheckout = () => {
     } else {
       // Jika tidak ada data di session storage, redirect ke marketplace
       console.log('No checkout data found, redirecting to marketplace');
-      router.visit(route('marketplace.index'));
+      router.visit(route('marketplace.home'));
     }
   }, []);
 
@@ -163,7 +163,7 @@ const ProductCheckout = () => {
     if (product && product.id) {
       router.visit(route('marketplace.product.detail', { id: product.id }));
     } else {
-      router.visit(route('marketplace.index'));
+      router.visit(route('marketplace.home'));
     }
   };
 
@@ -206,13 +206,6 @@ const ProductCheckout = () => {
                   3
                 </div>
                 <span className="ml-2 text-sm text-gray-500">Pembayaran</span>
-              </div>
-              <div className="flex-1 mx-4 h-1 bg-gray-200 rounded"></div>
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center text-sm font-medium">
-                  4
-                </div>
-                <span className="ml-2 text-sm text-gray-500">Selesai</span>
               </div>
             </div>
           </div>

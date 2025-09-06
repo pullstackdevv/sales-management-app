@@ -15,7 +15,7 @@ const PaymentMethodCheckout = () => {
     const data = checkoutSession.get();
     if (!data || !data.product || !data.customer) {
       // Jika tidak ada data yang diperlukan, redirect ke halaman utama
-      router.visit(route('marketplace.index'));
+      router.visit(route('marketplace.home'));
       return;
     }
     
@@ -23,7 +23,7 @@ const PaymentMethodCheckout = () => {
     setLoading(false);
   }, []);
 
-console.log('Checkout data:', checkoutData);
+
 
   // Handle lanjut ke step berikutnya - Direct payment with xendit
   const handleContinue = async () => {
@@ -38,27 +38,45 @@ console.log('Checkout data:', checkoutData);
         return;
       }
 
-      // Debug checkout data
-      console.log('Checkout data:', checkoutData);
-      console.log('Product quantity:', checkoutData.product.quantity);
-      console.log('Product data:', checkoutData.product);
+
+
+      // Calculate total quantity and prepare items
+      let items = [];
+      
+      if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
+        // Multiple variants selected
+        items = Object.values(checkoutData.product.selectedVariants).map(({ variant, quantity }) => ({
+          product_variant_id: variant.id,
+          quantity: parseInt(quantity) || 1,
+          price: variant.price
+        }));
+      } else if (checkoutData.product.variant) {
+        // Single variant
+        items = [{
+          product_variant_id: checkoutData.product.variant.id,
+          quantity: parseInt(checkoutData.product.quantity) || 1,
+          price: checkoutData.product.variant.price
+        }];
+      } else {
+        // No variant (base product)
+        items = [{
+          product_variant_id: checkoutData.product.id,
+          quantity: parseInt(checkoutData.product.quantity) || 1,
+          price: checkoutData.product.price
+        }];
+      }
 
       // Prepare order data with correct customer_id field
       const orderData = {
         customer_id: checkoutData.customer.customer_id, // Use customer_id instead of id
         address_id: checkoutData.customer.address_id || 1,
         sales_channel_id: 1, // Default sales channel
-        items: [{
-          product_variant_id: checkoutData.product.variant?.id || checkoutData.product.id,
-          quantity: parseInt(checkoutData.product.quantity) || 1, // Ensure quantity is a number
-          price: checkoutData.product.price || (checkoutData.product.subtotal / checkoutData.product.quantity)
-        }],
+        items: items,
         shipping_cost: 0, // Default shipping cost
         notes: 'Order dari marketplace - Payment via Xendit'
       };
 
-      console.log('Creating order with data:', orderData);
-      console.log('Items array:', orderData.items);
+
 
       // Create order
       const orderResponse = await axios.post('/api/orders', orderData, {
@@ -73,7 +91,7 @@ console.log('Checkout data:', checkoutData);
         const orderNumber = orderResponse.data.data.order_number;
         
         // Create payment with xendit
-        const paymentResponse = await axios.post(`http://127.0.0.1:8000/api/payment/create/${orderNumber}`, {
+        const paymentResponse = await axios.post(`/api/payment/create/${orderNumber}`, {
           payment_gateway: 'xendit'
         }, {
           headers: {
@@ -205,13 +223,7 @@ console.log('Checkout data:', checkoutData);
                 </div>
                 <span className="ml-2 text-sm font-medium text-blue-600">Pembayaran</span>
               </div>
-              <div className="flex-1 mx-4 h-1 bg-gray-200 rounded"></div>
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center text-sm font-medium">
-                  4
-                </div>
-                <span className="ml-2 text-sm text-gray-500">Selesai</span>
-              </div>
+              
             </div>
           </div>
 

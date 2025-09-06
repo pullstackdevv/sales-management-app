@@ -78,7 +78,7 @@ const CustomerDataCheckout = () => {
     const checkoutData = checkoutSession.get();
     if (!checkoutData || !checkoutData.product) {
       // Jika tidak ada data produk, redirect ke halaman utama
-      router.visit(route('marketplace.index'));
+      router.visit(route('marketplace.home'));
       return;
     }
 

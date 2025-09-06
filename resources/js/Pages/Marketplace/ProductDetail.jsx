@@ -17,8 +17,6 @@ import Swal from 'sweetalert2';
 import { checkoutSession } from '@/utils/checkoutSession';
 
 export default function ProductDetail() {
-    console.log('ProductDetail component loaded');
-    alert('ProductDetail component loaded');
     const { id } = usePage().props;
     console.log('Product ID from props:', id);
     const [product, setProduct] = useState(null);

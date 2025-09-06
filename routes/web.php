@@ -7,6 +7,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Auth\Middleware\Authenticate;
 use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\MidtransController;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 Route::get('/welcome', function () {
@@ -283,6 +284,15 @@ Route::prefix('payment')->name('payment.')->group(function () {
     Route::get('/error', function () {
         return Inertia::render('Payment/Error');
     })->name('error');
+    
+    // Payment success redirect
+    Route::get('/success', function (Request $request) {
+        $orderNumber = $request->query('order');
+        if ($orderNumber) {
+            return redirect()->route('checkout.payment-status', ['orderNumber' => $orderNumber]);
+        }
+        return redirect()->route('marketplace.index');
+    })->name('success');
 });
 
 Route::fallback(function () {

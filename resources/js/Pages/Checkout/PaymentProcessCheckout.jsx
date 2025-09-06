@@ -19,7 +19,7 @@ const PaymentProcessCheckout = () => {
     const data = checkoutSession.get();
     if (!data || !data.product || !data.customer || !data.paymentMethod) {
       // Jika tidak ada data yang diperlukan, redirect ke halaman utama
-      router.visit(route('marketplace.index'));
+      router.visit(route('marketplace.home'));
       return;
     }
     
@@ -272,20 +272,6 @@ const PaymentProcessCheckout = () => {
               <div className={`flex-1 mx-4 h-1 rounded ${
                 paymentStatus === 'success' ? 'bg-green-600' : 'bg-gray-200'
               }`}></div>
-              <div className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  paymentStatus === 'success'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {paymentStatus === 'success' ? '✓' : '4'}
-                </div>
-                <span className={`ml-2 text-sm ${
-                  paymentStatus === 'success'
-                    ? 'font-medium text-green-600'
-                    : 'text-gray-500'
-                }`}>Selesai</span>
-              </div>
             </div>
           </div>
 

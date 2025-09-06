@@ -15,6 +15,7 @@ return [
         'http://127.0.0.1:8001',
         'http://192.168.19.165:8000',
         'http://192.168.19.165:5173',
+        'https://mystock.thebee.id',
     ],
 
     'allowed_origins_patterns' => [
@@ -23,12 +24,24 @@ return [
         '/^http:\/\/127\.0\.0\.1:(8000|8001|5173)$/',
     ],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => [
+        'Accept',
+        'Authorization',
+        'Content-Type',
+        'X-Requested-With',
+        'X-CSRF-TOKEN',
+        'X-XSRF-TOKEN',
+    ],
 
-    'exposed_headers' => [],
+    'exposed_headers' => [
+        'X-RateLimit-Limit',
+        'X-RateLimit-Remaining',
+        'X-RateLimit-Reset',
+        'Retry-After',
+    ],
 
-    'max_age' => 0,
+    'max_age' => 86400, // 24 hours
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];

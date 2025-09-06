@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Handle assets requests directly
+RewriteCond %{REQUEST_URI} ^/assets/ [NC]
+RewriteRule ^assets/(.*)$ /public/build/assets/$1 [L]
+
+# Handle other requests
+RewriteCond %{REQUEST_URI} !^/public/ [NC]
+RewriteRule ^(.*)$ /public/$1 [L]

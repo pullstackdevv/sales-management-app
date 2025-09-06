@@ -13,7 +13,6 @@
 
 <body class="antialiased" theme="light">
   @inertia
-  <script src="http://localhost:8097"></script>
 </body>
 
 </html>

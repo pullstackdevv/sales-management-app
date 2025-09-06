@@ -64,6 +64,8 @@ Route::prefix('courier-rates')->group(function () {
     Route::get('/destinations', [CourierRateController::class, 'destinations']);
     Route::get('/service-types', [CourierRateController::class, 'serviceTypes']);
     Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
+    Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
+    Route::get('/active-imports', [CourierRateController::class, 'activeImports']);
     Route::get('/{id}', [CourierRateController::class, 'show']);
 });
 
@@ -178,7 +180,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
-        Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
     });
 });
 

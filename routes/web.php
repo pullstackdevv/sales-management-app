@@ -150,6 +150,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])->group(fu
         return Inertia::render('Settings/index', ['activeMenu' => 'courier']);
     })->name('settings.courier');
     
+    Route::get('/settings/courier-rates', function () {
+        return Inertia::render('Settings/CourierRates');
+    })->name('settings.courier-rates');
+    
     Route::get('/settings/origin', function () {
         return Inertia::render('Settings/index', ['activeMenu' => 'origin']);
     })->name('settings.origin');

@@ -1,10 +1,12 @@
 
 import { Link } from '@inertiajs/react'
+import { route } from 'ziggy-js'
+import { imageAsset } from '@/utils/asset'
 
 const Logo = () => {
   return (
    <Link href={'/'}>
-      <img src="/assets/images/logos/mystock.jpeg" alt="logo" className="block" />
+      <img src={imageAsset('logos/mystock.jpeg')} alt="logo" className="block" />
       </Link>
   )
 }

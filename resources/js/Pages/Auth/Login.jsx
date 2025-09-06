@@ -4,10 +4,11 @@ import { Icon } from '@iconify/react';
 import { AuthAPI } from '@/api'
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
+import { imageAsset } from '@/utils/asset';
 
 // Logo Component
 const Logo = () => (
-  <img src="/assets/images/logos/mystock.png" alt="logo" className="block w-60 mx-auto mb-6" />
+  <img src={imageAsset('logos/mystock.png')} alt="logo" className="block w-60 mx-auto mb-6" />
 );
 
 export default function LoginForm() {

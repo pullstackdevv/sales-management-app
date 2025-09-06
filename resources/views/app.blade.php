@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <title>Stock Management</title>
-  <link rel="icon" href="/assets/icons/icon.svg" type="image/x-icon">
+  <link rel="icon" href="{{ asset('assets/icons/icon.svg') }}" type="image/x-icon">
   @routes
   @viteReactRefresh
   @vite('resources/js/app.jsx')

@@ -73,6 +73,15 @@ const CustomerDataCheckout = () => {
   const [productData, setProductData] = useState(null);
   const [errors, setErrors] = useState({});
 
+  // Mask phone number to show only the last 4 digits
+  const maskPhone = (phone) => {
+    if (!phone) return '';
+    const digits = String(phone).replace(/\D/g, '');
+    const last4 = digits.slice(-4);
+    const maskedPrefixLength = Math.max(0, digits.length - 4);
+    return `${'*'.repeat(maskedPrefixLength)}${last4}`;
+  };
+
   useEffect(() => {
     // Ambil data produk dari session
     const checkoutData = checkoutSession.get();
@@ -1077,7 +1086,7 @@ const CustomerDataCheckout = () => {
                               className="w-full px-3 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
                             >
                               <div className="font-medium text-gray-900">{customer.name}</div>
-                              <div className="text-sm text-gray-500">{customer.phone}</div>
+                              <div className="text-sm text-gray-500">{maskPhone(customer.phone)}</div>
                               {customer.email && (
                                 <div className="text-sm text-gray-500">{customer.email}</div>
                               )}
@@ -1093,7 +1102,7 @@ const CustomerDataCheckout = () => {
                         <div className="flex items-start justify-between">
                           <div>
                             <h4 className="font-medium text-blue-900">{selectedCustomer.name}</h4>
-                            <p className="text-sm text-blue-700">{selectedCustomer.phone}</p>
+                            <p className="text-sm text-blue-700">{maskPhone(selectedCustomer.phone)}</p>
                             {selectedCustomer.email && (
                               <p className="text-sm text-blue-700">{selectedCustomer.email}</p>
                             )}

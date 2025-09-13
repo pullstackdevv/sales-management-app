@@ -181,7 +181,7 @@ export default function MarketplaceLayout({ children }) {
                             </div>
                         </div>
                     </div>
-                    <div className="mt-8 pt-8 border-t border-gray-700 text-center text-sm text-gray-400">
+                    <div className="mt-8 pt-8 border-t border-gray-300 text-center text-sm text-gray-400">
                         <p>&copy; {new Date().getFullYear()} Marketplace. All rights reserved.</p>
                     </div>
                 </div>

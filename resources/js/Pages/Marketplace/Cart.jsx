@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { Link } from "@inertiajs/react";
 import MarketplaceLayout from "../../Layouts/MarketplaceLayout";
 import { 
@@ -8,9 +8,79 @@ import {
     ArrowLeft,
     CreditCard,
     Truck,
-    Shield,
-    CheckCircle
+    Shield
 } from "lucide-react";
+
+// Cart item row component, memoized to avoid unnecessary re-renders
+const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity, onRemove, formatPrice }) {
+    return (
+        <div className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0">
+                <div className="flex items-center">
+                    <input
+                        type="checkbox"
+                        checked={item.selected}
+                        onChange={() => onToggleSelect(item.id)}
+                        className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <div className="ml-3 sm:ml-4 flex-1 flex items-center">
+                        <img 
+                            src={item.image} 
+                            alt={item.name}
+                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg"
+                        />
+                        <div className="ml-3 sm:ml-4 flex-1">
+                            <h3 className="text-lg sm:text-xl font-medium text-gray-900">
+                                {item.name}
+                            </h3>
+                            <div className="flex flex-col sm:flex-row sm:items-center mt-2 space-y-1 sm:space-y-0">
+                                <span className="text-lg sm:text-xl font-bold text-gray-900">
+                                    {formatPrice(item.price)}
+                                </span>
+                                {item.originalPrice > item.price && (
+                                    <span className="text-lg sm:text-xl text-gray-500 line-through sm:ml-3">
+                                        {formatPrice(item.originalPrice)}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-lg sm:text-xl text-gray-500 mt-2">
+                                Stok: {item.stock} tersedia
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex items-center justify-between sm:justify-end space-x-4 sm:space-x-6">
+                    {/* Quantity Control */}
+                    <div className="flex items-center border border-gray-300 rounded-lg">
+                        <button
+                            onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                            disabled={item.quantity <= 1}
+                            className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Minus className="h-5 w-5 sm:h-6 sm:w-6" />
+                        </button>
+                        <span className="px-4 sm:px-6 py-3 sm:py-4 text-lg sm:text-xl font-medium">
+                            {item.quantity}
+                        </span>
+                        <button
+                            onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                            disabled={item.quantity >= item.stock}
+                            className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => onRemove(item.id)}
+                        className="text-red-600 hover:text-red-700 p-3 sm:p-4"
+                    >
+                        <Trash2 className="h-6 w-6 sm:h-7 sm:w-7" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+});
 
 export default function Cart() {
     const [cartItems, setCartItems] = useState([
@@ -46,15 +116,17 @@ export default function Cart() {
         }
     ]);
 
-    const formatPrice = (price) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0
-        }).format(price);
-    };
+    // Memoize formatter to avoid creating a new Intl instance on every render
+    const currencyFormatter = useMemo(() => new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }), []);
 
-    const updateQuantity = (id, newQuantity) => {
+    const formatPrice = useCallback((price) => currencyFormatter.format(price), [currencyFormatter]);
+
+    // Stable handlers using functional updates, so deps can be [] safely
+    const updateQuantity = useCallback((id, newQuantity) => {
         setCartItems(prev => 
             prev.map(item => 
                 item.id === id 
@@ -62,13 +134,13 @@ export default function Cart() {
                     : item
             )
         );
-    };
+    }, []);
 
-    const removeItem = (id) => {
+    const removeItem = useCallback((id) => {
         setCartItems(prev => prev.filter(item => item.id !== id));
-    };
+    }, []);
 
-    const toggleSelect = (id) => {
+    const toggleSelect = useCallback((id) => {
         setCartItems(prev => 
             prev.map(item => 
                 item.id === id 
@@ -76,19 +148,20 @@ export default function Cart() {
                     : item
             )
         );
-    };
+    }, []);
 
-    const toggleSelectAll = () => {
-        const allSelected = cartItems.every(item => item.selected);
-        setCartItems(prev => 
-            prev.map(item => ({ ...item, selected: !allSelected }))
-        );
-    };
+    const toggleSelectAll = useCallback(() => {
+        setCartItems(prev => {
+            const allSelected = prev.every(item => item.selected);
+            return prev.map(item => ({ ...item, selected: !allSelected }));
+        });
+    }, []);
 
-    const selectedItems = cartItems.filter(item => item.selected);
-    const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const shippingCost = selectedItems.length > 0 ? 15000 : 0;
-    const total = subtotal + shippingCost;
+    // Derived values memoized to avoid recalculation on unrelated renders
+    const selectedItems = useMemo(() => cartItems.filter(item => item.selected), [cartItems]);
+    const subtotal = useMemo(() => selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [selectedItems]);
+    const shippingCost = useMemo(() => (selectedItems.length > 0 ? 15000 : 0), [selectedItems.length]);
+    const total = useMemo(() => subtotal + shippingCost, [subtotal, shippingCost]);
 
     return (
         <MarketplaceLayout>
@@ -160,71 +233,14 @@ export default function Cart() {
                                     {/* Cart Items List */}
                                     <div className="divide-y divide-gray-200">
                                         {cartItems.map((item) => (
-                                            <div key={item.id} className="p-4 sm:p-6">
-                                                <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0">
-                                                    <div className="flex items-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={item.selected}
-                                                            onChange={() => toggleSelect(item.id)}
-                                                            className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                                        />
-                                                        <div className="ml-3 sm:ml-4 flex-1 flex items-center">
-                                                            <img 
-                                                                src={item.image} 
-                                                                alt={item.name}
-                                                                className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg"
-                                                            />
-                                                            <div className="ml-3 sm:ml-4 flex-1">
-                                                                <h3 className="text-lg sm:text-xl font-medium text-gray-900">
-                                                                    {item.name}
-                                                                </h3>
-                                                                <div className="flex flex-col sm:flex-row sm:items-center mt-2 space-y-1 sm:space-y-0">
-                                                                    <span className="text-lg sm:text-xl font-bold text-gray-900">
-                                                                        {formatPrice(item.price)}
-                                                                    </span>
-                                                                    {item.originalPrice > item.price && (
-                                                                        <span className="text-lg sm:text-xl text-gray-500 line-through sm:ml-3">
-                                                                            {formatPrice(item.originalPrice)}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <p className="text-lg sm:text-xl text-gray-500 mt-2">
-                                                                    Stok: {item.stock} tersedia
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center justify-between sm:justify-end space-x-4 sm:space-x-6">
-                                                        {/* Quantity Control */}
-                                                        <div className="flex items-center border border-gray-300 rounded-lg">
-                                                            <button
-                                                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                                                disabled={item.quantity <= 1}
-                                                                className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Minus className="h-5 w-5 sm:h-6 sm:w-6" />
-                                                            </button>
-                                                            <span className="px-4 sm:px-6 py-3 sm:py-4 text-lg sm:text-xl font-medium">
-                                                                {item.quantity}
-                                                            </span>
-                                                            <button
-                                                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                                                disabled={item.quantity >= item.stock}
-                                                                className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
-                                                            </button>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => removeItem(item.id)}
-                                                            className="text-red-600 hover:text-red-700 p-3 sm:p-4"
-                                                        >
-                                                            <Trash2 className="h-6 w-6 sm:h-7 sm:w-7" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            <CartItem
+                                                key={item.id}
+                                                item={item}
+                                                onToggleSelect={toggleSelect}
+                                                onUpdateQuantity={updateQuantity}
+                                                onRemove={removeItem}
+                                                formatPrice={formatPrice}
+                                            />
                                         ))}
                                     </div>
                                 </div>

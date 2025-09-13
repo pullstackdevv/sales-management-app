@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Link } from '@inertiajs/react';
 import { 
     Star, 
@@ -23,141 +23,50 @@ const Homepage = () => {
         { id: "home", name: "Rumah Tangga" }
     ];
 
-    const popularProducts = [
-        {
-            id: 1,
-            name: "Smartphone Samsung Galaxy A54",
-            price: 3500000,
-            originalPrice: 4200000,
-            rating: 4.5,
-            reviewCount: 128,
-            image: "/assets/images/products/dash-prd-1.jpg",
-            discount: 17,
-            isNew: true,
-            isWishlisted: false
-        },
-        {
-            id: 2,
-            name: "Laptop ASUS VivoBook S14",
-            price: 8500000,
-            originalPrice: 9500000,
-            rating: 4.3,
-            reviewCount: 89,
-            image: "/assets/images/products/dash-prd-2.jpg",
-            discount: 11,
-            isNew: false,
-            isWishlisted: true
-        },
-        {
-            id: 3,
-            name: "Headphone Sony WH-1000XM4",
-            price: 2800000,
-            originalPrice: 3500000,
-            rating: 4.7,
-            reviewCount: 256,
-            image: "/assets/images/products/dash-prd-3.jpg",
-            discount: 20,
-            isNew: false,
-            isWishlisted: false
-        },
-        {
-            id: 4,
-            name: "Smartwatch Apple Watch Series 8",
-            price: 5200000,
-            originalPrice: 6500000,
-            rating: 4.6,
-            reviewCount: 167,
-            image: "/assets/images/products/dash-prd-4.jpg",
-            discount: 20,
-            isNew: true,
-            isWishlisted: false
-        },
-        {
-            id: 5,
-            name: "Kamera Canon EOS R6",
-            price: 18500000,
-            originalPrice: 22000000,
-            rating: 4.8,
-            reviewCount: 73,
-            image: "/assets/images/products/dash-prd-1.jpg",
-            discount: 16,
-            isNew: false,
-            isWishlisted: true
-        },
-        {
-            id: 6,
-            name: "Speaker JBL Flip 6",
-            price: 1200000,
-            originalPrice: 1500000,
-            rating: 4.4,
-            reviewCount: 94,
-            image: "/assets/images/products/dash-prd-2.jpg",
-            discount: 20,
-            isNew: false,
-            isWishlisted: false
-        },
-        {
-            id: 7,
-            name: "Tablet iPad Air 5th Gen",
-            price: 7800000,
-            originalPrice: 8500000,
-            rating: 4.6,
-            reviewCount: 142,
-            image: "/assets/images/products/dash-prd-3.jpg",
-            discount: 8,
-            isNew: true,
-            isWishlisted: false
-        },
-        {
-            id: 8,
-            name: "Gaming Mouse Logitech G Pro X",
-            price: 850000,
-            originalPrice: 1200000,
-            rating: 4.5,
-            reviewCount: 203,
-            image: "/assets/images/products/dash-prd-4.jpg",
-            discount: 29,
-            isNew: false,
-            isWishlisted: true
-        }
-    ];
-
-    useEffect(() => {
-        fetchProducts();
-    }, []);
-
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try {
             setLoading(true);
             const response = await productsAPI.getProducts({ per_page: 8 });
             // Laravel API returns {status: 'success', data: paginatedResults}
             // paginatedResults has a 'data' property with the actual products array
-            const productsData = response.data?.data || [];
+            const productsData = response?.data?.data || [];
             setProducts(productsData);
             setFeaturedProducts(productsData.slice(0, 4));
+            setError(null);
         } catch (err) {
             setError('Failed to load products');
             console.error('Error fetching products:', err);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const formatPrice = (price) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0
-        }).format(price);
-    };
+    useEffect(() => {
+        let isActive = true;
+        (async () => {
+            await fetchProducts();
+        })();
+        return () => {
+            isActive = false;
+        };
+    }, [fetchProducts]);
+console.log(products.category);
 
-    const ProductCard = ({ product }) => {
+    const currencyFormatter = useMemo(() => new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }), []);
+
+    const formatPrice = useCallback((price) => currencyFormatter.format(price), [currencyFormatter]);
+
+    const ProductCard = memo(({ product }) => {
         return (
             <Link href={`/marketplace/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
                     <div className="relative overflow-hidden">
                         <img 
-                            src={product.image || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300'} 
+                            src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
                             alt={product.name}
                             className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
                         />
@@ -178,7 +87,7 @@ const Homepage = () => {
                 </div>
             </Link>
         );
-    };
+    });
 
     if (loading) {
         return (
@@ -259,30 +168,11 @@ const Homepage = () => {
                     <div className="text-center mb-12">
                         <h2 className="text-2xl font-light text-gray-900 mb-4">Produk Populer</h2>
                     </div>
-                    {loading ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
-                            {[...Array(4)].map((_, index) => (
-                                <div key={index} className="bg-white border border-gray-100 animate-pulse">
-                                    <div className="bg-gray-200 h-48"></div>
-                                    <div className="p-4">
-                                        <div className="bg-gray-200 h-4 rounded mb-2"></div>
-                                        <div className="bg-gray-200 h-3 rounded mb-2"></div>
-                                        <div className="bg-gray-200 h-4 rounded"></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : error ? (
-                        <div className="text-center py-12">
-                            <p className="text-gray-600">{error}</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
-                            {featuredProducts.slice(0, 4).map((product) => (
-                                <ProductCard key={product.id} product={product} />
-                            ))}
-                        </div>
-                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
+                        {featuredProducts.slice(0, 4).map((product) => (
+                            <ProductCard key={product.id} product={product} />
+                        ))}
+                    </div>
                 </div>
             </div>
         </MarketplaceLayout>

@@ -83,11 +83,8 @@ const ProductList = () => {
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
         <div className="relative overflow-hidden">
           <img
-            src={
-              product.image ||
-              'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300'
-            }
-            alt={product.name}
+           src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
+                                    alt={product.name}
             className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>

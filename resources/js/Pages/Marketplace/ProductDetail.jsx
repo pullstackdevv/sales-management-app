@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { router } from '@inertiajs/react';
+import { router, Link } from '@inertiajs/react';
 import { Icon } from '@iconify/react';
 import { 
     ShoppingCart,
@@ -80,93 +80,28 @@ export default function ProductDetail() {
         }
     };
 
-    // Mock product data - nanti akan diambil dari API
-    const mockProduct = {
-        id: 1,
-        name: "Smartphone Samsung Galaxy A54 5G",
-        price: 3500000,
-        originalPrice: 4200000,
-        rating: 4.5,
-        reviewCount: 128,
-        soldCount: 2450,
-        stock: 15,
-        images: [
-            "/assets/images/products/dash-prd-1.jpg",
-            "/assets/images/products/dash-prd-2.jpg",
-            "/assets/images/products/dash-prd-3.jpg",
-            "/assets/images/products/dash-prd-4.jpg"
-        ],
-        description: "Samsung Galaxy A54 5G adalah smartphone terbaru dengan performa tinggi dan kamera berkualitas. Dilengkapi dengan layar AMOLED 6.4 inch, chipset Exynos 1380, dan kamera triple 50MP yang memukau.",
-        specifications: {
-            "Layar": "6.4 inch AMOLED, 1080 x 2400 pixels",
-            "Processor": "Exynos 1380 Octa-core",
-            "RAM": "8GB",
-            "Storage": "128GB (expandable up to 1TB)",
-            "Kamera Belakang": "50MP + 12MP + 5MP",
-            "Kamera Depan": "32MP",
-            "Baterai": "5000mAh, 25W Fast Charging",
-            "OS": "Android 13, One UI 5.1",
-            "Warna": "Awesome Black, Awesome White, Awesome Green"
-        },
-        features: [
-            "5G Connectivity",
-            "IP67 Water & Dust Resistance",
-            "25W Fast Charging",
-            "Wireless PowerShare",
-            "Samsung Knox Security",
-            "Dolby Atmos Sound"
-        ],
-        reviews: [
-            {
-                id: 1,
-                user: "Ahmad Rizki",
-                rating: 5,
-                date: "2024-01-15",
-                comment: "Produk sangat bagus, pengiriman cepat dan aman. Smartphone ini memiliki performa yang luar biasa untuk gaming dan fotografi.",
-                helpful: 12
-            },
-            {
-                id: 2,
-                user: "Siti Nurhaliza",
-                rating: 4,
-                date: "2024-01-10",
-                comment: "Kamera sangat jernih, baterai tahan lama. Hanya sedikit masalah dengan fingerprint sensor yang kadang tidak responsif.",
-                helpful: 8
-            },
-            {
-                id: 3,
-                user: "Budi Santoso",
-                rating: 5,
-                date: "2024-01-08",
-                comment: "Worth it banget untuk harga segini. Performa smooth, kamera bagus, dan design yang elegan.",
-                helpful: 15
-            }
-        ]
-    };
-
-    // Use fetched product or fallback to mock data
-    const currentProduct = product || mockProduct;
+    // Remove mock data; use the fetched product only
 
     // Set default variant when product loads
     useEffect(() => {
-        if (currentProduct && currentProduct.variants && currentProduct.variants.length > 0 && !selectedVariant) {
-            setSelectedVariant(currentProduct.variants[0]);
+        if (product && product.variants && product.variants.length > 0 && !selectedVariant) {
+            setSelectedVariant(product.variants[0]);
         }
-    }, [currentProduct, selectedVariant]);
+    }, [product, selectedVariant]);
 
     // Get current price and stock based on selected variant
     const getCurrentPrice = () => {
         if (selectedVariant) {
             return selectedVariant.price;
         }
-        return currentProduct.base_price || currentProduct.price;
+        return product.base_price || product.price;
     };
 
     const getCurrentStock = () => {
         if (selectedVariant) {
             return selectedVariant.stock;
         }
-        return currentProduct.stock;
+        return product.stock;
     };
 
     const getMaxQuantity = () => {
@@ -182,26 +117,26 @@ export default function ProductDetail() {
         }).format(price);
     };
 
-    const discount = currentProduct.originalPrice ? Math.round(((currentProduct.originalPrice - (currentProduct.base_price || currentProduct.price)) / currentProduct.originalPrice) * 100) : 0;
+    const discount = product?.originalPrice ? Math.round(((product.originalPrice - (product.base_price || product.price)) / product.originalPrice) * 100) : 0;
 
     const addToCart = () => {
-        if (currentProduct.is_active !== false && selectedVariant && getCurrentStock() > 0) {
+        if (product && product.is_active !== false && selectedVariant && getCurrentStock() > 0) {
             const variantInfo = selectedVariant ? ` (${selectedVariant.variant_label})` : '';
-            alert(`${currentProduct.name}${variantInfo} sebanyak ${quantity} berhasil ditambahkan ke keranjang!`);
+            alert(`${product.name}${variantInfo} sebanyak ${quantity} berhasil ditambahkan ke keranjang!`);
         }
     };
 
     const buyNow = () => {
         console.log('buyNow called');
-        console.log('currentProduct:', currentProduct);
+        console.log('product:', product);
         console.log('selectedVariant:', selectedVariant);
         console.log('quantity:', quantity);
         
-        if (currentProduct.is_active !== false && selectedVariant && getCurrentStock() > 0) {
+        if (product && product.is_active !== false && selectedVariant && getCurrentStock() > 0) {
             // Initialize checkout session with product data
             // Pass parameters correctly to initWithProduct function
-            console.log('Initializing checkout session with product:', currentProduct.name);
-            checkoutSession.initWithProduct(currentProduct, selectedVariant, quantity);
+            console.log('Initializing checkout session with product:', product.name);
+            checkoutSession.initWithProduct(product, selectedVariant, quantity);
             
             // Verify data was saved
             const savedData = checkoutSession.get();
@@ -212,7 +147,7 @@ export default function ProductDetail() {
             router.visit(route('checkout.product'));
         } else {
             console.log('buyNow conditions not met:', {
-                isActive: currentProduct.is_active,
+                isActive: product?.is_active,
                 hasVariant: !!selectedVariant,
                 stock: getCurrentStock()
             });
@@ -356,7 +291,7 @@ export default function ProductDetail() {
         );
     }
 
-    if (error || !currentProduct) {
+    if (error || !product) {
         return (
             <MarketplaceLayout>
                 <div className="bg-gray-50 min-h-screen flex items-center justify-center">
@@ -384,8 +319,8 @@ export default function ProductDetail() {
                         <div className="space-y-4">
                             <div className="aspect-square w-full rounded-sm overflow-hidden bg-white border border-gray-100">
                                 <img 
-                                    src={currentProduct.image || 'https://via.placeholder.com/600x600?text=No+Image'} 
-                                    alt={currentProduct.name}
+                                    src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
+                                    alt={product.name}
                                     className="w-full h-full object-cover"
                                 />
                             </div>
@@ -395,7 +330,7 @@ export default function ProductDetail() {
                         <div className="space-y-6">
                             <div>
                                 <h1 className="text-2xl font-normal text-gray-800 leading-tight">
-                                    {currentProduct.name}
+                                    {product.name}
                                 </h1>
                             </div>
 
@@ -407,20 +342,20 @@ export default function ProductDetail() {
                                     </span>
                                 </div>
                                 <p className={`text-sm ${
-                                    currentProduct.is_active !== false && getCurrentStock() > 0 ? 'text-green-600' : 'text-red-500'
+                                    product.is_active !== false && getCurrentStock() > 0 ? 'text-green-600' : 'text-red-500'
                                 }`}>
-                                    {currentProduct.is_active !== false && getCurrentStock() > 0 ? `Stok: ${getCurrentStock()}` : 'Tidak Tersedia'}
+                                    {product.is_active !== false && getCurrentStock() > 0 ? `Stok: ${getCurrentStock()}` : 'Tidak Tersedia'}
                                 </p>
                             </div>
 
                             {/* Variants */}
-                            {currentProduct.variants && currentProduct.variants.length > 0 && (
+                            {product.variants && product.variants.length > 0 && (
                                 <div className="space-y-3">
                                     <label className="text-sm font-normal text-gray-600">
                                         Pilih Variant
                                     </label>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {currentProduct.variants.map((variant) => (
+                                        {product.variants.map((variant) => (
                                             <button
                                                 key={variant.id}
                                                 onClick={() => {
@@ -462,7 +397,7 @@ export default function ProductDetail() {
                                     <div className="flex items-center border border-gray-200 rounded-sm bg-white">
                                         <button
                                             onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                            disabled={quantity <= 1 || currentProduct.is_active === false || getCurrentStock() <= 0}
+                                            disabled={quantity <= 1 || product.is_active === false || getCurrentStock() <= 0}
                                             className="p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
                                         >
                                             <span className="text-sm">-</span>
@@ -472,7 +407,7 @@ export default function ProductDetail() {
                                         </span>
                                         <button
                                             onClick={() => setQuantity(Math.min(getMaxQuantity(), quantity + 1))}
-                                            disabled={currentProduct.is_active === false || getCurrentStock() <= 0 || quantity >= getMaxQuantity()}
+                                            disabled={product.is_active === false || getCurrentStock() <= 0 || quantity >= getMaxQuantity()}
                                             className="p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
                                         >
                                             <span className="text-sm">+</span>
@@ -490,9 +425,9 @@ export default function ProductDetail() {
                             <div className="space-y-3">
                                 <button
                                     onClick={addToCart}
-                                    disabled={currentProduct.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
+                                    disabled={product.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
                                     className={`w-full py-2.5 px-4 border text-sm font-normal transition-all duration-200 flex items-center justify-center ${
-                                        currentProduct.is_active !== false && getCurrentStock() > 0 && selectedVariant
+                                        product.is_active !== false && getCurrentStock() > 0 && selectedVariant
                                             ? 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 bg-white' 
                                             : 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
                                     }`}
@@ -502,9 +437,9 @@ export default function ProductDetail() {
                                 </button>
                                 <button
                                     onClick={buyNow}
-                                    disabled={currentProduct.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
+                                    disabled={product.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
                                     className={`w-full py-2.5 px-4 text-sm font-normal transition-all duration-200 ${
-                                        currentProduct.is_active !== false && getCurrentStock() > 0 && selectedVariant
+                                        product.is_active !== false && getCurrentStock() > 0 && selectedVariant
                                             ? 'bg-gray-800 text-white hover:bg-gray-900' 
                                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     }`}
@@ -543,13 +478,13 @@ export default function ProductDetail() {
                             {activeTab === 'description' && (
                                 <div className="prose max-w-none">
                                     <p className="text-gray-600 leading-relaxed text-sm">
-                                        {currentProduct.description || 'Deskripsi produk tidak tersedia.'}
+                                        {product.description || 'Deskripsi produk tidak tersedia.'}
                                     </p>
-                                    {currentProduct.features && currentProduct.features.length > 0 && (
+                                    {product.features && product.features.length > 0 && (
                                         <div className="mt-6">
                                             <h4 className="font-normal text-gray-800 mb-3 text-base">Fitur Utama:</h4>
                                             <ul className="space-y-2">
-                                                {currentProduct.features.map((feature, index) => (
+                                                {product.features.map((feature, index) => (
                                                     <li key={index} className="flex items-center space-x-2">
                                                         <CheckCircle className="h-4 w-4 text-gray-400" />
                                                         <span className="text-gray-600 text-sm">{feature}</span>
@@ -585,12 +520,12 @@ export default function ProductDetail() {
                                 <h3 className="font-medium text-gray-900 mb-2">Produk yang Dipesan</h3>
                                 <div className="flex items-center space-x-3">
                                     <img 
-                                        src={currentProduct.image || 'https://via.placeholder.com/60x60?text=No+Image'} 
-                                        alt={currentProduct.name}
+                                        src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://via.placeholder.com/60x60?text=No+Image'} 
+                                        alt={product.name}
                                         className="w-12 h-12 object-cover rounded"
                                     />
                                     <div className="flex-1">
-                                        <p className="font-medium text-sm">{currentProduct.name}</p>
+                                        <p className="font-medium text-sm">{product.name}</p>
                                         {selectedVariant && (
                                             <p className="text-xs text-gray-500">{selectedVariant.variant_label}</p>
                                         )}

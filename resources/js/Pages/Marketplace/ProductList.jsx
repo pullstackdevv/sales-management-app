@@ -79,7 +79,7 @@ const ProductList = () => {
     }).format(price);
 
   const ProductCard = ({ product }) => (
-    <Link href={`/marketplace/products/${product.id}`} className="block group">
+    <Link href={`/products/${product.id}`} className="block group">
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
         <div className="relative overflow-hidden">
           <img

@@ -11,11 +11,11 @@ import OrderHistoryModal from "../modal/OrderHistoryModal";
 // Helper function for route generation
 const route = (name, params = null) => {
     const routes = {
-        'orders.show': (id) => `/order/detail/${id}`,
-        'orders.payment-history': (id) => `/order/payment-history/${id}`,
-        'orders.edit': (id) => `/order/edit/${id}`
+        'cms.orders.show': (id) => `/cms/order/detail/${id}`,
+        'cms.orders.payment-history': (id) => `/cms/order/payment-history/${id}`,
+        'cms.orders.edit': (id) => `/cms/order/edit/${id}`
     };
-    
+
     if (routes[name]) {
         return params ? routes[name](params) : routes[name]();
     }
@@ -42,8 +42,8 @@ export default function OrderCard({ order, onOrderUpdate }) {
 
     // Helper function to determine order source
     const getOrderSource = (order) => {
-    
-        
+
+
         // Default to manual admin order
         return {
             type: 'manual',
@@ -109,7 +109,7 @@ export default function OrderCard({ order, onOrderUpdate }) {
     const getTimelineStepColor = (stepIndex, orderStatus) => {
         // Gunakan raw_status jika tersedia, fallback ke status yang sudah ditransformasi
         const rawStatus = order.raw_status || orderStatus;
-        
+
         // Jika status dibatalkan, semua ikon timeline berwarna merah
         if (rawStatus === "cancelled") {
             return "text-red-500";
@@ -135,7 +135,7 @@ export default function OrderCard({ order, onOrderUpdate }) {
             { icon: "material-symbols:local-shipping-outline", tooltip: "Order Dikirim" },
             { icon: "material-symbols:home-outline", tooltip: "Order Diterima" }
         ];
-        
+
         return stepData[stepIndex] || { icon: "material-symbols:circle", tooltip: "Status" };
     };
 
@@ -210,7 +210,7 @@ export default function OrderCard({ order, onOrderUpdate }) {
 
             // Update local order state
             setLocalOrder(prev => ({ ...prev, status: newStatus }));
-            
+
             // Call parent callback to refresh data
             if (onOrderUpdate) {
                 onOrderUpdate();
@@ -234,15 +234,13 @@ export default function OrderCard({ order, onOrderUpdate }) {
         }
     };
 
-
-
     // Handle mark as received
     const handleMarkReceived = async () => {
         console.log('handleMarkReceived called - Before update:', {
             orderId: localOrder.id,
             currentStatus: localOrder.status
         });
-        
+
         const result = await Swal.fire({
             title: "Konfirmasi",
             text: "Apakah Anda yakin ingin menandai order ini sebagai diterima?",
@@ -293,12 +291,12 @@ export default function OrderCard({ order, onOrderUpdate }) {
 
             // Update local order state
             setLocalOrder(prev => ({ ...prev, status: 'delivered' }));
-            
+
             console.log('handleMarkReceived - After state update:', {
                 orderId: localOrder.id,
                 updatedStatus: 'delivered'
             });
-            
+
             // Call parent callback to refresh data
             if (onOrderUpdate) {
                 onOrderUpdate();
@@ -328,7 +326,7 @@ export default function OrderCard({ order, onOrderUpdate }) {
                 <div className="grid">
                     <div className="flex items-center gap-2 mb-1">
                         <Link
-                            href={route('orders.show', localOrder.id)}
+                            href={route('cms.orders.show', localOrder.id)}
                             className="text-blue-600 font-semibold text-base hover:text-blue-800"
                         >
                             {localOrder.number}
@@ -349,16 +347,16 @@ export default function OrderCard({ order, onOrderUpdate }) {
                                 <TimelineItem key={stepIndex}>
                                     <TimelinePoint
                                         icon={() => (
-                                            <div 
+                                            <div
                                                 className="relative group cursor-pointer"
                                                 title={stepData.tooltip}
                                             >
                                                 <Icon
                                                     icon={stepData.icon}
                                                     className={getTimelineStepColor(
-                                        stepIndex,
-                                        localOrder.status
-                                    )}
+                                                        stepIndex,
+                                                        localOrder.status
+                                                    )}
                                                     width={20}
                                                     height={20}
                                                 />
@@ -413,14 +411,12 @@ export default function OrderCard({ order, onOrderUpdate }) {
                                         isUpdatingStatus ||
                                         validTransitions.length === 0
                                     }
-                                    className={`${statusBadge.bgColor} ${
-                                        statusBadge.textColor
-                                    } text-xs font-semibold px-2 py-1 rounded-md flex items-center gap-1 ${
-                                        validTransitions.length > 0 &&
-                                        !isUpdatingStatus
+                                    className={`${statusBadge.bgColor} ${statusBadge.textColor
+                                        } text-xs font-semibold px-2 py-1 rounded-md flex items-center gap-1 ${validTransitions.length > 0 &&
+                                            !isUpdatingStatus
                                             ? "hover:opacity-80 cursor-pointer"
                                             : "cursor-default"
-                                    } ${isUpdatingStatus ? "opacity-50" : ""}`}
+                                        } ${isUpdatingStatus ? "opacity-50" : ""}`}
                                 >
                                     {isUpdatingStatus ? (
                                         <Icon
@@ -500,22 +496,21 @@ export default function OrderCard({ order, onOrderUpdate }) {
                                         Payment Gateway
                                     </span>
                                     {localOrder.payment_status && (
-                                        <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 ${
-                                            localOrder.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
-                                            localOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                            localOrder.payment_status === 'expired' ? 'bg-red-100 text-red-700' :
-                                            'bg-gray-100 text-gray-700'
-                                        }`}>
+                                        <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 ${localOrder.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
+                                                localOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                    localOrder.payment_status === 'expired' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-700'
+                                            }`}>
                                             <Icon icon={
                                                 localOrder.payment_status === 'paid' ? 'mdi:check-circle' :
-                                                localOrder.payment_status === 'pending' ? 'mdi:clock' :
-                                                localOrder.payment_status === 'expired' ? 'mdi:close-circle' :
-                                                'mdi:help-circle'
+                                                    localOrder.payment_status === 'pending' ? 'mdi:clock' :
+                                                        localOrder.payment_status === 'expired' ? 'mdi:close-circle' :
+                                                            'mdi:help-circle'
                                             } width="12" />
                                             {localOrder.payment_status === 'paid' ? 'Dibayar' :
-                                             localOrder.payment_status === 'pending' ? 'Menunggu' :
-                                             localOrder.payment_status === 'expired' ? 'Kedaluwarsa' :
-                                             localOrder.payment_status}
+                                                localOrder.payment_status === 'pending' ? 'Menunggu' :
+                                                    localOrder.payment_status === 'expired' ? 'Kedaluwarsa' :
+                                                        localOrder.payment_status}
                                         </span>
                                     )}
                                 </div>
@@ -565,13 +560,13 @@ export default function OrderCard({ order, onOrderUpdate }) {
             <div className="flex justify-between border-t mt-4">
                 <div className="flex items-center gap-2 mt-4">
                     <Link 
-                        href={`/order/print-invoice/${localOrder.id}`}
+                        href={`/cms/order/print-invoice/${localOrder.id}`}
                         className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
                     >
                         <Icon icon="mdi:printer" width="16" />
                         Print
                     </Link>
-                    <button 
+                    <button
                         onClick={() => setShowOrderHistory(true)}
                         className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
                     >
@@ -585,28 +580,28 @@ export default function OrderCard({ order, onOrderUpdate }) {
 
                         return shouldShowShipping;
                     })() && (
-                        <button 
-                            onClick={() => setShowShippingModal(true)}
-                            className="border border-green-600 text-green-600 px-4 py-1.5 rounded-md hover:bg-green-50 flex items-center gap-2"
-                        >
-                            <Icon icon="mdi:truck" width="16" />
-                            Update Shipping
-                        </button>
-                    )}
+                            <button
+                                onClick={() => setShowShippingModal(true)}
+                                className="border border-green-600 text-green-600 px-4 py-1.5 rounded-md hover:bg-green-50 flex items-center gap-2"
+                            >
+                                <Icon icon="mdi:truck" width="16" />
+                                Update Shipping
+                            </button>
+                        )}
                     {(() => {
-                      const shouldShow = localOrder.status !== 'delivered' && localOrder.status !== 'Diterima';
+                        const shouldShow = localOrder.status !== 'delivered' && localOrder.status !== 'Diterima';
 
-                      return shouldShow;
+                        return shouldShow;
                     })() && (
-                        <button 
-                            onClick={handleMarkReceived}
-                            className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md hover:bg-blue-50"
-                        >
-                            Tandai diterima
-                        </button>
-                    )}
+                            <button
+                                onClick={handleMarkReceived}
+                                className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md hover:bg-blue-50"
+                            >
+                                Tandai diterima
+                            </button>
+                        )}
                     <Link
-                        href={route('orders.edit', localOrder.id)}
+                        href={route('cms.orders.edit', localOrder.id)}
                         className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md hover:bg-blue-50 flex items-center gap-2"
                     >
                         <Icon icon="mdi:pencil" width="16" />

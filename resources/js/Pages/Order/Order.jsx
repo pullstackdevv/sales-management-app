@@ -236,7 +236,7 @@ export default function Order() {
             <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Filter</button>
             <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
             <Link
-              href={route('orders.create')}
+              href={route('cms.orders.create')}
               className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Tambah Order

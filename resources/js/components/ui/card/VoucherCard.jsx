@@ -101,12 +101,10 @@ const VoucherCard = ({ voucher, onEdit, onView, onDelete }) => {
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className={`h-2 rounded-full transition-all duration-300 ${
-                usagePercentage >= 80 ? 'bg-red-500' : usagePercentage >= 60 ? 'bg-yellow-500' : 'bg-blue-500'
-              }`}
-              style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-            ></div>
+            <div
+              className={`h-2 rounded-full transition-all duration-300 ${usagePercentage >= 80 ? 'bg-red-500' : usagePercentage >= 60 ? 'bg-yellow-500' : 'bg-blue-500'
+                }`}
+              style={{ width: `${Math.min(usagePercentage, 100)}%` }}></div>
           </div>
         </div>
 

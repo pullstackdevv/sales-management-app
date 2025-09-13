@@ -32,7 +32,7 @@ export default function LoginForm() {
       setMessage(res.data.message || 'Login berhasil!');
       setMessageStatus('success');
       setTimeout(() => {
-        window.location.reload();
+        window.location.href = route('cms.dashboard');
       }, 2000);
     } catch (err) {
       if (err.response) {

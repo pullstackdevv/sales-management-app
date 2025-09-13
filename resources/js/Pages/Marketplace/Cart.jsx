@@ -170,7 +170,7 @@ export default function Cart() {
                     {/* Header */}
                     <div className="mb-6 sm:mb-8">
                         <Link 
-                            href="/marketplace"
+                            href="/"
                             className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4 sm:mb-6 text-lg sm:text-xl"
                         >
                             <ArrowLeft className="h-5 w-5 sm:h-6 sm:w-6 mr-3" />
@@ -195,7 +195,7 @@ export default function Cart() {
                                     Belum ada produk di keranjang belanja Anda
                                 </p>
                                 <Link 
-                                    href="/marketplace/products"
+                                    href="/products"
                                     className="bg-blue-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors text-lg sm:text-xl"
                                 >
                                     Mulai Belanja
@@ -298,7 +298,7 @@ export default function Cart() {
 
                                     {/* Checkout Button */}
                                     <Link
-                                        href="/marketplace/checkout"
+                                        href="/checkout"
                                         className={`w-full py-4 sm:py-5 px-4 sm:px-6 rounded-lg font-medium text-center transition-colors text-lg sm:text-xl ${
                                             selectedItems.length > 0
                                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
@@ -313,7 +313,7 @@ export default function Cart() {
 
                                     {/* Continue Shopping */}
                                     <Link
-                                        href="/marketplace/products"
+                                        href="/products"
                                         className="w-full mt-4 sm:mt-6 py-4 sm:py-5 px-4 sm:px-6 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors text-center block text-lg sm:text-xl"
                                     >
                                         Lanjut Belanja

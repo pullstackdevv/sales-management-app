@@ -298,7 +298,7 @@ export default function ProductDetail() {
                     <div className="text-center">
                         <p className="text-red-500 text-lg mb-4">{error || 'Product not found'}</p>
                         <Link 
-                            href="/marketplace"
+                            href="/"
                             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                         >
                             Back to Marketplace

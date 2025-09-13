@@ -361,7 +361,7 @@ export default function CourierRates() {
           <ol className="inline-flex items-center space-x-1 md:space-x-3">
             <li className="inline-flex items-center">
               <Link
-                href="/settings/courier"
+                href="/cms/settings/courier"
                 className="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600"
               >
                 <Icon icon="solar:settings-outline" className="w-4 h-4 mr-2" />
@@ -372,7 +372,7 @@ export default function CourierRates() {
               <div className="flex items-center">
                 <Icon icon="solar:alt-arrow-right-outline" className="w-4 h-4 text-gray-400 mx-1" />
                 <Link
-                  href="/settings/courier"
+                  href="/cms/settings/courier"
                   className="text-sm font-medium text-gray-700 hover:text-blue-600"
                 >
                   Courier

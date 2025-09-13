@@ -3,12 +3,12 @@ export const sidebarMenus = [
     {
       name: "Dashboard",
       icon: "icon-dashboard",
-      url: "/dashboard",
+      url: "/cms/dashboard",
     },
     {
       name: "Order",
       icon: "icon-order",
-      url: "/order",
+      url: "/cms/order/data",
       dropdown: true,
       quota: {
         used: 215,
@@ -19,25 +19,25 @@ export const sidebarMenus = [
     {
       name: "Pengiriman",
       icon: "icon-shipping",
-      url: "/pengiriman",
+      url: "/cms/pengiriman",
       dropdown: true,
     },
     {
       name: "Produk",
       icon: "icon-product",
-      url: "/produk",
+      url: "/cms/product/data",
       dropdown: true,
     },
     {
       name: "Marketplace",
       icon: "icon-marketplace",
-      url: "/marketplace",
+      url: "/",
       dropdown: true,
     },
     {
       name: "Data Customer",
       icon: "icon-customer",
-      url: "/customer",
+      url: "/cms/customer/data",
       dropdown: true,
     },
     {
@@ -48,17 +48,17 @@ export const sidebarMenus = [
     {
       name: "Expense",
       icon: "icon-expense",
-      url: "/expense",
+      url: "/cms/expense",
     },
     {
       name: "Report",
       icon: "icon-report",
-      url: "/report",
+      url: "/cms/report",
     },
     {
       name: "Analyzer",
       icon: "icon-analyzer",
-      url: "/analyzer",
+      url: "/cms/analyzer",
       active: true,
     },
     {
@@ -70,6 +70,6 @@ export const sidebarMenus = [
     {
       name: "Setting",
       icon: "icon-setting",
-      url: "/setting",
+      url: "/cms/settings",
     },
   ];

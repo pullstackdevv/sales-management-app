@@ -62,7 +62,7 @@ console.log(products.category);
 
     const ProductCard = memo(({ product }) => {
         return (
-            <Link href={`/marketplace/products/${product.id}`} className="block group">
+            <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
                     <div className="relative overflow-hidden">
                         <img 
@@ -130,7 +130,7 @@ console.log(products.category);
                             Temukan produk berkualitas dengan harga terbaik
                         </p>
                         <Link 
-                            href="/marketplace/products" 
+                            href="/products" 
                             className="inline-flex items-center px-6 py-3 border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition-colors"
                         >
                             Lihat Semua Produk
@@ -152,7 +152,7 @@ console.log(products.category);
                         {categories.slice(1).map((category) => (
                             <Link 
                                 key={category.id} 
-                                href={`/marketplace/products?category=${category.id}`}
+                                href={`/products?category=${category.id}`}
                                 className="text-gray-600 hover:text-gray-900 transition-colors text-sm"
                             >
                                 {category.name}

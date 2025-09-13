@@ -23,8 +23,8 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
 
   const handleLogout = async () => {
     try {
-      await fetch("/logout", { method: "GET" });
-      window.location.href = "/";
+      await fetch("/cms/logout", { method: "GET" });
+      window.location.href = "/cms/login";
     } catch (err) {
       alert("Logout gagal");
     }

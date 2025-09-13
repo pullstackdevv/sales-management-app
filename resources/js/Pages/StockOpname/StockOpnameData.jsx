@@ -220,7 +220,7 @@ export default function StockOpnamePage() {
                             />
                             Filter
                         </button>
-                        <Link href="/stock-opname/add">
+                        <Link href="/cms/stock-opname/add">
                             <button className="text-sm bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-1">
                                 <Icon
                                     icon="material-symbols:add"
@@ -343,7 +343,7 @@ export default function StockOpnamePage() {
                                                     <Icon icon="material-symbols:check-circle" className="text-lg" />
                                                 </button>
                                                 
-                                                <Link href={`/stock-opname/edit/${item.id}`}>
+                                                <Link href={`/cms/stock-opname/edit/${item.id}`}>
                                                     <button
                                                         className="text-yellow-600 hover:text-yellow-800"
                                                         title="Edit Stock Opname"

@@ -12,69 +12,86 @@ import {
 } from "lucide-react";
 
 // Cart item row component, memoized to avoid unnecessary re-renders
-const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity, onRemove, formatPrice }) {
+const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity, onRemove, onProceed, formatPrice }) {
     return (
-        <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0">
-                <div className="flex items-center">
+        <div className="p-5 hover:bg-gray-50/50 transition-colors duration-200">
+            <div className="flex items-center gap-4">
+                {/* Checkbox */}
+                <div className="flex-shrink-0">
                     <input
                         type="checkbox"
                         checked={item.selected}
-                        onChange={() => onToggleSelect(item.id)}
-                        className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        onChange={(e) => { e.stopPropagation(); onToggleSelect(item.id); }}
+                        className="h-4 w-4 text-gray-900 focus:ring-gray-500 border-gray-300 rounded"
                     />
-                    <div className="ml-3 sm:ml-4 flex-1 flex items-center">
-                        <img 
-                            src={item.image} 
-                            alt={item.name}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg"
-                        />
-                        <div className="ml-3 sm:ml-4 flex-1">
-                            <h3 className="text-lg sm:text-xl font-medium text-gray-900">
-                                {item.name}
-                            </h3>
-                            <div className="flex flex-col sm:flex-row sm:items-center mt-2 space-y-1 sm:space-y-0">
-                                <span className="text-lg sm:text-xl font-bold text-gray-900">
-                                    {formatPrice(item.price)}
-                                </span>
-                                {item.originalPrice > item.price && (
-                                    <span className="text-lg sm:text-xl text-gray-500 line-through sm:ml-3">
-                                        {formatPrice(item.originalPrice)}
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-lg sm:text-xl text-gray-500 mt-2">
-                                Stok: {item.stock} tersedia
-                            </p>
-                        </div>
-                    </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end space-x-4 sm:space-x-6">
+
+                {/* Product Info - Clickable */}
+                <button
+                    type="button"
+                    onClick={() => onProceed(item)}
+                    className="flex-1 flex items-center gap-4 text-left group"
+                >
+                    <div className="relative flex-shrink-0">
+                        <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-20 h-20 object-cover rounded-lg border border-gray-100 group-hover:shadow-md transition-shadow duration-200"
+                        />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 group-hover:text-gray-700 transition-colors line-clamp-2">
+                            {item.name}
+                        </h3>
+                        {item.variant_label && (
+                            <p className="text-sm text-gray-500 mt-1">{item.variant_label}</p>
+                        )}
+                        <div className="flex items-baseline gap-2 mt-2">
+                            <span className="text-lg font-semibold text-gray-900">
+                                {formatPrice(item.price)}
+                            </span>
+                            {item.originalPrice > item.price && (
+                                <span className="text-sm text-gray-400 line-through">
+                                    {formatPrice(item.originalPrice)}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Stok: {item.stock}
+                        </p>
+                    </div>
+                </button>
+
+                {/* Quantity & Actions */}
+                <div className="flex items-center gap-3 flex-shrink-0">
                     {/* Quantity Control */}
-                    <div className="flex items-center border border-gray-300 rounded-lg">
+                    <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm">
                         <button
                             onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
                             disabled={item.quantity <= 1}
-                            className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-2 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-l-lg"
                         >
-                            <Minus className="h-5 w-5 sm:h-6 sm:w-6" />
+                            <Minus className="h-4 w-4 text-gray-600" />
                         </button>
-                        <span className="px-4 sm:px-6 py-3 sm:py-4 text-lg sm:text-xl font-medium">
+                        <div className="px-4 py-2 text-sm font-medium text-gray-900 min-w-[3rem] text-center border-x border-gray-200">
                             {item.quantity}
-                        </span>
+                        </div>
                         <button
                             onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
                             disabled={item.quantity >= item.stock}
-                            className="p-3 sm:p-4 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-2 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-r-lg"
                         >
-                            <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
+                            <Plus className="h-4 w-4 text-gray-600" />
                         </button>
                     </div>
+
+                    {/* Remove Button */}
                     <button
                         onClick={() => onRemove(item.id)}
-                        className="text-red-600 hover:text-red-700 p-3 sm:p-4"
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Hapus item"
                     >
-                        <Trash2 className="h-6 w-6 sm:h-7 sm:w-7" />
+                        <Trash2 className="h-5 w-5" />
                     </button>
                 </div>
             </div>
@@ -85,30 +102,39 @@ const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity
 export default function Cart() {
     const [cartItems, setCartItems] = useState([]);
 
-    // Load cart from session storage (key: 'checkout_data')
+    // Load cart from session storage
     useEffect(() => {
         try {
-            const raw = sessionStorage.getItem('checkout_data');
-            if (!raw) return;
-            const data = JSON.parse(raw);
-            let items = [];
-            if (Array.isArray(data)) {
-                items = data;
-            } else if (Array.isArray(data?.items)) {
-                items = data.items;
-            } else if (data?.product) {
-                // Shape: { customer: {...}, product: {...} }
-                items = [data.product];
+            // Preferred: 'cart' is an array of items
+            const rawCart = sessionStorage.getItem('cart');
+            let items = rawCart ? JSON.parse(rawCart) : [];
+
+            // Backward compatibility: support legacy 'checkout_data'
+            if ((!items || items.length === 0)) {
+                const rawLegacy = sessionStorage.getItem('checkout_data');
+                if (rawLegacy) {
+                    const data = JSON.parse(rawLegacy);
+                    if (Array.isArray(data)) {
+                        items = data;
+                    } else if (Array.isArray(data?.items)) {
+                        items = data.items;
+                    } else if (data?.product) {
+                        items = [data.product];
+                    }
+                }
             }
 
             const mapped = items.map((it, idx) => {
                 const img = it.image || it.product_image || it.thumbnail;
-                const imgUrl = img ? (String(img).startsWith('http') ? img : `/storage/${img}`) : '/assets/images/products/placeholder.jpg';
+                const imgUrl = img ? (String(img).startsWith('http') ? img : `${img}`) : '/assets/images/products/placeholder.jpg';
                 const price = Number(it.price ?? it.base_price ?? it.product_price ?? 0);
                 const original = Number(it.originalPrice ?? it.original_price ?? it.price ?? price);
                 return {
-                    id: it.id ?? it.product_id ?? idx + 1,
+                    id: it.variant_id ?? it.id ?? it.product_id ?? idx + 1,
+                    product_id: it.product_id ?? it.id,
+                    variant_id: it.variant_id ?? it.id,
                     name: it.name ?? it.product_name ?? 'Produk',
+                    variant_label: it.variant_label,
                     price,
                     originalPrice: original,
                     image: imgUrl,
@@ -126,25 +152,20 @@ export default function Cart() {
 
     const persistToSession = useCallback((items) => {
         try {
-            // Preserve original structure loosely under 'items'
-            const raw = sessionStorage.getItem('checkout_data');
-            const base = raw ? JSON.parse(raw) : {};
-            const payload = {
-                ...base,
-                items: items.map(it => ({
-                    id: it.id,
-                    product_id: it.id,
-                    product_name: it.name,
-                    name: it.name,
-                    price: it.price,
-                    original_price: it.originalPrice,
-                    image: it.image,
-                    quantity: it.quantity,
-                    stock: it.stock,
-                    selected: it.selected,
-                })),
-            };
-            sessionStorage.setItem('checkout_data', JSON.stringify(payload));
+            // Save simplified array to 'cart'
+            const payload = items.map(it => ({
+                id: it.variant_id ?? it.id,
+                product_id: it.product_id ?? it.id,
+                variant_id: it.variant_id ?? it.id,
+                name: it.name,
+                variant_label: it.variant_label,
+                price: it.price,
+                image: it.image,
+                quantity: it.quantity,
+                stock: it.stock,
+                selected: it.selected,
+            }));
+            sessionStorage.setItem('cart', JSON.stringify(payload));
         } catch {}
     }, []);
 
@@ -273,7 +294,7 @@ export default function Cart() {
                                     </div>
 
                                     {/* Cart Items List */}
-                                    <div className="divide-y divide-gray-200">
+                                    <div className="divide-y divide-gray-100">
                                         {cartItems.map((item) => (
                                             <CartItem
                                                 key={item.id}
@@ -281,6 +302,21 @@ export default function Cart() {
                                                 onToggleSelect={toggleSelect}
                                                 onUpdateQuantity={updateQuantity}
                                                 onRemove={removeItem}
+                                                onProceed={(it) => {
+                                                    // Save single item to legacy checkout_data and go to checkout/product
+                                                    const productPayload = {
+                                                        id: it.product_id ?? it.id,
+                                                        name: it.name,
+                                                        price: it.price,
+                                                        image: it.image,
+                                                        quantity: it.quantity,
+                                                        stock: it.stock,
+                                                        variant_id: it.variant_id ?? it.id,
+                                                        variant_label: it.variant_label,
+                                                    };
+                                                    sessionStorage.setItem('checkout_data', JSON.stringify({ product: productPayload }));
+                                                    window.location.href = '/checkout/product';
+                                                }}
                                                 formatPrice={formatPrice}
                                             />
                                         ))}

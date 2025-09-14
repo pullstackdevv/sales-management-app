@@ -46,7 +46,7 @@ Route::get('/login', function () {
 });
 
 // CMS (admin) protected routes
-Route::middleware([Authenticate::class, HandleInertiaRequests::class])
+Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\Middleware\EnsureModulePermission::class])
     ->prefix('cms')
     ->name('cms.')
     ->group(function () {
@@ -71,133 +71,133 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class])
         // Order
         Route::get('/order/data', function () {
             return Inertia::render('Order/Order');
-        })->name('orders.index')->middleware('can:orders.view');
+        })->name('orders.index');
 
         Route::get('/order/add', function () {
             return Inertia::render('Order/AddOrder');
-        })->name('orders.create')->middleware('can:orders.create');
+        })->name('orders.create');
 
         Route::get('/order/edit/{id}', function ($id) {
             return Inertia::render('Order/EditOrder', ['orderId' => $id]);
-        })->name('orders.edit')->middleware('can:orders.edit');
+        })->name('orders.edit');
 
         Route::get('/order/detail/{id}', function ($id) {
             return Inertia::render('Order/OrderDetail', ['orderId' => $id]);
-        })->name('orders.detail')->middleware('can:orders.view');
+        })->name('orders.detail');
 
         Route::get('/order/print-invoice/{id}', function ($id) {
             return Inertia::render('Order/PrintInvoice', [
                 'orderId' => $id
             ]);
-        })->name('order.print-invoice')->middleware('can:orders.view');
+        })->name('order.print-invoice');
 
         // Customer
         Route::get('/customer/data', function () {
             return Inertia::render('Customer/CustomerData');
-        })->name('customers.index')->middleware('can:customers.view');
+        })->name('customers.index');
 
         Route::get('/customer/add', function () {
             return Inertia::render('Customer/AddCustomer');
-        })->name('customers.create')->middleware('can:customers.create');
+        })->name('customers.create');
 
         Route::get('/customer/edit/{id}', function ($id) {
             return Inertia::render('Customer/EditCustomer', ['customerId' => $id]);
-        })->name('customers.edit')->middleware('can:customers.edit');
+        })->name('customers.edit');
 
         // Produk
         Route::get('/product/data', function () {
             return Inertia::render('Product/ProductData');
-        })->name('products.index')->middleware('can:products.view');
+        })->name('products.index');
 
         Route::get('/product/add', function () {
             return Inertia::render('Product/ProductAdd');
-        })->name('products.create')->middleware('can:products.create');
+        })->name('products.create');
 
         Route::get('/product/edit/{id}', function ($id) {
             return Inertia::render('Product/ProductEdit', ['productId' => $id]);
-        })->name('products.edit')->middleware('can:products.edit');
+        })->name('products.edit');
 
         // stock opname
         Route::get('/stock-opname/data', function () {
             return Inertia::render('StockOpname/StockOpnameData');
-        })->name('stock-opname.index')->middleware('can:stock-opname.view');
+        })->name('stock-opname.index');
 
         Route::get('/stock-opname/add', function () {
             return Inertia::render('StockOpname/StockOpnameAdd');
-        })->name('stock-opname.create')->middleware('can:stock-opname.create');
+        })->name('stock-opname.create');
 
         Route::get('/stock-opname/edit/{id}', function ($id) {
             $stockOpname = \App\Models\StockOpname::with(['details.productVariant.product'])->findOrFail($id);
             return Inertia::render('StockOpname/StockOpnameEdit', [
                 'stockOpname' => $stockOpname
             ]);
-        })->name('stock-opname.edit')->middleware('can:stock-opname.edit');
+        })->name('stock-opname.edit');
 
         // Settings
         Route::get('/settings', function () {
             return Inertia::render('Settings/index');
-        })->name('settings.index')->middleware('can:settings.view');
+        })->name('settings.index');
 
         Route::get('/settings/general', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'general']);
-        })->name('settings.general')->middleware('can:settings.view');
+        })->name('settings.general');
 
         Route::get('/settings/order', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'order']);
-        })->name('settings.order')->middleware('can:settings.view');
+        })->name('settings.order');
 
         Route::get('/settings/product', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'product']);
-        })->name('settings.product')->middleware('can:settings.view');
+        })->name('settings.product');
 
         Route::get('/settings/customer', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'customer']);
-        })->name('settings.customer')->middleware('can:settings.view');
+        })->name('settings.customer');
 
         Route::get('/settings/payment', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'payment']);
-        })->name('settings.payment')->middleware('can:settings.view');
+        })->name('settings.payment');
 
         Route::get('/settings/courier', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'courier']);
-        })->name('settings.courier')->middleware('can:settings.view');
+        })->name('settings.courier');
 
         Route::get('/settings/courier-rates', function () {
             return Inertia::render('Settings/CourierRates');
-        })->name('settings.courier-rates')->middleware('can:settings.view');
+        })->name('settings.courier-rates');
 
         Route::get('/settings/origin', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'origin']);
-        })->name('settings.origin')->middleware('can:settings.view');
+        })->name('settings.origin');
 
         Route::get('/settings/template', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'template']);
-        })->name('settings.template')->middleware('can:settings.view');
+        })->name('settings.template');
 
         Route::get('/settings/user', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'user']);
-        })->name('settings.user')->middleware('can:settings.view');
+        })->name('settings.user');
 
         Route::get('/settings/role', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'role']);
-        })->name('settings.role')->middleware('can:settings.view');
+        })->name('settings.role');
 
         Route::get('/settings/dashboard', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'dashboard']);
-        })->name('settings.dashboard')->middleware('can:settings.view');
+        })->name('settings.dashboard');
 
         Route::get('/settings/api', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'api']);
-        })->name('settings.api')->middleware('can:settings.view');
+        })->name('settings.api');
 
         // User management routes
         Route::get('/settings/users/create', function () {
             return Inertia::render('Settings/AddEditUser', ['mode' => 'create']);
-        })->name('settings.users.create')->middleware('can:settings.view');
+        })->name('settings.users.create');
 
         Route::get('/settings/users/{id}/edit', function ($id) {
             return Inertia::render('Settings/AddEditUser', ['mode' => 'edit', 'userId' => $id]);
-        })->name('settings.users.edit')->middleware('can:settings.view');
+        })->name('settings.users.edit');
 
         // Voucher
         Route::get('/voucher/data', function () {

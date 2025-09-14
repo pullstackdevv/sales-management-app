@@ -16,12 +16,14 @@ class OrderItem extends Model
         'variant_label',
         'quantity',
         'price',
+        'base_price',
         'subtotal',
     ];
 
     protected $casts = [
         'quantity' => 'integer',
         'price' => 'decimal:2',
+        'base_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
     ];
 

@@ -2,10 +2,8 @@
 
 namespace App\Http\Requests\User;
 
-use App\Enums\UserRole;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 
 class UpdateRequest extends FormRequest
 {
@@ -27,9 +25,9 @@ class UpdateRequest extends FormRequest
                 Rule::unique('users')->ignore($this->user),
             ],
             'password' => 'sometimes|required|string|min:8|confirmed',
-            'role' => ['sometimes', 'required', new Enum(UserRole::class)],
+            'role_id' => 'sometimes|required|exists:roles,id',
             'phone' => 'sometimes|nullable|string|max:20',
             'is_active' => 'sometimes|boolean',
         ];
     }
-} 
+}

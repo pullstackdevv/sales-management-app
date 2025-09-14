@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Handle Vite build assets directly
+RewriteCond %{REQUEST_URI} ^/build/ [NC]
+RewriteRule ^build/(.*)$ /public/build/$1 [L]
+
+# Handle other requests
+RewriteCond %{REQUEST_URI} !^/public/ [NC]
+RewriteRule ^(.*)$ /public/$1 [L]

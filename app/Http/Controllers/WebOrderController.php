@@ -137,6 +137,7 @@ class WebOrderController extends Controller
                     'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
                     'price' => $price,
+                    'base_price' => $variant->product->base_price,
                     'total_price' => $subtotal,
                 ];
             }

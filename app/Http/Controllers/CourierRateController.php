@@ -407,6 +407,9 @@ class CourierRateController extends Controller
             $courierId = $request->input('courier_id');
             $userId = Auth::id();
             
+            // Additional file validation
+            // $this->validateExcelFormat($file);
+            
             // Store the uploaded file temporarily
             $fileName = 'courier_rates_' . time() . '.' . $file->getClientOriginalExtension();
             $filePath = $file->storeAs('temp', $fileName, 'local');
@@ -422,8 +425,14 @@ class CourierRateController extends Controller
                 'id' => $jobId,
                 'status' => 'queued',
                 'message' => 'Import job has been queued for processing',
+                'courier_id' => $courierId,
                 'created_at' => now()->toISOString()
             ], now()->addHours(24));
+            
+            // Add to active jobs list
+            $activeJobIds = cache()->get('active_import_jobs', []);
+            $activeJobIds[] = $jobId;
+            cache()->put('active_import_jobs', $activeJobIds, now()->addHours(24));
 
             return response()->json([
                 'success' => true,
@@ -443,6 +452,74 @@ class CourierRateController extends Controller
                 'message' => 'Import failed',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Validate Excel file format and structure
+     *
+     * @param \Illuminate\Http\UploadedFile $file
+     * @throws \Exception
+     */
+    private function validateExcelFormat($file)
+    {
+        try {
+            // Check file extension
+            $allowedExtensions = ['xlsx', 'xls'];
+            $extension = strtolower($file->getClientOriginalExtension());
+            
+            if (!in_array($extension, $allowedExtensions)) {
+                throw new \Exception('File harus berformat Excel (.xlsx atau .xls)');
+            }
+
+            // Check file size (max 10MB)
+            $maxSize = 10 * 1024 * 1024; // 10MB in bytes
+            if ($file->getSize() > $maxSize) {
+                throw new \Exception('Ukuran file tidak boleh lebih dari 10MB');
+            }
+
+            // Load Excel file to validate structure
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xlsx');
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($file->getPathname());
+            $worksheet = $spreadsheet->getActiveSheet();
+            
+            // Check if file has data
+            $highestRow = $worksheet->getHighestRow();
+            if ($highestRow < 3) {
+                throw new \Exception('File Excel harus memiliki minimal 3 baris (header + data)');
+            }
+            
+            // Validate required headers
+            $requiredHeaders = ['PROVINCE', 'CITY', 'DISTRICT'];
+            $headerRow = 2; // Headers are in row 2
+            
+            foreach ($requiredHeaders as $index => $header) {
+                $cellValue = $worksheet->getCell(chr(65 + $index) . $headerRow)->getValue();
+                if (strtoupper(trim($cellValue)) !== $header) {
+                    throw new \Exception("Header kolom " . chr(65 + $index) . " harus berisi '{$header}', ditemukan: '{$cellValue}'");
+                }
+            }
+            
+            // Check for service type headers (ECO, REG, ONS, etc.)
+            $serviceHeaders = ['ECO', 'REG', 'ONS', 'SDS', 'TRC', 'T15', 'T25', 'T60'];
+            $foundServices = 0;
+            
+            for ($col = 4; $col <= 21; $col++) { // Columns D to U
+                $cellValue = $worksheet->getCell(chr(64 + $col) . $headerRow)->getValue();
+                if (in_array(strtoupper(trim($cellValue)), $serviceHeaders)) {
+                    $foundServices++;
+                }
+            }
+            
+            if ($foundServices < 1) {
+                throw new \Exception('File harus memiliki minimal 1 jenis layanan kurir (ECO, REG, ONS, SDS, TRC, T15, T25, T60)');
+            }
+            
+        } catch (\PhpOffice\PhpSpreadsheet\Exception $e) {
+            throw new \Exception('File Excel tidak valid atau rusak: ' . $e->getMessage());
+        } catch (\Exception $e) {
+            throw $e;
         }
     }
 
@@ -501,6 +578,72 @@ class CourierRateController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get import status'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get active import jobs
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function activeImports(Request $request): JsonResponse
+    {
+        try {
+            $courierId = $request->input('courier_id');
+            $activeImports = [];
+            
+            // Store active job IDs in a separate cache key for easier retrieval
+            $activeJobIds = cache()->get('active_import_jobs', []);
+            
+            // Debug logging
+            Log::info('Checking active imports', [
+                'active_job_ids' => $activeJobIds,
+                'courier_id' => $courierId
+            ]);
+            
+            foreach ($activeJobIds as $jobId) {
+                $status = cache()->get("import_job_{$jobId}");
+                
+                Log::info("Checking job {$jobId}", ['status' => $status]);
+                
+                if ($status && isset($status['status']) && in_array($status['status'], ['queued', 'processing'])) {
+                    // If courier_id is specified, filter by it
+                    if ($courierId && isset($status['courier_id']) && $status['courier_id'] != $courierId) {
+                        continue;
+                    }
+                    
+                    $activeImports[] = $status;
+                } else {
+                    // Remove completed/failed jobs from active list
+                    $activeJobIds = array_filter($activeJobIds, function($id) use ($jobId) {
+                        return $id !== $jobId;
+                    });
+                    cache()->put('active_import_jobs', array_values($activeJobIds), now()->addHours(24));
+                }
+            }
+            
+            Log::info('Active imports found', ['count' => count($activeImports), 'imports' => $activeImports]);
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'active_imports' => $activeImports,
+                    'count' => count($activeImports)
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to get active imports: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get active imports',
+                'data' => [
+                    'active_imports' => [],
+                    'count' => 0
+                ]
             ], 500);
         }
     }

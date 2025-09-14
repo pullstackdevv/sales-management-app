@@ -125,7 +125,7 @@ export default function Order() {
           // Add fields needed for order source detection
           payment_url: order.payment_url,
           payment_status: order.payment_status, // Add payment status for display
-          sales_channel: order.sales_channel?.name,
+          sales_channel: order.sales_channel?.name || 'Website',
           // Add shipping object with ID for update operations
           shipping: order.shipping,
           // Add payment bank details for detailed display
@@ -236,7 +236,7 @@ export default function Order() {
             <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Filter</button>
             <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
             <Link
-              href={route('orders.create')}
+              href={route('cms.orders.create')}
               className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
               Tambah Order

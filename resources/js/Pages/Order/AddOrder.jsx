@@ -11,16 +11,23 @@ export default function AddOrder() {
         customer_id: '',
         address_id: '',
         sales_channel_id: '',
+        origin_setting_id: '',
         shipping_cost: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
-        status: 'pending'
+        status: 'pending',
+        payment_status: 'pending',
+        payment_bank_id: '',
+        courier: ''
     });
 
     const [orderItems, setOrderItems] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [salesChannels, setSalesChannels] = useState([]);
+    const [paymentBanks, setPaymentBanks] = useState([]);
+    const [couriers, setCouriers] = useState([]);
+    const [origins, setOrigins] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     
@@ -29,6 +36,9 @@ export default function AddOrder() {
         customers: false,
         products: false,
         salesChannels: false,
+        paymentBanks: false,
+        couriers: false,
+        origins: false,
         submitting: false
     });
     
@@ -90,6 +100,69 @@ export default function AddOrder() {
             console.error('Error fetching sales channels:', error);
         } finally {
             setLoading(prev => ({ ...prev, salesChannels: false }));
+        }
+    };
+
+    // Fetch payment banks dari API
+    const fetchPaymentBanks = async () => {
+        setLoading(prev => ({ ...prev, paymentBanks: true }));
+        try {
+            console.log('🏦 Fetching payment banks...');
+            const response = await axios.get('/api/payment-banks');
+            console.log('🏦 Payment banks response:', response.data);
+            if (response.data.status === 'success' && response.data.data) {
+                // Handle paginated response - access the actual data array
+                const banksData = response.data.data.data || response.data.data;
+                setPaymentBanks(Array.isArray(banksData) ? banksData : []);
+                console.log('🏦 Payment banks set to state:', banksData);
+            } else {
+                setPaymentBanks(Array.isArray(response.data) ? response.data : []);
+                console.log('🏦 Payment banks fallback set to state:', response.data);
+            }
+        } catch (error) {
+            console.error('🏦 Error fetching payment banks:', error);
+            setPaymentBanks([]);
+        } finally {
+            setLoading(prev => ({ ...prev, paymentBanks: false }));
+        }
+    };
+
+    // Fetch couriers dari API
+    const fetchCouriers = async () => {
+        setLoading(prev => ({ ...prev, couriers: true }));
+        try {
+            const response = await axios.get('/api/couriers');
+            if (response.data.status === 'success') {
+                const couriersData = response.data.data?.data || response.data.data || [];
+                const activeCouriers = Array.isArray(couriersData) ? couriersData.filter(courier => courier.is_active) : [];
+                setCouriers(activeCouriers);
+            } else {
+                setCouriers([]);
+            }
+        } catch (error) {
+            console.error('Error fetching couriers:', error);
+            setCouriers([]);
+        } finally {
+            setLoading(prev => ({ ...prev, couriers: false }));
+        }
+    };
+
+    // Fetch origins dari API
+    const fetchOrigins = async () => {
+        setLoading(prev => ({ ...prev, origins: true }));
+        try {
+            const response = await axios.get('/api/origin-settings');
+            if (response.data.success) {
+                const activeOrigins = response.data.data.filter(origin => origin.is_active);
+                setOrigins(activeOrigins);
+            } else {
+                setOrigins([]);
+            }
+        } catch (error) {
+            console.error('Error fetching origins:', error);
+            setOrigins([]);
+        } finally {
+            setLoading(prev => ({ ...prev, origins: false }));
         }
     };
 
@@ -197,8 +270,18 @@ export default function AddOrder() {
                 })),
                 shipping_cost: formData.shipping_cost,
                 notes: formData.notes,
-                status: formData.status
+                status: formData.status,
+                payment_status: formData.payment_status,
+                payment_bank_id: formData.payment_bank_id || null,
+                courier_id: formData.courier || null
             };
+            
+            console.log('AddOrder - Sending data:', {
+                courier_raw: formData.courier,
+                courier_id: formData.courier || null,
+                payment_bank_raw: formData.payment_bank_id,
+                payment_bank_id: formData.payment_bank_id || null
+            });
 
             const response = await axios.post('/api/orders', orderData);
             
@@ -252,17 +335,20 @@ export default function AddOrder() {
     useEffect(() => {
         fetchCustomers();
         fetchSalesChannels();
+        fetchPaymentBanks();
+        fetchCouriers();
+        fetchOrigins();
     }, []);
 
     // Handle search debouncing
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (searchTerms.customer) {
+            if (searchTerms.customer && !selectedCustomer) {
                 fetchCustomers(searchTerms.customer);
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchTerms.customer]);
+    }, [searchTerms.customer, selectedCustomer]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -305,7 +391,14 @@ export default function AddOrder() {
                                     type="text"
                                     placeholder="Cari customer"
                                     value={searchTerms.customer}
-                                    onChange={(e) => setSearchTerms(prev => ({ ...prev, customer: e.target.value }))}
+                                    onChange={(e) => {
+                                        setSearchTerms(prev => ({ ...prev, customer: e.target.value }));
+                                        if (!e.target.value) {
+                                            setSelectedCustomer(null);
+                                            setFormData(prev => ({ ...prev, customer_id: '', address_id: '' }));
+                                            setCustomerAddresses([]);
+                                        }
+                                    }}
                                     className={`w-full px-3 py-2 border rounded-lg ${
                                         errors.customer_id ? 'border-red-500' : 'border-gray-300'
                                     }`}
@@ -375,9 +468,25 @@ export default function AddOrder() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Pengiriman Dari
                                 </label>
-                                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                                    <option>SP | Kemayoran Kota Jakarta Pusat</option>
+                                <select 
+                                    value={formData.origin_setting_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, origin_setting_id: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    required
+                                >
+                                    <option value="">Pilih asal pengiriman...</option>
+                                    {origins.map((origin) => (
+                                        <option key={origin.id} value={origin.id}>
+                                            {origin.store_name} | {origin.origin_address}
+                                        </option>
+                                    ))}
                                 </select>
+                                {loading.origins && (
+                                    <p className="text-gray-500 text-xs mt-1">Memuat origins...</p>
+                                )}
+                                {errors.origin_setting_id && (
+                                    <p className="text-red-500 text-xs mt-1">{errors.origin_setting_id}</p>
+                                )}
                             </div>
 
                             <div>
@@ -420,6 +529,24 @@ export default function AddOrder() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Kurir
+                                </label>
+                                <select
+                                    value={formData.courier}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="">Pilih kurir</option>
+                                    {couriers.map((courier) => (
+                                    <option key={courier.id} value={courier.id}>
+                                        {courier.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Ongkos Kirim
                                 </label>
                                 <input
@@ -429,6 +556,50 @@ export default function AddOrder() {
                                     onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Status Pembayaran
+                                </label>
+                                <select 
+                                    value={formData.payment_status}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value, payment_bank_id: e.target.value === 'pending' ? '' : prev.payment_bank_id }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Bank Pembayaran
+                                </label>
+                                <select 
+                                    value={formData.payment_bank_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    disabled={formData.payment_status !== 'paid'}
+                                >
+                                    <option value="">Pilih bank</option>
+                                    {(() => {
+                                        console.log('🏦 All payment banks:', paymentBanks);
+                                        const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
+                                        console.log('🏦 Active banks:', activeBanks);
+                                        return activeBanks.map((bank) => (
+                                            <option key={bank.id} value={bank.id}>
+                                                {bank.bank_name} - {bank.account_number} ({bank.account_name})
+                                            </option>
+                                        ));
+                                    })()}
+                                </select>
+                                {loading.paymentBanks && (
+                                    <p className="text-gray-500 text-xs mt-1">Memuat payment banks...</p>
+                                )}
+                                {formData.payment_status !== 'paid' && (
+                                    <p className="text-gray-500 text-xs mt-1">Bank pembayaran hanya diperlukan untuk status 'paid'</p>
+                                )}
                             </div>
 
                             <div>
@@ -497,7 +668,7 @@ export default function AddOrder() {
                                                             <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID')}</span>
+                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
                                                                 disabled={variant.stock <= 0}
@@ -551,7 +722,7 @@ export default function AddOrder() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm font-medium text-blue-600 mt-1">Rp {item.price?.toLocaleString('id-ID')}</p>
+                                                <p className="text-sm font-medium text-blue-600 mt-1">Rp {item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                             </div>
                                             
                                             <div className="flex items-center gap-3">
@@ -597,7 +768,7 @@ export default function AddOrder() {
                                                 </div>
                                                 
                                                 <div className="text-right">
-                                                    <p className="font-medium">Rp {(item.quantity * item.price)?.toLocaleString('id-ID')}</p>
+                                                    <p className="font-medium">Rp {(item.quantity * item.price)?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                                 </div>
                                                 
                                                 <button
@@ -633,17 +804,17 @@ export default function AddOrder() {
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Subtotal ({orderItems.length} item)</span>
-                                <span className="text-sm font-medium">Rp {calculateSubtotal().toLocaleString('id-ID')}</span>
+                                <span className="text-sm font-medium">Rp {calculateSubtotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Ongkos Kirim</span>
-                                <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID')}</span>
+                                <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                             
                             <div className="flex justify-between pt-4 border-t font-semibold text-lg">
                                 <span>TOTAL</span>
-                                <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
+                                <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                         </div>
 

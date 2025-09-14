@@ -1,6 +1,7 @@
 <?php
 
 use App\Helpers\ResponseFormatter;
+use App\Http\Middleware\ApiRateLimiter;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,16 +23,34 @@ return Application::configure(basePath: dirname(__DIR__))
             ->api([
                 \Illuminate\Http\Middleware\HandleCors::class,
                 EnsureFrontendRequestsAreStateful::class,
+                'throttle:api',
                 SubstituteBindings::class,
             ])
             ->group('api', [
                 EnsureFrontendRequestsAreStateful::class,
+                'throttle:api',
                 SubstituteBindings::class,
+            ])
+            ->alias([
+                'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+                'api.rate.limit' => ApiRateLimiter::class,
             ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->renderable(function (Throwable $e, $request) {
             if ($request->expectsJson()) {
+                $statusCode = 500;
+                
+                if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException) {
+                    $statusCode = $e->getStatusCode();
+                } elseif ($e instanceof \Illuminate\Validation\ValidationException) {
+                    $statusCode = 422;
+                } elseif ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                    $statusCode = 401;
+                } elseif ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
+                    $statusCode = 403;
+                }
+                
                 return ResponseFormatter::error(
                     'Server Error',
                     [[
@@ -39,8 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
                         'tag' => 'exception',
                         'message' => config('app.debug') ? $e->getMessage() : 'Something went wrong.'
                     ]],
-                    method_exists($e, 'getStatusCode') ?
-                        $e->getStatusCode() : 500
+                    $statusCode
                 );
             }
         });

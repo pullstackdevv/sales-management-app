@@ -23,7 +23,7 @@ export const productsAPI = {
     // Get all products with pagination and filters
     getProducts: async (params = {}) => {
         try {
-            const response = await api.get('/products', { params });
+            const response = await api.get('/products/storefront', { params });
             return response.data;
         } catch (error) {
             console.error('Error fetching products:', error);

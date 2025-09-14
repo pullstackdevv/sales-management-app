@@ -37,6 +37,12 @@ const PrintInvoice = () => {
             setLoading(true);
             const response = await api.get(`/orders/${orderId}`);
             const orderData = response.data.data;
+            // Calculate total weight from order items
+            const totalWeight = orderData.items?.reduce((total, item) => {
+                const weight = item.product_variant?.weight || 0;
+                return total + (weight * item.quantity);
+            }, 0) || 0;
+
             const transformedData = {
                 invoice_number: orderData.order_number,
                 created_at: orderData.created_at,
@@ -52,6 +58,7 @@ const PrintInvoice = () => {
                 tax_rate: orderData.tax_rate || 0,
                 discount_amount: orderData.discount_amount || 0,
                 total_amount: orderData.total_price,
+                total_weight: totalWeight,
                 payment_info: orderData.payments?.[0] ? {
                     status: orderData.payments[0].status,
                     method: orderData.payments[0].payment_method,
@@ -60,10 +67,10 @@ const PrintInvoice = () => {
                 notes: orderData.notes,
                 shipping: orderData.shipping,
                 company: {
-                    name: 'PT. Sales Management',
+                    name: 'SALEPARFUM',
                     address: 'Jl. Contoh No. 123, Jakarta',
                     phone: '+62 21 1234567',
-                    email: 'info@salesmanagement.com'
+                    email: 'info@saleparfum.com'
                 }
             };
             setInvoiceData(transformedData);
@@ -328,7 +335,7 @@ const PrintInvoice = () => {
                                 INSTANT
                             </div>
                             <div className="p-4 font-bold text-lg text-center">
-                                0.5kg
+                                {invoiceData?.total_weight ? `${invoiceData.total_weight}kg` : '0.5kg'}
                             </div>
                         </div>
 
@@ -402,7 +409,7 @@ const PrintInvoice = () => {
                         {printSettings.showTotal && (
                             <div className="p-4">
                                 <div className="font-bold text-lg">
-                                     Total: Rp{invoiceData?.total_amount?.toLocaleString('id-ID') || '2.199.000'}
+                                     Total: Rp{invoiceData?.total_amount?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '2.199.000'}
                                  </div>
                             </div>
                         )}

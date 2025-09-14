@@ -49,84 +49,105 @@ export default function OrderDetail({ auth, order }) {
         toast.info('Fitur kirim pesan akan segera tersedia');
     };
 
-    const handleCopyOrderDetail = () => {
-        const orderText = `Order ID: ${orderData.id}\nTanggal: ${orderData.created_at}\nCustomer: ${orderData.customer?.name}\nTotal: Rp${orderData.total?.toLocaleString('id-ID')}`;
-        navigator.clipboard.writeText(orderText);
-        toast.success('Detail order berhasil disalin');
+    const handleCopyOrderDetails = () => {
+        if (!orderData) return;
+        
+        const orderDetails = `
+Order #${orderData.order_number || orderData.id}
+Tanggal: ${new Date(orderData.created_at).toLocaleDateString('id-ID')}
+Customer: ${orderData.customer?.name || '-'}
+Alamat: ${orderData.shipping_address || '-'}
+Telp: ${orderData.customer?.phone || '-'}
+
+Produk:
+${orderData.items?.map(item => 
+    `- ${item.product_name_snapshot || item.product_variant?.product?.name} ${item.variant_label ? `(${item.variant_label})` : ''}
+  ${item.quantity} x Rp${item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })} = Rp${item.subtotal?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
+).join('\n') || 'Tidak ada produk'}
+Ongkir: Rp${orderData.shipping_cost?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}
+Total: Rp${orderData.total_price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}
+
+Status: ${getStatusLabel(orderData.payment_status)}
+Kurir: ${orderData.shipping?.courier?.name || 'Kurir'} - ${orderData.shipping?.service_type || 'Reguler'}
+Resi: ${orderData.shipping?.tracking_number || '-'}
+        `;
+        
+        navigator.clipboard.writeText(orderDetails).then(() => {
+            toast.success('Detail order berhasil disalin!');
+        }).catch(() => {
+            toast.error('Gagal menyalin detail order');
+        });
     };
 
     const handleManageOrder = () => {
-        router.visit(`/order/edit/${orderData.id}`);
+        if (orderData?.id) {
+            router.visit(`/order/manage/${orderData.id}`);
+        }
     };
 
     const handleCheckPaymentStatus = async () => {
-        if (!orderData.payment_url) {
-            toast.error('Order ini tidak memiliki payment URL');
-            return;
-        }
-
+        if (!orderData?.payment_url) return;
+        
+        setCheckingPayment(true);
         try {
-            setCheckingPayment(true);
-            const response = await api.get(`/payment/xendit/status/${orderData.order_number}`);
-            
-            if (response.data.status === 'success') {
-                // Refresh order data
-                await fetchOrderDetail(orderData.id);
+            const response = await api.post(`/orders/${orderData.id}/check-payment`);
+            if (response.data.success) {
+                setOrderData(prev => ({
+                    ...prev,
+                    payment_status: response.data.payment_status
+                }));
                 toast.success('Status pembayaran berhasil diperbarui');
-            } else {
-                toast.error('Gagal mengecek status pembayaran');
             }
         } catch (error) {
-            console.error('Error checking payment status:', error);
-            toast.error('Terjadi kesalahan saat mengecek status pembayaran');
+            console.error('Error checking payment:', error);
+            toast.error('Gagal mengecek status pembayaran');
         } finally {
             setCheckingPayment(false);
         }
     };
 
-    const isWebOrder = () => {
-        return orderData.payment_url && orderData.payment_url.trim() !== '';
-    };
-
     const getStatusColor = (status) => {
         switch (status) {
-            case 'pending': return 'bg-yellow-100 text-yellow-800';
-            case 'paid': return 'bg-green-100 text-green-800';
-            case 'processing': return 'bg-blue-100 text-blue-800';
-            case 'shipped': return 'bg-purple-100 text-purple-800';
-            case 'delivered': return 'bg-emerald-100 text-emerald-800';
-            case 'cancelled': return 'bg-red-100 text-red-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'paid':
+                return 'bg-green-100 text-green-800';
+            case 'pending':
+                return 'bg-yellow-100 text-yellow-800';
+            case 'failed':
+                return 'bg-red-100 text-red-800';
+            case 'cancelled':
+                return 'bg-gray-100 text-gray-800';
+            default:
+                return 'bg-gray-100 text-gray-800';
         }
     };
 
     const getStatusLabel = (status) => {
         switch (status) {
-            case 'pending': return 'Belum Bayar';
-            case 'paid': return 'Dibayar';
-            case 'processing': return 'Diproses';
-            case 'shipped': return 'Dikirim';
-            case 'delivered': return 'Diterima';
-            case 'cancelled': return 'Dibatalkan';
-            default: return status;
+            case 'paid':
+                return 'Lunas';
+            case 'pending':
+                return 'Menunggu';
+            case 'failed':
+                return 'Gagal';
+            case 'cancelled':
+                return 'Dibatalkan';
+            default:
+                return 'Tidak Diketahui';
         }
+    };
+
+    const isWebOrder = () => {
+        return orderData?.payment_url && orderData?.payment_url.trim() !== '';
     };
 
     if (loading) {
         return (
             <DashboardLayout user={auth.user}>
                 <Head title="Detail Order" />
-                <div className="py-12">
-                    <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                        <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div className="p-6">
-                                <div className="animate-pulse">
-                                    <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-                                    <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                                    <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                                </div>
-                            </div>
-                        </div>
+                <div className="flex items-center justify-center min-h-screen">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                        <p className="mt-4 text-gray-600">Memuat detail order...</p>
                     </div>
                 </div>
             </DashboardLayout>
@@ -137,60 +158,41 @@ export default function OrderDetail({ auth, order }) {
         return (
             <DashboardLayout user={auth.user}>
                 <Head title="Detail Order" />
-                <div className="py-12">
-                    <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                        <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div className="p-6 text-center">
-                                <p className="text-gray-500">Order tidak ditemukan</p>
-                                <Link href="/order" className="text-blue-600 hover:text-blue-800 mt-2 inline-block">
-                                    Kembali ke daftar order
-                                </Link>
-                            </div>
-                        </div>
+                <div className="flex items-center justify-center min-h-screen">
+                    <div className="text-center">
+                        <p className="text-gray-600">Order tidak ditemukan</p>
+                        <Link href="/cms/order/data" className="mt-4 inline-block text-blue-600 hover:text-blue-800">
+                            Kembali ke daftar order
+                        </Link>
                     </div>
                 </div>
-             </DashboardLayout>
-         );
+            </DashboardLayout>
+        );
     }
 
+    // Calculate totals with base_price from order_items table
     const totalSellingPrice = orderData.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
-    const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.product_variant?.product?.cost_price || 0) * item.quantity), 0) || 0;
+    const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
     const profit = totalSellingPrice - totalProductCost;
 
     return (
         <DashboardLayout user={auth.user}>
-            <Head title={`Detail Order #${orderData.id}`} />
+            <Head title={`Order #${orderData.order_number || orderData.id}`} />
             
             <div className="py-6">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
-                        <div className="p-6">
+                    <div className="bg-white shadow-sm rounded-lg mb-6">
+                        <div className="px-6 py-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-4">
-                                    <Link href="/order/data" className="text-gray-600 hover:text-gray-800">
+                                    <Link href="/cms/order/data" className="text-gray-600 hover:text-gray-800">
                                         <ChevronLeft className="w-6 h-6" />
                                     </Link>
                                     <h1 className="text-2xl font-bold text-gray-900">Order</h1>
                                 </div>
                                 
                                 <div className="flex space-x-3">
-                                    <button
-                                        onClick={handleSendMessage}
-                                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                                    >
-                                        <MessageCircle className="w-4 h-4" />
-                                        <span>Kirim Pesan</span>
-                                    </button>
-                                    
-                                    <button
-                                        onClick={handleCopyOrderDetail}
-                                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                                    >
-                                        <Copy className="w-4 h-4" />
-                                        <span>Salin Detail Order</span>
-                                    </button>
-                                    
                                     <button
                                         onClick={() => setShowOrderHistory(true)}
                                         className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -220,7 +222,7 @@ export default function OrderDetail({ auth, order }) {
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-600">Total harga jual produk</p>
-                                    <p className="text-xl font-bold">Rp{totalSellingPrice.toLocaleString('id-ID')}</p>
+                                    <p className="text-xl font-bold">Rp{totalSellingPrice.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                 </div>
                             </div>
                         </div>
@@ -232,7 +234,7 @@ export default function OrderDetail({ auth, order }) {
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-600">Total harga modal produk</p>
-                                    <p className="text-xl font-bold">Rp{totalProductCost.toLocaleString('id-ID')}</p>
+                                    <p className="text-xl font-bold">Rp{totalProductCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                 </div>
                             </div>
                         </div>
@@ -244,7 +246,7 @@ export default function OrderDetail({ auth, order }) {
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-600">Profit</p>
-                                    <p className="text-xl font-bold">Rp{profit.toLocaleString('id-ID')}</p>
+                                    <p className="text-xl font-bold">Rp{profit.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                                 </div>
                             </div>
                         </div>
@@ -308,16 +310,9 @@ export default function OrderDetail({ auth, order }) {
                                                         </a>
                                                     </>
                                                 )}
-                                                <button 
-                                                    onClick={() => setShowPaymentHistory(true)}
-                                                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm transition-colors"
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                    <span>Lihat Riwayat</span>
-                                                </button>
                                             </div>
                                         </div>
-                                        <p className="text-lg font-bold mt-2">Rp{orderData.total_price?.toLocaleString('id-ID')}</p>
+                                        <p className="text-lg font-bold mt-2">Rp{orderData.total_price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
                                         {isWebOrder() && (
                                             <div className="mt-2 p-2 bg-blue-50 rounded-md">
                                                 <p className="text-xs text-blue-700">
@@ -337,11 +332,11 @@ export default function OrderDetail({ auth, order }) {
                                         <Truck className="w-6 h-6 text-white" />
                                     </div>
                                     <div>
-                                        <p className="font-medium">{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'ONS'}</p>
+                                        <p className="font-medium">{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</p>
                                         <p className="text-sm text-gray-600">Resi: {orderData.shipping?.tracking_number || '-'}</p>
                                     </div>
                                     <div className="ml-auto">
-                                        <p className="font-bold">Rp{orderData.shipping_cost?.toLocaleString('id-ID') || '0'}</p>
+                                        <p className="font-bold">Rp{orderData.shipping_cost?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -381,7 +376,7 @@ export default function OrderDetail({ auth, order }) {
                                         <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
                                             {item.product_variant?.product?.image ? (
                                                 <img 
-                                                    src={item.product_variant.product.image} 
+                                                    src={`/storage/${item.product_variant.product.image}`} 
                                                     alt={item.product_variant.product.name}
                                                     className="w-full h-full object-cover"
                                                 />
@@ -392,10 +387,10 @@ export default function OrderDetail({ auth, order }) {
                                         <div className="flex-1">
                                             <h4 className="font-medium">{item.product_name_snapshot || item.product_variant?.product?.name || '-'}</h4>
                                             <p className="text-sm text-gray-600">{item.variant_label && `(${item.variant_label})`}</p>
-                                            <p className="text-sm text-gray-600">{item.quantity} x Rp{item.price?.toLocaleString('id-ID')}</p>
+                                            <p className="text-sm text-gray-600">{item.quantity} x Rp{item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="font-bold">Rp{item.subtotal?.toLocaleString('id-ID')}</p>
+                                            <p className="font-bold">Rp{item.subtotal?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
                                         </div>
                                     </div>
                                 )) || (
@@ -409,12 +404,12 @@ export default function OrderDetail({ auth, order }) {
                             <div className="mt-6 pt-4 border-t">
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span>{orderData.shipping?.courier?.name || 'Tiki'} - {orderData.shipping?.service_type || 'ONS'}</span>
-                                        <span>Rp{orderData.shipping_cost?.toLocaleString('id-ID') || '45.000'}</span>
+                                        <span>{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</span>
+                                        <span>Rp{orderData.shipping_cost?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</span>
                                     </div>
                                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                         <span>TOTAL</span>
-                                        <span>Rp{orderData.total?.toLocaleString('id-ID')}</span>
+                                        <span>Rp{orderData.total_price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</span>
                                     </div>
                                 </div>
                             </div>

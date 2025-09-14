@@ -14,6 +14,9 @@ class StockMovementController extends Controller
     public function index(Request $request): JsonResponse
     {
         $movements = StockMovement::with(['productVariant.product', 'createdBy'])
+            ->when($request->product_variant_id, function ($query, $variantId) {
+                $query->where('product_variant_id', $variantId);
+            })
             ->when($request->search, function ($query, $search) {
                 $query->whereHas('productVariant', function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -49,7 +52,10 @@ class StockMovementController extends Controller
             DB::beginTransaction();
 
             $movement = StockMovement::create([
-                ...$validated,
+                'product_variant_id' => $validated['product_variant_id'],
+                'type' => $validated['type'],
+                'quantity' => $validated['quantity'],
+                'note' => $validated['notes'] ?? null,
                 'created_by' => Auth::id()
             ]);
 
@@ -155,4 +161,4 @@ class StockMovementController extends Controller
             throw $e;
         }
     }
-} 
+}

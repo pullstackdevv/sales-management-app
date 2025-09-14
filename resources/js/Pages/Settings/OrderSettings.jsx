@@ -38,7 +38,6 @@ export default function OrderSettings() {
     code: '',
     description: '',
     platform: '',
-    url: '',
     is_active: true
   });
 
@@ -136,7 +135,6 @@ export default function OrderSettings() {
       code: '',
       description: '',
       platform: '',
-      url: '',
       is_active: true
     });
     setEditingChannel(null);
@@ -146,13 +144,12 @@ export default function OrderSettings() {
   const handleEdit = (channel) => {
     setEditingChannel(channel);
     setFormData({
-      name: channel.name,
-      code: channel.code,
-      description: channel.description,
-      platform: channel.platform,
-      url: channel.url,
-      is_active: channel.is_active
-    });
+        name: channel.name,
+        code: channel.code,
+        description: channel.description,
+        platform: channel.platform,
+        is_active: channel.is_active
+      });
     setShowModal(true);
   };
 
@@ -220,21 +217,28 @@ export default function OrderSettings() {
       {/* Header & Save Button */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">Pengaturan Order</h2>
-        <Button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 text-sm">
+        {/* <Button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 text-sm">
           Simpan Pengaturan
-        </Button>
+        </Button> */}
+         <Button 
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            onClick={handleAddNew}
+          >
+            <Icon icon="mdi:plus" width={18} className="mr-1" />
+            Tambah Sales Channels
+          </Button>
       </div>
 
       <div className="bg-white rounded-lg shadow p-8 space-y-6">
         {/* Toggle Settings */}
-        <ToggleSwitch
+        {/* <ToggleSwitch
           label="Simpan order tanpa customer"
           description="ON: Input order diperbolehkan nama customer kosong, dengan default pengiriman 'Ambil di Toko'"
         />
         <ToggleSwitch
           label="Tampilkan logo di Shipping Label untuk Dropshipper / Reseller"
           description="ON: Tampilkan, OFF: Sembunyikan"
-        />
+        /> */}
 
         {/* Sales Channels Table */}
         <div>
@@ -246,13 +250,7 @@ export default function OrderSettings() {
           ) : (
             <TableComponent columns={columns} data={salesChannels} />
           )}
-          <Button 
-            className="mt-3 border border-primary text-primary px-4 py-2 rounded-md text-sm hover:bg-gray-100 flex items-center"
-            onClick={handleAddNew}
-          >
-            <Icon icon="mdi:plus" width={18} className="mr-1" />
-            Tambah Sales Channels
-          </Button>
+         
         </div>
 
         {/* Custom Modal for Add/Edit Sales Channel */}
@@ -319,33 +317,12 @@ export default function OrderSettings() {
                   
                   <div>
                     <label className="block text-sm font-medium mb-1">Platform</label>
-                    <select
+                    <input
+                      type="text"
                       value={formData.platform}
                       onChange={(e) => setFormData({...formData, platform: e.target.value})}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Pilih Platform</option>
-                      <option value="website">Website</option>
-                      <option value="shopee">Shopee</option>
-                      <option value="tokopedia">Tokopedia</option>
-                      <option value="lazada">Lazada</option>
-                      <option value="bukalapak">Bukalapak</option>
-                      <option value="instagram">Instagram</option>
-                      <option value="facebook">Facebook</option>
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="offline">Offline</option>
-                      <option value="other">Lainnya</option>
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-1">URL (Opsional)</label>
-                    <input
-                      type="url"
-                      value={formData.url}
-                      onChange={(e) => setFormData({...formData, url: e.target.value})}
-                      placeholder="https://example.com"
+                      placeholder="Masukkan platform (contoh: marketplace, website, social media)"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -383,7 +360,7 @@ export default function OrderSettings() {
         )}
 
         {/* Custom Filter & Template */}
-        <div>
+        {/* <div>
           <h3 className="font-semibold mb-2">Custom filter di data order</h3>
           <p className="text-sm text-gray-500">Nama Filter</p>
         </div>
@@ -391,13 +368,13 @@ export default function OrderSettings() {
         <div>
           <h3 className="font-semibold mb-2">Custom biaya template di form order</h3>
           <p className="text-sm text-gray-500">Nama Template</p>
-        </div>
+        </div> */}
 
         {/* More Toggle Settings */}
-        <ToggleSwitch label="Simpan order dari Reseller / Dropshipper / Custom Customer sebagai perolehan Admin" />
+        {/* <ToggleSwitch label="Simpan order dari Reseller / Dropshipper / Custom Customer sebagai perolehan Admin" />
         <ToggleSwitch label="Tampilkan email customer di download order" />
         <ToggleSwitch label="Tampilkan id customer di download order" />
-        <ToggleSwitch label="Aktifkan input barcode marketplace" />
+        <ToggleSwitch label="Aktifkan input barcode marketplace" /> */}
       </div>
     </div>
   );

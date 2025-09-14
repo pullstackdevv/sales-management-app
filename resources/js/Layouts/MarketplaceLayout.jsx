@@ -12,36 +12,35 @@ import {
     CreditCard,
     UserCircle
 } from "lucide-react";
+import { AuthProvider } from "../contexts/AuthContext";
 
 export default function MarketplaceLayout({ children }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0); // Ini akan diambil dari state management
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <AuthProvider>
+            <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <header className="bg-white shadow-sm sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
                         {/* Logo */}
                         <div className="flex items-center">
-                            <Link href="/marketplace" className="flex items-center space-x-2">
+                            <Link href="/" className="flex items-center space-x-2">
                                 <img src="/assets/images/logos/mystock.png" alt="Logo" className="h-8 w-auto" />
                             </Link>
                         </div>
 
                         {/* Desktop Navigation */}
                         <nav className="hidden md:flex items-center space-x-8">
-                            <Link href="/marketplace" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                            <Link href="/" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                                 Beranda
                             </Link>
-                            <Link href="/marketplace/products" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                            <Link href="/products" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                                 Produk
-                            </Link>
-                            <Link href="/marketplace/categories" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
-                                Kategori
-                            </Link>
-                            <Link href="/marketplace/promotions" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                            </Link>                            
+                            <Link href="/promotions" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                                 Promosi
                             </Link>
                         </nav>
@@ -51,12 +50,12 @@ export default function MarketplaceLayout({ children }) {
                         {/* Right side icons */}
                         <div className="flex items-center space-x-4">
                             {/* Wishlist */}
-                            <Link href="/marketplace/wishlist" className="text-gray-700 hover:text-red-500 p-2">
+                            <Link href="/wishlist" className="text-gray-700 hover:text-red-500 p-2">
                                 <Heart className="h-6 w-6" />
                             </Link>
 
                             {/* Cart */}
-                            <Link href="/marketplace/cart" className="text-gray-700 hover:text-blue-600 p-2 relative">
+                            <Link href="/cart" className="text-gray-700 hover:text-blue-600 p-2 relative">
                                 <ShoppingCart className="h-6 w-6" />
                                 {cartCount > 0 && (
                                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -66,7 +65,7 @@ export default function MarketplaceLayout({ children }) {
                             </Link>
 
                             {/* User Profile */}
-                            <Link href="/marketplace/profile" className="text-gray-700 hover:text-blue-600 p-2">
+                            <Link href="/profile" className="text-gray-700 hover:text-blue-600 p-2">
                                 <User className="h-6 w-6" />
                             </Link>
 
@@ -90,28 +89,28 @@ export default function MarketplaceLayout({ children }) {
                     <div className="md:hidden">
                         <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t">
                             <Link
-                                href="/marketplace"
+                                href="/"
                                 className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium"
                             >
                                 <Home className="h-5 w-5" />
                                 <span>Beranda</span>
                             </Link>
                             <Link
-                                href="/marketplace/products"
+                                href="/products"
                                 className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium"
                             >
                                 <Package className="h-5 w-5" />
                                 <span>Produk</span>
                             </Link>
                             <Link
-                                href="/marketplace/cart"
+                                href="/cart"
                                 className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium"
                             >
                                 <ShoppingCart className="h-5 w-5" />
                                 <span>Keranjang</span>
                             </Link>
                             <Link
-                                href="/marketplace/profile"
+                                href="/profile"
                                 className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium"
                             >
                                 <UserCircle className="h-5 w-5" />
@@ -140,19 +139,19 @@ export default function MarketplaceLayout({ children }) {
                         <div>
                             <h3 className="text-lg font-semibold mb-4 text-gray-500">Layanan</h3>
                             <ul className="space-y-2 text-sm text-gray-400">
-                                <li><Link href="/marketplace/help" className="hover:text-gray-200">Bantuan</Link></li>
-                                <li><Link href="/marketplace/shipping" className="hover:text-gray-200">Pengiriman</Link></li>
-                                <li><Link href="/marketplace/returns" className="hover:text-gray-200">Retur</Link></li>
-                                <li><Link href="/marketplace/contact" className="hover:text-gray-200">Kontak</Link></li>
+                                <li><Link href="/help" className="hover:text-gray-200">Bantuan</Link></li>
+                                <li><Link href="/shipping" className="hover:text-gray-200">Pengiriman</Link></li>
+                                <li><Link href="/returns" className="hover:text-gray-200">Retur</Link></li>
+                                <li><Link href="/contact" className="hover:text-gray-200">Kontak</Link></li>
                             </ul>
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold mb-4 text-gray-500">Akun</h3>
                             <ul className="space-y-2 text-sm text-gray-400">
-                                <li><Link href="/marketplace/profile" className="hover:text-gray-200">Profil Saya</Link></li>
-                                <li><Link href="/marketplace/orders" className="hover:text-gray-200">Pesanan</Link></li>
-                                <li><Link href="/marketplace/wishlist" className="hover:text-gray-200">Wishlist</Link></li>
-                                <li><Link href="/marketplace/settings" className="hover:text-gray-200">Pengaturan</Link></li>
+                                <li><Link href="/profile" className="hover:text-gray-200">Profil Saya</Link></li>
+                                <li><Link href="/orders" className="hover:text-gray-200">Pesanan</Link></li>
+                                <li><Link href="/wishlist" className="hover:text-gray-200">Wishlist</Link></li>
+                                <li><Link href="/settings" className="hover:text-gray-200">Pengaturan</Link></li>
                             </ul>
                         </div>
                         <div>
@@ -179,11 +178,12 @@ export default function MarketplaceLayout({ children }) {
                             </div>
                         </div>
                     </div>
-                    <div className="mt-8 pt-8 border-t border-gray-700 text-center text-sm text-gray-400">
+                    <div className="mt-8 pt-8 border-t border-gray-300 text-center text-sm text-gray-400">
                         <p>&copy; {new Date().getFullYear()} Marketplace. All rights reserved.</p>
                     </div>
                 </div>
             </footer>
-        </div>
+            </div>
+        </AuthProvider>
     );
-} 
+}

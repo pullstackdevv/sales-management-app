@@ -14,7 +14,7 @@ use App\Http\Controllers\PaymentBankController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductVariantController;
 use App\Http\Controllers\ReportController;
-// use App\Http\Controllers\RoleController; // Not needed - using enum in User model
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesChannelController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AnalyzerController;
@@ -29,6 +29,8 @@ use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\XenditController;
 use App\Http\Controllers\MidtransController;
 use App\Http\Controllers\WilayahController;
+use App\Http\Controllers\ProductSettingController;
+use App\Http\Controllers\OriginSettingController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -37,7 +39,7 @@ Route::prefix('auth/')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register'])
         ->middleware('throttle:5,1');
-    
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
@@ -62,6 +64,8 @@ Route::prefix('courier-rates')->group(function () {
     Route::get('/destinations', [CourierRateController::class, 'destinations']);
     Route::get('/service-types', [CourierRateController::class, 'serviceTypes']);
     Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
+    Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
+    Route::get('/active-imports', [CourierRateController::class, 'activeImports']);
     Route::get('/{id}', [CourierRateController::class, 'show']);
 });
 
@@ -79,6 +83,15 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+// Product routes
+Route::get('products/storefront', [ProductController::class, 'storefront']);
+// product
+Route::apiResource('products', ProductController::class);
+Route::apiResource('products.variants', ProductVariantController::class);
+// Customer routes
+Route::apiResource('customers', CustomerController::class);
+Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+
 // Other authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
     // User routes
@@ -90,17 +103,17 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()
             ->json(Auth::user());
     });
-    
+
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
+    Route::get('users/role-permissions', [UserController::class, 'getRolePermissions']);
 
-    // Role routes - using enum in User model, no separate roles table needed
+    // Role routes
+    Route::get('roles', [RoleController::class, 'index']);
+    Route::get('roles/permissions', [RoleController::class, 'getPermissions']);
+    Route::put('roles/{roleName}', [RoleController::class, 'update']);
 
-    // Customer routes
-    Route::apiResource('customers', CustomerController::class);
-    Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
-    
     // Customer address routes
     Route::get('customers/{customer}/addresses', [AddressController::class, 'index']);
     Route::post('customers/{customer}/addresses', [AddressController::class, 'store']);
@@ -108,16 +121,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('customers/{customer}/addresses/{address}', [AddressController::class, 'destroy']);
     Route::post('customers/{customer}/addresses/{address}/set-default', [AddressController::class, 'setDefault']);
 
-    // Product routes
-    Route::get('products/storefront', [ProductController::class, 'storefront']);
-    Route::apiResource('products', ProductController::class);
-    Route::apiResource('products.variants', ProductVariantController::class);
 
     // Stock movement routes
     Route::apiResource('stock-movements', StockMovementController::class);
 
     // Stock opname routes
     Route::apiResource('stock-opnames', StockOpnameController::class);
+    Route::patch('stock-opnames/{stockOpname}/status', [StockOpnameController::class, 'updateStatus']);
     Route::post('stock-opnames/{stockOpname}/start', [StockOpnameController::class, 'start']);
     Route::post('stock-opnames/{stockOpname}/complete', [StockOpnameController::class, 'complete']);
     Route::post('stock-opnames/{stockOpname}/finalize', [StockOpnameController::class, 'finalize']);
@@ -141,7 +151,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('orders/{order}/shipping', [OrderController::class, 'updateShipping']);
     Route::get('orders/{order}/generate-shipping-label', [OrderController::class, 'generateShippingLabel']);
     Route::get('orders/{order}/audit-history', [OrderController::class, 'auditHistory']);
-    
+
     // Shipping routes (nested under orders)
     Route::get('orders/{order}/shipping', [ShippingController::class, 'index']);
     Route::post('orders/{order}/shipping', [ShippingController::class, 'store']);
@@ -166,12 +176,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('expense-summary', [ExpenseController::class, 'getSummary']);
     Route::post('expenses/export-excel', [ExpenseController::class, 'exportExcel']);
 
+    // Settings routes
+    Route::apiResource('product-settings', ProductSettingController::class);
+    Route::apiResource('origin-settings', OriginSettingController::class);
+
     // Other authenticated routes remain here
 
     // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
-        Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
     });
 });
 
@@ -180,13 +193,13 @@ Route::prefix('payment')->name('payment.')->group(function () {
     // Web Order Payment Routes (can be used by guests)
     Route::post('/create/{orderNumber}', [WebOrderController::class, 'createPayment'])->name('web.create');
     Route::get('/status/{orderNumber}', [WebOrderController::class, 'checkPaymentStatus'])->name('web.status');
-    
+
     // Xendit specific routes
     Route::prefix('xendit')->name('xendit.')->group(function () {
         Route::post('/webhook', [XenditController::class, 'handleWebhook'])->name('webhook');
         Route::get('/status/{orderNumber}', [XenditController::class, 'checkPaymentStatus'])->name('status');
     });
-    
+
     // Midtrans specific routes (existing routes from web.php can be moved here if needed)
     Route::prefix('midtrans')->name('midtrans.')->group(function () {
         Route::post('/webhook', [MidtransController::class, 'handleNotification'])->name('webhook');

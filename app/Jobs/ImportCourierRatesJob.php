@@ -316,10 +316,20 @@ class ImportCourierRatesJob implements ShouldQueue
             'id' => $this->jobId,
             'status' => $status,
             'message' => $message,
+            'courier_id' => $this->courierId,
             'updated_at' => now()->toISOString()
         ];
         
         cache()->put("import_job_{$this->jobId}", $jobData, now()->addHours(24));
+        
+        // Remove from active jobs list when completed or failed
+        if (in_array($status, ['completed', 'failed'])) {
+            $activeJobs = cache()->get('active_import_jobs', []);
+            $activeJobs = array_filter($activeJobs, function($jobId) {
+                return $jobId !== $this->jobId;
+            });
+            cache()->put('active_import_jobs', array_values($activeJobs), now()->addHours(24));
+        }
     }
     
     /**

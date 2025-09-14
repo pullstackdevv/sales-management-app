@@ -154,7 +154,7 @@ export default function Report() {
                                     className="flex justify-between border-b py-1"
                                 >
                                     <span>{transaction.bank_name}</span>
-                                    <span>Rp {transaction.total_amount.toLocaleString('id-ID')}</span>
+                                    <span>Rp {transaction.total_amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                 </li>
                             ))}
                         </ul>
@@ -170,7 +170,7 @@ export default function Report() {
                                 >
                                     <span>{courier.courier_name}</span>
                                     <span>
-                                        {courier.percentage}% - Rp {courier.total_cost.toLocaleString('id-ID')}
+                                        {courier.percentage}% - Rp {courier.total_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                                     </span>
                                 </li>
                             ))}

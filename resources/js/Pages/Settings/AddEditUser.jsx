@@ -233,7 +233,7 @@ export default function AddEditUser({ user = null }) {
           timer: 2000,
           showConfirmButton: false
         }).then(() => {
-          router.visit('/settings/user');
+          router.visit('/cms/settings/user');
         });
       }
     } catch (err) {
@@ -307,7 +307,7 @@ export default function AddEditUser({ user = null }) {
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link 
-            href="/settings/user"
+            href="/cms/settings/user"
             className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Icon icon="mdi:arrow-left" className="w-6 h-6" />
@@ -519,7 +519,7 @@ export default function AddEditUser({ user = null }) {
           {/* Submit Button */}
           <div className="flex justify-end gap-4">
             <Link
-              href="/settings/user"
+              href="/cms/settings/user"
               className="px-6 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
             >
               Batal

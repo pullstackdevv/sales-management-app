@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from '@inertiajs/react';
 import { Search, Star, ShoppingCart } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
@@ -18,14 +18,64 @@ const ProductList = () => {
     total: 0,
   });
 
+  // Derive categories from currently loaded products
+  const categories = useMemo(() => {
+    const map = new Map();
+    map.set('all', { id: 'all', name: 'Semua' });
+
+    products.forEach((p) => {
+      const catObj = p.category || p.product_category || null;
+      let id = null;
+      let name = null;
+      if (catObj && typeof catObj === 'object') {
+        id = catObj.slug || catObj.name || null;
+        name = catObj.name || catObj.slug || null;
+      } else if (typeof catObj === 'string') {
+        id = catObj;
+        name = catObj;
+      }
+      if (id && name && !map.has(id)) {
+        map.set(id, { id, name });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [products]);
+
   const currentPage = pagination.current_page;
   const setCurrentPage = (page) => {
     setPagination((prev) => ({ ...prev, current_page: page }));
   };
 
+  const handleCategoryClick = (categoryId) => {
+    setSelectedCategory(categoryId);
+    setCurrentPage(1);
+    const params = new URLSearchParams(window.location.search);
+    if (categoryId === 'all') {
+      params.delete('category');
+    } else {
+      params.set('category', categoryId);
+    }
+    const qs = params.toString();
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', url);
+  };
+
   useEffect(() => {
     fetchProducts();
   }, [pagination.current_page, selectedCategory, sortBy, searchTerm]);
+
+  // Initialize selectedCategory from URL query (?category=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const categoryFromUrl = params.get('category');
+    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+      setCurrentPage(1);
+    }
+    // run only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchProducts = async (page = pagination.current_page) => {
     try {
@@ -79,15 +129,12 @@ const ProductList = () => {
     }).format(price);
 
   const ProductCard = ({ product }) => (
-    <Link href={`/marketplace/products/${product.id}`} className="block group">
+    <Link href={`/products/${product.id}`} className="block group">
       <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
         <div className="relative overflow-hidden">
           <img
-            src={
-              product.image ||
-              'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=300'
-            }
-            alt={product.name}
+           src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
+                                    alt={product.name}
             className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
@@ -160,6 +207,27 @@ const ProductList = () => {
                   />
                 </div>
               </div>
+
+              {/* Categories filter */}
+              {categories.length > 1 && (
+                <div className="mb-6">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleCategoryClick(cat.id)}
+                        className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                          selectedCategory === cat.id
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                        }`}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -35,7 +35,6 @@ class CourierController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:couriers,code',
             'description' => 'nullable|string|max:255',
             'is_active' => 'boolean'
         ]);
@@ -73,7 +72,6 @@ class CourierController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'code' => 'sometimes|required|string|max:50|unique:couriers,code,' . $courier->id,
             'description' => 'nullable|string|max:255',
             'is_active' => 'boolean'
         ]);
@@ -102,7 +100,7 @@ class CourierController extends Controller
     public function destroy(Courier $courier): JsonResponse
     {
         // Check if courier is used in any shipping
-        if ($courier->shipping()->exists()) {
+        if ($courier->shippings()->exists()) {
             throw ValidationException::withMessages([
                 'courier' => ['Cannot delete courier that is used in shipping.']
             ]);
@@ -148,4 +146,4 @@ class CourierController extends Controller
             throw $e;
         }
     }
-} 
+}

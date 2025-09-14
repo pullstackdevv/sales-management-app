@@ -220,8 +220,8 @@ const ProductCheckout = () => {
                   {/* Product Image */}
                   <div className="md:w-1/3">
                     <img
-                      src={product.image || '/assets/images/no-image.png'}
-                      alt={product.name || 'Product'}
+                      src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
+                      alt={product.name}
                       className="w-full h-64 object-cover rounded-lg"
                     />
                   </div>

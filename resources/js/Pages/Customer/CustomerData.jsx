@@ -78,7 +78,7 @@ export default function CustomerData() {
     };
 
     const handleEdit = (customerId) => {
-        window.location.href = `/customer/edit/${customerId}`;
+        window.location.href = `/cms/customer/edit/${customerId}`;
     };
 
     const handleDelete = async (customer) => {
@@ -144,7 +144,7 @@ export default function CustomerData() {
                         <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
                             Filter
                         </button>
-                        <Link href={"/customer/add"}>
+                        <Link href={"/cms/customer/add"}>
                             <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
                                 <Icon
                                     icon="material-symbols:add"

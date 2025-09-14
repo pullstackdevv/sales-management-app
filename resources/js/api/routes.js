@@ -117,6 +117,19 @@ const API_ROUTES = {
     complete: (id) => `/stock-opnames/${id}/complete`,
     finalize: (id) => `/stock-opnames/${id}/finalize`,
   },
+  courierRates: {
+    index: '/courier-rates',
+    store: '/courier-rates',
+    show: (id) => `/courier-rates/${id}`,
+    update: (id) => `/courier-rates/${id}`,
+    destroy: (id) => `/courier-rates/${id}`,
+    import: '/courier-rates/import',
+    importStatus: (jobId) => `/courier-rates/import-status/${jobId}`,
+    activeImports: '/courier-rates/active-imports',
+    destinations: '/courier-rates/destinations',
+    serviceTypes: '/courier-rates/service-types',
+    getCouriers: '/courier-rates/couriers',
+  },
 };
 
 export default API_ROUTES;

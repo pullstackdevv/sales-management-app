@@ -103,16 +103,10 @@ export default function CourierSettings() {
     }
   };
 
-  // Handle toggle status
-  const handleToggleStatus = async (id, currentStatus) => {
-    try {
-      await api.put(API_ROUTES.couriers.toggleStatus(id));
-      fetchCouriers();
-      Swal.fire('Berhasil!', `Courier berhasil ${currentStatus ? 'dinonaktifkan' : 'diaktifkan'}.`, 'success');
-    } catch (err) {
-      console.error('Error toggling courier status:', err);
-      Swal.fire('Error!', 'Gagal mengubah status courier.', 'error');
-    }
+  // Handle view courier rates
+  const handleViewRates = (courier) => {
+    // Navigate to courier rates page with courier filter
+    window.location.href = `/cms/settings/courier-rates?courier_id=${courier.id}`;
   };
 
   // Filter couriers based on search term
@@ -272,34 +266,38 @@ export default function CourierSettings() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEditCourier(courier)}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                            title="Edit"
-                          >
-                            <Icon icon="solar:pen-outline" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleToggleStatus(courier.id, courier.is_active)}
-                            className={`p-1 rounded ${
-                              courier.is_active
-                                ? "text-red-600 hover:text-red-900"
-                                : "text-green-600 hover:text-green-900"
-                            }`}
-                            title={courier.is_active ? "Nonaktifkan" : "Aktifkan"}
-                          >
-                            <Icon
-                              icon={courier.is_active ? "solar:eye-closed-outline" : "solar:eye-outline"}
-                              className="w-4 h-4"
-                            />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCourier(courier.id)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded"
-                            title="Hapus"
-                          >
-                            <Icon icon="solar:trash-bin-minimalistic-outline" className="w-4 h-4" />
-                          </button>
+                          {courier.name.toLowerCase().includes('tiki') && (
+                            <button
+                              onClick={() => handleViewRates(courier)}
+                              className="text-green-600 hover:text-green-900 p-1 rounded"
+                              title="Lihat Tarif"
+                            >
+                              <Icon icon="solar:list-check-outline" className="w-4 h-4" />
+                            </button>
+                          )}
+                          {!courier.name.toLowerCase().includes('tiki') && (
+                            <button
+                              onClick={() => handleEditCourier(courier)}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                              title="Edit"
+                            >
+                              <Icon icon="solar:pen-outline" className="w-4 h-4" />
+                            </button>
+                          )}
+                          {!courier.name.toLowerCase().includes('tiki') && (
+                            <button
+                              onClick={() => handleDeleteCourier(courier.id)}
+                              className="text-red-600 hover:text-red-900 p-1 rounded"
+                              title="Hapus"
+                            >
+                              <Icon icon="solar:trash-bin-minimalistic-outline" className="w-4 h-4" />
+                            </button>
+                          )}
+                          {courier.name.toLowerCase().includes('tiki') && (
+                            <span className="text-gray-400 text-xs px-2 py-1 bg-gray-100 rounded">
+                              Tidak dapat diedit/hapus
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>

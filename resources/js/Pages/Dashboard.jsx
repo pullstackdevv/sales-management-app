@@ -62,7 +62,7 @@ export default function Dashboard() {
     };
     return (
         <DashboardLayout>
-            <div className="text-gray-800">
+            <div className="text-gray-800" style={{maxWidth: '99%'}}>
                 {/* Header */}
                 <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 

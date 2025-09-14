@@ -229,6 +229,18 @@ export default function AddCustomer() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
     
+    // Helper: detect if an address has any meaningful data entered
+    const hasAnyAddressData = (address) => {
+        // Only consider meaningful location/detail fields
+        return [
+            address.city,
+            address.district,
+            address.province,
+            address.postal_code,
+            address.address_detail,
+        ].some((v) => (v || '').toString().trim() !== '');
+    };
+
     // Form validation
     const validateForm = () => {
         const newErrors = {};
@@ -244,27 +256,28 @@ export default function AddCustomer() {
             newErrors.phone = 'Format nomor telepon tidak valid (contoh: 081234567890)';
         }
         
-        // Validate all addresses
-        addresses.forEach((address, index) => {
-            if (!address.city.trim()) {
-                newErrors[`city_${index}`] = 'Kota/Kecamatan wajib diisi';
+        // Only validate addresses if user has entered any address data
+        const addressesToValidate = addresses.filter(hasAnyAddressData);
+        if (addressesToValidate.length > 0) {
+            addressesToValidate.forEach((address, index) => {
+                if (!address.city?.trim()) {
+                    newErrors[`city_${index}`] = 'Kota/Kecamatan wajib diisi';
+                }
+                if (!address.postal_code?.trim()) {
+                    newErrors[`postal_code_${index}`] = 'Kode pos wajib diisi';
+                } else if (!/^[0-9]{5}$/.test(address.postal_code)) {
+                    newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
+                }
+                if (!address.address_detail?.trim()) {
+                    newErrors[`address_detail_${index}`] = 'Alamat lengkap wajib diisi';
+                }
+            });
+            // Ensure one default address when sending addresses
+            const hasDefaultAddress = addressesToValidate.some((addr) => addr.is_default);
+            if (!hasDefaultAddress) {
+                // Mutate local state to mark first as default so UI stays consistent
+                addresses[0].is_default = true;
             }
-            
-            if (!address.postal_code.trim()) {
-                newErrors[`postal_code_${index}`] = 'Kode pos wajib diisi';
-            } else if (!/^[0-9]{5}$/.test(address.postal_code)) {
-                newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
-            }
-            
-            if (!address.address_detail.trim()) {
-                newErrors[`address_detail_${index}`] = 'Alamat lengkap wajib diisi';
-            }
-        });
-        
-        // Check if at least one address is set as default
-        const hasDefaultAddress = addresses.some(addr => addr.is_default);
-        if (!hasDefaultAddress && addresses.length > 0) {
-            addresses[0].is_default = true; // Auto-set first address as default
         }
         
         // Email validation (optional but must be valid if provided)
@@ -273,18 +286,36 @@ export default function AddCustomer() {
         }
         
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        return { isValid: Object.keys(newErrors).length === 0, errors: newErrors };
     };
     
+    console.log(formData);
     // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        if (!validateForm()) {
+        const { isValid, errors: validationErrors } = validateForm();
+        if (!isValid) {
+            // Build a readable error list
+            const friendly = {
+                full_name: 'Nama lengkap',
+                phone: 'No. HP / Telepon',
+                email: 'Email',
+            };
+            const addressLabel = (key) => {
+                if (key.startsWith('city_')) return 'Alamat: Kota/Kecamatan';
+                if (key.startsWith('postal_code_')) return 'Alamat: Kode Pos';
+                if (key.startsWith('address_detail_')) return 'Alamat: Alamat Lengkap';
+                return key;
+            };
+            const items = Object.entries(validationErrors).map(([k, v]) => {
+                const label = friendly[k] || addressLabel(k);
+                return `<li><strong>${label}</strong>: ${v}</li>`;
+            }).join('');
             Swal.fire({
                 icon: 'error',
                 title: 'Validasi Gagal',
-                text: 'Mohon periksa kembali data yang Anda masukkan',
+                html: items ? `<ul style="text-align:left; margin-left: 1rem; list-style: disc;">${items}</ul>` : 'Mohon periksa kembali data yang Anda masukkan',
                 confirmButtonColor: '#3B82F6'
             });
             return;
@@ -293,6 +324,9 @@ export default function AddCustomer() {
         setLoading(true);
         
         try {
+            // Prepare addresses payload only if user entered any address data
+            const addressesToSend = addresses.filter(hasAnyAddressData);
+
             const customerData = {
                 name: formData.full_name,
                 email: formData.email || null,
@@ -300,19 +334,23 @@ export default function AddCustomer() {
                 line_id: formData.line_id || null,
                 other_contact: formData.other_contact || null,
                 category: formData.category,
-                addresses: addresses.map(address => ({
-                    label: address.label,
-                    recipient_name: address.recipient_name || formData.full_name,
-                    recipient_phone: address.recipient_phone || formData.phone,
-                    province: address.province,
-                    city: address.city,
-                    district: address.district,
-                    postal_code: address.postal_code,
-                    address_detail: address.address_detail,
-                    is_default: address.is_default
-                }))
+                ...(addressesToSend.length > 0
+                    ? {
+                        addresses: addressesToSend.map(address => ({
+                            label: address.label,
+                            recipient_name: address.recipient_name || formData.full_name,
+                            recipient_phone: address.recipient_phone || formData.phone,
+                            province: address.province,
+                            city: address.city,
+                            district: address.district,
+                            postal_code: address.postal_code,
+                            address_detail: address.address_detail,
+                            is_default: address.is_default,
+                        }))
+                      }
+                    : {})
             };
-            
+            console.log(customerData);
             const response = await api.post('/customers', customerData);
             
             if (response.data.status === 'success') {
@@ -324,67 +362,44 @@ export default function AddCustomer() {
                 });
                 
                 // Redirect to customer list or reset form
-                window.location.href = '/customer/data';
+                window.location.href = '/cms/customer/data';
             } else {
                 throw new Error(response.data.message || 'Gagal menambahkan customer');
             }
         } catch (error) {
             console.error('Error adding customer:', error);
-            console.log('Full error object:', error);
-            console.log('Error response:', error.response);
-            console.log('Error response data:', error.response?.data);
-            console.log('Error response status:', error.response?.status);
-            
             let errorMessage = 'Terjadi kesalahan saat menambahkan customer';
-            
-            // Debug: Log the structure of error response
+            let listHtml = '';
+
+            const buildListHtml = (entries) =>
+                entries.map(([k, v]) => `<li><strong>${k}</strong>: ${Array.isArray(v) ? v.join(', ') : v}</li>`).join('');
+
             if (error.response?.data) {
-                console.log('Response data structure:', {
-                    status: error.response.data.status,
-                    message: error.response.data.message,
-                    errors: error.response.data.errors,
-                    data: error.response.data.data
-                });
-            }
-            
-            // Check errors array first for specific messages
-             if (error.response?.data?.errors) {
-                 console.log('Processing errors array/object:', error.response.data.errors);
-                // Handle specific error format from API
                 const apiErrors = error.response.data.errors;
-                
-                if (Array.isArray(apiErrors)) {
-                    console.log('Errors is array:', apiErrors);
-                    // Handle array format errors
-                    const specificError = apiErrors.find(err => err.message);
-                    console.log('Found specific error:', specificError);
-                    if (specificError) {
-                        errorMessage = specificError.message;
-                        console.log('Using specific error message:', specificError.message);
-                    } else {
+                if (apiErrors) {
+                    if (Array.isArray(apiErrors)) {
+                        // e.g., [{ field: 'phone', message: 'invalid' }]
+                        const entries = apiErrors.map((e, i) => [e.field || `Error ${i+1}`, e.message || JSON.stringify(e)]);
+                        listHtml = buildListHtml(entries);
                         errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
-                        console.log('No specific error found, using generic message');
+                    } else if (typeof apiErrors === 'object') {
+                        // e.g., { phone: ['invalid'], email: ['required'] }
+                        setErrors(apiErrors);
+                        const entries = Object.entries(apiErrors);
+                        listHtml = buildListHtml(entries);
+                        errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
                     }
-                } else {
-                    console.log('Errors is object:', apiErrors);
-                    // Handle object format validation errors
-                    setErrors(apiErrors);
-                    errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
-                    console.log('Set form errors and using generic message');
-                 }
-             } else if (error.response?.data?.message) {
-                 console.log('No errors array found, using message from response:', error.response.data.message);
-                 errorMessage = error.response.data.message;
-             } else {
-                 console.log('No specific error structure found, using generic message');
-             }
-            
-            console.log('Final error message to display:', errorMessage);
-            
+                } else if (error.response.data.message) {
+                    errorMessage = error.response.data.message;
+                }
+            }
+
             Swal.fire({
                 icon: 'error',
                 title: 'Gagal!',
-                text: errorMessage,
+                html: listHtml
+                    ? `<div style="text-align:left">${errorMessage}<ul style="margin-left:1rem; list-style:disc;">${listHtml}</ul></div>`
+                    : errorMessage,
                 confirmButtonColor: '#3B82F6'
             });
         } finally {

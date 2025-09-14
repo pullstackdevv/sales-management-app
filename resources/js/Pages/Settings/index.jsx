@@ -3,10 +3,9 @@ import { Icon } from "@iconify/react";
 import { Link } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import OrderSettings from "./OrderSettings";
-import CustomerSettings from "./CustomerSettings";
 import ProductSettings from "./ProductSettings";
-import TemplateSettings from "./TemplateSettings";
 import UserSettings from "./UserSettings";
+import RoleSettings from "./RoleSettings";
 import OriginSettings from "./OriginSettings";
 import CourierSettings from "./CourierSettings";
 import PaymentSettings from "./PaymentSettings";
@@ -29,12 +28,11 @@ const menus = [
   { key: "general", label: "General", icon: "mdi:cog" },
   { key: "order", label: "Order", icon: "mdi:clipboard-list-outline" },
   { key: "product", label: "Product", icon: "mdi:package-variant" },
-  { key: "customer", label: "Customer", icon: "mdi:account-group-outline" },
   { key: "payment", label: "Payment", icon: "mdi:credit-card-outline" },
   { key: "courier", label: "Courier", icon: "mdi:truck-outline" },
   { key: "origin", label: "Asal Pengiriman", icon: "mdi:map-marker-outline" },
-  { key: "template", label: "Template", icon: "mdi:file-document-outline" },
   { key: "user", label: "User", icon: "mdi:account-outline" },
+  { key: "role", label: "Role Settings", icon: "mdi:shield-account-outline" },
 ];
 
 function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
@@ -48,7 +46,7 @@ function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
           {menus.map((menu) => (
             <Link
               key={menu.key}
-              href={`/settings/${menu.key}`}
+              href={`/cms/settings/${menu.key}`}
               className={`px-4 py-2 rounded-lg border flex items-center gap-2 transition-colors ${
                 activeMenu === menu.key 
                   ? "bg-primary text-white border-primary" 
@@ -63,12 +61,11 @@ function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
         {activeMenu === "general" && <GeneralSettings />}
         {activeMenu === "order" && <OrderSettings />}
         {activeMenu === "product" && <ProductSettings />}
-        {activeMenu === "customer" && <CustomerSettings />}
         {activeMenu === "payment" && <PaymentSettings />}
         {activeMenu === "courier" && <CourierSettings />}
         {activeMenu === "origin" && <OriginSettings />}
-        {activeMenu === "template" && <TemplateSettings />}
         {activeMenu === "user" && <UserSettings />}
+        {activeMenu === "role" && <RoleSettings />}
         {activeMenu === "dashboard" && <DashboardSettings />}
         {activeMenu === "api" && <ApiSettings />}
       </div>

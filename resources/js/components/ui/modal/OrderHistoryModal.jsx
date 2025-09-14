@@ -101,6 +101,10 @@ const OrderHistoryModal = ({ isOpen, onClose, orderId }) => {
         if (typeof value === 'object') {
             return JSON.stringify(value);
         }
+        // Format angka dengan ribuan tanpa desimal
+        if (!isNaN(value) && !isNaN(parseFloat(value))) {
+            return parseFloat(value).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+        }
         return String(value);
     };
 

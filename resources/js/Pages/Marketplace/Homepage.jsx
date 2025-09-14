@@ -15,13 +15,32 @@ const Homepage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const categories = [
-        { id: "all", name: "Semua" },
-        { id: "electronics", name: "Elektronik" },
-        { id: "fashion", name: "Fashion" },
-        { id: "beauty", name: "Kecantikan" },
-        { id: "home", name: "Rumah Tangga" }
-    ];
+    // Derive categories from loaded products (fallback to string/slug if available)
+    const categories = useMemo(() => {
+        const map = new Map();
+        // Always include "all"
+        map.set('all', { id: 'all', name: 'Semua' });
+
+        products.forEach((p) => {
+            // Support various possible shapes from API
+            // e.g. p.category is string | { name, slug } | { name }
+            const catObj = p.category || p.product_category || null;
+            let id = null;
+            let name = null;
+            if (catObj && typeof catObj === 'object') {
+                id = catObj.slug || catObj.name || null;
+                name = catObj.name || catObj.slug || null;
+            } else if (typeof catObj === 'string') {
+                id = catObj;
+                name = catObj;
+            }
+            if (id && name && !map.has(id)) {
+                map.set(id, { id, name });
+            }
+        });
+
+        return Array.from(map.values());
+    }, [products]);
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -50,7 +69,7 @@ const Homepage = () => {
             isActive = false;
         };
     }, [fetchProducts]);
-console.log(products.category);
+
 
     const currencyFormatter = useMemo(() => new Intl.NumberFormat('id-ID', {
         style: 'currency',

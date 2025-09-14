@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from '@inertiajs/react';
 import { Search, Star, ShoppingCart } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
@@ -18,14 +18,64 @@ const ProductList = () => {
     total: 0,
   });
 
+  // Derive categories from currently loaded products
+  const categories = useMemo(() => {
+    const map = new Map();
+    map.set('all', { id: 'all', name: 'Semua' });
+
+    products.forEach((p) => {
+      const catObj = p.category || p.product_category || null;
+      let id = null;
+      let name = null;
+      if (catObj && typeof catObj === 'object') {
+        id = catObj.slug || catObj.name || null;
+        name = catObj.name || catObj.slug || null;
+      } else if (typeof catObj === 'string') {
+        id = catObj;
+        name = catObj;
+      }
+      if (id && name && !map.has(id)) {
+        map.set(id, { id, name });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [products]);
+
   const currentPage = pagination.current_page;
   const setCurrentPage = (page) => {
     setPagination((prev) => ({ ...prev, current_page: page }));
   };
 
+  const handleCategoryClick = (categoryId) => {
+    setSelectedCategory(categoryId);
+    setCurrentPage(1);
+    const params = new URLSearchParams(window.location.search);
+    if (categoryId === 'all') {
+      params.delete('category');
+    } else {
+      params.set('category', categoryId);
+    }
+    const qs = params.toString();
+    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState({}, '', url);
+  };
+
   useEffect(() => {
     fetchProducts();
   }, [pagination.current_page, selectedCategory, sortBy, searchTerm]);
+
+  // Initialize selectedCategory from URL query (?category=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const categoryFromUrl = params.get('category');
+    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+      setCurrentPage(1);
+    }
+    // run only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchProducts = async (page = pagination.current_page) => {
     try {
@@ -157,6 +207,27 @@ const ProductList = () => {
                   />
                 </div>
               </div>
+
+              {/* Categories filter */}
+              {categories.length > 1 && (
+                <div className="mb-6">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleCategoryClick(cat.id)}
+                        className={`px-3 py-1 text-sm rounded-full border transition-colors ${
+                          selectedCategory === cat.id
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                        }`}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

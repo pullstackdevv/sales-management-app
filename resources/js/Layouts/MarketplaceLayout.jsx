@@ -39,10 +39,7 @@ export default function MarketplaceLayout({ children }) {
                             </Link>
                             <Link href="/products" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                                 Produk
-                            </Link>
-                            <Link href="/categories" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
-                                Kategori
-                            </Link>
+                            </Link>                            
                             <Link href="/promotions" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                                 Promosi
                             </Link>

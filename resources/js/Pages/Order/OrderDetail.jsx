@@ -161,7 +161,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                 <div className="flex items-center justify-center min-h-screen">
                     <div className="text-center">
                         <p className="text-gray-600">Order tidak ditemukan</p>
-                        <Link href="/order/data" className="mt-4 inline-block text-blue-600 hover:text-blue-800">
+                        <Link href="/cms/order/data" className="mt-4 inline-block text-blue-600 hover:text-blue-800">
                             Kembali ke daftar order
                         </Link>
                     </div>
@@ -186,7 +186,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                         <div className="px-6 py-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-4">
-                                    <Link href="/order/data" className="text-gray-600 hover:text-gray-800">
+                                    <Link href="/cms/order/data" className="text-gray-600 hover:text-gray-800">
                                         <ChevronLeft className="w-6 h-6" />
                                     </Link>
                                     <h1 className="text-2xl font-bold text-gray-900">Order</h1>

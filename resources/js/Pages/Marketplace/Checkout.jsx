@@ -29,7 +29,7 @@ export default function Checkout() {
     return (
         <MarketplaceLayout>
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                <Link href="/marketplace/cart" className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4 sm:mb-6 text-lg sm:text-xl">
+                <Link href="/cart" className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4 sm:mb-6 text-lg sm:text-xl">
                     <ArrowLeft className="h-6 w-6 sm:h-7 sm:w-7 mr-3 sm:mr-4" />
                     Kembali ke Keranjang
                 </Link>

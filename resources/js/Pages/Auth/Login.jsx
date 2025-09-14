@@ -32,7 +32,7 @@ export default function LoginForm() {
       setMessage(res.data.message || 'Login berhasil!');
       setMessageStatus('success');
       setTimeout(() => {
-        window.location.reload();
+        window.location.href = route('cms.dashboard');
       }, 2000);
     } catch (err) {
       if (err.response) {
@@ -52,21 +52,20 @@ export default function LoginForm() {
         <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
           {/* Logo */}
           <Logo />
-          
+
           {/* Title */}
           <div className="text-center mb-8">
             {/* <h1 className="text-3xl font-bold text-gray-800 mb-2">Sales Management</h1> */}
             {/* <p className="text-gray-600">Masuk ke akun Anda</p> */}
           </div>
           {message && (
-            <div className={`mb-6 p-4 rounded-lg text-center font-medium ${
-              messageStatus === 'success' 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
+            <div className={`mb-6 p-4 rounded-lg text-center font-medium ${messageStatus === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-200'
                 : 'bg-red-50 text-red-700 border border-red-200'
-            }`}>
-              <Icon 
-                icon={messageStatus === 'success' ? 'fluent:checkmark-circle-16-filled' : 'fluent:error-circle-16-filled'} 
-                className="inline w-5 h-5 mr-2" 
+              }`}>
+              <Icon
+                icon={messageStatus === 'success' ? 'fluent:checkmark-circle-16-filled' : 'fluent:error-circle-16-filled'}
+                className="inline w-5 h-5 mr-2"
               />
               {message}
             </div>
@@ -130,8 +129,8 @@ export default function LoginForm() {
               <Icon icon="fluent:arrow-right-16-filled" className="inline w-5 h-5 mr-2" />
               Login
             </button>
-            
-            
+
+
           </form>
         </div>
       </div>

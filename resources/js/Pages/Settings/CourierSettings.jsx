@@ -106,7 +106,7 @@ export default function CourierSettings() {
   // Handle view courier rates
   const handleViewRates = (courier) => {
     // Navigate to courier rates page with courier filter
-    window.location.href = `/settings/courier-rates?courier_id=${courier.id}`;
+    window.location.href = `/cms/settings/courier-rates?courier_id=${courier.id}`;
   };
 
   // Filter couriers based on search term

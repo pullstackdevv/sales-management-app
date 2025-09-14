@@ -380,7 +380,7 @@ const PaymentProcessCheckout = () => {
                     <p className="text-gray-600 mb-6">{error || 'Terjadi kesalahan saat memproses pembayaran.'}</p>
                     <div className="space-x-4">
                       <button
-                        onClick={() => router.visit('/marketplace/checkout/payment-method')}
+                        onClick={() => router.visit('/checkout/payment-method')}
                         className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
                       >
                         Pilih Metode Lain

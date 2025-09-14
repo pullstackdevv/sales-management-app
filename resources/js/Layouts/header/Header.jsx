@@ -23,8 +23,8 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
 
   const handleLogout = async () => {
     try {
-      await fetch("/logout", { method: "GET" });
-      window.location.href = "/";
+      await fetch("/cms/logout", { method: "GET" });
+      window.location.href = "/cms/login";
     } catch (err) {
       alert("Logout gagal");
     }
@@ -65,13 +65,6 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
           <div className="flex items-center gap-4 ml-auto">
 
 
-            {/* Icons */}
-            <button className="hover:text-primary">
-              <Icon icon="mdi:square-edit-outline" className="text-xl" />
-            </button>
-            <button className="relative hover:text-primary">
-              <Icon icon="solar:bell-bing-bold" className="text-xl" />
-            </button>
 
             {/* Avatar & Dropdown */}
             <div className="relative">

@@ -129,7 +129,7 @@ export default function ProductData() {
             <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
               Download
             </button>
-            <Link href="/product/add">
+            <Link href="/cms/product/add">
               <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
                 <Icon icon="material-symbols:add" className="text-lg" />
                 Tambah Produk
@@ -256,7 +256,7 @@ export default function ProductData() {
                       >
                         <Icon icon="mdi:eye-outline" />
                       </button>
-                      <Link href={`/product/edit/${product.id}`}>
+                      <Link href={`/cms/product/edit/${product.id}`}>
                         <button className="hover:text-blue-600 transition-colors" title="Edit produk">
                           <Icon icon="mdi:pencil-outline" />
                         </button>

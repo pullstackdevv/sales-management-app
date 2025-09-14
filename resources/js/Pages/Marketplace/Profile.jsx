@@ -1,79 +1,61 @@
 import MarketplaceLayout from "../../Layouts/MarketplaceLayout";
-import { User, MapPin, ShoppingBag, LogOut } from "lucide-react";
+import { usePage, Link } from "@inertiajs/react";
+import { MapPin, LogOut, ShoppingBag, User as UserIcon } from "lucide-react";
 
 export default function Profile() {
-    // Mock data user
-    const user = {
-        name: "Budi Santoso",
-        email: "budi@example.com",
-        phone: "+62 812-3456-7890",
-        address: "Jl. Mawar No. 123, Jakarta",
-        avatar: "/assets/images/profile/user-1.jpg"
-    };
-    const orders = [
-        {
-            id: 1,
-            date: "2024-07-01",
-            status: "Selesai",
-            total: 3500000,
-            items: 2
-        },
-        {
-            id: 2,
-            date: "2024-06-28",
-            status: "Diproses",
-            total: 8500000,
-            items: 1
-        }
-    ];
-    const formatPrice = (price) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
+    const { auth } = usePage().props;
+    const user = auth?.user || {};
+
+    const avatar = user.avatar
+        ? (String(user.avatar).startsWith('http') ? user.avatar : `/storage/${user.avatar}`)
+        : "/assets/images/profile/user-1.jpg";
+
     return (
         <MarketplaceLayout>
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-                <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6 sm:mb-8">Profil Saya</h1>
-                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center mb-6 sm:mb-8">
-                    <img src={user.avatar} alt={user.name} className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover mb-4 sm:mb-0 sm:mr-6" />
-                    <div className="flex-1">
-                        <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2 sm:mb-3">{user.name}</h2>
-                        <p className="text-gray-600 mb-2 sm:mb-3 text-lg sm:text-xl">{user.email}</p>
-                        <p className="text-gray-600 mb-2 sm:mb-3 text-lg sm:text-xl">{user.phone}</p>
-                        <div className="flex items-center text-gray-600">
-                            <MapPin className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3" />
-                            <span className="text-lg sm:text-xl">{user.address}</span>
-                        </div>
-                    </div>
-                    <button className="mt-4 sm:mt-0 sm:ml-auto bg-red-100 text-red-600 px-4 sm:px-6 py-3 sm:py-4 rounded-lg flex items-center hover:bg-red-200 text-lg sm:text-xl">
-                        <LogOut className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3" /> Logout
-                    </button>
-                </div>
-                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
-                    <h3 className="font-semibold text-gray-900 mb-4 sm:mb-6 text-xl sm:text-2xl">Alamat Pengiriman</h3>
-                    <div className="flex flex-col sm:flex-row sm:items-center text-gray-700">
-                        <div className="flex items-center mb-3 sm:mb-0 flex-1">
-                            <MapPin className="h-6 w-6 sm:h-7 sm:w-7 mr-3 sm:mr-4" />
-                            <span className="text-lg sm:text-xl">{user.address}</span>
-                        </div>
-                        <button className="text-blue-600 hover:underline text-lg sm:text-xl self-start sm:self-auto">Ubah</button>
-                    </div>
-                </div>
-                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                    <h3 className="font-semibold text-gray-900 mb-4 sm:mb-6 text-xl sm:text-2xl">Pesanan Saya</h3>
-                    <div className="divide-y divide-gray-100">
-                        {orders.map(order => (
-                            <div key={order.id} className="flex flex-col sm:flex-row sm:items-center py-4 sm:py-6">
-                                <div className="flex items-center mb-3 sm:mb-0 flex-1">
-                                    <ShoppingBag className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 mr-4 sm:mr-6" />
-                                    <div className="flex-1">
-                                        <div className="font-medium text-gray-900 text-lg sm:text-xl">Order #{order.id}</div>
-                                        <div className="text-lg sm:text-xl text-gray-500">{order.date} • {order.status} • {order.items} produk</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between sm:block">
-                                    <div className="font-bold text-gray-900 text-lg sm:text-xl">{formatPrice(order.total)}</div>
-                                    <button className="ml-4 sm:ml-6 text-blue-600 hover:underline text-lg sm:text-xl">Lihat</button>
-                                </div>
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <h1 className="text-2xl font-light text-gray-900 mb-6">Profil</h1>
+
+                {/* Profile Card */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 flex flex-col sm:flex-row items-start sm:items-center mb-8">
+                    <div className="relative">
+                        <img src={avatar} alt={user.name || 'User'} className="w-20 h-20 rounded-full object-cover" />
+                        {!user.avatar && (
+                            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-gray-100 text-gray-500">
+                                <UserIcon className="w-8 h-8" />
                             </div>
-                        ))}
+                        )}
+                    </div>
+                    <div className="flex-1 sm:ml-5 mt-4 sm:mt-0">
+                        <h2 className="text-lg font-semibold text-gray-900">{user.name || 'Pengguna'}</h2>
+                        <p className="text-gray-600 text-sm mt-1">{user.email || '-'}</p>
+                        {(user.whatsapp || user.phone) && (
+                            <p className="text-gray-600 text-sm mt-1">{user.whatsapp || user.phone}</p>
+                        )}
+                        {typeof user.address === 'string' && user.address && (
+                            <div className="flex items-center text-gray-600 text-sm mt-2">
+                                <MapPin className="h-4 w-4 mr-2" />
+                                <span>{user.address}</span>
+                            </div>
+                        )}
+                    </div>
+                    <Link
+                        href="/cms/logout"
+                        className="mt-4 sm:mt-0 sm:ml-auto inline-flex items-center px-3 py-2 rounded-md text-sm bg-red-50 text-red-600 hover:bg-red-100"
+                    >
+                        <LogOut className="h-4 w-4 mr-2" /> Logout
+                    </Link>
+                </div>
+
+                {/* Orders placeholder (no dummy) */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Riwayat Pemesanan</h3>
+                        <Link href="/orders" className="text-sm text-gray-600 hover:text-gray-900">Lihat semua</Link>
+                    </div>
+                    <div className="text-center py-8">
+                        <ShoppingBag className="mx-auto h-10 w-10 text-gray-300 mb-3" />
+                        <p className="text-gray-600 text-sm">Belum ada pesanan</p>
+                        <Link href="/products" className="inline-block mt-4 px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800">Mulai Belanja</Link>
                     </div>
                 </div>
             </div>

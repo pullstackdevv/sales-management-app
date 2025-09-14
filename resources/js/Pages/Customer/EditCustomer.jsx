@@ -403,7 +403,7 @@ export default function EditCustomer({ customerId }) {
                 });
                 
                 // Redirect to customer list
-                window.location.href = '/customer/data';
+                window.location.href = '/cms/customer/data';
             } else {
                 throw new Error(response.data.message || 'Gagal memperbarui customer');
             }

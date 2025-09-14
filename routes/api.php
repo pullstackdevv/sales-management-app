@@ -39,7 +39,7 @@ Route::prefix('auth/')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
     Route::post('register', [AuthController::class, 'register'])
         ->middleware('throttle:5,1');
-    
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
@@ -83,6 +83,15 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+// Product routes
+Route::get('products/storefront', [ProductController::class, 'storefront']);
+// product
+Route::apiResource('products', ProductController::class);
+Route::apiResource('products.variants', ProductVariantController::class);
+// Customer routes
+Route::apiResource('customers', CustomerController::class);
+Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+
 // Other authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
     // User routes
@@ -94,7 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()
             ->json(Auth::user());
     });
-    
+
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
@@ -105,10 +114,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('roles/permissions', [RoleController::class, 'getPermissions']);
     Route::put('roles/{roleName}', [RoleController::class, 'update']);
 
-    // Customer routes
-    Route::apiResource('customers', CustomerController::class);
-    Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
-    
     // Customer address routes
     Route::get('customers/{customer}/addresses', [AddressController::class, 'index']);
     Route::post('customers/{customer}/addresses', [AddressController::class, 'store']);
@@ -116,10 +121,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('customers/{customer}/addresses/{address}', [AddressController::class, 'destroy']);
     Route::post('customers/{customer}/addresses/{address}/set-default', [AddressController::class, 'setDefault']);
 
-    // Product routes
-    Route::get('products/storefront', [ProductController::class, 'storefront']);
-    Route::apiResource('products', ProductController::class);
-    Route::apiResource('products.variants', ProductVariantController::class);
 
     // Stock movement routes
     Route::apiResource('stock-movements', StockMovementController::class);
@@ -150,7 +151,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('orders/{order}/shipping', [OrderController::class, 'updateShipping']);
     Route::get('orders/{order}/generate-shipping-label', [OrderController::class, 'generateShippingLabel']);
     Route::get('orders/{order}/audit-history', [OrderController::class, 'auditHistory']);
-    
+
     // Shipping routes (nested under orders)
     Route::get('orders/{order}/shipping', [ShippingController::class, 'index']);
     Route::post('orders/{order}/shipping', [ShippingController::class, 'store']);
@@ -192,13 +193,13 @@ Route::prefix('payment')->name('payment.')->group(function () {
     // Web Order Payment Routes (can be used by guests)
     Route::post('/create/{orderNumber}', [WebOrderController::class, 'createPayment'])->name('web.create');
     Route::get('/status/{orderNumber}', [WebOrderController::class, 'checkPaymentStatus'])->name('web.status');
-    
+
     // Xendit specific routes
     Route::prefix('xendit')->name('xendit.')->group(function () {
         Route::post('/webhook', [XenditController::class, 'handleWebhook'])->name('webhook');
         Route::get('/status/{orderNumber}', [XenditController::class, 'checkPaymentStatus'])->name('status');
     });
-    
+
     // Midtrans specific routes (existing routes from web.php can be moved here if needed)
     Route::prefix('midtrans')->name('midtrans.')->group(function () {
         Route::post('/webhook', [MidtransController::class, 'handleNotification'])->name('webhook');

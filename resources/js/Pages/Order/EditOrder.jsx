@@ -378,7 +378,7 @@ export default function EditOrder() {
                     showConfirmButton: false
                 });
                 // Redirect back to orders page with forced refresh
-                router.visit('/order/data', {
+                router.visit('/cms/order/data', {
                     preserveState: false,
                     preserveScroll: false
                 });

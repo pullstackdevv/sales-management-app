@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from '@inertiajs/react';
-import { Search, Star, ShoppingCart } from 'lucide-react';
+import { Search, Star, ShoppingCart, Heart } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { productsAPI } from '@/api/products';
 
@@ -17,6 +17,7 @@ const ProductList = () => {
     per_page: 12,
     total: 0,
   });
+  const [wishlistIds, setWishlistIds] = useState([]);
 
   // Derive categories from currently loaded products
   const categories = useMemo(() => {
@@ -62,6 +63,12 @@ const ProductList = () => {
   };
 
   useEffect(() => {
+    // load wishlist from session once on mount
+    try {
+      const raw = sessionStorage.getItem('wishlist');
+      const ids = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(ids)) setWishlistIds(ids);
+    } catch {}
     fetchProducts();
   }, [pagination.current_page, selectedCategory, sortBy, searchTerm]);
 
@@ -128,33 +135,54 @@ const ProductList = () => {
       minimumFractionDigits: 0,
     }).format(price);
 
-  const ProductCard = ({ product }) => (
-    <Link href={`/products/${product.id}`} className="block group">
-      <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
-        <div className="relative overflow-hidden">
-          <img
-           src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
-                                    alt={product.name}
-            className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
-        </div>
-        <div className="p-5">
-          <h3 className="text-sm font-medium text-gray-900 mb-3 line-clamp-2 leading-relaxed group-hover:text-gray-700 transition-colors">
-            {product.name}
-          </h3>
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-              {formatPrice(product.base_price ?? product.price ?? 0)}
-            </span>
-            <button className="p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110">
-              <ShoppingCart className="h-4 w-4" />
+  const toggleWishlist = (productId) => {
+    setWishlistIds((prev) => {
+      const set = new Set(prev);
+      if (set.has(productId)) set.delete(productId); else set.add(productId);
+      const next = Array.from(set);
+      sessionStorage.setItem('wishlist', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const ProductCard = ({ product }) => {
+    const liked = wishlistIds.includes(product.id);
+    return (
+      <Link href={`/products/${product.id}`} className="block group">
+        <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
+          <div className="relative overflow-hidden">
+            <img
+              src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'}
+              alt={product.name}
+              className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product.id); }}
+              className={`absolute top-3 right-3 p-2 rounded-full shadow-sm transition-all duration-200 ${liked ? 'bg-red-500 text-white' : 'bg-white text-gray-500 hover:text-red-500 hover:bg-red-50'}`}
+              aria-label={liked ? 'Hapus dari Wishlist' : 'Tambah ke Wishlist'}
+            >
+              <Heart className="h-5 w-5" />
             </button>
           </div>
+          <div className="p-5">
+            <h3 className="text-sm font-medium text-gray-900 mb-3 line-clamp-2 leading-relaxed group-hover:text-gray-700 transition-colors">
+              {product.name}
+            </h3>
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                {formatPrice(product.base_price ?? product.price ?? 0)}
+              </span>
+              <button className="p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110">
+                <ShoppingCart className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </Link>
-  );
+      </Link>
+    );
+  };
 
   if (loading && products.length === 0) {
     return (

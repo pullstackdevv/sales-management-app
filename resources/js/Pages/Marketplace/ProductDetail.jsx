@@ -120,9 +120,57 @@ export default function ProductDetail() {
     const discount = product?.originalPrice ? Math.round(((product.originalPrice - (product.base_price || product.price)) / product.originalPrice) * 100) : 0;
 
     const addToCart = () => {
-        if (product && product.is_active !== false && selectedVariant && getCurrentStock() > 0) {
-            const variantInfo = selectedVariant ? ` (${selectedVariant.variant_label})` : '';
-            alert(`${product.name}${variantInfo} sebanyak ${quantity} berhasil ditambahkan ke keranjang!`);
+        if (!(product && product.is_active !== false && selectedVariant && getCurrentStock() > 0)) {
+            return;
+        }
+
+        try {
+            const raw = sessionStorage.getItem('cart');
+            const existing = raw ? JSON.parse(raw) : [];
+
+            // Normalize current item
+            const img = product.image;
+            const imageUrl = img ? (String(img).startsWith('http') ? img : `/storage/${img}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg';
+
+            const item = {
+                id: selectedVariant.id, // use variant id as unique key per selection
+                product_id: product.id,
+                variant_id: selectedVariant.id,
+                name: product.name,
+                variant_label: selectedVariant.variant_label,
+                price: Number(getCurrentPrice()),
+                image: imageUrl,
+                quantity: Number(quantity),
+                stock: Number(getCurrentStock()),
+                selected: true,
+            };
+
+            // Merge with existing if same variant already in cart
+            let merged = false;
+            const next = existing.map((it) => {
+                if ((it.variant_id ?? it.id) === item.variant_id) {
+                    merged = true;
+                    const newQty = Math.min((Number(it.quantity) || 0) + item.quantity, item.stock);
+                    return { ...it, quantity: newQty, selected: true };
+                }
+                return it;
+            });
+
+            if (!merged) {
+                next.push(item);
+            }
+
+            sessionStorage.setItem('cart', JSON.stringify(next));
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Ditambahkan ke Keranjang',
+                text: `${product.name} (${selectedVariant.variant_label}) x${quantity}`,
+                timer: 1500,
+                showConfirmButton: false
+            });
+        } catch (e) {
+            console.error('Failed to add to cart', e);
         }
     };
 

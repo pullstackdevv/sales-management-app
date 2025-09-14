@@ -235,6 +235,10 @@ Route::get('/products', function () {
     return Inertia::render('Marketplace/ProductList');
 })->name('marketplace.products');
 
+Route::get('/categories', function () {
+    return Inertia::render('Marketplace/Categories');
+})->name('marketplace.categories');
+
 Route::get('/products/{id}', function ($id) {
     return Inertia::render('Marketplace/ProductDetail', ['id' => $id]);
 })->name('marketplace.product.detail');
@@ -242,6 +246,10 @@ Route::get('/products/{id}', function ($id) {
 Route::get('/cart', function () {
     return Inertia::render('Marketplace/Cart');
 })->name('marketplace.cart');
+
+Route::get('/wishlist', function () {
+    return Inertia::render('Marketplace/Wishlist');
+})->name('marketplace.wishlist');
 
 Route::get('/checkout', function () {
     return Inertia::render('Marketplace/Checkout');

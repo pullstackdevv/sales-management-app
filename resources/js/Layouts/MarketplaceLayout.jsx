@@ -37,12 +37,6 @@ export default function MarketplaceLayout({ children }) {
                             <Link href="/" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                                 Beranda
                             </Link>
-                            <Link href="/products" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
-                                Produk
-                            </Link>
-                            <Link href="/categories" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
-                                Kategori
-                            </Link>
                             {/* <Link href="/promotions" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
                                 Promosi
                             </Link> */}
@@ -97,13 +91,6 @@ export default function MarketplaceLayout({ children }) {
                             >
                                 <Home className="h-5 w-5" />
                                 <span>Beranda</span>
-                            </Link>
-                            <Link
-                                href="/products"
-                                className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium"
-                            >
-                                <Package className="h-5 w-5" />
-                                <span>Produk</span>
                             </Link>
                             <Link
                                 href="/cart"

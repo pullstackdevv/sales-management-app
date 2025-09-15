@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { productsAPI } from '@/api/products';
-import { Grid, List, Search, Filter, ShoppingCart, Heart } from 'lucide-react';
+import { Grid, List, Search, Filter, ShoppingCart } from 'lucide-react';
 
 export default function Categories() {
     const [products, setProducts] = useState([]);
@@ -12,27 +12,11 @@ export default function Categories() {
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState('grid');
     const [sortBy, setSortBy] = useState('name');
-    const [wishlistIds, setWishlistIds] = useState([]);
 
     useEffect(() => {
-        // Load wishlist once
-        try {
-            const raw = sessionStorage.getItem('wishlist');
-            const ids = raw ? JSON.parse(raw) : [];
-            if (Array.isArray(ids)) setWishlistIds(ids);
-        } catch {}
         fetchProducts();
     }, [selectedCategory, searchQuery, sortBy]);
 
-    const toggleWishlist = (productId) => {
-        setWishlistIds((prev) => {
-            const set = new Set(prev);
-            if (set.has(productId)) set.delete(productId); else set.add(productId);
-            const next = Array.from(set);
-            sessionStorage.setItem('wishlist', JSON.stringify(next));
-            return next;
-        });
-    };
 
     const fetchProducts = async () => {
         try {
@@ -79,7 +63,6 @@ export default function Categories() {
     };
 
     const ProductCard = ({ product }) => {
-        const liked = wishlistIds.includes(product.id);
         return (
         <Link href={`/products/${product.id}`} className="block group">
             <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
@@ -90,14 +73,6 @@ export default function Categories() {
                         className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product.id); }}
-                        className={`absolute top-3 right-3 p-2 rounded-full shadow-sm transition-all duration-200 ${liked ? 'bg-red-500 text-white' : 'bg-white text-gray-500 hover:text-red-500 hover:bg-red-50'}`}
-                        aria-label={liked ? 'Hapus dari Wishlist' : 'Tambah ke Wishlist'}
-                    >
-                        <Heart className="h-5 w-5" />
-                    </button>
                 </div>
                 <div className="p-5">
                     <h3 className="text-sm font-medium text-gray-900 mb-3 line-clamp-2 leading-relaxed group-hover:text-gray-700 transition-colors">{product.name}</h3>
@@ -115,7 +90,6 @@ export default function Categories() {
     ); };
 
     const ProductListItem = ({ product }) => {
-        const liked = wishlistIds.includes(product.id);
         return (
         <Link href={`/products/${product.id}`} className="block group">
             <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden">
@@ -141,14 +115,6 @@ export default function Categories() {
                             </button>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product.id); }}
-                        className={`ml-2 p-2 rounded-full shadow-sm transition-all duration-200 ${liked ? 'bg-red-500 text-white' : 'bg-gray-50 text-gray-500 hover:text-red-500 hover:bg-red-50'}`}
-                        aria-label={liked ? 'Hapus dari Wishlist' : 'Tambah ke Wishlist'}
-                    >
-                        <Heart className="h-5 w-5" />
-                    </button>
                 </div>
             </div>
         </Link>

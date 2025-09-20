@@ -16,14 +16,12 @@ class Product extends Model
         'category',
         'description',
         'image',
-        'base_price',
         'is_active',
         'is_storefront',
         'created_by',
     ];
 
     protected $casts = [
-        'base_price' => 'decimal:2',
         'is_active' => 'boolean',
         'is_storefront' => 'boolean',
     ];
@@ -42,5 +40,30 @@ class Product extends Model
     public function variants()
     {
         return $this->hasMany(ProductVariant::class);
+    }
+
+    // Helper method to get the minimum price from variants
+    public function getMinPriceAttribute()
+    {
+        return $this->variants()->min('price') ?? 0;
+    }
+
+    // Helper method to get the maximum price from variants
+    public function getMaxPriceAttribute()
+    {
+        return $this->variants()->max('price') ?? 0;
+    }
+
+    // Helper method to get price range
+    public function getPriceRangeAttribute()
+    {
+        $min = $this->min_price;
+        $max = $this->max_price;
+        
+        if ($min == $max) {
+            return number_format($min, 0, ',', '.');
+        }
+        
+        return number_format($min, 0, ',', '.') . ' - ' . number_format($max, 0, ',', '.');
     }
 }

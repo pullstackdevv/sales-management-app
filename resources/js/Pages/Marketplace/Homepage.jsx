@@ -267,14 +267,14 @@ const Homepage = () => {
                 return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             case 'price_asc':
                 return sorted.sort((a, b) => {
-                    const priceA = a.base_price || a.price || 0;
-                    const priceB = b.base_price || b.price || 0;
+                    const priceA = a.price || a.base_price || a.min_price || 0;
+                    const priceB = b.price || b.base_price || b.min_price || 0;
                     return priceA - priceB;
                 });
             case 'price_desc':
                 return sorted.sort((a, b) => {
-                    const priceA = a.base_price || a.price || 0;
-                    const priceB = b.base_price || b.price || 0;
+                    const priceA = a.price || a.base_price || a.min_price || 0;
+                    const priceB = b.price || b.base_price || b.min_price || 0;
                     return priceB - priceA;
                 });
             case 'stock':
@@ -310,7 +310,7 @@ const Homepage = () => {
                         
                         <div className="flex items-center justify-between">
                             <span className="text-lg sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                {formatPrice(product.base_price || product.price)}
+                                {formatPrice(product.price || product.base_price || product.min_price)}
                             </span>
                             <button 
                                 onClick={(e) => {
@@ -373,7 +373,7 @@ const Homepage = () => {
                             </h3>
                             <div className="flex items-center justify-between">
                                 <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                    {formatPrice(product.base_price || product.price)}
+                                    {formatPrice(product.price || product.base_price || product.min_price)}
                                 </span>
                                 <button 
                                     onClick={(e) => {

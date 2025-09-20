@@ -96,7 +96,11 @@ export default function ProductDetail() {
         if (selectedVariant) {
             return selectedVariant.price;
         }
-        return product.base_price || product.price;
+        // Get price from first variant or min_price
+        if (product.variants && product.variants.length > 0) {
+            return product.variants[0].price;
+        }
+        return product.price || product.min_price || 0;
     };
 
     const getCurrentStock = () => {
@@ -119,7 +123,7 @@ export default function ProductDetail() {
         }).format(price);
     };
 
-    const discount = product?.originalPrice ? Math.round(((product.originalPrice - (product.base_price || product.price)) / product.originalPrice) * 100) : 0;
+    const discount = product?.originalPrice ? Math.round(((product.originalPrice - getCurrentPrice()) / product.originalPrice) * 100) : 0;
 
     const addToCart = () => {
         if (!(product && product.is_active !== false && selectedVariant && getCurrentStock() > 0)) {

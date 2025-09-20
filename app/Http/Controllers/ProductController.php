@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\ProductVariant;
-use Illuminate\Http\JsonResponse;
+use App\Http\Resources\ProductResource;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -48,8 +49,32 @@ class ProductController extends Controller
             ->when($request->category, function($query, $category) {
                 $query->where('category', $category);
             })
-            ->when($request->sort_by, function ($query, $sortBy) use ($request) {
-                $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
+            ->when($request->sort, function ($query, $sort) {
+                switch ($sort) {
+                    case 'name':
+                        $query->orderBy('name', 'asc');
+                        break;
+                    case 'price_asc':
+                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
+                              ->selectRaw('products.*, MIN(product_variants.price) as min_variant_price')
+                              ->groupBy('products.id')
+                              ->orderBy('min_variant_price', 'asc');
+                        break;
+                    case 'price_desc':
+                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
+                              ->selectRaw('products.*, MIN(product_variants.price) as min_variant_price')
+                              ->groupBy('products.id')
+                              ->orderBy('min_variant_price', 'desc');
+                        break;
+                    case 'stock':
+                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
+                              ->selectRaw('products.*, SUM(product_variants.stock) as total_stock')
+                              ->groupBy('products.id')
+                              ->orderBy('total_stock', 'desc');
+                        break;
+                    default:
+                        $query->latest();
+                }
             }, function ($query) {
                 $query->latest();
             })
@@ -57,7 +82,13 @@ class ProductController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $products
+            'data' => [
+                'data' => ProductResource::collection($products->items()),
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+            ]
         ]);
     }
 
@@ -65,16 +96,15 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'sku' => 'required|string|max:100|unique:products,sku',
+            'sku' => 'required|string|max:255|unique:products,sku',
             'description' => 'nullable|string',
             'category' => 'required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'base_price' => 'required|numeric|min:0',
             'is_active' => 'boolean',
             'is_storefront' => 'boolean',
             'variants' => 'required|array|min:1',
             'variants.*.variant_label' => 'required|string|max:255',
-            'variants.*.sku' => 'required|string|max:50|unique:product_variants,sku',
+            'variants.*.sku' => 'required|string|max:255',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
@@ -96,7 +126,6 @@ class ProductController extends Controller
                 'description' => $validated['description'],
                 'category' => $validated['category'],
                 'image' => $imagePath,
-                'base_price' => $validated['base_price'],
                 'is_active' => $validated['is_active'] ?? true,
                 'is_storefront' => $validated['is_storefront'] ?? true,
                 'created_by' => Auth::id()
@@ -114,7 +143,7 @@ class ProductController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Product created successfully',
-                'data' => $product->load(['variants', 'createdBy'])
+                'data' => new ProductResource($product->load(['variants', 'createdBy']))
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -126,7 +155,7 @@ class ProductController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $product->load(['variants', 'createdBy'])
+            'data' => new ProductResource($product->load(['variants', 'createdBy']))
         ]);
     }
 
@@ -139,7 +168,6 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'category' => 'sometimes|required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'base_price' => 'sometimes|required|numeric|min:0',
             'is_active' => 'boolean',
             'is_storefront' => 'boolean',
             'variants' => 'sometimes|required|array|min:1',
@@ -189,7 +217,6 @@ class ProductController extends Controller
                 'description' => $validated['description'] ?? $product->description,
                 'category' => $validated['category'] ?? $product->category,
                 'image' => $imagePath,
-                'base_price' => $validated['base_price'] ?? $product->base_price,
                 'is_active' => $validated['is_active'] ?? $product->is_active,
                 'is_storefront' => $validated['is_storefront'] ?? $product->is_storefront,
                 'updated_by' => Auth::id()
@@ -231,7 +258,7 @@ class ProductController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Product updated successfully',
-                'data' => $product->fresh()->load(['variants', 'createdBy'])
+                'data' => new ProductResource($product->load(['variants', 'createdBy']))
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

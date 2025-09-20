@@ -14,7 +14,6 @@ export default function ProductEdit() {
     category: "",
     description: "",
     image: "",
-    base_price: 0,
     is_active: true,
     is_storefront: true,
     variants: []
@@ -61,14 +60,13 @@ export default function ProductEdit() {
       const productData = response.data.data;
       
       setProduct({
-        name: productData.name || '',
-        sku: productData.sku || '',
-        category: productData.category || '',
-        description: productData.description || '',
-        image: productData.image || '',
-        base_price: productData.base_price || 0,
-        is_active: productData.is_active ?? true,
-        is_storefront: productData.is_storefront ?? true,
+        name: productData?.name || "",
+        sku: productData?.sku || "",
+        category: productData?.category || "",
+        description: productData?.description || "",
+        image: null,
+        is_active: productData?.is_active ?? true,
+        is_storefront: productData?.is_storefront ?? true,
         variants: productData.variants || []
       });
     } catch (error) {
@@ -167,13 +165,12 @@ export default function ProductEdit() {
       formData.append('_method', 'PUT');
       
       // Append basic product data
-       formData.append('name', product.name);
-       formData.append('sku', product.sku);
-       formData.append('description', product.description);
-       formData.append('category', product.category);
-       formData.append('base_price', product.base_price);
-       formData.append('is_active', product.is_active ? '1' : '0');
-       formData.append('is_storefront', product.is_storefront ? '1' : '0');
+      formData.append('name', product.name);
+      formData.append('sku', product.sku);
+      formData.append('description', product.description);
+      formData.append('category', product.category);
+      formData.append('is_active', product.is_active ? '1' : '0');
+      formData.append('is_storefront', product.is_storefront ? '1' : '0');
       
       // Append image file if exists (only if user selected a new file)
       if (product.image && typeof product.image !== 'string') {
@@ -360,24 +357,6 @@ export default function ProductEdit() {
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Harga Dasar*</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className={`w-full border px-3 py-2 rounded-md ${
-                        errors.base_price ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Masukkan harga dasar..."
-                      value={product.base_price}
-                      onChange={(e) => setProduct({ ...product, base_price: parseFloat(e.target.value) || 0 })}
-                      required
-                    />
-                    {errors.base_price && (
-                      <p className="text-red-500 text-xs mt-1">{errors.base_price[0]}</p>
-                    )}
-                  </div>
                 </div>
               </div>
 

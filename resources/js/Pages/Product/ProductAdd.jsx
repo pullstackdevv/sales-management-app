@@ -12,7 +12,6 @@ export default function ProductAdd() {
     category: "",
     description: "",
     image: "",
-    base_price: 0,
     is_active: true,
     is_storefront: true,
     variants: [
@@ -76,7 +75,6 @@ export default function ProductAdd() {
       formData.append('sku', product.sku);
       formData.append('description', product.description);
       formData.append('category', product.category);
-      formData.append('base_price', product.base_price);
       formData.append('is_active', product.is_active ? '1' : '0');
       formData.append('is_storefront', product.is_storefront ? '1' : '0');
       
@@ -237,24 +235,6 @@ export default function ProductAdd() {
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Harga Dasar*</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className={`w-full border px-3 py-2 rounded-md ${
-                        errors.base_price ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Masukkan harga dasar..."
-                      value={product.base_price}
-                      onChange={(e) => setProduct({ ...product, base_price: parseFloat(e.target.value) || 0 })}
-                      required
-                    />
-                    {errors.base_price && (
-                      <p className="text-red-500 text-xs mt-1">{errors.base_price[0]}</p>
-                    )}
-                  </div>
                 </div>
               </div>
 

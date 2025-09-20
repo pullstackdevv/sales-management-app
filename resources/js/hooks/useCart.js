@@ -29,8 +29,8 @@ export const useCart = () => {
             const mapped = items.map((it, idx) => {
                 const img = it.image || it.product_image || it.thumbnail;
                 const imgUrl = img ? (String(img).startsWith('http') ? img : `${img}`) : '/assets/images/products/placeholder.jpg';
-                const price = Number(it.price ?? it.base_price ?? it.product_price ?? 0);
-                const original = Number(it.originalPrice ?? it.original_price ?? it.price ?? price);
+                const price = Number(it.price ?? it.product_price ?? 0);
+                const original = Number(it.originalPrice ?? it.original_price ?? price);
                 return {
                     id: it.variant_id ?? it.id ?? it.product_id ?? idx + 1,
                     product_id: it.product_id ?? it.id,
@@ -93,16 +93,19 @@ export const useCart = () => {
 
     // Add item to cart
     const addToCart = useCallback((product, quantity = 1, variant = null) => {
+        // If no variant provided, use first variant or create default
+        const selectedVariant = variant || (product.variants && product.variants.length > 0 ? product.variants[0] : null);
+        
         const newItem = {
-            id: variant?.id || product.id,
+            id: selectedVariant?.id || product.id,
             product_id: product.id,
-            variant_id: variant?.id || product.id,
+            variant_id: selectedVariant?.id || product.id,
             name: product.name,
-            variant_label: variant?.variant_label || null,
-            price: variant?.price || product.base_price || product.price,
+            variant_label: selectedVariant?.variant_label || 'Default',
+            price: selectedVariant?.price || product.price || product.min_price || 0,
             image: product.image,
             quantity: quantity,
-            stock: variant?.stock || product.stock || 99,
+            stock: selectedVariant?.stock || product.stock || 99,
             selected: true,
         };
 

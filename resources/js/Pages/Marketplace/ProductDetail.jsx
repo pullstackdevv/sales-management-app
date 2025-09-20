@@ -15,6 +15,7 @@ import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { checkoutSession } from '@/utils/checkoutSession';
+import { useCart } from '@/hooks/useCart';
 
 export default function ProductDetail() {
     const { id } = usePage().props;
@@ -25,6 +26,7 @@ export default function ProductDetail() {
     const [quantity, setQuantity] = useState(1);
     const [activeTab, setActiveTab] = useState('description');
     const [selectedVariant, setSelectedVariant] = useState(null);
+    const { addToCart: addToCartHook } = useCart();
     
     // Order states
     const [showOrderModal, setShowOrderModal] = useState(false);
@@ -125,42 +127,8 @@ export default function ProductDetail() {
         }
 
         try {
-            const raw = sessionStorage.getItem('cart');
-            const existing = raw ? JSON.parse(raw) : [];
-
-            // Normalize current item
-            const img = product.image;
-            const imageUrl = img ? (String(img).startsWith('http') ? img : `/storage/${img}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg';
-
-            const item = {
-                id: selectedVariant.id, // use variant id as unique key per selection
-                product_id: product.id,
-                variant_id: selectedVariant.id,
-                name: product.name,
-                variant_label: selectedVariant.variant_label,
-                price: Number(getCurrentPrice()),
-                image: imageUrl,
-                quantity: Number(quantity),
-                stock: Number(getCurrentStock()),
-                selected: true,
-            };
-
-            // Merge with existing if same variant already in cart
-            let merged = false;
-            const next = existing.map((it) => {
-                if ((it.variant_id ?? it.id) === item.variant_id) {
-                    merged = true;
-                    const newQty = Math.min((Number(it.quantity) || 0) + item.quantity, item.stock);
-                    return { ...it, quantity: newQty, selected: true };
-                }
-                return it;
-            });
-
-            if (!merged) {
-                next.push(item);
-            }
-
-            sessionStorage.setItem('cart', JSON.stringify(next));
+            // Use the cart hook to add item
+            addToCartHook(product, quantity, selectedVariant);
 
             Swal.fire({
                 icon: 'success',
@@ -171,6 +139,13 @@ export default function ProductDetail() {
             });
         } catch (e) {
             console.error('Failed to add to cart', e);
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menambahkan ke Keranjang',
+                text: 'Terjadi kesalahan saat menambahkan produk ke keranjang',
+                timer: 2000,
+                showConfirmButton: false
+            });
         }
     };
 
@@ -359,10 +334,10 @@ export default function ProductDetail() {
 
     return (
         <MarketplaceLayout>
-            <div className="min-h-screen bg-gray-50 py-6">
+            <div className="min-h-screen bg-gray-50 py-4 sm:py-6">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
                         {/* Product Image */}
                         <div className="space-y-4">
                             <div className="aspect-square w-full rounded-sm overflow-hidden bg-white border border-gray-100">
@@ -377,7 +352,7 @@ export default function ProductDetail() {
                         {/* Product Info */}
                         <div className="space-y-6">
                             <div>
-                                <h1 className="text-2xl font-normal text-gray-800 leading-tight">
+                                <h1 className="text-xl sm:text-2xl lg:text-3xl font-normal text-gray-800 leading-tight">
                                     {product.name}
                                 </h1>
                             </div>
@@ -385,11 +360,11 @@ export default function ProductDetail() {
                             {/* Price */}
                             <div className="space-y-3">
                                 <div className="flex items-center space-x-3">
-                                    <span className="text-2xl font-medium text-gray-900">
+                                    <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
                                         {formatPrice(getCurrentPrice())}
                                     </span>
                                 </div>
-                                <p className={`text-sm ${
+                                <p className={`text-base sm:text-sm ${
                                     product.is_active !== false && getCurrentStock() > 0 ? 'text-green-600' : 'text-red-500'
                                 }`}>
                                     {product.is_active !== false && getCurrentStock() > 0 ? `Stok: ${getCurrentStock()}` : 'Tidak Tersedia'}
@@ -399,10 +374,10 @@ export default function ProductDetail() {
                             {/* Variants */}
                             {product.variants && product.variants.length > 0 && (
                                 <div className="space-y-3">
-                                    <label className="text-sm font-normal text-gray-600">
+                                    <label className="text-base sm:text-sm font-normal text-gray-600">
                                         Pilih Variant
                                     </label>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
                                         {product.variants.map((variant) => (
                                             <button
                                                 key={variant.id}
@@ -411,7 +386,7 @@ export default function ProductDetail() {
                                                     setQuantity(1); // Reset quantity when variant changes
                                                 }}
                                                 disabled={!variant.is_active || variant.stock <= 0}
-                                                className={`p-3 text-left border rounded-sm text-sm transition-all duration-200 ${
+                                                className={`p-4 sm:p-3 text-left border rounded-lg sm:rounded-sm text-base sm:text-sm transition-all duration-200 ${
                                                     selectedVariant?.id === variant.id
                                                         ? 'border-gray-700 bg-gray-50'
                                                         : 'border-gray-200 hover:border-gray-300'
@@ -424,10 +399,10 @@ export default function ProductDetail() {
                                                 <div className="font-normal text-gray-800">
                                                     {variant.variant_label}
                                                 </div>
-                                                <div className="text-xs text-gray-500 mt-1">
+                                                <div className="text-sm sm:text-xs text-gray-500 mt-1">
                                                     {variant.stock > 0 ? `Stok: ${variant.stock}` : 'Habis'}
                                                 </div>
-                                                <div className="text-xs text-gray-600 mt-1">
+                                                <div className="text-sm sm:text-xs text-gray-600 mt-1">
                                                     {formatPrice(variant.price)}
                                                 </div>
                                             </button>
@@ -438,31 +413,31 @@ export default function ProductDetail() {
 
                             {/* Quantity */}
                             <div className="space-y-3">
-                                <label className="text-sm font-normal text-gray-600">
+                                <label className="text-base sm:text-sm font-normal text-gray-600">
                                     Jumlah
                                 </label>
                                 <div className="flex items-center space-x-3">
-                                    <div className="flex items-center border border-gray-200 rounded-sm bg-white">
+                                    <div className="flex items-center border border-gray-200 rounded-lg sm:rounded-sm bg-white">
                                         <button
                                             onClick={() => setQuantity(Math.max(1, quantity - 1))}
                                             disabled={quantity <= 1 || product.is_active === false || getCurrentStock() <= 0}
-                                            className="p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
+                                            className="p-3 sm:p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
                                         >
-                                            <span className="text-sm">-</span>
+                                            <span className="text-base sm:text-sm">-</span>
                                         </button>
-                                        <span className="px-4 py-2 text-sm font-normal min-w-[40px] text-center">
+                                        <span className="px-4 py-3 sm:py-2 text-base sm:text-sm font-normal min-w-[50px] sm:min-w-[40px] text-center">
                                             {quantity}
                                         </span>
                                         <button
                                             onClick={() => setQuantity(Math.min(getMaxQuantity(), quantity + 1))}
                                             disabled={product.is_active === false || getCurrentStock() <= 0 || quantity >= getMaxQuantity()}
-                                            className="p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
+                                            className="p-3 sm:p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-600"
                                         >
-                                            <span className="text-sm">+</span>
+                                            <span className="text-base sm:text-sm">+</span>
                                         </button>
                                     </div>
                                     {getCurrentStock() > 0 && (
-                                        <span className="text-xs text-gray-400">
+                                        <span className="text-sm sm:text-xs text-gray-400">
                                             Maksimal {getCurrentStock()}
                                         </span>
                                     )}
@@ -474,19 +449,19 @@ export default function ProductDetail() {
                                 <button
                                     onClick={addToCart}
                                     disabled={product.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
-                                    className={`w-full py-2.5 px-4 border text-sm font-normal transition-all duration-200 flex items-center justify-center ${
+                                    className={`w-full py-3 sm:py-2.5 px-4 border text-base sm:text-sm font-normal transition-all duration-200 flex items-center justify-center rounded-lg sm:rounded-sm ${
                                         product.is_active !== false && getCurrentStock() > 0 && selectedVariant
                                             ? 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 bg-white' 
                                             : 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
                                     }`}
                                 >
-                                    <ShoppingCart className="h-4 w-4 mr-2" />
+                                    <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
                                     Tambah ke Keranjang
                                 </button>
                                 <button
                                     onClick={buyNow}
                                     disabled={product.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
-                                    className={`w-full py-2.5 px-4 text-sm font-normal transition-all duration-200 ${
+                                    className={`w-full py-3 sm:py-2.5 px-4 text-base sm:text-sm font-normal transition-all duration-200 rounded-lg sm:rounded-sm ${
                                         product.is_active !== false && getCurrentStock() > 0 && selectedVariant
                                             ? 'bg-gray-800 text-white hover:bg-gray-900' 
                                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -501,16 +476,16 @@ export default function ProductDetail() {
                     </div>
 
                     {/* Product Details */}
-                    <div className="bg-white rounded-sm border border-gray-100">
+                    <div className="bg-white rounded-lg sm:rounded-sm border border-gray-100">
                         <div className="border-b border-gray-100">
-                            <nav className="flex space-x-6 px-4">
+                            <nav className="flex space-x-6 px-4 sm:px-4">
                                 {[
                                     { id: 'description', label: 'Deskripsi' }
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`py-3 px-1 border-b-2 text-sm font-normal ${
+                                        className={`py-4 sm:py-3 px-1 border-b-2 text-base sm:text-sm font-normal ${
                                             activeTab === tab.id
                                                 ? 'border-gray-700 text-gray-800'
                                                 : 'border-transparent text-gray-500 hover:text-gray-600'
@@ -522,20 +497,20 @@ export default function ProductDetail() {
                             </nav>
                         </div>
 
-                        <div className="p-4">
+                        <div className="p-4 sm:p-4">
                             {activeTab === 'description' && (
                                 <div className="prose max-w-none">
-                                    <p className="text-gray-600 leading-relaxed text-sm">
+                                    <p className="text-gray-600 leading-relaxed text-base sm:text-sm">
                                         {product.description || 'Deskripsi produk tidak tersedia.'}
                                     </p>
                                     {product.features && product.features.length > 0 && (
                                         <div className="mt-6">
-                                            <h4 className="font-normal text-gray-800 mb-3 text-base">Fitur Utama:</h4>
+                                            <h4 className="font-normal text-gray-800 mb-3 text-lg sm:text-base">Fitur Utama:</h4>
                                             <ul className="space-y-2">
                                                 {product.features.map((feature, index) => (
                                                     <li key={index} className="flex items-center space-x-2">
-                                                        <CheckCircle className="h-4 w-4 text-gray-400" />
-                                                        <span className="text-gray-600 text-sm">{feature}</span>
+                                                        <CheckCircle className="h-5 w-5 sm:h-4 sm:w-4 text-gray-400" />
+                                                        <span className="text-gray-600 text-base sm:text-sm">{feature}</span>
                                                     </li>
                                                 ))}
                                             </ul>

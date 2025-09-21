@@ -178,6 +178,15 @@ export default function ProductData() {
               const minPrice = product.variants?.length > 0 
                 ? Math.min(...product.variants.map(v => v.price))
                 : 0;
+              const maxPrice = product.variants?.length > 0 
+                ? Math.max(...product.variants.map(v => v.price))
+                : 0;
+              const minBasePrice = product.variants?.length > 0 
+                ? Math.min(...product.variants.map(v => v.base_price || 0))
+                : 0;
+              const maxBasePrice = product.variants?.length > 0 
+                ? Math.max(...product.variants.map(v => v.base_price || 0))
+                : 0;
 
               return (
                 <div key={product.id}>
@@ -202,9 +211,23 @@ export default function ProductData() {
                     </div>
                     <div className="col-span-3">
                       <p className="text-blue-600 font-medium">{product.name}</p>
-                      <p className="text-gray-600">
-                        {product.variants?.length > 0 ? formatCurrency(minPrice) : 'Belum ada harga'}
-                      </p>
+                      <div className="space-y-1">
+                        <p className="text-gray-800 font-medium">
+                          {product.variants?.length > 0 ? (
+                            minPrice === maxPrice 
+                              ? formatCurrency(minPrice)
+                              : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`
+                          ) : 'Belum ada harga'}
+                        </p>
+                        {minBasePrice > 0 && (
+                          <p className="text-gray-500 text-xs">
+                            Modal: {minBasePrice === maxBasePrice 
+                              ? formatCurrency(minBasePrice)
+                              : `${formatCurrency(minBasePrice)} - ${formatCurrency(maxBasePrice)}`
+                            }
+                          </p>
+                        )}
+                      </div>
                       {product.description && (
                         <p className="text-xs text-gray-500 mt-1">{product.description}</p>
                       )}
@@ -280,48 +303,72 @@ export default function ProductData() {
                             <tr>
                               <th className="px-3 py-2">Nama Varian</th>
                               <th className="px-3 py-2">SKU</th>
-                              <th className="px-3 py-2">Harga</th>
+                              <th className="px-3 py-2">Harga Jual</th>
+                              <th className="px-3 py-2">Harga Modal</th>
+                              <th className="px-3 py-2">Margin</th>
                               <th className="px-3 py-2">Stok</th>
                               <th className="px-3 py-2">Status</th>
                               <th className="px-3 py-2">Aksi</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {product.variants.map((variant) => (
-                              <tr key={variant.id} className="border-b">
-                                <td className="px-3 py-2">{variant.name || variant.variant_label}</td>
-                                <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
-                                <td className="px-3 py-2">{formatCurrency(variant.price)}</td>
-                                <td className="px-3 py-2">
-                                  <button
-                                    onClick={() => openStockHistoryModal({ ...variant, product })}
-                                    className={`font-semibold hover:underline cursor-pointer ${
-                                      variant.stock === 0 ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'
-                                    }`}
-                                    title="Klik untuk melihat riwayat stok"
-                                  >
-                                    {variant.stock}
-                                  </button>
-                                </td>
-                                <td className="px-3 py-2">
-                                  {variant.is_active ? (
-                                    <span className="text-green-600 text-xs">Aktif</span>
-                                  ) : (
-                                    <span className="text-gray-500 text-xs">Nonaktif</span>
-                                  )}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <button
-                                    onClick={() => openStockAdjustmentModal({ ...variant, product })}
-                                    className="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 border border-blue-300 rounded hover:bg-blue-50 transition-colors"
-                                    title="Tambah/Kurangi Stok"
-                                  >
-                                    <Icon icon="material-symbols:inventory" className="inline mr-1" />
-                                    Stok
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
+                            {product.variants.map((variant) => {
+                              const profitMargin = variant.base_price > 0 
+                                ? (((variant.price - variant.base_price) / variant.base_price) * 100).toFixed(1)
+                                : 0;
+                              
+                              return (
+                                <tr key={variant.id} className="border-b">
+                                  <td className="px-3 py-2">{variant.name || variant.variant_label}</td>
+                                  <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
+                                  <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>
+                                  <td className="px-3 py-2 text-gray-600">
+                                    {variant.base_price > 0 ? formatCurrency(variant.base_price) : '-'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {variant.base_price > 0 ? (
+                                      <span className={`text-xs px-2 py-1 rounded ${
+                                        profitMargin >= 30 ? 'bg-green-100 text-green-800' :
+                                        profitMargin >= 15 ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
+                                      }`}>
+                                        +{profitMargin}%
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 text-xs">-</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <button
+                                      onClick={() => openStockHistoryModal({ ...variant, product })}
+                                      className={`font-semibold hover:underline cursor-pointer ${
+                                        variant.stock === 0 ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'
+                                      }`}
+                                      title="Klik untuk melihat riwayat stok"
+                                    >
+                                      {variant.stock}
+                                    </button>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {variant.is_active ? (
+                                      <span className="text-green-600 text-xs">Aktif</span>
+                                    ) : (
+                                      <span className="text-gray-500 text-xs">Nonaktif</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <button
+                                      onClick={() => openStockAdjustmentModal({ ...variant, product })}
+                                      className="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 border border-blue-300 rounded hover:bg-blue-50 transition-colors"
+                                      title="Tambah/Kurangi Stok"
+                                    >
+                                      <Icon icon="material-symbols:inventory" className="inline mr-1" />
+                                      Stok
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       ) : (

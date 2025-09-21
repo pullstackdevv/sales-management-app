@@ -4,18 +4,32 @@ import {
     Star, 
     ShoppingCart, 
     ArrowRight,
-    Heart
+    Search,
+    Filter,
+    Grid,
+    List
 } from "lucide-react";
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { productsAPI } from '@/api/products';
+import { useCart } from '@/hooks/useCart';
+import Swal from 'sweetalert2';
 
 const Homepage = () => {
-    const [activeCategory, setActiveCategory] = useState("all");
     const [products, setProducts] = useState([]);
-    const [featuredProducts, setFeaturedProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchLoading, setSearchLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [wishlistIds, setWishlistIds] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [sortBy, setSortBy] = useState('name');
+    const [viewMode, setViewMode] = useState('grid');
+    const [pagination, setPagination] = useState({
+        current_page: 1,
+        last_page: 1,
+        per_page: 1000, // Set high value to fetch all products
+        total: 0,
+    });
+    const { addToCart } = useCart();
 
     // Derive categories from loaded products (fallback to string/slug if available)
     const categories = useMemo(() => {
@@ -44,15 +58,26 @@ const Homepage = () => {
         return Array.from(map.values());
     }, [products]);
 
-    const fetchProducts = useCallback(async () => {
+    const fetchProducts = useCallback(async (page = 1) => {
         try {
             setLoading(true);
-            const response = await productsAPI.getProducts({ per_page: 8 });
-            // Laravel API returns {status: 'success', data: paginatedResults}
-            // paginatedResults has a 'data' property with the actual products array
-            const productsData = response?.data?.data || [];
-            setProducts(productsData);
-            setFeaturedProducts(productsData.slice(0, 4));
+            const params = {
+                page,
+                per_page: pagination.per_page,
+                search: searchQuery || undefined,
+                category: selectedCategory || undefined,
+                sort: sortBy,
+            };
+            
+            const response = await productsAPI.getProducts(params);
+            const payload = response?.data || {};
+            setProducts(payload.data || []);
+            setPagination(prev => ({
+                ...prev,
+                current_page: payload.current_page || page,
+                last_page: payload.last_page || 1,
+                total: payload.total || 0,
+            }));
             setError(null);
         } catch (err) {
             setError('Failed to load products');
@@ -62,21 +87,150 @@ const Homepage = () => {
         }
     }, []);
 
+    // Debounced search effect
     useEffect(() => {
-        let isActive = true;
-        (async () => {
-            // load wishlist from session
-            try {
-                const raw = sessionStorage.getItem('wishlist');
-                const ids = raw ? JSON.parse(raw) : [];
-                if (Array.isArray(ids)) setWishlistIds(ids);
-            } catch {}
-            await fetchProducts();
-        })();
-        return () => {
-            isActive = false;
+        const timer = setTimeout(() => {
+            const params = {
+                page: 1,
+                per_page: pagination.per_page,
+                search: searchQuery || undefined,
+                category: selectedCategory || undefined,
+                sort: sortBy,
+            };
+            
+            const fetchData = async () => {
+                try {
+                    setSearchLoading(true);
+                    const response = await productsAPI.getProducts(params);
+                    const payload = response?.data || {};
+                    setProducts(payload.data || []);
+                    setPagination(prev => ({
+                        ...prev,
+                        current_page: payload.current_page || 1,
+                        last_page: payload.last_page || 1,
+                        total: payload.total || 0,
+                    }));
+                    setError(null);
+                } catch (err) {
+                    setError('Failed to load products');
+                    console.error('Error fetching products:', err);
+                } finally {
+                    setSearchLoading(false);
+                }
+            };
+            
+            fetchData();
+        }, 500); // 500ms delay
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Effect for category and sort changes (immediate)
+    useEffect(() => {
+        const params = {
+            page: 1,
+            per_page: pagination.per_page,
+            search: searchQuery || undefined,
+            category: selectedCategory || undefined,
+            sort: sortBy,
         };
-    }, [fetchProducts]);
+        
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const response = await productsAPI.getProducts(params);
+                const payload = response?.data || {};
+                setProducts(payload.data || []);
+                setPagination(prev => ({
+                    ...prev,
+                    current_page: payload.current_page || 1,
+                    last_page: payload.last_page || 1,
+                    total: payload.total || 0,
+                }));
+                setError(null);
+            } catch (err) {
+                setError('Failed to load products');
+                console.error('Error fetching products:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchData();
+    }, [selectedCategory, sortBy]);
+
+    // Effect for pagination - Disabled when showing all products
+    useEffect(() => {
+        // Skip pagination effect when per_page is set to show all products
+        if (pagination.per_page >= 1000) return;
+        
+        const params = {
+            page: pagination.current_page,
+            per_page: pagination.per_page,
+            search: searchQuery || undefined,
+            category: selectedCategory || undefined,
+            sort: sortBy,
+        };
+        
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const response = await productsAPI.getProducts(params);
+                const payload = response?.data || {};
+                setProducts(payload.data || []);
+                setPagination(prev => ({
+                    ...prev,
+                    current_page: payload.current_page || pagination.current_page,
+                    last_page: payload.last_page || 1,
+                    total: payload.total || 0,
+                }));
+                setError(null);
+            } catch (err) {
+                setError('Failed to load products');
+                console.error('Error fetching products:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        if (pagination.current_page > 1) {
+            fetchData();
+        }
+    }, [pagination.current_page]);
+
+    // Initial load
+    useEffect(() => {
+        const params = {
+            page: 1,
+            per_page: pagination.per_page,
+            search: searchQuery || undefined,
+            category: selectedCategory || undefined,
+            sort: sortBy,
+        };
+        
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const response = await productsAPI.getProducts(params);
+                const payload = response?.data || {};
+                setProducts(payload.data || []);
+                setPagination(prev => ({
+                    ...prev,
+                    current_page: payload.current_page || 1,
+                    last_page: payload.last_page || 1,
+                    total: payload.total || 0,
+                }));
+                setError(null);
+            } catch (err) {
+                setError('Failed to load products');
+                console.error('Error fetching products:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchData();
+    }, []);
 
 
     const currencyFormatter = useMemo(() => new Intl.NumberFormat('id-ID', {
@@ -87,18 +241,59 @@ const Homepage = () => {
 
     const formatPrice = useCallback((price) => currencyFormatter.format(price), [currencyFormatter]);
 
-    const toggleWishlist = (productId) => {
-        setWishlistIds((prev) => {
-            const set = new Set(prev);
-            if (set.has(productId)) set.delete(productId); else set.add(productId);
-            const next = Array.from(set);
-            sessionStorage.setItem('wishlist', JSON.stringify(next));
-            return next;
-        });
+    const handleSearch = (value) => {
+        setSearchQuery(value);
+        setPagination(prev => ({ ...prev, current_page: 1 }));
     };
 
+    const handleCategoryChange = (category) => {
+        setSelectedCategory(category);
+        setPagination(prev => ({ ...prev, current_page: 1 }));
+    };
+
+    const handleSortChange = (sort) => {
+        setSortBy(sort);
+        setPagination(prev => ({ ...prev, current_page: 1 }));
+    };
+
+    // Client-side sorting as fallback
+    const sortedProducts = useMemo(() => {
+        if (!products || products.length === 0) return [];
+        
+        const sorted = [...products];
+        
+        switch (sortBy) {
+            case 'name':
+                return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            case 'price_asc':
+                return sorted.sort((a, b) => {
+                    const priceA = a.price || a.base_price || a.min_price || 0;
+                    const priceB = b.price || b.base_price || b.min_price || 0;
+                    return priceA - priceB;
+                });
+            case 'price_desc':
+                return sorted.sort((a, b) => {
+                    const priceA = a.price || a.base_price || a.min_price || 0;
+                    const priceB = b.price || b.base_price || b.min_price || 0;
+                    return priceB - priceA;
+                });
+            case 'stock':
+                return sorted.sort((a, b) => {
+                    const stockA = a.stock || 0;
+                    const stockB = b.stock || 0;
+                    return stockB - stockA;
+                });
+            default:
+                return sorted;
+        }
+    }, [products, sortBy]);
+
+    const setCurrentPage = (page) => {
+        setPagination(prev => ({ ...prev, current_page: page }));
+    };
+
+
     const ProductCard = memo(({ product }) => {
-        const liked = wishlistIds.includes(product.id);
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
@@ -106,29 +301,117 @@ const Homepage = () => {
                         <img 
                             src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
                             alt={product.name}
-                            className="w-full h-52 object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="w-full h-48 sm:h-52 object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
-                        {/* Like button */}
-                        <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product.id); }}
-                            className={`absolute top-3 right-3 p-2 rounded-full shadow-sm transition-all duration-200 ${liked ? 'bg-red-500 text-white' : 'bg-white text-gray-500 hover:text-red-500 hover:bg-red-50'}`}
-                            aria-label={liked ? 'Hapus dari Wishlist' : 'Tambah ke Wishlist'}
-                        >
-                            <Heart className="h-5 w-5" />
-                        </button>
                     </div>
-                    <div className="p-5">
-                        <h3 className="text-sm font-medium text-gray-900 mb-3 line-clamp-2 leading-relaxed group-hover:text-gray-700 transition-colors">{product.name}</h3>
+                    <div className="p-4 sm:p-5">
+                        <h3 className="text-base sm:text-sm font-medium text-gray-900 mb-3 line-clamp-2 leading-relaxed group-hover:text-gray-700 transition-colors">{product.name}</h3>
                         
                         <div className="flex items-center justify-between">
-                            <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                {formatPrice(product.base_price || product.price)}
+                            <span className="text-lg sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                {formatPrice(product.price || product.min_price || 0)}
                             </span>
-                            <button className="p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110">
-                                <ShoppingCart className="h-4 w-4" />
+                            <button 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    try {
+                                        // Add to cart with default variant (first variant or base product)
+                                        const variant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
+                                        addToCart(product, 1, variant);
+                                        
+                                        Swal.fire({
+                                            icon: 'success',
+                                            title: 'Ditambahkan ke Keranjang',
+                                            text: `${product.name} berhasil ditambahkan`,
+                                            timer: 1500,
+                                            showConfirmButton: false,
+                                            position: 'top-end',
+                                            toast: true
+                                        });
+                                    } catch (error) {
+                                        console.error('Failed to add to cart:', error);
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Gagal',
+                                            text: 'Gagal menambahkan ke keranjang',
+                                            timer: 1500,
+                                            showConfirmButton: false,
+                                            position: 'top-end',
+                                            toast: true
+                                        });
+                                    }
+                                }}
+                                className="p-2 sm:p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110"
+                            >
+                                <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4" />
                             </button>
+                        </div>
+                    </div>
+                </div>
+            </Link>
+        );
+    });
+
+    const ProductListItem = memo(({ product }) => {
+        return (
+            <Link href={`/products/${product.id}`} className="block group">
+                <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden">
+                    <div className="flex items-center gap-4 p-4 sm:p-4">
+                        <div className="relative overflow-hidden rounded-lg">
+                            <img
+                                src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'}
+                                alt={product.name}
+                                className="w-24 h-24 sm:w-20 sm:h-20 object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg"></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-base sm:text-sm font-medium text-gray-900 mb-2 sm:mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
+                                {product.name}
+                            </h3>
+                            <div className="flex items-center justify-between">
+                                <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                    {formatPrice(product.price || product.min_price || 0)}
+                                </span>
+                                <button 
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        try {
+                                            // Add to cart with default variant (first variant or base product)
+                                            const variant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
+                                            addToCart(product, 1, variant);
+                                            
+                                            Swal.fire({
+                                                icon: 'success',
+                                                title: 'Ditambahkan ke Keranjang',
+                                                text: `${product.name} berhasil ditambahkan`,
+                                                timer: 1500,
+                                                showConfirmButton: false,
+                                                position: 'top-end',
+                                                toast: true
+                                            });
+                                        } catch (error) {
+                                            console.error('Failed to add to cart:', error);
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Gagal',
+                                                text: 'Gagal menambahkan ke keranjang',
+                                                timer: 1500,
+                                                showConfirmButton: false,
+                                                position: 'top-end',
+                                                toast: true
+                                            });
+                                        }
+                                    }}
+                                    className="p-2 sm:p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110" 
+                                    type="button"
+                                >
+                                    <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -168,58 +451,189 @@ const Homepage = () => {
         <MarketplaceLayout>
             {/* Hero Section */}
             <div className="bg-gray-50 border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
                     <div className="text-center">
-                        <h1 className="text-3xl font-light text-gray-900 mb-4">
+                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-900 mb-3 sm:mb-4">
                             Koleksi Produk Terbaik
                         </h1>
-                        <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
+                        <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
                             Temukan produk berkualitas dengan harga terbaik
                         </p>
-                        <Link 
-                            href="/products" 
-                            className="inline-flex items-center px-6 py-3 border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition-colors"
-                        >
-                            Lihat Semua Produk
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
                     </div>
                 </div>
             </div>
 
-            {/* Categories Section */}
-            <div className="py-16 bg-white border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center mb-12">
-                        <h2 className="text-2xl font-light text-gray-900 mb-4">
-                            Kategori
-                        </h2>
+            {/* Search and Filters */}
+            <div className="bg-white border-b border-gray-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                    {/* Search Bar */}
+                    <div className="mb-6">
+                        <div className="max-w-lg mx-auto relative">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                            <input
+                                type="text"
+                                placeholder="Cari produk..."
+                                value={searchQuery}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                className="w-full pl-12 pr-4 py-3 sm:py-2 text-base sm:text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400"
+                                autoComplete="off"
+                            />
+                            {searchLoading && (
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex justify-center space-x-8">
-                        {categories.slice(1).map((category) => (
-                            <Link 
-                                key={category.id} 
-                                href={`/products?category=${category.id}`}
-                                className="text-gray-600 hover:text-gray-900 transition-colors text-sm"
-                            >
-                                {category.name}
-                            </Link>
-                        ))}
+
+                    {/* Categories Filter */}
+                    {categories.length > 1 && (
+                        <div className="mb-6">
+                            <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+                                <button
+                                    onClick={() => handleCategoryChange('')}
+                                    className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${
+                                        selectedCategory === ''
+                                            ? 'bg-gray-900 text-white border-gray-900'
+                                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                                    }`}
+                                >
+                                    Semua
+                                </button>
+                                {categories.slice(1).map((cat) => (
+                                    <button
+                                        key={cat.id}
+                                        onClick={() => handleCategoryChange(cat.id)}
+                                        className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${
+                                            selectedCategory === cat.id
+                                                ? 'bg-gray-900 text-white border-gray-900'
+                                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                                        }`}
+                                    >
+                                        {cat.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filters and Controls */}
+                    <div className="bg-white rounded-lg border border-gray-100 p-4 sm:p-4">
+                        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                            {/* Sort */}
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                                <label className="text-base sm:text-sm text-gray-600 whitespace-nowrap">Urutkan:</label>
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => handleSortChange(e.target.value)}
+                                    className="flex-1 sm:flex-none px-3 py-2 text-base sm:text-sm border border-gray-300 rounded-md focus:ring-gray-500 focus:border-gray-500"
+                                >
+                                    <option value="name">Nama A-Z</option>
+                                    <option value="price_asc">Harga Terendah</option>
+                                    <option value="price_desc">Harga Tertinggi</option>
+                                    <option value="stock">Stok Terbanyak</option>
+                                </select>
+                            </div>
+
+                            {/* View Toggle */}
+                            <div className="flex border border-gray-300 rounded-md overflow-hidden">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-3 sm:p-2 ${
+                                        viewMode === 'grid'
+                                            ? 'bg-gray-900 text-white'
+                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <Grid className="h-5 w-5 sm:h-4 sm:w-4" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`p-3 sm:p-2 ${
+                                        viewMode === 'list'
+                                            ? 'bg-gray-900 text-white'
+                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <List className="h-5 w-5 sm:h-4 sm:w-4" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Popular Products */}
-            <div className="py-16 bg-white">
+            {/* Products Section */}
+            <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center mb-12">
-                        <h2 className="text-2xl font-light text-gray-900 mb-4">Produk Populer</h2>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
-                        {featuredProducts.slice(0, 4).map((product) => (
-                            <ProductCard key={product.id} product={product} />
-                        ))}
-                    </div>
+                    {loading ? (
+                        <div className="flex justify-center items-center py-12">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Results Info */}
+                            <div className="mb-6">
+                                <p className="text-base sm:text-sm text-gray-600 px-2 sm:px-0">
+                                    Menampilkan {sortedProducts.length} produk
+                                    {selectedCategory && ` dalam kategori "${categories.find(c => c.id === selectedCategory)?.name}"`}
+                                    {searchQuery && ` untuk "${searchQuery}"`}
+                                </p>
+                            </div>
+
+                            {/* Products Grid/List */}
+                            {sortedProducts.length === 0 ? (
+                                <div className="text-center py-12 px-4">
+                                    <Filter className="mx-auto h-16 w-16 sm:h-12 sm:w-12 text-gray-300 mb-4" />
+                                    <h3 className="text-xl sm:text-lg font-medium text-gray-900 mb-2">Tidak ada produk ditemukan</h3>
+                                    <p className="text-base sm:text-sm text-gray-500">Coba ubah kata kunci pencarian atau filter</p>
+                                </div>
+                            ) : (
+                                <div className={
+                                    viewMode === 'grid'
+                                        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6"
+                                        : "space-y-4"
+                                }>
+                                    {sortedProducts.map((product) => (
+                                        viewMode === 'grid'
+                                            ? <ProductCard key={product.id} product={product} />
+                                            : <ProductListItem key={product.id} product={product} />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Pagination - Hidden when showing all products */}
+                            {pagination.last_page > 1 && pagination.per_page < 1000 && (
+                                <div className="flex justify-center items-center space-x-4 mt-12">
+                                    <button
+                                        onClick={() => {
+                                            const prev = Math.max(1, pagination.current_page - 1);
+                                            setCurrentPage(prev);
+                                        }}
+                                        disabled={pagination.current_page === 1}
+                                        className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        ← Sebelumnya
+                                    </button>
+
+                                    <span className="text-sm text-gray-500">
+                                        {pagination.current_page} dari {pagination.last_page}
+                                    </span>
+
+                                    <button
+                                        onClick={() => {
+                                            const next = Math.min(pagination.last_page, pagination.current_page + 1);
+                                            setCurrentPage(next);
+                                        }}
+                                        disabled={pagination.current_page === pagination.last_page}
+                                        className="text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Selanjutnya →
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
         </MarketplaceLayout>

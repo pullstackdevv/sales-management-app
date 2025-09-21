@@ -14,7 +14,6 @@ export default function ProductEdit() {
     category: "",
     description: "",
     image: "",
-    base_price: 0,
     is_active: true,
     is_storefront: true,
     variants: []
@@ -48,7 +47,7 @@ export default function ProductEdit() {
         title: 'Error',
         text: 'ID produk tidak ditemukan'
       }).then(() => {
-        router.visit('/product/data');
+        router.visit('/cms/product/data');
       });
     }
   }, []);
@@ -61,14 +60,13 @@ export default function ProductEdit() {
       const productData = response.data.data;
       
       setProduct({
-        name: productData.name || '',
-        sku: productData.sku || '',
-        category: productData.category || '',
-        description: productData.description || '',
-        image: productData.image || '',
-        base_price: productData.base_price || 0,
-        is_active: productData.is_active ?? true,
-        is_storefront: productData.is_storefront ?? true,
+        name: productData?.name || "",
+        sku: productData?.sku || "",
+        category: productData?.category || "",
+        description: productData?.description || "",
+        image: null,
+        is_active: productData?.is_active ?? true,
+        is_storefront: productData?.is_storefront ?? true,
         variants: productData.variants || []
       });
     } catch (error) {
@@ -78,7 +76,7 @@ export default function ProductEdit() {
         title: 'Error',
         text: 'Gagal memuat data produk'
       }).then(() => {
-        router.visit('/product/data');
+        router.visit('/cms/product/data');
       });
     } finally {
       setLoadingData(false);
@@ -95,6 +93,7 @@ export default function ProductEdit() {
           variant_label: "",
           sku: "",
           price: 0,
+          base_price: 0,
           weight: 0,
           stock: 0,
           is_active: true
@@ -167,13 +166,12 @@ export default function ProductEdit() {
       formData.append('_method', 'PUT');
       
       // Append basic product data
-       formData.append('name', product.name);
-       formData.append('sku', product.sku);
-       formData.append('description', product.description);
-       formData.append('category', product.category);
-       formData.append('base_price', product.base_price);
-       formData.append('is_active', product.is_active ? '1' : '0');
-       formData.append('is_storefront', product.is_storefront ? '1' : '0');
+      formData.append('name', product.name);
+      formData.append('sku', product.sku);
+      formData.append('description', product.description);
+      formData.append('category', product.category);
+      formData.append('is_active', product.is_active ? '1' : '0');
+      formData.append('is_storefront', product.is_storefront ? '1' : '0');
       
       // Append image file if exists (only if user selected a new file)
       if (product.image && typeof product.image !== 'string') {
@@ -188,6 +186,7 @@ export default function ProductEdit() {
         formData.append(`variants[${index}][variant_label]`, variant.variant_label);
         formData.append(`variants[${index}][sku]`, variant.sku);
         formData.append(`variants[${index}][price]`, variant.price);
+        formData.append(`variants[${index}][base_price]`, variant.base_price || 0);
         formData.append(`variants[${index}][weight]`, variant.weight);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
@@ -206,7 +205,7 @@ export default function ProductEdit() {
         showConfirmButton: false,
         timer: 1500
       }).then(() => {
-        router.visit('/product/data');
+        router.visit('/cms/product/data');
       });
     } catch (error) {
       if (error.response?.status === 422) {
@@ -360,24 +359,6 @@ export default function ProductEdit() {
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Harga Dasar*</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className={`w-full border px-3 py-2 rounded-md ${
-                        errors.base_price ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Masukkan harga dasar..."
-                      value={product.base_price}
-                      onChange={(e) => setProduct({ ...product, base_price: parseFloat(e.target.value) || 0 })}
-                      required
-                    />
-                    {errors.base_price && (
-                      <p className="text-red-500 text-xs mt-1">{errors.base_price[0]}</p>
-                    )}
-                  </div>
                 </div>
               </div>
 
@@ -460,7 +441,7 @@ export default function ProductEdit() {
                           </div>
 
                           <div>
-                            <label className="block text-sm font-medium mb-1">Harga*</label>
+                            <label className="block text-sm font-medium mb-1">Harga Jual*</label>
                             <input
                               type="number"
                               className={`w-full border px-3 py-2 rounded-md text-sm ${
@@ -475,6 +456,25 @@ export default function ProductEdit() {
                             />
                             {errors[`variants.${index}.price`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Harga Modal*</label>
+                            <input
+                              type="number"
+                              className={`w-full border px-3 py-2 rounded-md text-sm ${
+                                errors[`variants.${index}.base_price`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                              placeholder="0"
+                              value={variant.base_price || 0}
+                              onChange={(e) => updateVariant(index, 'base_price', parseFloat(e.target.value) || 0)}
+                              min="0"
+                              step="0.01"
+                              required
+                            />
+                            {errors[`variants.${index}.base_price`] && (
+                              <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.base_price`][0]}</p>
                             )}
                           </div>
 
@@ -501,7 +501,7 @@ export default function ProductEdit() {
                             <div className="flex gap-2">
                               <input
                                 type="number"
-                                className={`flex-1 border px-3 py-2 rounded-md text-sm ${
+                                className={`w-1/2 border px-3 py-2 rounded-md text-sm ${
                                   errors[`variants.${index}.stock`] ? 'border-red-500' : 'border-gray-300'
                                 }`}
                                 placeholder="0"

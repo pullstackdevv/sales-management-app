@@ -398,18 +398,26 @@ const CustomerDataCheckout = () => {
       return;
     }
 
+    // Validate that we have a selected customer
+    console.log('selectedCustomer:', selectedCustomer);
+    if (!selectedCustomer || !selectedCustomer.id) {
+      console.error('No selected customer or customer ID missing');
+      alert('Silakan pilih customer terlebih dahulu');
+      return;
+    }
+
     setSavingAddress(true);
 
     try {
       const addressPayload = {
-        label: newAddressData.label,
-        recipient_name: newAddressData.recipient_name,
-        recipient_phone: newAddressData.recipient_phone,
-        address_detail: newAddressData.address_detail,
-        city: newAddressData.city,
-        district: newAddressData.district || '',
-        province: newAddressData.province,
-        postal_code: newAddressData.postal_code,
+        label: newAddressData.label || 'Rumah',
+        recipient_name: newAddressData.recipient_name || selectedCustomer?.name || 'Penerima',
+        recipient_phone: newAddressData.recipient_phone || selectedCustomer?.phone || '08123456789',
+        address_detail: newAddressData.address_detail || 'Alamat tidak diketahui',
+        city: newAddressData.city || 'Kota tidak diketahui',
+        district: newAddressData.district || 'Kecamatan tidak diketahui',
+        province: newAddressData.province || 'Provinsi tidak diketahui',
+        postal_code: newAddressData.postal_code || '00000',
         is_default: newAddressData.is_default,
         is_primary: newAddressData.is_default || false
       };
@@ -700,16 +708,19 @@ const CustomerDataCheckout = () => {
           name: formData.full_name,
           email: formData.email,
           phone: formData.phone,
+          line_id: formData.line_id || null,
+          other_contact: formData.other_contact || null,
+          category: formData.category || 'Pelanggan',
           addresses: [{
             label: addressData.label || 'Rumah',
-            address_detail: addressData.address_detail,
-            city: addressData.city,
-            district: addressData.district || '',
-            province: addressData.province,
-            postal_code: addressData.postal_code,
+            address_detail: addressData.address_detail || 'Alamat tidak diketahui',
+            city: addressData.city || 'Kota tidak diketahui',
+            district: addressData.district || 'Kecamatan tidak diketahui',
+            province: addressData.province || 'Provinsi tidak diketahui',
+            postal_code: addressData.postal_code || '00000',
             recipient_name: addressData.recipient_name || formData.full_name,
             recipient_phone: addressData.recipient_phone || formData.phone,
-            is_primary: true
+            is_default: true
           }]
         };
 
@@ -730,12 +741,25 @@ const CustomerDataCheckout = () => {
         });
 
         if (!response.ok) {
-          throw new Error('Gagal membuat customer baru');
+          const errorData = await response.json();
+          console.error('API Error:', errorData);
+          throw new Error(`Gagal membuat customer baru: ${errorData.message || response.statusText}`);
         }
 
         const result = await response.json();
+        console.log('API Response:', result);
+        
+        if (!result.data) {
+          throw new Error('Response data is missing');
+        }
+        
         const createdCustomer = result.data;
-        const primaryAddress = createdCustomer.addresses.find(addr => addr.is_primary);
+        
+        if (!createdCustomer.addresses || createdCustomer.addresses.length === 0) {
+          throw new Error('No addresses found in created customer');
+        }
+        
+        const primaryAddress = createdCustomer.addresses.find(addr => addr.is_default) || createdCustomer.addresses[0];
 
         // Format data from database response
         customerData = {
@@ -743,13 +767,13 @@ const CustomerDataCheckout = () => {
           name: createdCustomer.name,
           email: createdCustomer.email,
           whatsapp: createdCustomer.phone,
-          address_id: primaryAddress.id,
-          address: primaryAddress.address_detail,
-          city: primaryAddress.city,
-          province: primaryAddress.province,
-          postal_code: primaryAddress.postal_code,
-          recipient_name: primaryAddress.recipient_name,
-          recipient_phone: primaryAddress.recipient_phone
+          address_id: primaryAddress?.id || null,
+          address: primaryAddress?.address_detail || '',
+          city: primaryAddress?.city || '',
+          province: primaryAddress?.province || '',
+          postal_code: primaryAddress?.postal_code || '',
+          recipient_name: primaryAddress?.recipient_name || createdCustomer.name,
+          recipient_phone: primaryAddress?.phone || createdCustomer.phone
         };
       } else {
         // Format data for existing customer
@@ -1122,22 +1146,23 @@ const CustomerDataCheckout = () => {
                         </div>
                       </div>
                     )}
-
                     {/* Address Selection */}
                     {selectedCustomer && (
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <label className="block text-sm font-medium text-gray-700">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             <MapPin className="w-4 h-4 inline mr-1" />
                             Pilih Alamat Pengiriman *
                           </label>
-                          <button
-                            type="button"
-                            onClick={handleShowAddAddressForm}
-                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            + Tambah Alamat Baru
-                          </button>
+                          {selectedCustomer && selectedCustomer.id && (
+                            <button
+                              type="button"
+                              onClick={handleShowAddAddressForm}
+                              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              + Tambah Alamat Baru
+                            </button>
+                          )}
                         </div>
                         
                         {customerAddresses.length > 0 ? (

@@ -61,7 +61,7 @@ class XenditController extends Controller
 
             $nameParts = explode(' ', $customerName, 2);
             $givenNames = $nameParts[0];
-            $surname = isset($nameParts[1]) ? $nameParts[1] : '';
+            $surname = isset($nameParts[1]) && !empty($nameParts[1]) ? $nameParts[1] : 'Customer';
 
             // Prepare items
             $items = [];

@@ -106,6 +106,7 @@ class ProductController extends Controller
             'variants.*.variant_label' => 'required|string|max:255',
             'variants.*.sku' => 'required|string|max:255',
             'variants.*.price' => 'required|numeric|min:0',
+            'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean'
@@ -175,6 +176,7 @@ class ProductController extends Controller
             'variants.*.variant_label' => 'required|string|max:255',
             'variants.*.sku' => 'required|string|max:50',
             'variants.*.price' => 'required|numeric|min:0',
+            'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean'
@@ -234,6 +236,7 @@ class ProductController extends Controller
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
                             'price' => $variant['price'],
+                            'base_price' => $variant['base_price'],
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
@@ -244,6 +247,7 @@ class ProductController extends Controller
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
                             'price' => $variant['price'],
+                            'base_price' => $variant['base_price'],
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,

@@ -19,6 +19,7 @@ export default function ProductAdd() {
         variant_label: "Default",
         sku: "",
         price: 0,
+        base_price: 0,
         weight: 0,
         stock: 0,
         is_active: true
@@ -38,6 +39,7 @@ export default function ProductAdd() {
           variant_label: "",
           sku: "",
           price: 0,
+          base_price: 0,
           weight: 0,
           stock: 0,
           is_active: true
@@ -88,6 +90,7 @@ export default function ProductAdd() {
         formData.append(`variants[${index}][variant_label]`, variant.variant_label);
         formData.append(`variants[${index}][sku]`, variant.sku);
         formData.append(`variants[${index}][price]`, variant.price);
+        formData.append(`variants[${index}][base_price]`, variant.base_price);
         formData.append(`variants[${index}][weight]`, variant.weight);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
@@ -304,7 +307,7 @@ export default function ProductAdd() {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium mb-1">Harga*</label>
+                          <label className="block text-sm font-medium mb-1">Harga Jual*</label>
                           <input
                             type="number"
                             className={`w-full border px-3 py-2 rounded-md text-sm ${
@@ -319,6 +322,25 @@ export default function ProductAdd() {
                           />
                           {errors[`variants.${index}.price`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Harga Modal*</label>
+                          <input
+                            type="number"
+                            className={`w-full border px-3 py-2 rounded-md text-sm ${
+                              errors[`variants.${index}.base_price`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            placeholder="0"
+                            value={variant.base_price}
+                            onChange={(e) => updateVariant(index, 'base_price', parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.01"
+                            required
+                          />
+                          {errors[`variants.${index}.base_price`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.base_price`][0]}</p>
                           )}
                         </div>
 

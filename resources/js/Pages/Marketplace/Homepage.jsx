@@ -310,7 +310,7 @@ const Homepage = () => {
                         
                         <div className="flex items-center justify-between">
                             <span className="text-lg sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                {formatPrice(product.price || product.base_price || product.min_price)}
+                                {formatPrice(product.price || product.min_price || 0)}
                             </span>
                             <button 
                                 onClick={(e) => {
@@ -373,7 +373,7 @@ const Homepage = () => {
                             </h3>
                             <div className="flex items-center justify-between">
                                 <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                    {formatPrice(product.price || product.base_price || product.min_price)}
+                                    {formatPrice(product.price || product.min_price || 0)}
                                 </span>
                                 <button 
                                     onClick={(e) => {

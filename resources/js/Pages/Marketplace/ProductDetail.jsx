@@ -103,6 +103,24 @@ export default function ProductDetail() {
         return product.price || product.min_price || 0;
     };
 
+    const getCurrentBasePrice = () => {
+        if (selectedVariant) {
+            return selectedVariant.base_price || 0;
+        }
+        // Get base price from first variant or min_base_price
+        if (product.variants && product.variants.length > 0) {
+            return product.variants[0].base_price || 0;
+        }
+        return product.base_price || product.min_base_price || 0;
+    };
+
+    const getProfitMargin = () => {
+        const price = getCurrentPrice();
+        const basePrice = getCurrentBasePrice();
+        if (basePrice === 0) return 0;
+        return ((price - basePrice) / basePrice) * 100;
+    };
+
     const getCurrentStock = () => {
         if (selectedVariant) {
             return selectedVariant.stock;
@@ -363,10 +381,20 @@ export default function ProductDetail() {
 
                             {/* Price */}
                             <div className="space-y-3">
-                                <div className="flex items-center space-x-3">
-                                    <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
-                                        {formatPrice(getCurrentPrice())}
-                                    </span>
+                                <div className="flex flex-col space-y-2">
+                                    {/* Current Selected Price */}
+                                    <div className="flex items-center space-x-3">
+                                        <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
+                                            {formatPrice(getCurrentPrice())}
+                                        </span>
+                                    </div>
+                                    
+                                    {/* Price Range for Multiple Variants */}
+                                    {product.variants && product.variants.length > 1 && (
+                                        <div className="text-sm text-gray-600">
+                                            <span>{product.price_range || `${formatPrice(product.min_price)} - ${formatPrice(product.max_price)}`}</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <p className={`text-base sm:text-sm ${
                                     product.is_active !== false && getCurrentStock() > 0 ? 'text-green-600' : 'text-red-500'

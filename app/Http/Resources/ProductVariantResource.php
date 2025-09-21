@@ -20,9 +20,11 @@ class ProductVariantResource extends JsonResource
             'variant_label' => $this->variant_label,
             'sku' => $this->sku,
             'price' => $this->price,
+            'base_price' => $this->base_price,
             'weight' => $this->weight,
             'stock' => $this->stock,
             'is_active' => $this->is_active,
+            'profit_margin' => $this->base_price > 0 ? round((($this->price - $this->base_price) / $this->base_price) * 100, 2) : 0,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

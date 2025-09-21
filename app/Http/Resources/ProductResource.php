@@ -25,11 +25,15 @@ class ProductResource extends JsonResource
             'is_storefront' => $this->is_storefront,
             
             // Price information from variants
-            'price' => $this->min_price, // Minimum price from variants
-            'base_price' => $this->min_price, // For backward compatibility
+            'price' => $this->min_price, // Minimum selling price from variants
+            'base_price' => $this->min_base_price, // Minimum base price from variants
             'min_price' => $this->min_price,
             'max_price' => $this->max_price,
+            'min_base_price' => $this->min_base_price,
+            'max_base_price' => $this->max_base_price,
             'price_range' => $this->price_range,
+            'base_price_range' => $this->base_price_range,
+            'profit_margin_range' => $this->profit_margin_range,
             
             // Variants
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),

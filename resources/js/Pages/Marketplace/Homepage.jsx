@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Link } from '@inertiajs/react';
 import { 
-    Star, 
-    ShoppingCart, 
-    ArrowRight,
     Search,
     Filter,
     Grid,
@@ -11,8 +8,7 @@ import {
 } from "lucide-react";
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { productsAPI } from '@/api/products';
-import { useCart } from '@/hooks/useCart';
-import Swal from 'sweetalert2';
+// Removed cart functionality from homepage cards
 
 const Homepage = () => {
     const [products, setProducts] = useState([]);
@@ -29,7 +25,7 @@ const Homepage = () => {
         per_page: 1000, // Set high value to fetch all products
         total: 0,
     });
-    const { addToCart } = useCart();
+    // Removed: addToCart integration on homepage cards
 
     // Derive categories from loaded products (fallback to string/slug if available)
     const categories = useMemo(() => {
@@ -103,7 +99,22 @@ const Homepage = () => {
                     setSearchLoading(true);
                     const response = await productsAPI.getProducts(params);
                     const payload = response?.data || {};
-                    setProducts(payload.data || []);
+                    const productsData = payload.data || [];
+                    
+                    // Debug log for price issues
+                    console.log('Search fetch - Products received:', productsData.length);
+                    if (productsData.length > 0) {
+                        console.log('Sample product price fields:', {
+                            id: productsData[0].id,
+                            name: productsData[0].name,
+                            price: productsData[0].price,
+                            base_price: productsData[0].base_price,
+                            min_price: productsData[0].min_price,
+                            selling_price: productsData[0].selling_price
+                        });
+                    }
+                    
+                    setProducts(productsData);
                     setPagination(prev => ({
                         ...prev,
                         current_page: payload.current_page || 1,
@@ -213,7 +224,22 @@ const Homepage = () => {
                 setLoading(true);
                 const response = await productsAPI.getProducts(params);
                 const payload = response?.data || {};
-                setProducts(payload.data || []);
+                const productsData = payload.data || [];
+                
+                // Debug log for initial load
+                console.log('Initial load - Products received:', productsData.length);
+                if (productsData.length > 0) {
+                    console.log('Sample product from initial load:', {
+                        id: productsData[0].id,
+                        name: productsData[0].name,
+                        price: productsData[0].price,
+                        base_price: productsData[0].base_price,
+                        min_price: productsData[0].min_price,
+                        selling_price: productsData[0].selling_price
+                    });
+                }
+                
+                setProducts(productsData);
                 setPagination(prev => ({
                     ...prev,
                     current_page: payload.current_page || 1,
@@ -233,13 +259,68 @@ const Homepage = () => {
     }, []);
 
 
+    // Robust price extraction function to handle various price field formats
+    const getProductPrice = useCallback((product) => {
+        if (!product) {
+            console.warn('getProductPrice: product is null/undefined');
+            return 0;
+        }
+
+        // Try different price fields in order of preference
+        const priceFields = [
+            product.price,
+            product.base_price, 
+            product.min_price,
+            product.selling_price,
+            product.regular_price
+        ];
+
+        for (const priceField of priceFields) {
+            if (priceField !== null && priceField !== undefined && priceField !== '') {
+                // Convert to number if it's a string
+                const numPrice = typeof priceField === 'string' ? parseFloat(priceField) : priceField;
+                
+                // Validate that it's a positive number
+                if (!isNaN(numPrice) && numPrice > 0) {
+                    return numPrice;
+                }
+            }
+        }
+
+        // Log when no valid price is found for debugging
+        console.warn('getProductPrice: No valid price found for product:', {
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            base_price: product.base_price,
+            min_price: product.min_price,
+            selling_price: product.selling_price,
+            regular_price: product.regular_price
+        });
+        
+        return 0;
+    }, []);
+
     const currencyFormatter = useMemo(() => new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
         minimumFractionDigits: 0
     }), []);
 
-    const formatPrice = useCallback((price) => currencyFormatter.format(price), [currencyFormatter]);
+    const formatPrice = useCallback((price) => {
+        // Ensure price is a valid number
+        const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+        
+        if (isNaN(numPrice) || numPrice < 0) {
+            return 'Harga tidak tersedia';
+        }
+        
+        if (numPrice === 0) {
+            return 'Hubungi untuk harga';
+        }
+        
+        return currencyFormatter.format(numPrice);
+    }, [currencyFormatter]);
 
     const handleSearch = (value) => {
         setSearchQuery(value);
@@ -267,14 +348,14 @@ const Homepage = () => {
                 return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             case 'price_asc':
                 return sorted.sort((a, b) => {
-                    const priceA = a.price || a.base_price || a.min_price || 0;
-                    const priceB = b.price || b.base_price || b.min_price || 0;
+                    const priceA = getProductPrice(a);
+                    const priceB = getProductPrice(b);
                     return priceA - priceB;
                 });
             case 'price_desc':
                 return sorted.sort((a, b) => {
-                    const priceA = a.price || a.base_price || a.min_price || 0;
-                    const priceB = b.price || b.base_price || b.min_price || 0;
+                    const priceA = getProductPrice(a);
+                    const priceB = getProductPrice(b);
                     return priceB - priceA;
                 });
             case 'stock':
@@ -310,43 +391,8 @@ const Homepage = () => {
                         
                         <div className="flex items-center justify-between">
                             <span className="text-lg sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                {formatPrice(product.price || product.min_price || 0)}
+                                {formatPrice(getProductPrice(product))}
                             </span>
-                            <button 
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    try {
-                                        // Add to cart with default variant (first variant or base product)
-                                        const variant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
-                                        addToCart(product, 1, variant);
-                                        
-                                        Swal.fire({
-                                            icon: 'success',
-                                            title: 'Ditambahkan ke Keranjang',
-                                            text: `${product.name} berhasil ditambahkan`,
-                                            timer: 1500,
-                                            showConfirmButton: false,
-                                            position: 'top-end',
-                                            toast: true
-                                        });
-                                    } catch (error) {
-                                        console.error('Failed to add to cart:', error);
-                                        Swal.fire({
-                                            icon: 'error',
-                                            title: 'Gagal',
-                                            text: 'Gagal menambahkan ke keranjang',
-                                            timer: 1500,
-                                            showConfirmButton: false,
-                                            position: 'top-end',
-                                            toast: true
-                                        });
-                                    }
-                                }}
-                                className="p-2 sm:p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110"
-                            >
-                                <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4" />
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -373,44 +419,8 @@ const Homepage = () => {
                             </h3>
                             <div className="flex items-center justify-between">
                                 <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                    {formatPrice(product.price || product.min_price || 0)}
+                                    {formatPrice(getProductPrice(product))}
                                 </span>
-                                <button 
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        try {
-                                            // Add to cart with default variant (first variant or base product)
-                                            const variant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
-                                            addToCart(product, 1, variant);
-                                            
-                                            Swal.fire({
-                                                icon: 'success',
-                                                title: 'Ditambahkan ke Keranjang',
-                                                text: `${product.name} berhasil ditambahkan`,
-                                                timer: 1500,
-                                                showConfirmButton: false,
-                                                position: 'top-end',
-                                                toast: true
-                                            });
-                                        } catch (error) {
-                                            console.error('Failed to add to cart:', error);
-                                            Swal.fire({
-                                                icon: 'error',
-                                                title: 'Gagal',
-                                                text: 'Gagal menambahkan ke keranjang',
-                                                timer: 1500,
-                                                showConfirmButton: false,
-                                                position: 'top-end',
-                                                toast: true
-                                            });
-                                        }
-                                    }}
-                                    className="p-2 sm:p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110" 
-                                    type="button"
-                                >
-                                    <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4" />
-                                </button>
                             </div>
                         </div>
                     </div>

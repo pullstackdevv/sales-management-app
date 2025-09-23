@@ -267,7 +267,22 @@ class CourierRateController extends Controller
         }
 
         if ($request->has('district')) {
-            $query->where('destination_district', 'like', '%' . $request->district . '%');
+            $district = $request->district;
+            
+            // Clean and normalize district name for flexible search
+            $cleanDistrict = $this->normalizeDistrictName($district);
+            
+            // Search with multiple approaches for flexibility
+            $query->where(function ($q) use ($district, $cleanDistrict) {
+                // Exact match
+                $q->where('destination_district', 'like', '%' . $district . '%')
+                  // Match without common prefixes
+                  ->orWhere('destination_district', 'like', '%' . $cleanDistrict . '%')
+                  // Match if database has prefix but search doesn't
+                  ->orWhere('destination_district', 'like', '%Kabupaten ' . $cleanDistrict . '%')
+                  ->orWhere('destination_district', 'like', '%Kota ' . $cleanDistrict . '%')
+                  ->orWhere('destination_district', 'like', '%Kecamatan ' . $cleanDistrict . '%');
+            });
         }
 
         if ($request->has('origin_city')) {
@@ -348,8 +363,8 @@ class CourierRateController extends Controller
             ],
             'availability' => [
                 'is_available' => $rate->is_available,
-                'effective_date' => $rate->effective_date?->format('Y-m-d'),
-                'expired_date' => $rate->expired_date?->format('Y-m-d')
+                'effective_date' => $rate->effective_date ? $rate->effective_date->format('Y-m-d') : null,
+                'expired_date' => $rate->expired_date ? $rate->expired_date->format('Y-m-d') : null
             ],
             'timestamps' => [
                 'created_at' => $rate->created_at?->toISOString(),
@@ -378,6 +393,36 @@ class CourierRateController extends Controller
         ];
 
         return $serviceNames[$type] ?? $type;
+    }
+
+    /**
+     * Normalize district name by removing common prefixes
+     *
+     * @param string $district
+     * @return string
+     */
+    private function normalizeDistrictName(string $district): string
+    {
+        // Common prefixes to remove for flexible search
+        $prefixes = [
+            'Kabupaten ',
+            'Kota ',
+            'Kecamatan ',
+            'Kelurahan ',
+            'Desa '
+        ];
+
+        $cleanDistrict = trim($district);
+        
+        // Remove prefixes (case insensitive)
+        foreach ($prefixes as $prefix) {
+            if (stripos($cleanDistrict, $prefix) === 0) {
+                $cleanDistrict = trim(substr($cleanDistrict, strlen($prefix)));
+                break; // Only remove the first matching prefix
+            }
+        }
+
+        return $cleanDistrict;
     }
 
     /**

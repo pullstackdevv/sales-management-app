@@ -97,6 +97,12 @@ const ProductCheckout = () => {
         // Jika sudah dipilih, hapus dari selection
         delete newVariants[variant.id];
       } else {
+        // Check if variant has stock before adding
+        if (variant.stock <= 0) {
+          alert('Varian ini sedang tidak tersedia (stok habis).');
+          return prev;
+        }
+        
         // Jika belum dipilih, tambahkan dengan quantity 1
         newVariants[variant.id] = {
           variant: variant,
@@ -110,7 +116,11 @@ const ProductCheckout = () => {
 
   // Handle perubahan quantity untuk varian tertentu
   const handleVariantQuantityChange = (variantId, newQuantity) => {
-    if (newQuantity >= 1) {
+    // Find the variant to check stock
+    const variant = product.variants.find(v => v.id === variantId);
+    const maxStock = variant ? variant.stock : 0;
+    
+    if (newQuantity >= 1 && newQuantity <= maxStock) {
       setSelectedVariants(prev => ({
         ...prev,
         [variantId]: {
@@ -118,6 +128,9 @@ const ProductCheckout = () => {
           quantity: newQuantity
         }
       }));
+    } else if (newQuantity > maxStock) {
+      // Show alert when trying to exceed stock
+      alert(`Stok tidak mencukupi! Maksimal ${maxStock} item untuk varian ini.`);
     }
   };
 
@@ -263,15 +276,24 @@ const ProductCheckout = () => {
                                       type="checkbox"
                                       checked={!!isSelected}
                                       onChange={() => handleVariantToggle(variant)}
-                                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                      disabled={variant.stock <= 0}
+                                      className={`mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded ${
+                                        variant.stock <= 0 ? 'opacity-50 cursor-not-allowed' : ''
+                                      }`}
                                     />
                                     <div>
                                       <div className="font-medium text-gray-900">{variant.name}</div>
                                       <div className="text-sm text-gray-500">
                                         Rp {variant.price.toLocaleString('id-ID')}
                                       </div>
-                                      <div className="text-xs text-gray-400">
-                                        Stok: {variant.stock}
+                                      <div className={`text-xs ${
+                                        variant.stock <= 0 
+                                          ? 'text-red-500 font-medium' 
+                                          : variant.stock <= 5 
+                                            ? 'text-orange-500 font-medium' 
+                                            : 'text-gray-400'
+                                      }`}>
+                                        Stok: {variant.stock} {variant.stock <= 0 ? '(Habis)' : variant.stock <= 5 ? '(Terbatas)' : ''}
                                       </div>
                                     </div>
                                   </div>
@@ -289,7 +311,13 @@ const ProductCheckout = () => {
                                       <span className="w-8 text-center text-sm font-medium">{isSelected.quantity}</span>
                                       <button
                                         onClick={() => handleVariantQuantityChange(variant.id, isSelected.quantity + 1)}
-                                        className="w-8 h-8 border border-gray-300 rounded flex items-center justify-center hover:bg-gray-50"
+                                        disabled={isSelected.quantity >= variant.stock}
+                                        className={`w-8 h-8 border border-gray-300 rounded flex items-center justify-center hover:bg-gray-50 ${
+                                          isSelected.quantity >= variant.stock 
+                                            ? 'opacity-50 cursor-not-allowed bg-gray-100' 
+                                            : ''
+                                        }`}
+                                        title={isSelected.quantity >= variant.stock ? `Maksimal ${variant.stock} item` : 'Tambah quantity'}
                                       >
                                         <Plus className="w-3 h-3" />
                                       </button>

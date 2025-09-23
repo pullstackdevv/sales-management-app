@@ -9,6 +9,9 @@ const PaymentMethodCheckout = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [checkoutData, setCheckoutData] = useState(null);
+  const [shippingCost, setShippingCost] = useState(0);
+  const [courierRates, setCourierRates] = useState([]);
+  const [loadingShipping, setLoadingShipping] = useState(false);
 
   useEffect(() => {
     // Ambil data checkout dari session
@@ -22,6 +25,108 @@ const PaymentMethodCheckout = () => {
     setCheckoutData(data);
     setLoading(false);
   }, []);
+
+  // Separate useEffect to fetch courier rates after checkoutData is set
+  useEffect(() => {
+    if (checkoutData && checkoutData.customer) {
+      fetchCourierRates();
+    }
+  }, [checkoutData]);
+
+  // Function to fetch courier rates from API
+  const fetchCourierRates = async () => {
+    if (!checkoutData || !checkoutData.customer) {
+      console.log('No customer data available for shipping calculation');
+      setShippingCost(0);
+      return;
+    }
+
+    setLoadingShipping(true);
+    try {
+      // Get district from customer data
+      const district = checkoutData.customer.district || checkoutData.customer.city || 'Denpasar';
+      
+      const response = await axios.get(`/api/courier-rates?page=1&per_page=10&district=${encodeURIComponent(district)}`);
+      console.log('API Response:', response.data); // Debug log
+      
+      if (response.data && response.data.success && response.data.data && response.data.data.rates) {
+        const rates = response.data.data.rates;
+        console.log('Found courier rates:', rates); // Debug log
+        setCourierRates(rates);
+        // Calculate shipping cost after getting rates
+        calculateShippingCost(rates);
+      } else {
+        console.log('No courier rates found in response');
+        setShippingCost(0);
+        setCourierRates([]);
+      }
+    } catch (error) {
+      console.error('Error fetching courier rates:', error);
+      // Set default shipping cost if API fails
+      setShippingCost(0);
+    } finally {
+      setLoadingShipping(false);
+    }
+  };
+
+  // Function to calculate total weight from products
+  const calculateTotalWeight = () => {
+    if (!checkoutData || !checkoutData.product) return 0;
+    
+    let totalWeight = 0;
+    
+    if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
+      // Multiple variants selected
+      Object.values(checkoutData.product.selectedVariants).forEach(({ variant, quantity }) => {
+        const weight = variant.weight || checkoutData.product.weight || 1; // Default 1kg if no weight
+        totalWeight += weight * quantity;
+      });
+    } else {
+      // Single product or variant
+      const weight = checkoutData.product.variant?.weight || checkoutData.product.weight || 1;
+      const quantity = checkoutData.product.quantity || 1;
+      totalWeight += weight * quantity;
+    }
+    
+    return totalWeight;
+  };
+
+  // Function to calculate shipping cost based on weight and courier rates
+  const calculateShippingCost = (rates) => {
+    if (!rates || rates.length === 0) {
+      console.log('No rates available for shipping calculation');
+      setShippingCost(0);
+      return;
+    }
+    
+    const totalWeight = calculateTotalWeight();
+    // Round up weight (if 1.1kg, becomes 2kg)
+    const roundedWeight = Math.ceil(totalWeight);
+    
+    console.log(`Calculating shipping: Weight=${totalWeight}kg, Rounded=${roundedWeight}kg`);
+    
+    // Use first available courier rate
+    const courierRate = rates[0];
+    console.log('Using courier rate:', courierRate);
+    
+    // Check for price_per_kg in the correct nested structure
+    const pricePerKg = courierRate?.pricing?.price_per_kg || courierRate?.price_per_kg;
+    
+    if (courierRate && pricePerKg) {
+      const calculatedCost = roundedWeight * pricePerKg;
+      console.log(`Shipping calculation: ${roundedWeight}kg × Rp${pricePerKg} = Rp${calculatedCost}`);
+      setShippingCost(calculatedCost);
+    } else {
+      console.log('No price_per_kg found in courier rate:', courierRate);
+      setShippingCost(0);
+    }
+  };
+
+  // Calculate total including shipping
+  const calculateTotal = () => {
+    if (!checkoutData || !checkoutData.product) return 0;
+    return checkoutData.product.subtotal + shippingCost;
+  };
 
 
 
@@ -72,7 +177,7 @@ const PaymentMethodCheckout = () => {
         address_id: checkoutData.customer.address_id || 1,
         sales_channel_id: 1, // Default sales channel
         items: items,
-        shipping_cost: 0, // Default shipping cost
+        shipping_cost: shippingCost, // Use calculated shipping cost
         notes: 'Order dari marketplace - Payment via Xendit'
       };
 
@@ -306,11 +411,31 @@ const PaymentMethodCheckout = () => {
                     <span className="font-medium">Rp {checkoutData.product.subtotal.toLocaleString('id-ID')}</span>
                   </div>
                   
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Ongkos Kirim</span>
+                    <span className="font-medium">
+                      {loadingShipping ? (
+                        <span className="text-sm text-gray-400">Menghitung...</span>
+                      ) : (
+                        `Rp ${shippingCost.toLocaleString('id-ID')}`
+                      )}
+                    </span>
+                  </div>
+                  
+                  {/* Show shipping details if available */}
+                  {courierRates.length > 0 && !loadingShipping && (
+                    <div className="text-xs text-gray-500">
+                      <div>Berat: {Math.ceil(calculateTotalWeight())} kg</div>
+                      <div>Kurir: {courierRates[0]?.courier?.name || 'Standard'}</div>
+                      <div>Layanan: {courierRates[0]?.service?.name || 'Regular'}</div>
+                    </div>
+                  )}
+                  
                   <hr className="my-4" />
                   
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total</span>
-                    <span className="text-blue-600">Rp {checkoutData.product.subtotal.toLocaleString('id-ID')}</span>
+                    <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
                   </div>
                 </div>
 

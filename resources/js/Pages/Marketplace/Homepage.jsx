@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Link } from '@inertiajs/react';
 import { 
-    Star, 
-    ShoppingCart, 
-    ArrowRight,
     Search,
     Filter,
     Grid,
@@ -11,8 +8,7 @@ import {
 } from "lucide-react";
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { productsAPI } from '@/api/products';
-import { useCart } from '@/hooks/useCart';
-import Swal from 'sweetalert2';
+// Removed cart functionality from homepage cards
 
 const Homepage = () => {
     const [products, setProducts] = useState([]);
@@ -29,7 +25,7 @@ const Homepage = () => {
         per_page: 1000, // Set high value to fetch all products
         total: 0,
     });
-    const { addToCart } = useCart();
+    // Removed: addToCart integration on homepage cards
 
     // Derive categories from loaded products (fallback to string/slug if available)
     const categories = useMemo(() => {
@@ -397,41 +393,6 @@ const Homepage = () => {
                             <span className="text-lg sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                                 {formatPrice(getProductPrice(product))}
                             </span>
-                            <button 
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    try {
-                                        // Add to cart with default variant (first variant or base product)
-                                        const variant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
-                                        addToCart(product, 1, variant);
-                                        
-                                        Swal.fire({
-                                            icon: 'success',
-                                            title: 'Ditambahkan ke Keranjang',
-                                            text: `${product.name} berhasil ditambahkan`,
-                                            timer: 1500,
-                                            showConfirmButton: false,
-                                            position: 'top-end',
-                                            toast: true
-                                        });
-                                    } catch (error) {
-                                        console.error('Failed to add to cart:', error);
-                                        Swal.fire({
-                                            icon: 'error',
-                                            title: 'Gagal',
-                                            text: 'Gagal menambahkan ke keranjang',
-                                            timer: 1500,
-                                            showConfirmButton: false,
-                                            position: 'top-end',
-                                            toast: true
-                                        });
-                                    }
-                                }}
-                                className="p-2 sm:p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110"
-                            >
-                                <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4" />
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -460,42 +421,6 @@ const Homepage = () => {
                                 <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                                     {formatPrice(getProductPrice(product))}
                                 </span>
-                                <button 
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        try {
-                                            // Add to cart with default variant (first variant or base product)
-                                            const variant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
-                                            addToCart(product, 1, variant);
-                                            
-                                            Swal.fire({
-                                                icon: 'success',
-                                                title: 'Ditambahkan ke Keranjang',
-                                                text: `${product.name} berhasil ditambahkan`,
-                                                timer: 1500,
-                                                showConfirmButton: false,
-                                                position: 'top-end',
-                                                toast: true
-                                            });
-                                        } catch (error) {
-                                            console.error('Failed to add to cart:', error);
-                                            Swal.fire({
-                                                icon: 'error',
-                                                title: 'Gagal',
-                                                text: 'Gagal menambahkan ke keranjang',
-                                                timer: 1500,
-                                                showConfirmButton: false,
-                                                position: 'top-end',
-                                                toast: true
-                                            });
-                                        }
-                                    }}
-                                    className="p-2 sm:p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110" 
-                                    type="button"
-                                >
-                                    <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4" />
-                                </button>
                             </div>
                         </div>
                     </div>

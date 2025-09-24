@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import { Plus, Minus, ArrowLeft, ArrowRight } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
+import Swal from 'sweetalert2';
 
 const ProductCheckout = () => {
   const [product, setProduct] = useState(null);
@@ -99,7 +100,12 @@ const ProductCheckout = () => {
       } else {
         // Check if variant has stock before adding
         if (variant.stock <= 0) {
-          alert('Varian ini sedang tidak tersedia (stok habis).');
+          Swal.fire({
+            icon: 'warning',
+            title: 'Stok Habis',
+            text: 'Varian ini sedang tidak tersedia (stok habis).',
+            confirmButtonColor: '#3b82f6'
+          });
           return prev;
         }
         
@@ -130,7 +136,12 @@ const ProductCheckout = () => {
       }));
     } else if (newQuantity > maxStock) {
       // Show alert when trying to exceed stock
-      alert(`Stok tidak mencukupi! Maksimal ${maxStock} item untuk varian ini.`);
+      Swal.fire({
+        icon: 'warning',
+        title: 'Stok Tidak Mencukupi',
+        text: `Maksimal ${maxStock} item untuk varian ini.`,
+        confirmButtonColor: '#3b82f6'
+      });
     }
   };
 
@@ -166,7 +177,12 @@ const ProductCheckout = () => {
       // Redirect ke halaman customer data
       router.visit(route('checkout.customer-data'));
     } else {
-      alert('Terjadi kesalahan saat menyimpan data. Silakan coba lagi.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Terjadi Kesalahan',
+        text: 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.',
+        confirmButtonColor: '#3b82f6'
+      });
       setLoading(false);
     }
   };

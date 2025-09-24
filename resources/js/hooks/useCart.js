@@ -26,25 +26,14 @@ export const useCart = () => {
                 }
             }
 
-            const mapped = items.map((it, idx) => {
-                const img = it.image || it.product_image || it.thumbnail;
-                const imgUrl = img ? (String(img).startsWith('http') ? img : `${img}`) : '/assets/images/products/placeholder.jpg';
-                const price = Number(it.price ?? it.product_price ?? 0);
-                const original = Number(it.originalPrice ?? it.original_price ?? price);
-                return {
-                    id: it.variant_id ?? it.id ?? it.product_id ?? idx + 1,
-                    product_id: it.product_id ?? it.id,
-                    variant_id: it.variant_id ?? it.id,
-                    name: it.name ?? it.product_name ?? 'Produk',
-                    variant_label: it.variant_label,
-                    price,
-                    originalPrice: original,
-                    image: imgUrl,
-                    quantity: Number(it.quantity ?? 1),
-                    stock: Number(it.stock ?? it.available_stock ?? 99),
-                    selected: typeof it.selected === 'boolean' ? it.selected : true,
-                };
-            });
+            // Map to minimal cart structure
+            const mapped = items.map((it, idx) => ({
+                id: it.variant_id ?? it.id ?? it.product_id ?? idx + 1,
+                product_id: it.product_id ?? it.id,
+                variant_id: it.variant_id ?? it.id,
+                quantity: Number(it.quantity ?? 1),
+                selected: typeof it.selected === 'boolean' ? it.selected : true,
+            }));
 
             setCartItems(mapped);
             
@@ -64,17 +53,13 @@ export const useCart = () => {
     // Save cart to session storage
     const saveCart = useCallback((items) => {
         try {
+            // Persist minimal structure only
             const payload = items.map(it => ({
                 id: it.variant_id ?? it.id,
                 product_id: it.product_id ?? it.id,
                 variant_id: it.variant_id ?? it.id,
-                name: it.name,
-                variant_label: it.variant_label,
-                price: it.price,
-                image: it.image,
                 quantity: it.quantity,
-                stock: it.stock,
-                selected: it.selected,
+                selected: typeof it.selected === 'boolean' ? it.selected : true,
             }));
             sessionStorage.setItem('cart', JSON.stringify(payload));
             
@@ -93,26 +78,20 @@ export const useCart = () => {
 
     // Add item to cart
     const addToCart = useCallback((product, quantity = 1, variant = null) => {
-        // If no variant provided, use first variant or create default
+        // Determine variant id (if any)
         const selectedVariant = variant || (product.variants && product.variants.length > 0 ? product.variants[0] : null);
-        
+        const variantId = selectedVariant?.id || product.id;
+
         const newItem = {
-            id: selectedVariant?.id || product.id,
+            id: variantId,
             product_id: product.id,
-            variant_id: selectedVariant?.id || product.id,
-            name: product.name,
-            variant_label: selectedVariant?.variant_label || 'Default',
-            price: selectedVariant?.price || product.price || product.min_price || 0,
-            image: product.image,
-            quantity: quantity,
-            stock: selectedVariant?.stock || product.stock || 99,
+            variant_id: variantId,
+            quantity: Number(quantity) || 1,
             selected: true,
         };
 
         const currentItems = loadCart();
-        const existingItemIndex = currentItems.findIndex(item => 
-            item.variant_id === newItem.variant_id || item.id === newItem.id
-        );
+        const existingItemIndex = currentItems.findIndex(item => item.variant_id === newItem.variant_id);
 
         let updatedItems;
         if (existingItemIndex >= 0) {
@@ -146,7 +125,7 @@ export const useCart = () => {
         const currentItems = loadCart();
         const updatedItems = currentItems.map(item => 
             item.id === itemId 
-                ? { ...item, quantity: Math.max(1, Math.min(newQuantity, item.stock)) }
+                ? { ...item, quantity: Math.max(1, Number(newQuantity) || 1) }
                 : item
         );
         

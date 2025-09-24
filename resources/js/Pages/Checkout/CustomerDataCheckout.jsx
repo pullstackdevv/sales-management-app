@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, User, MapPin, Phone, Mail, Search, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, X, User, MapPin, Phone, Mail, UserPlus, Search } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
+import axios from 'axios';
+import Swal from 'sweetalert2';
 import api from '../../api/axios';
 
 const CustomerDataCheckout = () => {
@@ -402,7 +404,12 @@ const CustomerDataCheckout = () => {
     console.log('selectedCustomer:', selectedCustomer);
     if (!selectedCustomer || !selectedCustomer.id) {
       console.error('No selected customer or customer ID missing');
-      alert('Silakan pilih customer terlebih dahulu');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Customer Belum Dipilih',
+        text: 'Silakan pilih customer terlebih dahulu',
+        confirmButtonColor: '#3b82f6'
+      });
       return;
     }
 
@@ -507,7 +514,12 @@ const CustomerDataCheckout = () => {
       setAddressFormErrors({});
       
       // Show success message
-      alert(successMessage);
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil',
+        text: successMessage,
+        confirmButtonColor: '#3b82f6'
+      });
     } catch (error) {
       console.error('Error saving address:', error);
       
@@ -533,7 +545,12 @@ const CustomerDataCheckout = () => {
         errorMessage = error.message;
       }
       
-      alert(errorMessage);
+      Swal.fire({
+        icon: 'error',
+        title: 'Terjadi Kesalahan',
+        text: errorMessage,
+        confirmButtonColor: '#3b82f6'
+      });
     } finally {
       setSavingAddress(false);
     }
@@ -804,7 +821,12 @@ const CustomerDataCheckout = () => {
       }
     } catch (error) {
       console.error('Error in handleContinue:', error);
-      alert(error.message || 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Terjadi Kesalahan',
+        text: error.message || 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.',
+        confirmButtonColor: '#3b82f6'
+      });
       setLoading(false);
     }
   };

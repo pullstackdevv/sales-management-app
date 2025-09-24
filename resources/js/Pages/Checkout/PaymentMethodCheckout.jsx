@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, CheckCircle, CreditCard } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 
 const PaymentMethodCheckout = () => {
   const [loading, setLoading] = useState(true);
@@ -73,10 +74,24 @@ const PaymentMethodCheckout = () => {
   const calculateTotalWeight = () => {
     if (!checkoutData || !checkoutData.product) return 0;
     
+    // Check if this is from MultiProductCheckout with pre-calculated weight
+    if (checkoutData.product.totalWeight) {
+      return checkoutData.product.totalWeight;
+    }
+    
+    // Check if this is from MultiProductCheckout with multiProducts array
+    if (checkoutData.product.multiProducts && Array.isArray(checkoutData.product.multiProducts)) {
+      return checkoutData.product.multiProducts.reduce((totalWeight, product) => {
+        const weight = product.weight || 0.5; // Default 0.5kg if no weight specified
+        const quantity = product.quantity || 1;
+        return totalWeight + (weight * quantity);
+      }, 0);
+    }
+    
     let totalWeight = 0;
     
     if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
-      // Multiple variants selected
+      // Multiple variants selected (single product with multiple variants)
       Object.values(checkoutData.product.selectedVariants).forEach(({ variant, quantity }) => {
         const weight = variant.weight || checkoutData.product.weight || 1; // Default 1kg if no weight
         totalWeight += weight * quantity;
@@ -138,7 +153,12 @@ const PaymentMethodCheckout = () => {
       // Get auth token from localStorage
       const authToken = localStorage.getItem('auth_token');
       if (!authToken) {
-        alert('Anda perlu login terlebih dahulu');
+        Swal.fire({
+          icon: 'warning',
+          title: 'Login Diperlukan',
+          text: 'Anda perlu login terlebih dahulu',
+          confirmButtonColor: '#3b82f6'
+        });
         setSubmitting(false);
         return;
       }
@@ -148,8 +168,20 @@ const PaymentMethodCheckout = () => {
       // Calculate total quantity and prepare items
       let items = [];
       
-      if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
-        // Multiple variants selected
+      // Debug: Log the checkout data structure
+      console.log('Checkout data structure:', checkoutData);
+      console.log('Product data:', checkoutData.product);
+      
+      // Check if this is from MultiProductCheckout
+      if (checkoutData.product.multiProducts && Array.isArray(checkoutData.product.multiProducts)) {
+        // Multi-product checkout from MultiProductCheckout
+        items = checkoutData.product.multiProducts.map(product => ({
+          product_variant_id: product.variant_id || product.product_id, // Use variant_id if available, otherwise product_id
+          quantity: parseInt(product.quantity) || 1,
+          price: product.price
+        }));
+      } else if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
+        // Multiple variants selected (single product with multiple variants)
         items = Object.values(checkoutData.product.selectedVariants).map(({ variant, quantity }) => ({
           product_variant_id: variant.id,
           quantity: parseInt(quantity) || 1,
@@ -171,6 +203,9 @@ const PaymentMethodCheckout = () => {
         }];
       }
 
+      // Debug: Log the final items array
+      console.log('Final items array:', items);
+      
       // Prepare order data with correct customer_id field
       const orderData = {
         customer_id: checkoutData.customer.customer_id, // Use customer_id instead of id
@@ -180,6 +215,9 @@ const PaymentMethodCheckout = () => {
         shipping_cost: shippingCost, // Use calculated shipping cost
         notes: 'Order dari marketplace - Payment via Xendit'
       };
+      
+      // Debug: Log the final order data
+      console.log('Final order data being sent to API:', orderData);
 
 
 
@@ -220,19 +258,39 @@ const PaymentMethodCheckout = () => {
             if (paymentUrl) {
               window.location.href = paymentUrl;
             } else {
-              alert('Payment URL tidak ditemukan dalam response.');
+              Swal.fire({
+                icon: 'error',
+                title: 'Payment URL Tidak Ditemukan',
+                text: 'Payment URL tidak ditemukan dalam response.',
+                confirmButtonColor: '#3b82f6'
+              });
               setSubmitting(false);
             }
           } else {
-            alert('Terjadi kesalahan saat menyimpan data. Silakan coba lagi.');
+            Swal.fire({
+              icon: 'error',
+              title: 'Terjadi Kesalahan',
+              text: 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.',
+              confirmButtonColor: '#3b82f6'
+            });
             setSubmitting(false);
           }
         } else {
-          alert('Gagal membuat pembayaran: ' + (paymentResponse.data.message || 'Unknown error'));
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal Membuat Pembayaran',
+            text: 'Gagal membuat pembayaran: ' + (paymentResponse.data.message || 'Unknown error'),
+            confirmButtonColor: '#3b82f6'
+          });
           setSubmitting(false);
         }
       } else {
-        alert('Gagal membuat order: ' + (orderResponse.data.message || 'Unknown error'));
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Membuat Order',
+          text: 'Gagal membuat order: ' + (orderResponse.data.message || 'Unknown error'),
+          confirmButtonColor: '#3b82f6'
+        });
         setSubmitting(false);
       }
     } catch (error) {
@@ -248,9 +306,19 @@ const PaymentMethodCheckout = () => {
           errorMessage += ` - ${validationErrors}`;
         }
         
-        alert(`Terjadi kesalahan: ${errorMessage}`);
+        Swal.fire({
+          icon: 'error',
+          title: 'Terjadi Kesalahan',
+          text: `Terjadi kesalahan: ${errorMessage}`,
+          confirmButtonColor: '#3b82f6'
+        });
       } else {
-        alert('Terjadi kesalahan jaringan. Silakan coba lagi.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Kesalahan Jaringan',
+          text: 'Terjadi kesalahan jaringan. Silakan coba lagi.',
+          confirmButtonColor: '#3b82f6'
+        });
       }
       setSubmitting(false);
     }

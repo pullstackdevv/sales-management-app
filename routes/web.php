@@ -276,6 +276,10 @@ Route::get('/checkout/payment-status/{orderNumber}', function ($orderNumber) {
     return Inertia::render('Checkout/PaymentStatusCheckout', ['orderNumber' => $orderNumber]);
 })->name('checkout.payment-status');
 
+Route::get('/checkout/multi-product', function () {
+    return Inertia::render('Checkout/MultiProductCheckout');
+})->name('checkout.multi-product');
+
 Route::get('/profile', function () {
     return Inertia::render('Marketplace/Profile');
 })->name('marketplace.profile');

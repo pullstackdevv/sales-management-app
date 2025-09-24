@@ -11,6 +11,7 @@ import {
     Shield
 } from "lucide-react";
 import useCart from "@/hooks/useCart";
+import { productsAPI } from "@/api/products";
 
 // Cart item row component, memoized to avoid unnecessary re-renders
 const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity, onRemove, onProceed, formatPrice }) {
@@ -35,30 +36,30 @@ const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity
                 >
                     <div className="relative flex-shrink-0">
                         <img
-                            src={item.image}
-                            alt={item.name}
+                            src={item.image || '/assets/images/products/placeholder.jpg'}
+                            alt={item.name || 'Produk'}
                             className="w-24 h-24 sm:w-20 sm:h-20 object-cover rounded-lg border border-gray-100 group-hover:shadow-md transition-shadow duration-200"
                         />
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="text-base sm:text-sm font-medium text-gray-900 group-hover:text-gray-700 transition-colors line-clamp-2">
-                            {item.name}
+                            {item.name || 'Produk'}
                         </h3>
                         {item.variant_label && (
                             <p className="text-sm text-gray-500 mt-1">{item.variant_label}</p>
                         )}
                         <div className="flex items-baseline gap-2 mt-2">
                             <span className="text-lg font-semibold text-gray-900">
-                                {formatPrice(item.price)}
+                                {formatPrice(item.price || 0)}
                             </span>
-                            {item.originalPrice > item.price && (
+                            {item.originalPrice && item.price && item.originalPrice > item.price && (
                                 <span className="text-sm text-gray-400 line-through">
                                     {formatPrice(item.originalPrice)}
                                 </span>
                             )}
                         </div>
                         <p className="text-sm text-gray-500 mt-1">
-                            Stok: {item.stock}
+                            Stok: {typeof item.stock === 'number' ? item.stock : '—'}
                         </p>
                     </div>
                 </button>
@@ -79,7 +80,7 @@ const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity
                         </div>
                         <button
                             onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                            disabled={item.quantity >= item.stock}
+                            disabled={typeof item.stock === 'number' ? item.quantity >= item.stock : false}
                             className="p-2 sm:p-2 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-r-lg"
                         >
                             <Plus className="h-5 w-5 sm:h-4 sm:w-4 text-gray-600" />
@@ -101,8 +102,9 @@ const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity
 });
 
 export default function Cart() {
-    const { cartItems, updateQuantity, removeFromCart, clearCart, loadCart } = useCart();
+    const { cartItems, updateQuantity, removeFromCart, clearCart, loadCart, saveCart } = useCart();
     const [localCartItems, setLocalCartItems] = useState([]);
+    const [loadingDetails, setLoadingDetails] = useState(false);
 
     // Load cart items on component mount
     useEffect(() => {
@@ -114,6 +116,50 @@ export default function Cart() {
     useEffect(() => {
         setLocalCartItems(cartItems);
     }, [cartItems]);
+
+    // Fetch live product and variant details to enrich minimal cart items
+    useEffect(() => {
+        const enrich = async () => {
+            if (!cartItems || cartItems.length === 0) return;
+            setLoadingDetails(true);
+            try {
+                const enriched = await Promise.all(cartItems.map(async (it) => {
+                    try {
+                        const resp = await productsAPI.getProduct(it.product_id);
+                        // productsAPI.getProduct returns response.data from axios
+                        // API shape example provided: { status: "success", data: { ...product } }
+                        const productPayload = resp?.data ?? resp; 
+                        const product = productPayload?.data || productPayload?.product || productPayload;
+                        if (!product) return it;
+                        const variants = product.variants || [];
+                        const variant = variants.find(v => String(v.id) === String(it.variant_id));
+                        const imagePath = product?.image ? (String(product.image).startsWith('http') ? product.image : `/storage/${product.image}`) : null;
+                        const image = imagePath || it.image || '/assets/images/products/placeholder.jpg';
+                        const price = (variant?.price ?? product?.price ?? product?.min_price ?? product?.base_price ?? 0);
+                        const stock = (typeof variant?.stock === 'number' ? variant.stock : (typeof product?.stock === 'number' ? product.stock : null));
+                        const variantLabel = variant?.variant_label || variant?.name || it.variant_label;
+                        const name = product?.name || it.name || 'Produk';
+                        return {
+                            ...it,
+                            name,
+                            image,
+                            price: Number(price) || 0,
+                            stock,
+                            variant_label: variantLabel,
+                        };
+                    } catch (e) {
+                        console.warn('Failed to enrich cart item', it, e);
+                        return it;
+                    }
+                }));
+                setLocalCartItems(enriched);
+            } finally {
+                setLoadingDetails(false);
+            }
+        };
+        enrich();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [JSON.stringify(cartItems)]);
 
 
     // Memoize formatter to avoid creating a new Intl instance on every render
@@ -141,21 +187,16 @@ export default function Cart() {
                     ? { ...item, selected: !item.selected }
                     : item
             );
-            // Update session storage
+            // Persist minimal structure only
             try {
-                const payload = next.map(it => ({
+                const minimal = next.map(it => ({
                     id: it.variant_id ?? it.id,
                     product_id: it.product_id ?? it.id,
                     variant_id: it.variant_id ?? it.id,
-                    name: it.name,
-                    variant_label: it.variant_label,
-                    price: it.price,
-                    image: it.image,
                     quantity: it.quantity,
-                    stock: it.stock,
                     selected: it.selected,
                 }));
-                sessionStorage.setItem('cart', JSON.stringify(payload));
+                sessionStorage.setItem('cart', JSON.stringify(minimal));
             } catch {}
             return next;
         });
@@ -165,21 +206,16 @@ export default function Cart() {
         setLocalCartItems(prev => {
             const allSelected = prev.every(item => item.selected);
             const next = prev.map(item => ({ ...item, selected: !allSelected }));
-            // Update session storage
+            // Persist minimal structure only
             try {
-                const payload = next.map(it => ({
+                const minimal = next.map(it => ({
                     id: it.variant_id ?? it.id,
                     product_id: it.product_id ?? it.id,
                     variant_id: it.variant_id ?? it.id,
-                    name: it.name,
-                    variant_label: it.variant_label,
-                    price: it.price,
-                    image: it.image,
                     quantity: it.quantity,
-                    stock: it.stock,
                     selected: it.selected,
                 }));
-                sessionStorage.setItem('cart', JSON.stringify(payload));
+                sessionStorage.setItem('cart', JSON.stringify(minimal));
             } catch {}
             return next;
         });
@@ -339,13 +375,37 @@ export default function Cart() {
                                     </div>
 
                                     {/* Checkout Button */}
-                                    <Link
-                                        href={selectedItems.length > 0 ? "/checkout/product" : "#"}
+                                    <button
                                         onClick={(e) => {
-                                            if (selectedItems.length === 0) {
-                                                e.preventDefault();
+                                            e.preventDefault();
+                                            if (selectedItems.length === 0) return;
+                                            
+                                            // Save multi-product checkout data
+                                            const checkoutData = {
+                                                products: selectedItems.map(item => ({
+                                                    product_id: item.product_id,
+                                                    variant_id: item.variant_id,
+                                                    quantity: item.quantity,
+                                                    name: item.name,
+                                                    variant_label: item.variant_label,
+                                                    price: item.price,
+                                                    image: item.image,
+                                                    stock: item.stock
+                                                })),
+                                                subtotal: subtotal,
+                                                total: total,
+                                                shipping_cost: shippingCost
+                                            };
+                                            
+                                            try {
+                                                sessionStorage.setItem('checkout_data', JSON.stringify(checkoutData));
+                                                window.location.href = '/checkout/multi-product';
+                                            } catch (error) {
+                                                console.error('Failed to save checkout data:', error);
+                                                alert('Terjadi kesalahan saat menyimpan data checkout');
                                             }
                                         }}
+                                        disabled={selectedItems.length === 0}
                                         className={`w-full py-3 px-4 rounded-md font-medium text-center transition-colors text-sm ${
                                             selectedItems.length > 0
                                                 ? 'bg-gray-900 text-white hover:bg-gray-800'
@@ -354,13 +414,13 @@ export default function Cart() {
                                     >
                                         <div className="flex items-center justify-center">
                                             <CreditCard className="h-5 w-5 mr-2" />
-                                            Lanjut ke Pembayaran
+                                            Lanjut ke Pembayaran ({selectedItems.length} item)
                                         </div>
-                                    </Link>
+                                    </button>
 
                                     {/* Continue Shopping */}
                                     <Link
-                                        href="/products"
+                                        href="/"
                                         className="w-full mt-3 py-3 px-4 border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50 transition-colors text-center block text-sm"
                                     >
                                         Lanjut Belanja

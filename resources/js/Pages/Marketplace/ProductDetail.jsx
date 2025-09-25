@@ -158,6 +158,9 @@ export default function ProductDetail() {
                 text: `${product.name} (${selectedVariant.variant_label}) x${quantity}`,
                 timer: 1500,
                 showConfirmButton: false
+            }).then(() => {
+                // Reload the page after successful addition to cart
+                window.location.reload();
             });
         } catch (e) {
             console.error('Failed to add to cart', e);

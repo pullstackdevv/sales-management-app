@@ -259,7 +259,7 @@ export default function Cart() {
                                     Belum ada produk yang Anda pilih.
                                 </p>
                                 <Link 
-                                    href="/products"
+                                    href="/"
                                     className="inline-flex items-center justify-center px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-md transition-colors text-sm"
                                 >
                                     Mulai Belanja

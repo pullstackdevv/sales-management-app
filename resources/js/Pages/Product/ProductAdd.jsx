@@ -29,15 +29,25 @@ export default function ProductAdd() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Generate auto SKU for variant
+  const generateVariantSKU = (productSku, variantIndex) => {
+    if (!productSku) return "";
+    const paddedIndex = String(variantIndex + 1).padStart(3, '0');
+    return `${productSku}-${paddedIndex}`;
+  };
+
   // Add new variant
   const addVariant = () => {
+    const newVariantIndex = product.variants.length;
+    const newVariantSKU = generateVariantSKU(product.sku, newVariantIndex);
+    
     setProduct({
       ...product,
       variants: [
         ...product.variants,
         {
           variant_label: "",
-          sku: "",
+          sku: newVariantSKU,
           price: 0,
           base_price: 0,
           weight: 0,
@@ -61,6 +71,20 @@ export default function ProductAdd() {
     const newVariants = [...product.variants];
     newVariants[index] = { ...newVariants[index], [field]: value };
     setProduct({ ...product, variants: newVariants });
+  };
+
+  // Update all variant SKUs when product SKU changes
+  const updateProductSKU = (newSku) => {
+    const updatedVariants = product.variants.map((variant, index) => ({
+      ...variant,
+      sku: generateVariantSKU(newSku, index)
+    }));
+    
+    setProduct({ 
+      ...product, 
+      sku: newSku,
+      variants: updatedVariants
+    });
   };
 
   // Submit form
@@ -179,7 +203,7 @@ export default function ProductAdd() {
                       }`}
                       placeholder="Masukkan SKU produk..."
                       value={product.sku}
-                      onChange={(e) => setProduct({ ...product, sku: e.target.value })}
+                      onChange={(e) => updateProductSKU(e.target.value)}
                       required
                     />
                     {errors.sku && (
@@ -293,13 +317,13 @@ export default function ProductAdd() {
                           <label className="block text-sm font-medium mb-1">SKU*</label>
                           <input
                             type="text"
-                            className={`w-full border px-3 py-2 rounded-md text-sm ${
+                            className={`w-full border px-3 py-2 rounded-md text-sm bg-gray-100 ${
                               errors[`variants.${index}.sku`] ? 'border-red-500' : 'border-gray-300'
                             }`}
-                            placeholder="Contoh: PRD-001-M"
+                            placeholder="Auto-generated"
                             value={variant.sku}
-                            onChange={(e) => updateVariant(index, 'sku', e.target.value)}
-                            required
+                            readOnly
+                            title="SKU otomatis berdasarkan SKU produk"
                           />
                           {errors[`variants.${index}.sku`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.sku`][0]}</p>

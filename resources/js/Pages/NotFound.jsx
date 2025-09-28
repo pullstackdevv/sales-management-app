@@ -20,7 +20,7 @@ export default function NotFound() {
                         Kembali ke Beranda
                     </Link>
                     <Link
-                        href="/products"
+                        href="/"
                         className="px-4 py-2 bg-white border border-gray-300 hover:border-gray-500 text-gray-800 rounded-md transition-colors"
                     >
                         Lihat Produk

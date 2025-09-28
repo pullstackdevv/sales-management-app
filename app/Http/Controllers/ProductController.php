@@ -104,7 +104,7 @@ class ProductController extends Controller
             'is_storefront' => 'boolean',
             'variants' => 'required|array|min:1',
             'variants.*.variant_label' => 'required|string|max:255',
-            'variants.*.sku' => 'required|string|max:255',
+            'variants.*.sku' => 'required|string|max:255|unique:product_variants,sku',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',

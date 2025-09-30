@@ -28,6 +28,8 @@ class DatabaseSeeder extends Seeder
         // ]);
 
         $this->call([
+            RoleSeeder::class,
+            UserSeeder::class,
             SalesChannelSeeder::class,
             PaymentBankSeeder::class,
             CourierSeeder::class,
@@ -35,7 +37,6 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             VoucherSeeder::class,
             ExpenseSeeder::class,
-            UserSeeder::class,
             OrderSeeder::class,
             StockMovementSeeder::class,
             StockOpnameSeeder::class,

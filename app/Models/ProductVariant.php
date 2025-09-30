@@ -18,6 +18,7 @@ class ProductVariant extends Model
         'base_price',
         'weight',
         'stock',
+        'image',
         'is_active',
         'created_by',
         'updated_by',

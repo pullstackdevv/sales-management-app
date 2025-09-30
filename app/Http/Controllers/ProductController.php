@@ -109,7 +109,8 @@ class ProductController extends Controller
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
-            'variants.*.is_active' => 'boolean'
+            'variants.*.is_active' => 'boolean',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         // Handle image upload
@@ -132,9 +133,31 @@ class ProductController extends Controller
                 'created_by' => Auth::id()
             ]);
 
-            foreach ($validated['variants'] as $variant) {
+            foreach ($validated['variants'] as $index => $variant) {
+                // Handle variant image upload (if provided)
+                $variantImagePath = null;
+                if ($request->hasFile("variants.$index.image")) {
+                    try {
+                        // Ensure directory exists
+                        if (!Storage::disk('public')->exists('product-variants')) {
+                            Storage::disk('public')->makeDirectory('product-variants');
+                        }
+                        
+                        $variantImagePath = $request->file("variants.$index.image")->store('product-variants', 'public');
+                    } catch (\Exception $e) {
+                        throw new \Exception("The variants.$index.image failed to upload: " . $e->getMessage());
+                    }
+                }
+
                 $product->variants()->create([
-                    ...$variant,
+                    'variant_label' => $variant['variant_label'],
+                    'sku' => $variant['sku'],
+                    'price' => $variant['price'],
+                    'base_price' => $variant['base_price'],
+                    'weight' => $variant['weight'] ?? null,
+                    'stock' => $variant['stock'],
+                    'is_active' => $variant['is_active'] ?? true,
+                    'image' => $variantImagePath,
                     'created_by' => Auth::id()
                 ]);
             }
@@ -179,7 +202,8 @@ class ProductController extends Controller
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
-            'variants.*.is_active' => 'boolean'
+            'variants.*.is_active' => 'boolean',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
 
         // Additional validation for variant SKU uniqueness
@@ -229,10 +253,28 @@ class ProductController extends Controller
                 $variantIds = collect($validated['variants'])->pluck('id')->filter();
                 $product->variants()->whereNotIn('id', $variantIds)->delete();
 
-                // Update or create variants
-                foreach ($validated['variants'] as $variant) {
+                // Update or create variants (with image handling)
+                foreach ($validated['variants'] as $index => $variant) {
                     if (isset($variant['id'])) {
-                        $product->variants()->where('id', $variant['id'])->update([
+                        $variantModel = $product->variants()->where('id', $variant['id'])->firstOrFail();
+                        $variantImagePath = $variantModel->image;
+                        if ($request->hasFile("variants.$index.image")) {
+                            try {
+                                // Ensure directory exists
+                                if (!Storage::disk('public')->exists('product-variants')) {
+                                    Storage::disk('public')->makeDirectory('product-variants');
+                                }
+                                
+                                if ($variantImagePath && Storage::disk('public')->exists($variantImagePath)) {
+                                    Storage::disk('public')->delete($variantImagePath);
+                                }
+                                $variantImagePath = $request->file("variants.$index.image")->store('product-variants', 'public');
+                            } catch (\Exception $e) {
+                                throw new \Exception("The variants.$index.image failed to upload: " . $e->getMessage());
+                            }
+                        }
+
+                        $variantModel->update([
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
                             'price' => $variant['price'],
@@ -240,9 +282,23 @@ class ProductController extends Controller
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
+                            'image' => $variantImagePath,
                             'updated_by' => Auth::id()
                         ]);
                     } else {
+                        $variantImagePath = null;
+                        if ($request->hasFile("variants.$index.image")) {
+                            try {
+                                // Ensure directory exists
+                                if (!Storage::disk('public')->exists('product-variants')) {
+                                    Storage::disk('public')->makeDirectory('product-variants');
+                                }
+                                
+                                $variantImagePath = $request->file("variants.$index.image")->store('product-variants', 'public');
+                            } catch (\Exception $e) {
+                                throw new \Exception("The variants.$index.image failed to upload: " . $e->getMessage());
+                            }
+                        }
                         $product->variants()->create([
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
@@ -251,6 +307,7 @@ class ProductController extends Controller
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
+                            'image' => $variantImagePath,
                             'created_by' => Auth::id()
                         ]);
                     }

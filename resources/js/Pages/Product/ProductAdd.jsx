@@ -22,7 +22,8 @@ export default function ProductAdd() {
         base_price: 0,
         weight: 0,
         stock: 0,
-        is_active: true
+        is_active: true,
+        is_storefront: true
       }
     ]
   });
@@ -52,7 +53,8 @@ export default function ProductAdd() {
           base_price: 0,
           weight: 0,
           stock: 0,
-          is_active: true
+          is_active: true,
+          is_storefront: true
         }
       ]
     });
@@ -118,8 +120,11 @@ export default function ProductAdd() {
         formData.append(`variants[${index}][weight]`, variant.weight);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
+        formData.append(`variants[${index}][is_storefront]`, variant.is_storefront ? '1' : '0');
+        if (variant.image && typeof variant.image !== 'string') {
+          formData.append(`variants[${index}][image]`, variant.image);
+        }
       });
-
       const response = await api.post('/products', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -254,6 +259,16 @@ export default function ProductAdd() {
                       }`}
                       onChange={(e) => setProduct({ ...product, image: e.target.files[0] })}
                     />
+                    {product.image && typeof product.image !== 'string' && (
+                      <div className="mt-2">
+                        <img
+                          src={URL.createObjectURL(product.image)}
+                          alt="Preview Produk"
+                          className="w-24 h-24 object-cover rounded border"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Preview gambar produk</p>
+                      </div>
+                    )}
                     <p className="text-sm text-gray-500 mt-1">
                       Format yang didukung: JPEG, PNG, JPG, GIF. Maksimal 2MB.
                     </p>
@@ -261,7 +276,6 @@ export default function ProductAdd() {
                       <p className="text-red-500 text-xs mt-1">{errors.image[0]}</p>
                     )}
                   </div>
-
                 </div>
               </div>
 
@@ -326,9 +340,29 @@ export default function ProductAdd() {
                             title="SKU otomatis berdasarkan SKU produk"
                           />
                           {errors[`variants.${index}.sku`] && (
-                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.sku`][0]}</p>
-                          )}
-                        </div>
+                          <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.sku`][0]}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Gambar Varian</label>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/jpg,image/gif"
+                          className="w-full border px-3 py-2 rounded-md text-sm border-gray-300"
+                          onChange={(e) => updateVariant(index, 'image', e.target.files[0])}
+                        />
+                        {variant.image && typeof variant.image !== 'string' && (
+                          <div className="mt-2">
+                            <img
+                              src={URL.createObjectURL(variant.image)}
+                              alt="Preview Varian"
+                              className="w-20 h-20 object-cover rounded border"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Preview gambar varian</p>
+                          </div>
+                        )}
+                      </div>
 
                         <div>
                           <label className="block text-sm font-medium mb-1">Harga Jual*</label>
@@ -405,16 +439,29 @@ export default function ProductAdd() {
                         </div>
                       </div>
 
-                      <div className="mt-3">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            className="mr-2"
-                            checked={variant.is_active}
-                            onChange={(e) => updateVariant(index, 'is_active', e.target.checked)}
-                          />
-                          <span className="text-sm">Varian aktif</span>
-                        </label>
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              className="mr-2"
+                              checked={variant.is_active}
+                              onChange={(e) => updateVariant(index, 'is_active', e.target.checked)}
+                            />
+                            <span className="text-sm">Varian aktif</span>
+                          </label>
+                        </div>
+                        <div>
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              className="mr-2"
+                              checked={variant.is_storefront !== false}
+                              onChange={(e) => updateVariant(index, 'is_storefront', e.target.checked)}
+                            />
+                            <span className="text-sm">Tampil di etalase</span>
+                          </label>
+                        </div>
                       </div>
                     </div>
                   ))}

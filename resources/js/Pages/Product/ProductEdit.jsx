@@ -22,6 +22,7 @@ export default function ProductEdit() {
   const [loadingData, setLoadingData] = useState(true);
   const [errors, setErrors] = useState({});
   const [productId, setProductId] = useState(null);
+  const [productImagePreview, setProductImagePreview] = useState(null);
   
   // Modal states
   const [stockHistoryModal, setStockHistoryModal] = useState({
@@ -64,11 +65,17 @@ export default function ProductEdit() {
         sku: productData?.sku || "",
         category: productData?.category || "",
         description: productData?.description || "",
-        image: null,
+        // keep existing image path so it can be previewed
+        image: productData?.image || "",
         is_active: productData?.is_active ?? true,
         is_storefront: productData?.is_storefront ?? true,
-        variants: productData.variants || []
+        variants: (productData.variants || []).map(variant => ({
+          ...variant,
+          is_storefront: variant.is_storefront ?? true
+        }))
       });
+      // initialize preview with existing image if available
+      setProductImagePreview(productData?.image ? `/storage/${productData.image}` : null);
     } catch (error) {
       console.error('Error fetching product:', error);
       Swal.fire({
@@ -106,7 +113,8 @@ export default function ProductEdit() {
           base_price: 0,
           weight: 0,
           stock: 0,
-          is_active: true
+          is_active: true,
+          is_storefront: true
         }
       ]
     });
@@ -214,6 +222,10 @@ export default function ProductEdit() {
         formData.append(`variants[${index}][weight]`, variant.weight);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
+        formData.append(`variants[${index}][is_storefront]`, variant.is_storefront ? '1' : '0');
+        if (variant.image && typeof variant.image !== 'string') {
+          formData.append(`variants[${index}][image]`, variant.image);
+        }
       });
 
       const response = await api.post(`/products/${productId}`, formData, {
@@ -357,7 +369,8 @@ export default function ProductEdit() {
 
                   <div>
                     <label className="block text-sm font-medium mb-1">Gambar Produk</label>
-                    {product.image && typeof product.image === 'string' && (
+                    {/* Tampilkan gambar saat ini hanya jika belum ada preview terpilih */}
+                    {(!productImagePreview && product.image && typeof product.image === 'string') && (
                       <div className="mb-2">
                         <img 
                           src={`/storage/${product.image}`} 
@@ -373,13 +386,21 @@ export default function ProductEdit() {
                       className={`w-full border px-3 py-2 rounded-md ${
                         errors.image ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      onChange={(e) => setProduct({ ...product, image: e.target.files[0] })}
+                      onChange={(e) => {
+                        setProduct({ ...product, image: e.target.files[0] });
+                        const url = URL.createObjectURL(e.target.files[0]);
+                        setProductImagePreview(url);
+                      }}
                     />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Format yang didukung: JPEG, PNG, JPG, GIF. Maksimal 2MB. Kosongkan jika tidak ingin mengubah gambar.
-                    </p>
-                    {errors.image && (
-                      <p className="text-red-500 text-xs mt-1">{errors.image[0]}</p>
+                    {productImagePreview && (
+                      <div className="mt-2">
+                        <img
+                          src={productImagePreview}
+                          alt="Preview Produk"
+                          className="w-20 h-20 object-cover rounded border"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Preview gambar produk</p>
+                      </div>
                     )}
                   </div>
 
@@ -426,6 +447,37 @@ export default function ProductEdit() {
                             >
                               <Icon icon="material-symbols:delete-outline" />
                             </button>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Gambar Varian</label>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/jpg,image/gif"
+                            className="w-full border px-3 py-2 rounded-md text-sm border-gray-300"
+                            onChange={(e) => updateVariant(index, 'image', e.target.files[0])}
+                          />
+                          {variant.image && typeof variant.image !== 'string' ? (
+                            <div className="mt-2">
+                              <img
+                                src={URL.createObjectURL(variant.image)}
+                                alt="Preview Varian"
+                                className="w-20 h-20 object-cover rounded border"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">Preview gambar varian</p>
+                            </div>
+                          ) : (
+                            variant.image && typeof variant.image === 'string' && (
+                              <div className="mt-2">
+                                <img
+                                  src={`/storage/${variant.image}`}
+                                  alt="Gambar Varian Saat Ini"
+                                  className="w-20 h-20 object-cover rounded border"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Gambar varian saat ini</p>
+                              </div>
+                            )
                           )}
                         </div>
 
@@ -557,16 +609,29 @@ export default function ProductEdit() {
                           </div>
                         </div>
 
-                        <div className="mt-3">
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              className="mr-2"
-                              checked={variant.is_active !== false}
-                              onChange={(e) => updateVariant(index, 'is_active', e.target.checked)}
-                            />
-                            <span className="text-sm">Varian aktif</span>
-                          </label>
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                className="mr-2"
+                                checked={variant.is_active !== false}
+                                onChange={(e) => updateVariant(index, 'is_active', e.target.checked)}
+                              />
+                              <span className="text-sm">Varian aktif</span>
+                            </label>
+                          </div>
+                          <div>
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                className="mr-2"
+                                checked={variant.is_storefront !== false}
+                                onChange={(e) => updateVariant(index, 'is_storefront', e.target.checked)}
+                              />
+                              <span className="text-sm">Tampil di etalase</span>
+                            </label>
+                          </div>
                         </div>
                       </div>
                     ))

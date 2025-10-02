@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, Plus, X, User, MapPin, Phone, Mail, UserPlus, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, X, User, MapPin, Phone, Mail, UserPlus, Search, Trash2 } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
 import axios from 'axios';
@@ -40,6 +40,7 @@ const CustomerDataCheckout = () => {
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
+  const [addressesLoading, setAddressesLoading] = useState(false);
   
   // Phone verification for existing customer
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
@@ -84,6 +85,11 @@ const CustomerDataCheckout = () => {
     return `${'*'.repeat(maskedPrefixLength)}${last4}`;
   };
 
+  // Helper function to get customer ID consistently
+  const getCustomerId = (customer) => {
+    return customer?.id || customer?.customer_id;
+  };
+
   useEffect(() => {
     // Ambil data produk dari session
     const checkoutData = checkoutSession.get();
@@ -101,6 +107,11 @@ const CustomerDataCheckout = () => {
         // Existing customer
         setCustomerType('existing');
         setSelectedCustomer(checkoutData.customer);
+        
+        // Fetch customer addresses only if customer_id exists and is valid
+        if (checkoutData.customer.customer_id && checkoutData.customer.customer_id !== '') {
+          fetchCustomerAddressesFromSession(checkoutData.customer.customer_id);
+        }
       } else {
         // New customer
         setCustomerType('new');
@@ -125,6 +136,57 @@ const CustomerDataCheckout = () => {
       }
     }
   }, []);
+
+  // Fetch customer addresses from session (when loading existing customer from session)
+  const fetchCustomerAddressesFromSession = async (customerId) => {
+    try {
+      setAddressesLoading(true);
+      const response = await api.get(`/customers/${customerId}/addresses`);
+      
+      if (response.data.status === 'success') {
+        const addresses = response.data.data || [];
+        setCustomerAddresses(addresses);
+        
+        // Check if there's a selected address in session
+        const checkoutData = checkoutSession.get();
+        if (checkoutData.customer && checkoutData.customer.address_id) {
+          setSelectedAddressId(checkoutData.customer.address_id);
+        } else if (addresses.length > 0) {
+          // Auto-select first address if no specific address selected
+          const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
+          setSelectedAddressId(defaultAddress.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching customer addresses from session:', error);
+      setCustomerAddresses([]);
+    } finally {
+      setAddressesLoading(false);
+    }
+  };
+
+  // Fetch customer addresses after customer selection (from search)
+  const fetchCustomerAddressesAfterSelection = async (customerId) => {
+    try {
+      setAddressesLoading(true);
+      const response = await api.get(`/customers/${customerId}/addresses`);
+      if (response.data.status === 'success') {
+        const addresses = response.data.data || [];
+        setCustomerAddresses(addresses);
+        
+        // Auto-select default address or first address
+        if (addresses.length > 0) {
+          const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
+          setSelectedAddressId(defaultAddress.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching customer addresses:', error);
+      setCustomerAddresses([]);
+    } finally {
+      setAddressesLoading(false);
+    }
+  };
 
   // Fetch customers for search
   const fetchCustomers = async (search = '') => {
@@ -193,15 +255,7 @@ const CustomerDataCheckout = () => {
     setShowPhoneVerification(false);
 
     // Fetch customer addresses
-    try {
-      const response = await api.get(`/customers/${pendingCustomer.id}/addresses`);
-      if (response.data.status === 'success') {
-        setCustomerAddresses(response.data.data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching customer addresses:', error);
-      setCustomerAddresses([]);
-    }
+    await fetchCustomerAddressesAfterSelection(pendingCustomer.id);
   };
 
   // Cancel phone verification
@@ -394,6 +448,77 @@ const CustomerDataCheckout = () => {
     return Object.keys(errors).length === 0;
   };
 
+  // Handle delete address
+  const handleDeleteAddress = async (address) => {
+    // Prevent deleting if it's the only address
+    if (customerAddresses.length <= 1) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Tidak Dapat Menghapus',
+        text: 'Customer harus memiliki minimal satu alamat',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Hapus Alamat',
+      text: `Apakah Anda yakin ingin menghapus alamat "${address.label}"?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Ya, Hapus',
+      cancelButtonText: 'Batal'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        // Use the new delete address endpoint
+        const response = await api.delete(`/customers/${getCustomerId(selectedCustomer)}/addresses/${address.id}`);
+        
+        if (response.data.status === 'success') {
+          // Update local state with the returned addresses
+          setCustomerAddresses(response.data.data || []);
+          
+          // If deleted address was selected, clear selection or select first available
+          if (selectedAddressId == address.id) {
+            const remainingAddresses = response.data.data || [];
+            if (remainingAddresses.length > 0) {
+              const defaultAddress = remainingAddresses.find(addr => addr.is_default) || remainingAddresses[0];
+              setSelectedAddressId(defaultAddress.id);
+            } else {
+              setSelectedAddressId('');
+            }
+          }
+
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: response.data.message || 'Alamat berhasil dihapus',
+            timer: 2000,
+            showConfirmButton: false
+          });
+        }
+
+      } catch (error) {
+        console.error('Error deleting address:', error);
+        
+        let errorMessage = 'Terjadi kesalahan saat menghapus alamat';
+        if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: errorMessage,
+          confirmButtonColor: '#3b82f6'
+        });
+      }
+    }
+  };
+
   // Handle save address
   const handleSaveAddress = async () => {
     if (!validateAddressForm()) {
@@ -401,9 +526,7 @@ const CustomerDataCheckout = () => {
     }
 
     // Validate that we have a selected customer
-    console.log('selectedCustomer:', selectedCustomer);
-    if (!selectedCustomer || !selectedCustomer.id) {
-      console.error('No selected customer or customer ID missing');
+    if (!selectedCustomer || !getCustomerId(selectedCustomer)) {
       Swal.fire({
         icon: 'warning',
         title: 'Customer Belum Dipilih',
@@ -455,7 +578,7 @@ const CustomerDataCheckout = () => {
           addresses: updatedAddresses
         };
         
-        await updateCustomerWithAddresses(selectedCustomer.id, customerPayload);
+        await updateCustomerWithAddresses(getCustomerId(selectedCustomer), customerPayload);
         successMessage = 'Alamat berhasil diperbarui';
       } else {
         // Add new address using customer endpoint with addresses array
@@ -481,12 +604,12 @@ const CustomerDataCheckout = () => {
           addresses: newAddresses
         };
         
-        await updateCustomerWithAddresses(selectedCustomer.id, customerPayload);
+        await updateCustomerWithAddresses(getCustomerId(selectedCustomer), customerPayload);
         successMessage = 'Alamat baru berhasil ditambahkan';
       }
 
       // Refresh customer addresses
-      const response = await api.get(`/customers/${selectedCustomer.id}/addresses`);
+      const response = await api.get(`/customers/${getCustomerId(selectedCustomer)}/addresses`);
       if (response.data.status === 'success') {
         setCustomerAddresses(response.data.data || []);
         
@@ -793,10 +916,16 @@ const CustomerDataCheckout = () => {
           recipient_phone: primaryAddress?.phone || createdCustomer.phone
         };
       } else {
-        // Format data for existing customer
-        const selectedAddress = customerAddresses.find(addr => addr.id == selectedAddressId);
+        // Helper function to get customer ID consistently
+  const getCustomerId = (customer) => {
+    return customer?.id || customer?.customer_id;
+  };
+
+  // Remove mock data; use the fetched product only
+
+  // Helper function to get storefront variantss = customerAddresses.find(addr => addr.id == selectedAddressId);
         customerData = {
-          customer_id: selectedCustomer.id,
+          customer_id: getCustomerId(selectedCustomer),
           name: selectedCustomer.name,
           email: selectedCustomer.email,
           whatsapp: selectedCustomer.phone,
@@ -1176,7 +1305,7 @@ const CustomerDataCheckout = () => {
                             <MapPin className="w-4 h-4 inline mr-1" />
                             Pilih Alamat Pengiriman *
                           </label>
-                          {selectedCustomer && selectedCustomer.id && (
+                          {selectedCustomer && getCustomerId(selectedCustomer) && (
                             <button
                               type="button"
                               onClick={handleShowAddAddressForm}
@@ -1187,7 +1316,12 @@ const CustomerDataCheckout = () => {
                           )}
                         </div>
                         
-                        {customerAddresses.length > 0 ? (
+                        {addressesLoading ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                            <p className="text-gray-500 mt-2">Memuat alamat...</p>
+                          </div>
+                        ) : customerAddresses.length > 0 ? (
                           <div className="space-y-2">
                             {customerAddresses.map((address) => (
                               <label
@@ -1221,6 +1355,18 @@ const CustomerDataCheckout = () => {
                                         className="text-xs text-gray-500 hover:text-gray-700 ml-2"
                                       >
                                         Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleDeleteAddress(address);
+                                        }}
+                                        className="text-xs text-red-500 hover:text-red-700 ml-2 flex items-center gap-1"
+                                        title="Hapus alamat"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        Hapus
                                       </button>
                                     </div>
                                     <p className="text-sm text-gray-600 mt-1">

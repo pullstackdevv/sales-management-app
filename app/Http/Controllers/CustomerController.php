@@ -241,4 +241,74 @@ class CustomerController extends Controller
             throw $e;
         }
     }
+
+    /**
+     * Get customer addresses
+     */
+    public function addresses(Customer $customer): JsonResponse
+    {
+        return response()->json([
+            'status' => 'success',
+            'data' => $customer->addresses()->orderBy('is_default', 'desc')->orderBy('created_at', 'asc')->get()
+        ]);
+    }
+
+    /**
+     * Delete specific customer address
+     */
+    public function deleteAddress(Customer $customer, $addressId): JsonResponse
+    {
+        try {
+            DB::beginTransaction();
+
+            // Find the address
+            $address = $customer->addresses()->findOrFail($addressId);
+            
+            // Check if this is the only address
+            $addressCount = $customer->addresses()->count();
+            if ($addressCount <= 1) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Customer harus memiliki minimal satu alamat'
+                ], 400);
+            }
+
+            // If deleting default address, set another address as default
+            if ($address->is_default) {
+                $newDefaultAddress = $customer->addresses()
+                    ->where('id', '!=', $addressId)
+                    ->first();
+                
+                if ($newDefaultAddress) {
+                    $newDefaultAddress->update(['is_default' => true]);
+                }
+            }
+
+            // Delete the address
+            $address->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Alamat berhasil dihapus',
+                'data' => $customer->addresses()->orderBy('is_default', 'desc')->orderBy('created_at', 'asc')->get()
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Alamat tidak ditemukan'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menghapus alamat'
+            ], 500);
+        }
+    }
 }

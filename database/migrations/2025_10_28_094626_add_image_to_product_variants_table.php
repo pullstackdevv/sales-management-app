@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::table('product_variants', function (Blueprint $table) {
             $table->string('image')->nullable()->after('stock');
+            $table->boolean('is_storefront')->default(false)->after('image');
         });
     }
 
@@ -22,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('product_variants', function (Blueprint $table) {
-            $table->dropColumn('image');
+            $table->dropColumn(['image', 'is_storefront']);
         });
     }
 };

@@ -24,6 +24,7 @@ class ProductVariantResource extends JsonResource
             'weight' => $this->weight,
             'stock' => $this->stock,
             'is_active' => $this->is_active,
+            'is_storefront' => $this->is_storefront,
             'profit_margin' => $this->base_price > 0 ? round((($this->price - $this->base_price) / $this->base_price) * 100, 2) : 0,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

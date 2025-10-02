@@ -71,6 +71,7 @@ export default function ProductEdit() {
         is_storefront: productData?.is_storefront ?? true,
         variants: (productData.variants || []).map(variant => ({
           ...variant,
+          is_active: variant.is_active ?? true,
           is_storefront: variant.is_storefront ?? true
         }))
       });

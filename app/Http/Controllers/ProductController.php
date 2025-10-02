@@ -39,7 +39,10 @@ class ProductController extends Controller
 
     public function storefront(Request $request): JsonResponse
     {
-        $products = Product::with(['variants'])
+        $products = Product::with(['variants' => function($query) {
+                $query->where('is_active', true)
+                      ->where('is_storefront', true);
+            }])
             ->where('is_storefront', true)
             ->where('is_active', true)
             ->when($request->search, function($query, $search) {
@@ -55,22 +58,22 @@ class ProductController extends Controller
                         $query->orderBy('name', 'asc');
                         break;
                     case 'price_asc':
-                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
-                              ->selectRaw('products.*, MIN(product_variants.price) as min_variant_price')
-                              ->groupBy('products.id')
-                              ->orderBy('min_variant_price', 'asc');
+                        $query->orderBy(
+                            \DB::raw('(SELECT MIN(price) FROM product_variants WHERE product_variants.product_id = products.id AND product_variants.is_active = 1 AND product_variants.is_storefront = 1)'),
+                            'asc'
+                        );
                         break;
                     case 'price_desc':
-                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
-                              ->selectRaw('products.*, MIN(product_variants.price) as min_variant_price')
-                              ->groupBy('products.id')
-                              ->orderBy('min_variant_price', 'desc');
+                        $query->orderBy(
+                            \DB::raw('(SELECT MIN(price) FROM product_variants WHERE product_variants.product_id = products.id AND product_variants.is_active = 1 AND product_variants.is_storefront = 1)'),
+                            'desc'
+                        );
                         break;
                     case 'stock':
-                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
-                              ->selectRaw('products.*, SUM(product_variants.stock) as total_stock')
-                              ->groupBy('products.id')
-                              ->orderBy('total_stock', 'desc');
+                        $query->orderBy(
+                            \DB::raw('(SELECT SUM(stock) FROM product_variants WHERE product_variants.product_id = products.id AND product_variants.is_active = 1 AND product_variants.is_storefront = 1)'),
+                            'desc'
+                        );
                         break;
                     default:
                         $query->latest();

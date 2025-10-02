@@ -916,14 +916,8 @@ const CustomerDataCheckout = () => {
           recipient_phone: primaryAddress?.phone || createdCustomer.phone
         };
       } else {
-        // Helper function to get customer ID consistently
-  const getCustomerId = (customer) => {
-    return customer?.id || customer?.customer_id;
-  };
-
-  // Remove mock data; use the fetched product only
-
-  // Helper function to get storefront variantss = customerAddresses.find(addr => addr.id == selectedAddressId);
+        // Format data for existing customer
+        const selectedAddress = customerAddresses.find(addr => addr.id == selectedAddressId);
         customerData = {
           customer_id: getCustomerId(selectedCustomer),
           name: selectedCustomer.name,

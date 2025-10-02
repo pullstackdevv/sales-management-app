@@ -110,6 +110,7 @@ class ProductController extends Controller
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean',
+            'variants.*.is_storefront' => 'boolean',
             'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -157,6 +158,7 @@ class ProductController extends Controller
                     'weight' => $variant['weight'] ?? null,
                     'stock' => $variant['stock'],
                     'is_active' => $variant['is_active'] ?? true,
+                    'is_storefront' => $variant['is_storefront'] ?? true,
                     'image' => $variantImagePath,
                     'created_by' => Auth::id()
                 ]);
@@ -203,6 +205,7 @@ class ProductController extends Controller
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean',
+            'variants.*.is_storefront' => 'boolean',
             'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
 
@@ -282,6 +285,7 @@ class ProductController extends Controller
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
+                            'is_storefront' => $variant['is_storefront'] ?? true,
                             'image' => $variantImagePath,
                             'updated_by' => Auth::id()
                         ]);
@@ -307,6 +311,7 @@ class ProductController extends Controller
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
+                            'is_storefront' => $variant['is_storefront'] ?? true,
                             'image' => $variantImagePath,
                             'created_by' => Auth::id()
                         ]);

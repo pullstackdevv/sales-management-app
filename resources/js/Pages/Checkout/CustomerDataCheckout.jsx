@@ -65,12 +65,12 @@ const CustomerDataCheckout = () => {
   const [addressFormErrors, setAddressFormErrors] = useState({});
   const [savingAddress, setSavingAddress] = useState(false);
 
-  // City search for new customer
-  const [cityQuery, setCityQuery] = useState('');
-  const [cityResults, setCityResults] = useState([]);
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [searchingCity, setSearchingCity] = useState(false);
-  const searchTimeoutRef = useRef(null);
+  // Location search for new customer (districts and regencies)
+  const [locationQuery, setLocationQuery] = useState('');
+  const [locationResults, setLocationResults] = useState([]);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [searchingLocation, setSearchingLocation] = useState(false);
+  const locationSearchTimeoutRef = useRef(null);
 
   const [loading, setLoading] = useState(false);
   const [productData, setProductData] = useState(null);
@@ -210,7 +210,6 @@ const CustomerDataCheckout = () => {
     }
   };
 
-  // Handle customer search with debouncing
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm && customerType === 'existing') {
@@ -219,6 +218,15 @@ const CustomerDataCheckout = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm, customerType]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (locationSearchTimeoutRef.current) {
+        clearTimeout(locationSearchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle customer selection - show phone verification first
   const handleCustomerSelect = (customer) => {
@@ -400,6 +408,7 @@ const CustomerDataCheckout = () => {
       recipient_phone: address.recipient_phone || '',
       address_detail: address.address_detail || '',
       city: address.city || '',
+      district: address.district || '',
       province: address.province || '',
       postal_code: address.postal_code || '',
       is_default: address.is_default || false
@@ -434,6 +443,10 @@ const CustomerDataCheckout = () => {
     
     if (!newAddressData.city.trim()) {
       errors.city = 'Kota wajib diisi';
+    }
+    
+    if (!newAddressData.district.trim()) {
+      errors.district = 'Kecamatan wajib diisi';
     }
     
     if (!newAddressData.province.trim()) {
@@ -707,29 +720,72 @@ const CustomerDataCheckout = () => {
       setAddressData(prev => ({ ...prev, recipient_phone: value }));
     }
 
-    // Clear error
+    // Clear error and validate in real-time
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
+    }
+
+    // Real-time validation
+    if (field === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setErrors(prev => ({ ...prev, email: 'Format email tidak valid' }));
+    }
+
+    if (field === 'phone') {
+      // Only allow numbers and basic phone format
+      const phoneValue = value.replace(/[^\d+]/g, '');
+      setFormData(prev => ({ ...prev, [field]: phoneValue }));
+      setAddressData(prev => ({ ...prev, recipient_phone: phoneValue }));
+      
+      if (phoneValue.length > 0 && phoneValue.length < 10) {
+        setErrors(prev => ({ ...prev, phone: 'Nomor telepon minimal 10 digit' }));
+      }
+      return;
     }
   };
 
   // Handle address changes
   const handleAddressChange = (field, value) => {
     setAddressData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear error
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
-  };
 
-  // City search with debouncing
-  const debouncedCitySearch = useCallback(async (query) => {
-    if (query.length < 2) {
-      setCityResults([]);
-      setShowCityDropdown(false);
+    // Real-time validation for postal code
+    if (field === 'postal_code') {
+      // Only allow numbers and limit to 5 digits
+      const numericValue = value.replace(/\D/g, '').slice(0, 5);
+      setAddressData(prev => ({ ...prev, [field]: numericValue }));
+      
+      if (numericValue.length > 0 && numericValue.length < 5) {
+        setErrors(prev => ({ ...prev, postal_code: 'Kode pos harus 5 digit' }));
+      }
       return;
     }
 
-    setSearchingCity(true);
+    // Real-time validation for phone numbers
+    if (field === 'recipient_phone') {
+      // Only allow numbers and basic phone format
+      const phoneValue = value.replace(/[^\d+]/g, '');
+      setAddressData(prev => ({ ...prev, [field]: phoneValue }));
+      
+      if (phoneValue.length > 0 && phoneValue.length < 10) {
+        setErrors(prev => ({ ...prev, recipient_phone: 'Nomor telepon minimal 10 digit' }));
+      }
+      return;
+    }
+  };
+
+  // Location search with debouncing (districts and regencies)
+  const debouncedLocationSearch = useCallback(async (query) => {
+    if (query.length < 2) {
+      setLocationResults([]);
+      setShowLocationDropdown(false);
+      return;
+    }
+
+    setSearchingLocation(true);
 
     try {
       const response = await api.get('/wilayah/search-regencies', {
@@ -737,97 +793,143 @@ const CustomerDataCheckout = () => {
       });
 
       if (response.data.status === 'success') {
-        const enrichedResults = response.data.data.map(regency => ({
-          name: regency.name,
-          type: 'Kabupaten/Kota',
-          regency_name: regency.name,
-          province_name: regency.province_name,
-          code: regency.code
-        }));
-
-        setCityResults(enrichedResults);
-        setShowCityDropdown(true);
+        setLocationResults(response.data.data);
+        setShowLocationDropdown(true);
       }
     } catch (error) {
-      console.error('Error searching cities:', error);
-      setCityResults([]);
+      console.error('Error searching locations:', error);
+      setLocationResults([]);
     } finally {
-      setSearchingCity(false);
+      setSearchingLocation(false);
     }
   }, []);
 
-  // Handle city search
-  const handleCitySearch = (e) => {
+  // Handle location search
+  const handleLocationSearch = (e) => {
     const query = e.target.value;
-    setCityQuery(query);
+    setLocationQuery(query);
 
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+    if (locationSearchTimeoutRef.current) {
+      clearTimeout(locationSearchTimeoutRef.current);
     }
 
-    searchTimeoutRef.current = setTimeout(() => {
-      debouncedCitySearch(query);
+    locationSearchTimeoutRef.current = setTimeout(() => {
+      debouncedLocationSearch(query);
     }, 300);
   };
 
-  // Select city
-  const selectCity = (city) => {
-    setCityQuery(city.name);
+  // Select location (district or regency)
+  const selectLocation = (location) => {
+    setLocationQuery(location.name);
+    
+    // Auto-fill all address data based on selection
     setAddressData(prev => ({
       ...prev,
-      city: city.regency_name,
-      province: city.province_name
+      district: location.district_name || '',
+      city: location.regency_name,
+      province: location.province_name
     }));
-    setShowCityDropdown(false);
-    setCityResults([]);
+    
+    setShowLocationDropdown(false);
+    setLocationResults([]);
   };
 
   // Validasi form
   const validateForm = () => {
     const newErrors = {};
+    const requiredFields = [];
 
     if (customerType === 'new') {
       // Validate new customer form
       if (!formData.full_name.trim()) {
         newErrors.full_name = 'Nama lengkap wajib diisi';
+        requiredFields.push('Nama Lengkap');
       }
 
       if (!formData.phone.trim()) {
         newErrors.phone = 'Nomor telepon wajib diisi';
+        requiredFields.push('Nomor Telepon');
+      } else if (formData.phone.length < 10) {
+        newErrors.phone = 'Nomor telepon minimal 10 digit';
       }
 
       if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         newErrors.email = 'Format email tidak valid';
       }
 
+      // Validate recipient info (auto-filled from customer data)
+      if (!addressData.recipient_name.trim()) {
+        newErrors.recipient_name = 'Nama penerima wajib diisi';
+        requiredFields.push('Nama Penerima');
+      }
+
+      if (!addressData.recipient_phone.trim()) {
+        newErrors.recipient_phone = 'Nomor telepon penerima wajib diisi';
+        requiredFields.push('Nomor Telepon Penerima');
+      } else if (addressData.recipient_phone.length < 10) {
+        newErrors.recipient_phone = 'Nomor telepon penerima minimal 10 digit';
+      }
+
       // Validate address
       if (!addressData.city.trim()) {
         newErrors.city = 'Kota wajib diisi';
+        requiredFields.push('Kota/Kabupaten');
+      }
+
+      if (!addressData.district.trim()) {
+        newErrors.district = 'Kecamatan wajib diisi';
+        requiredFields.push('Kecamatan');
       }
 
       if (!addressData.province.trim()) {
         newErrors.province = 'Provinsi wajib diisi';
+        requiredFields.push('Provinsi');
       }
 
       if (!addressData.postal_code.trim()) {
         newErrors.postal_code = 'Kode pos wajib diisi';
+        requiredFields.push('Kode Pos');
+      } else if (addressData.postal_code.length !== 5) {
+        newErrors.postal_code = 'Kode pos harus 5 digit';
       }
 
       if (!addressData.address_detail.trim()) {
         newErrors.address_detail = 'Alamat lengkap wajib diisi';
+        requiredFields.push('Alamat Lengkap');
       }
     } else {
       // Validate existing customer
       if (!selectedCustomer) {
         newErrors.customer = 'Pilih customer terlebih dahulu';
+        requiredFields.push('Customer');
       }
 
       if (!selectedAddressId) {
         newErrors.address_id = 'Pilih alamat pengiriman';
+        requiredFields.push('Alamat Pengiriman');
       }
     }
 
     setErrors(newErrors);
+
+    // Show alert if there are required fields missing
+    if (requiredFields.length > 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Field Wajib Belum Diisi',
+        html: `
+          <div class="text-left">
+            <p class="mb-3">Mohon lengkapi field berikut:</p>
+            <ul class="list-disc list-inside space-y-1">
+              ${requiredFields.map(field => `<li>${field}</li>`).join('')}
+            </ul>
+          </div>
+        `,
+        confirmButtonColor: '#3b82f6',
+        confirmButtonText: 'OK, Saya Mengerti'
+      });
+    }
+
     return Object.keys(newErrors).length === 0;
   };
 
@@ -883,6 +985,33 @@ const CustomerDataCheckout = () => {
         if (!response.ok) {
           const errorData = await response.json();
           console.error('API Error:', errorData);
+          
+          // Handle validation errors (422)
+          if (response.status === 422 && errorData.errors) {
+            const validationErrors = {};
+            Object.keys(errorData.errors).forEach(key => {
+              // Convert backend field names to frontend field names
+              if (key.startsWith('addresses.0.')) {
+                const fieldName = key.replace('addresses.0.', '');
+                if (fieldName === 'recipient_name') validationErrors.recipient_name = errorData.errors[key][0];
+                else if (fieldName === 'recipient_phone') validationErrors.recipient_phone = errorData.errors[key][0];
+                else validationErrors[fieldName] = errorData.errors[key][0];
+              } else {
+                validationErrors[key] = errorData.errors[key][0];
+              }
+            });
+            
+            setErrors(validationErrors);
+            
+            Swal.fire({
+              icon: 'error',
+              title: 'Data Tidak Lengkap',
+              text: 'Mohon lengkapi semua field yang diperlukan',
+              confirmButtonColor: '#3b82f6'
+            });
+            return;
+          }
+          
           throw new Error(`Gagal membuat customer baru: ${errorData.message || response.statusText}`);
         }
 
@@ -1120,64 +1249,120 @@ const CustomerDataCheckout = () => {
                       </h3>
 
                       <div className="space-y-4">
-                        {/* City Search */}
+                        {/* Location Search (Districts & Cities) */}
                         <div className="relative">
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Kota/Kabupaten *
+                            Cari Kecamatan/Kota *
                           </label>
                           <input
                             type="text"
-                            value={cityQuery}
-                            onChange={handleCitySearch}
-                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city ? 'border-red-500' : 'border-gray-300'
+                            value={locationQuery}
+                            onChange={handleLocationSearch}
+                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city || errors.district ? 'border-red-500' : 'border-gray-300'
                               }`}
-                            placeholder="Cari kota/kabupaten..."
+                            placeholder="Ketik nama kecamatan atau kota..."
                           />
-                          {errors.city && (
-                            <p className="text-red-500 text-sm mt-1">{errors.city}</p>
+                          {(errors.city || errors.district) && (
+                            <p className="text-red-500 text-sm mt-1">
+                              {errors.district || errors.city}
+                            </p>
                           )}
 
-                          {/* City Dropdown */}
-                          {showCityDropdown && cityResults.length > 0 && (
+                          {/* Location Dropdown */}
+                          {showLocationDropdown && locationResults.length > 0 && (
                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                              {cityResults.map((city, index) => (
+                              {locationResults.map((location, index) => (
                                 <button
                                   key={index}
                                   type="button"
-                                  onClick={() => selectCity(city)}
+                                  onClick={() => selectLocation(location)}
                                   className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
                                 >
-                                  <div className="font-medium">{city.name}</div>
-                                  <div className="text-sm text-gray-500">{city.province_name}</div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-1 text-xs rounded ${
+                                      location.type === 'Kecamatan' 
+                                        ? 'bg-blue-100 text-blue-800' 
+                                        : 'bg-green-100 text-green-800'
+                                    }`}>
+                                      {location.type}
+                                    </span>
+                                    <span className="font-medium">{location.name}</span>
+                                  </div>
+                                  <div className="text-sm text-gray-500 mt-1">
+                                    {location.type === 'Kecamatan' 
+                                      ? `${location.regency_name}, ${location.province_name}`
+                                      : location.province_name
+                                    }
+                                  </div>
                                 </button>
                               ))}
                             </div>
                           )}
 
-                          {searchingCity && (
+                          {searchingLocation && (
                             <div className="absolute right-3 top-9 text-gray-400">
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                             </div>
                           )}
                         </div>
 
-                        {/* Province (Auto-filled) */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Provinsi *
-                          </label>
-                          <input
-                            type="text"
-                            value={addressData.province}
-                            readOnly
-                            className={`w-full px-3 py-2 border rounded-lg bg-gray-50 ${errors.province ? 'border-red-500' : 'border-gray-300'
+                        {/* Display Selected Location Info */}
+                        {(addressData.district || addressData.city) && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <h4 className="text-sm font-medium text-blue-900 mb-2">Lokasi Terpilih:</h4>
+                            <div className="text-sm text-blue-800 space-y-1">
+                              {addressData.district && (
+                                <div><strong>Kecamatan:</strong> {addressData.district}</div>
+                              )}
+                              {addressData.city && (
+                                <div><strong>Kota/Kabupaten:</strong> {addressData.city}</div>
+                              )}
+                              {addressData.province && (
+                                <div><strong>Provinsi:</strong> {addressData.province}</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Recipient Information */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Nama Penerima *
+                            </label>
+                            <input
+                              type="text"
+                              value={addressData.recipient_name}
+                              onChange={(e) => handleAddressChange('recipient_name', e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                errors.recipient_name ? 'border-red-500' : 'border-gray-300'
                               }`}
-                            placeholder="Provinsi akan terisi otomatis"
-                          />
-                          {errors.province && (
-                            <p className="text-red-500 text-sm mt-1">{errors.province}</p>
-                          )}
+                              placeholder="Nama penerima paket"
+                            />
+                            {errors.recipient_name && (
+                              <p className="text-red-500 text-sm mt-1">{errors.recipient_name}</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Nomor Telepon Penerima *
+                            </label>
+                            <input
+                              type="tel"
+                              value={addressData.recipient_phone}
+                              onChange={(e) => handleAddressChange('recipient_phone', e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                errors.recipient_phone ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                              placeholder="08xxxxxxxxxx"
+                            />
+                            {errors.recipient_phone && (
+                              <p className="text-red-500 text-sm mt-1">{errors.recipient_phone}</p>
+                            )}
+                          </div>
                         </div>
+
 
                         {/* Postal Code */}
                         <div>
@@ -1207,7 +1392,7 @@ const CustomerDataCheckout = () => {
                             rows={3}
                             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.address_detail ? 'border-red-500' : 'border-gray-300'
                               }`}
-                            placeholder="Jalan, nomor rumah, RT/RW, kelurahan, kecamatan"
+                            placeholder="Jalan, nomor rumah, RT/RW, kelurahan"
                           />
                           {errors.address_detail && <p className="text-red-500 text-sm mt-1">{errors.address_detail}</p>}
                         </div>
@@ -1367,7 +1552,7 @@ const CustomerDataCheckout = () => {
                                       {address.recipient_name} - {address.recipient_phone}
                                     </p>
                                     <p className="text-sm text-gray-600">
-                                      {address.address_detail}, {address.city}, {address.province} {address.postal_code}
+                                      {address.address_detail}, {address.district}, {address.city}, {address.province} {address.postal_code}
                                     </p>
                                   </div>
                                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
@@ -1584,7 +1769,7 @@ const CustomerDataCheckout = () => {
                 <textarea
                   value={newAddressData.address_detail}
                   onChange={(e) => handleAddressFormChange('address_detail', e.target.value)}
-                  placeholder="Jalan, nomor rumah, RT/RW, kelurahan, kecamatan"
+                  placeholder="Jalan, nomor rumah, RT/RW, kelurahan"
                   rows={3}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     addressFormErrors.address_detail ? 'border-red-500' : 'border-gray-300'
@@ -1595,7 +1780,7 @@ const CustomerDataCheckout = () => {
                 )}
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Kota *
@@ -1611,6 +1796,23 @@ const CustomerDataCheckout = () => {
                   />
                   {addressFormErrors.city && (
                     <p className="text-red-500 text-sm mt-1">{addressFormErrors.city}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Kecamatan *
+                  </label>
+                  <input
+                    type="text"
+                    value={newAddressData.district}
+                    onChange={(e) => handleAddressFormChange('district', e.target.value)}
+                    placeholder="Nama kecamatan"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      addressFormErrors.district ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  {addressFormErrors.district && (
+                    <p className="text-red-500 text-sm mt-1">{addressFormErrors.district}</p>
                   )}
                 </div>
                 <div>

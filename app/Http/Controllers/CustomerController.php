@@ -46,31 +46,50 @@ class CustomerController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'nullable|string|email|max:255|unique:customers,email,NULL,id,deleted_at,NULL',
-            'phone' => 'required|string|max:20',
-            'line_id' => 'nullable|string|max:255',
-            'other_contact' => 'nullable|string|max:255',
-            'category' => 'required|string|max:255',
-            'addresses' => 'nullable|array',
-            'addresses.*.label' => 'required_with:addresses|string|max:255',
-            'addresses.*.recipient_name' => 'required_with:addresses|string|max:255',
-            'addresses.*.recipient_phone' => 'required_with:addresses|string|max:20',
-            'addresses.*.province' => 'required_with:addresses|string|max:255',
-            'addresses.*.city' => 'required_with:addresses|string|max:255',
-            'addresses.*.district' => 'required_with:addresses|string|max:255',
-            'addresses.*.postal_code' => 'required_with:addresses|string|max:10',
-            'addresses.*.address_detail' => 'required_with:addresses|string',
-            'addresses.*.is_default' => 'boolean'
-        ]);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'nullable|string|email|max:255|unique:customers,email,NULL,id,deleted_at,NULL',
+                'phone' => 'required|string|max:20',
+                'line_id' => 'nullable|string|max:255',
+                'other_contact' => 'nullable|string|max:255',
+                'category' => 'required|string|max:255',
+                'addresses' => 'required|array|min:1',
+                'addresses.*.label' => 'required|string|max:255',
+                'addresses.*.recipient_name' => 'required|string|max:255',
+                'addresses.*.recipient_phone' => 'required|string|max:20',
+                'addresses.*.province' => 'required|string|max:255',
+                'addresses.*.city' => 'required|string|max:255',
+                'addresses.*.district' => 'required|string|max:255',
+                'addresses.*.postal_code' => 'required|string|max:10',
+                'addresses.*.address_detail' => 'required|string',
+                'addresses.*.is_default' => 'boolean'
+            ], [
+                'addresses.required' => 'Alamat pengiriman wajib diisi',
+                'addresses.*.label.required' => 'Label alamat wajib diisi',
+                'addresses.*.recipient_name.required' => 'Nama penerima wajib diisi',
+                'addresses.*.recipient_phone.required' => 'Nomor telepon penerima wajib diisi',
+                'addresses.*.province.required' => 'Provinsi wajib diisi',
+                'addresses.*.city.required' => 'Kota/Kabupaten wajib diisi',
+                'addresses.*.district.required' => 'Kecamatan wajib diisi',
+                'addresses.*.postal_code.required' => 'Kode pos wajib diisi',
+                'addresses.*.address_detail.required' => 'Alamat lengkap wajib diisi',
+                'email.unique' => 'Email sudah terdaftar, gunakan email lain'
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation Error',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         try {
             DB::beginTransaction();
 
             // Create customer
             $customerData = collect($validated)->except('addresses')->toArray();
-            $customerData['created_by'] = Auth::id();
+            $customerData['created_by'] = Auth::id() ?? null; // Allow null for public API
             $customer = Customer::create($customerData);
 
             // Create addresses if provided
@@ -99,7 +118,12 @@ class CustomerController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            throw $e;
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Server Error: ' . $e->getMessage(),
+                'errors' => [$e->getMessage()]
+            ], 500);
         }
     }
 

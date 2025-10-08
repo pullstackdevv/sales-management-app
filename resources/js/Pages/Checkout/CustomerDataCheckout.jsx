@@ -1039,10 +1039,12 @@ const CustomerDataCheckout = () => {
           address_id: primaryAddress?.id || null,
           address: primaryAddress?.address_detail || '',
           city: primaryAddress?.city || '',
+          district: primaryAddress?.district || '',
           province: primaryAddress?.province || '',
           postal_code: primaryAddress?.postal_code || '',
           recipient_name: primaryAddress?.recipient_name || createdCustomer.name,
-          recipient_phone: primaryAddress?.phone || createdCustomer.phone
+          recipient_phone: primaryAddress?.phone || createdCustomer.phone,
+          addresses: createdCustomer.addresses
         };
       } else {
         // Format data for existing customer
@@ -1055,17 +1057,26 @@ const CustomerDataCheckout = () => {
           address_id: selectedAddressId,
           address: selectedAddress?.address_detail || '',
           city: selectedAddress?.city || '',
+          district: selectedAddress?.district || '',
           province: selectedAddress?.province || '',
           postal_code: selectedAddress?.postal_code || '',
           recipient_name: selectedAddress?.recipient_name || '',
-          recipient_phone: selectedAddress?.recipient_phone || ''
+          recipient_phone: selectedAddress?.recipient_phone || '',
+          addresses: customerAddresses
         };
       }
+
+      // Debug: Log customer data yang akan disimpan
+      console.log('Saving customer data to session:', customerData);
 
       // Simpan data customer ke session
       const success = checkoutSession.updateStep('customer', customerData);
 
       if (success) {
+        // Debug: Verify data saved correctly
+        const savedData = checkoutSession.get();
+        console.log('Verified saved checkout data:', savedData);
+        
         // Redirect ke halaman payment method
         router.visit(route('checkout.payment-method'));
       } else {

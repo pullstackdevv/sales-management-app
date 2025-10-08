@@ -12,12 +12,15 @@ class Courier extends Model
 
     protected $fillable = [
         'name',
+        'code',
+        'cost',
         'is_active',
         'created_by',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'cost' => 'decimal:2',
     ];
 
     // Relationships

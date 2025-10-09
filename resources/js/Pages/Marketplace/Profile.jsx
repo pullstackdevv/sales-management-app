@@ -55,7 +55,7 @@ export default function Profile() {
                     <div className="text-center py-8">
                         <ShoppingBag className="mx-auto h-10 w-10 text-gray-300 mb-3" />
                         <p className="text-gray-600 text-sm">Belum ada pesanan</p>
-                        <Link href="/products" className="inline-block mt-4 px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800">Mulai Belanja</Link>
+                        <Link href="/" className="inline-block mt-4 px-4 py-2 text-sm bg-gray-900 text-white rounded-md hover:bg-gray-800">Mulai Belanja</Link>
                     </div>
                 </div>
             </div>

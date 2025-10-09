@@ -13,6 +13,7 @@ export default function CourierSettings() {
   const [editingCourier, setEditingCourier] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
+    cost: "",
     is_active: true
   });
   const [formErrors, setFormErrors] = useState({});
@@ -36,7 +37,7 @@ export default function CourierSettings() {
   // Handle add courier
   const handleAddCourier = () => {
     setEditingCourier(null);
-    setFormData({ name: "", is_active: true });
+    setFormData({ name: "", cost: "", is_active: true });
     setFormErrors({});
     setShowModal(true);
   };
@@ -46,6 +47,7 @@ export default function CourierSettings() {
     setEditingCourier(courier);
     setFormData({
       name: courier.name,
+      cost: courier.cost || "",
       is_active: courier.is_active
     });
     setFormErrors({});
@@ -216,6 +218,9 @@ export default function CourierSettings() {
                       Nama Courier
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Biaya
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -235,6 +240,11 @@ export default function CourierSettings() {
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900">
                           {courier.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {courier.cost ? `Rp ${Number(courier.cost).toLocaleString('id-ID')}` : '-'}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -357,6 +367,26 @@ export default function CourierSettings() {
                 />
                 {formErrors.name && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.name[0]}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Biaya
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.cost}
+                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    formErrors.cost ? "border-red-300" : "border-gray-300"
+                  }`}
+                  placeholder="Masukkan biaya courier"
+                />
+                {formErrors.cost && (
+                  <p className="text-red-500 text-xs mt-1">{formErrors.cost[0]}</p>
                 )}
               </div>
 

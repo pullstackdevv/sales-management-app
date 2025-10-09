@@ -17,12 +17,20 @@ const PaymentMethodCheckout = () => {
   useEffect(() => {
     // Ambil data checkout dari session
     const data = checkoutSession.get();
+    console.log('PaymentMethodCheckout - Raw session data:', data);
+    
     if (!data || !data.product || !data.customer) {
+      console.log('PaymentMethodCheckout - Missing required data:', {
+        hasData: !!data,
+        hasProduct: !!(data?.product),
+        hasCustomer: !!(data?.customer)
+      });
       // Jika tidak ada data yang diperlukan, redirect ke halaman utama
       router.visit(route('marketplace.home'));
       return;
     }
     
+    console.log('PaymentMethodCheckout - Customer data received:', data.customer);
     setCheckoutData(data);
     setLoading(false);
   }, []);
@@ -44,26 +52,64 @@ const PaymentMethodCheckout = () => {
 
     setLoadingShipping(true);
     try {
-      // Get district from customer data
-      const district = checkoutData.customer.district || checkoutData.customer.city || 'Denpasar';
+      // Prioritize district (kecamatan) from customer address data
+      const customerAddress = checkoutData.customer.addresses?.[0] || checkoutData.customer;
+      const district = customerAddress.district || checkoutData.customer.district;
+      const city = customerAddress.city || checkoutData.customer.city;
+      const province = customerAddress.province || checkoutData.customer.province;
+      
+      console.log('Shipping calculation data:', {
+        district,
+        city, 
+        province,
+        customerAddress
+      });
+
+      if (!district) {
+        console.log('No district data available, cannot calculate shipping cost');
+        Swal.fire({
+          icon: 'warning',
+          title: 'Data Alamat Tidak Lengkap',
+          text: 'Data kecamatan diperlukan untuk menghitung ongkos kirim. Silakan lengkapi alamat pengiriman.',
+          confirmButtonColor: '#3b82f6'
+        });
+        setShippingCost(0);
+        return;
+      }
       
       const response = await axios.get(`/api/courier-rates?page=1&per_page=10&district=${encodeURIComponent(district)}`);
-      console.log('API Response:', response.data); // Debug log
+      console.log('Courier rates API response:', response.data);
       
       if (response.data && response.data.success && response.data.data && response.data.data.rates) {
         const rates = response.data.data.rates;
-        console.log('Found courier rates:', rates); // Debug log
+        console.log(`Found ${rates.length} courier rates for district: ${district}`);
         setCourierRates(rates);
         // Calculate shipping cost after getting rates
-        calculateShippingCost(rates);
+        calculateShippingCost(rates, district);
       } else {
-        console.log('No courier rates found in response');
+        console.log(`No courier rates found for district: ${district}`);
+        
+        // Show user-friendly message if no rates found
+        Swal.fire({
+          icon: 'info',
+          title: 'Ongkos Kirim Tidak Tersedia',
+          text: `Maaf, ongkos kirim untuk kecamatan ${district} belum tersedia. Silakan hubungi customer service untuk informasi lebih lanjut.`,
+          confirmButtonColor: '#3b82f6'
+        });
+        
         setShippingCost(0);
         setCourierRates([]);
       }
     } catch (error) {
       console.error('Error fetching courier rates:', error);
-      // Set default shipping cost if API fails
+      
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Mengambil Data Ongkir',
+        text: 'Terjadi kesalahan saat mengambil data ongkos kirim. Silakan coba lagi.',
+        confirmButtonColor: '#3b82f6'
+      });
+      
       setShippingCost(0);
     } finally {
       setLoadingShipping(false);
@@ -107,7 +153,7 @@ const PaymentMethodCheckout = () => {
   };
 
   // Function to calculate shipping cost based on weight and courier rates
-  const calculateShippingCost = (rates) => {
+  const calculateShippingCost = (rates, district) => {
     if (!rates || rates.length === 0) {
       console.log('No rates available for shipping calculation');
       setShippingCost(0);
@@ -118,21 +164,32 @@ const PaymentMethodCheckout = () => {
     // Round up weight (if 1.1kg, becomes 2kg)
     const roundedWeight = Math.ceil(totalWeight);
     
-    console.log(`Calculating shipping: Weight=${totalWeight}kg, Rounded=${roundedWeight}kg`);
+    console.log(`Calculating shipping for district "${district}": Weight=${totalWeight}kg, Rounded=${roundedWeight}kg`);
     
-    // Use first available courier rate
+    // Use first available courier rate for the district
     const courierRate = rates[0];
-    console.log('Using courier rate:', courierRate);
+    console.log('Using courier rate for district:', { district, courierRate });
     
     // Check for price_per_kg in the correct nested structure
     const pricePerKg = courierRate?.pricing?.price_per_kg || courierRate?.price_per_kg;
     
     if (courierRate && pricePerKg) {
       const calculatedCost = roundedWeight * pricePerKg;
-      console.log(`Shipping calculation: ${roundedWeight}kg × Rp${pricePerKg} = Rp${calculatedCost}`);
+      console.log(`Shipping calculation for ${district}: ${roundedWeight}kg × Rp${pricePerKg.toLocaleString('id-ID')} = Rp${calculatedCost.toLocaleString('id-ID')}`);
       setShippingCost(calculatedCost);
+      
+      // Show success message with shipping details
+      console.log(`✅ Ongkos kirim berhasil dihitung untuk kecamatan ${district}: Rp${calculatedCost.toLocaleString('id-ID')}`);
     } else {
       console.log('No price_per_kg found in courier rate:', courierRate);
+      
+      Swal.fire({
+        icon: 'warning',
+        title: 'Data Tarif Tidak Lengkap',
+        text: `Data tarif untuk kecamatan ${district} tidak lengkap. Silakan hubungi customer service.`,
+        confirmButtonColor: '#3b82f6'
+      });
+      
       setShippingCost(0);
     }
   };
@@ -492,10 +549,26 @@ const PaymentMethodCheckout = () => {
                   
                   {/* Show shipping details if available */}
                   {courierRates.length > 0 && !loadingShipping && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 space-y-1">
                       <div>Berat: {Math.ceil(calculateTotalWeight())} kg</div>
                       <div>Kurir: {courierRates[0]?.courier?.name || 'Standard'}</div>
                       <div>Layanan: {courierRates[0]?.service?.name || 'Regular'}</div>
+                      {checkoutData?.customer && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="font-medium text-gray-600 mb-1">Tujuan Pengiriman:</div>
+                          <div>Kecamatan: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).district}</div>
+                          <div>Kota: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).city}</div>
+                          <div>Provinsi: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).province}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Show message when no shipping data available */}
+                  {courierRates.length === 0 && !loadingShipping && shippingCost === 0 && (
+                    <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
+                      <div className="font-medium">⚠️ Ongkos kirim belum tersedia</div>
+                      <div>Data kecamatan diperlukan untuk menghitung ongkir yang akurat</div>
                     </div>
                   )}
                   

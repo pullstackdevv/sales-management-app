@@ -30,6 +30,7 @@ export default function AddOrder() {
     const [origins, setOrigins] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
+    const [isShippingCostManuallyEdited, setIsShippingCostManuallyEdited] = useState(false);
     
     // Loading states
     const [loading, setLoading] = useState({
@@ -176,6 +177,35 @@ export default function AddOrder() {
         // Auto select first address if available
         if (customer.addresses && customer.addresses.length > 0) {
             setFormData(prev => ({ ...prev, address_id: customer.addresses[0].id }));
+        }
+    };
+
+    // Handle courier selection and auto-fill shipping cost
+    const handleCourierSelect = (courierId) => {
+        const selectedCourier = couriers.find(courier => courier.id == courierId);
+        
+        setFormData(prev => ({ 
+            ...prev, 
+            courier: courierId,
+            // Auto-fill shipping cost only if not manually edited and courier has cost
+            shipping_cost: !isShippingCostManuallyEdited && selectedCourier?.cost 
+                ? parseFloat(selectedCourier.cost) 
+                : prev.shipping_cost
+        }));
+    };
+
+    // Handle manual shipping cost change
+    const handleShippingCostChange = (value) => {
+        setIsShippingCostManuallyEdited(true);
+        setFormData(prev => ({ ...prev, shipping_cost: parseInt(value) || 0 }));
+    };
+
+    // Reset shipping cost to courier default
+    const resetShippingCost = () => {
+        const selectedCourier = couriers.find(courier => courier.id == formData.courier);
+        if (selectedCourier?.cost) {
+            setFormData(prev => ({ ...prev, shipping_cost: parseFloat(selectedCourier.cost) }));
+            setIsShippingCostManuallyEdited(false);
         }
     };
 
@@ -533,13 +563,13 @@ export default function AddOrder() {
                                 </label>
                                 <select
                                     value={formData.courier}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
+                                    onChange={(e) => handleCourierSelect(e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                 >
                                     <option value="">Pilih kurir</option>
                                     {couriers.map((courier) => (
                                     <option key={courier.id} value={courier.id}>
-                                        {courier.name}
+                                        {courier.name} {courier.cost ? `(Rp ${Number(courier.cost).toLocaleString('id-ID')})` : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -549,13 +579,40 @@ export default function AddOrder() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Ongkos Kirim
                                 </label>
-                                <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={formData.shipping_cost}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={formData.shipping_cost}
+                                        onChange={(e) => handleShippingCostChange(e.target.value)}
+                                        className={`flex-1 px-3 py-2 border rounded-lg ${
+                                            isShippingCostManuallyEdited ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                                        }`}
+                                    />
+                                    {formData.courier && couriers.find(c => c.id == formData.courier)?.cost && (
+                                        <button
+                                            type="button"
+                                            onClick={resetShippingCost}
+                                            className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                            title="Reset ke biaya kurir default"
+                                        >
+                                            <Icon icon="solar:restart-outline" className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between mt-1">
+                                    <p className="text-gray-500 text-xs">
+                                        {isShippingCostManuallyEdited 
+                                            ? 'Diedit manual' 
+                                            : 'Otomatis dari kurir yang dipilih'
+                                        }
+                                    </p>
+                                    {formData.courier && couriers.find(c => c.id == formData.courier)?.cost && (
+                                        <p className="text-xs text-gray-400">
+                                            Default: Rp {Number(couriers.find(c => c.id == formData.courier).cost).toLocaleString('id-ID')}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
 
                             <div>

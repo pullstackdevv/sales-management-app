@@ -39,7 +39,10 @@ class ProductController extends Controller
 
     public function storefront(Request $request): JsonResponse
     {
-        $products = Product::with(['variants'])
+        $products = Product::with(['variants' => function($query) {
+                $query->where('is_active', true)
+                      ->where('is_storefront', true);
+            }])
             ->where('is_storefront', true)
             ->where('is_active', true)
             ->when($request->search, function($query, $search) {
@@ -55,22 +58,22 @@ class ProductController extends Controller
                         $query->orderBy('name', 'asc');
                         break;
                     case 'price_asc':
-                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
-                              ->selectRaw('products.*, MIN(product_variants.price) as min_variant_price')
-                              ->groupBy('products.id')
-                              ->orderBy('min_variant_price', 'asc');
+                        $query->orderBy(
+                            \DB::raw('(SELECT MIN(price) FROM product_variants WHERE product_variants.product_id = products.id AND product_variants.is_active = 1 AND product_variants.is_storefront = 1)'),
+                            'asc'
+                        );
                         break;
                     case 'price_desc':
-                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
-                              ->selectRaw('products.*, MIN(product_variants.price) as min_variant_price')
-                              ->groupBy('products.id')
-                              ->orderBy('min_variant_price', 'desc');
+                        $query->orderBy(
+                            \DB::raw('(SELECT MIN(price) FROM product_variants WHERE product_variants.product_id = products.id AND product_variants.is_active = 1 AND product_variants.is_storefront = 1)'),
+                            'desc'
+                        );
                         break;
                     case 'stock':
-                        $query->join('product_variants', 'products.id', '=', 'product_variants.product_id')
-                              ->selectRaw('products.*, SUM(product_variants.stock) as total_stock')
-                              ->groupBy('products.id')
-                              ->orderBy('total_stock', 'desc');
+                        $query->orderBy(
+                            \DB::raw('(SELECT SUM(stock) FROM product_variants WHERE product_variants.product_id = products.id AND product_variants.is_active = 1 AND product_variants.is_storefront = 1)'),
+                            'desc'
+                        );
                         break;
                     default:
                         $query->latest();
@@ -104,12 +107,14 @@ class ProductController extends Controller
             'is_storefront' => 'boolean',
             'variants' => 'required|array|min:1',
             'variants.*.variant_label' => 'required|string|max:255',
-            'variants.*.sku' => 'required|string|max:255',
+            'variants.*.sku' => 'required|string|max:255|unique:product_variants,sku',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
-            'variants.*.is_active' => 'boolean'
+            'variants.*.is_active' => 'boolean',
+            'variants.*.is_storefront' => 'boolean',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         // Handle image upload
@@ -132,9 +137,32 @@ class ProductController extends Controller
                 'created_by' => Auth::id()
             ]);
 
-            foreach ($validated['variants'] as $variant) {
+            foreach ($validated['variants'] as $index => $variant) {
+                // Handle variant image upload (if provided)
+                $variantImagePath = null;
+                if ($request->hasFile("variants.$index.image")) {
+                    try {
+                        // Ensure directory exists
+                        if (!Storage::disk('public')->exists('product-variants')) {
+                            Storage::disk('public')->makeDirectory('product-variants');
+                        }
+                        
+                        $variantImagePath = $request->file("variants.$index.image")->store('product-variants', 'public');
+                    } catch (\Exception $e) {
+                        throw new \Exception("The variants.$index.image failed to upload: " . $e->getMessage());
+                    }
+                }
+
                 $product->variants()->create([
-                    ...$variant,
+                    'variant_label' => $variant['variant_label'],
+                    'sku' => $variant['sku'],
+                    'price' => $variant['price'],
+                    'base_price' => $variant['base_price'],
+                    'weight' => $variant['weight'] ?? null,
+                    'stock' => $variant['stock'],
+                    'is_active' => $variant['is_active'] ?? true,
+                    'is_storefront' => $variant['is_storefront'] ?? true,
+                    'image' => $variantImagePath,
                     'created_by' => Auth::id()
                 ]);
             }
@@ -179,7 +207,9 @@ class ProductController extends Controller
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
-            'variants.*.is_active' => 'boolean'
+            'variants.*.is_active' => 'boolean',
+            'variants.*.is_storefront' => 'boolean',
+            'variants.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
         ]);
 
         // Additional validation for variant SKU uniqueness
@@ -229,10 +259,28 @@ class ProductController extends Controller
                 $variantIds = collect($validated['variants'])->pluck('id')->filter();
                 $product->variants()->whereNotIn('id', $variantIds)->delete();
 
-                // Update or create variants
-                foreach ($validated['variants'] as $variant) {
+                // Update or create variants (with image handling)
+                foreach ($validated['variants'] as $index => $variant) {
                     if (isset($variant['id'])) {
-                        $product->variants()->where('id', $variant['id'])->update([
+                        $variantModel = $product->variants()->where('id', $variant['id'])->firstOrFail();
+                        $variantImagePath = $variantModel->image;
+                        if ($request->hasFile("variants.$index.image")) {
+                            try {
+                                // Ensure directory exists
+                                if (!Storage::disk('public')->exists('product-variants')) {
+                                    Storage::disk('public')->makeDirectory('product-variants');
+                                }
+                                
+                                if ($variantImagePath && Storage::disk('public')->exists($variantImagePath)) {
+                                    Storage::disk('public')->delete($variantImagePath);
+                                }
+                                $variantImagePath = $request->file("variants.$index.image")->store('product-variants', 'public');
+                            } catch (\Exception $e) {
+                                throw new \Exception("The variants.$index.image failed to upload: " . $e->getMessage());
+                            }
+                        }
+
+                        $variantModel->update([
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
                             'price' => $variant['price'],
@@ -240,9 +288,24 @@ class ProductController extends Controller
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
+                            'is_storefront' => $variant['is_storefront'] ?? true,
+                            'image' => $variantImagePath,
                             'updated_by' => Auth::id()
                         ]);
                     } else {
+                        $variantImagePath = null;
+                        if ($request->hasFile("variants.$index.image")) {
+                            try {
+                                // Ensure directory exists
+                                if (!Storage::disk('public')->exists('product-variants')) {
+                                    Storage::disk('public')->makeDirectory('product-variants');
+                                }
+                                
+                                $variantImagePath = $request->file("variants.$index.image")->store('product-variants', 'public');
+                            } catch (\Exception $e) {
+                                throw new \Exception("The variants.$index.image failed to upload: " . $e->getMessage());
+                            }
+                        }
                         $product->variants()->create([
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
@@ -251,6 +314,8 @@ class ProductController extends Controller
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
+                            'is_storefront' => $variant['is_storefront'] ?? true,
+                            'image' => $variantImagePath,
                             'created_by' => Auth::id()
                         ]);
                     }

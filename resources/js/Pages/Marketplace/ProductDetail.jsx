@@ -26,6 +26,8 @@ export default function ProductDetail() {
     const [quantity, setQuantity] = useState(1);
     const [activeTab, setActiveTab] = useState('description');
     const [selectedVariant, setSelectedVariant] = useState(null);
+    const [currentImage, setCurrentImage] = useState(null);
+    const [imageLoading, setImageLoading] = useState(false);
     const { addToCart: addToCartHook } = useCart();
     
     // Order states
@@ -84,10 +86,92 @@ export default function ProductDetail() {
 
     // Remove mock data; use the fetched product only
 
-    // Set default variant when product loads
+    // Helper function to get storefront variants
+    const getStorefrontVariants = () => {
+        if (!product || !product.variants) return [];
+        return product.variants.filter(variant => variant.is_storefront !== false);
+    };
+
+    // Get all available images (product + variants) with selected variant prioritized
+    const getAllImages = () => {
+        const images = [];
+        
+        // Add selected variant image first if exists
+        if (selectedVariant && selectedVariant.image) {
+            images.push({
+                id: `variant-${selectedVariant.id}`,
+                url: selectedVariant.image.startsWith('http') ? selectedVariant.image : `/storage/${selectedVariant.image}`,
+                label: selectedVariant.variant_label,
+                type: 'variant',
+                variantId: selectedVariant.id,
+                isSelected: true
+            });
+        }
+        
+        // Add product image if exists and not already added
+        if (product && product.image) {
+            images.push({
+                id: 'product',
+                url: product.image.startsWith('http') ? product.image : `/storage/${product.image}`,
+                label: 'Produk Utama',
+                type: 'product'
+            });
+        }
+        
+        // Add other variant images if exist (excluding selected variant)
+        if (product && product.variants) {
+            getStorefrontVariants().forEach(variant => {
+                if (variant.image && variant.id !== selectedVariant?.id) {
+                    images.push({
+                        id: `variant-${variant.id}`,
+                        url: variant.image.startsWith('http') ? variant.image : `/storage/${variant.image}`,
+                        label: variant.variant_label,
+                        type: 'variant',
+                        variantId: variant.id
+                    });
+                }
+            });
+        }
+        
+        return images;
+    };
+
+    // Handle image change with loading state
+    const handleImageChange = (imageUrl) => {
+        setImageLoading(true);
+        setCurrentImage(imageUrl);
+        // Simulate loading time for better UX
+        setTimeout(() => setImageLoading(false), 200);
+    };
+
+    // Handle variant selection with image change
+    const handleVariantSelect = (variant) => {
+        setSelectedVariant(variant);
+        setQuantity(1);
+        // Image will be automatically changed by useEffect
+    };
+
+    // Set default variant when product loads (only storefront variants)
     useEffect(() => {
         if (product && product.variants && product.variants.length > 0 && !selectedVariant) {
-            setSelectedVariant(product.variants[0]);
+            const storefrontVariants = getStorefrontVariants();
+            if (storefrontVariants.length > 0) {
+                setSelectedVariant(storefrontVariants[0]);
+            }
+        }
+    }, [product, selectedVariant]);
+
+    // Set image based on selected variant
+    useEffect(() => {
+        if (product) {
+            // Priority: Selected variant image -> Product image -> Placeholder
+            if (selectedVariant && selectedVariant.image) {
+                setCurrentImage(selectedVariant.image.startsWith('http') ? selectedVariant.image : `/storage/${selectedVariant.image}`);
+            } else if (product.image) {
+                setCurrentImage(product.image.startsWith('http') ? product.image : `/storage/${product.image}`);
+            } else {
+                setCurrentImage('https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg');
+            }
         }
     }, [product, selectedVariant]);
 
@@ -96,8 +180,12 @@ export default function ProductDetail() {
         if (selectedVariant) {
             return selectedVariant.price;
         }
-        // Get price from first variant or min_price
+        // Get price from first storefront variant or min_price
         if (product.variants && product.variants.length > 0) {
+            const storefrontVariants = getStorefrontVariants();
+            if (storefrontVariants.length > 0) {
+                return storefrontVariants[0].price;
+            }
             return product.variants[0].price;
         }
         return product.price || product.min_price || 0;
@@ -107,8 +195,12 @@ export default function ProductDetail() {
         if (selectedVariant) {
             return selectedVariant.base_price || 0;
         }
-        // Get base price from first variant or min_base_price
+        // Get base price from first storefront variant or min_base_price
         if (product.variants && product.variants.length > 0) {
+            const storefrontVariants = getStorefrontVariants();
+            if (storefrontVariants.length > 0) {
+                return storefrontVariants[0].base_price || 0;
+            }
             return product.variants[0].base_price || 0;
         }
         return product.base_price || product.min_base_price || 0;
@@ -158,6 +250,9 @@ export default function ProductDetail() {
                 text: `${product.name} (${selectedVariant.variant_label}) x${quantity}`,
                 timer: 1500,
                 showConfirmButton: false
+            }).then(() => {
+                // Reload the page after successful addition to cart
+                window.location.reload();
             });
         } catch (e) {
             console.error('Failed to add to cart', e);
@@ -360,15 +455,71 @@ export default function ProductDetail() {
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
-                        {/* Product Image */}
+                        {/* Product Image Gallery */}
                         <div className="space-y-4">
-                            <div className="aspect-square w-full rounded-sm overflow-hidden bg-white border border-gray-100">
+                            {/* Main Image */}
+                            <div className="aspect-square w-full rounded-sm overflow-hidden bg-white border border-gray-100 relative">
+                                {imageLoading && (
+                                    <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
+                                    </div>
+                                )}
                                 <img 
-                                    src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
+                                    src={currentImage || 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
                                     alt={product.name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                    onLoad={() => setImageLoading(false)}
+                                    onError={() => setImageLoading(false)}
                                 />
                             </div>
+                            
+                            {/* Image Thumbnails - Shopee Style */}
+                            {getAllImages().length > 0 && (
+                                <div className="space-y-2">
+                                    <div className="flex gap-1 overflow-x-auto pb-2" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
+                                        {getAllImages().map((image, index) => (
+                                            <button
+                                                key={image.id}
+                                                onClick={() => handleImageChange(image.url)}
+                                                className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded border overflow-hidden transition-all duration-200 relative ${
+                                                    currentImage === image.url
+                                                        ? 'border-red-500 ring-1 ring-red-200'
+                                                        : 'border-gray-300 hover:border-gray-400'
+                                                }`}
+                                                title={image.label}
+                                            >
+                                                <img 
+                                                    src={image.url} 
+                                                    alt={image.label}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                {/* Active indicator */}
+                                                {currentImage === image.url && (
+                                                    <div className="absolute inset-0 border-2 border-red-500 rounded"></div>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    
+                                    {/* Current image info */}
+                                    {selectedVariant && selectedVariant.image && currentImage === (selectedVariant.image.startsWith('http') ? selectedVariant.image : `/storage/${selectedVariant.image}`) && (
+                                        <div className="text-center">
+                                            <p className="text-xs text-gray-600">
+                                                Gambar: {selectedVariant.variant_label}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
+                            {/* Image Labels */}
+                            {getAllImages().length > 1 && (
+                                <div className="text-center">
+                                    <p className="text-xs text-gray-500">
+                                        {getAllImages().findIndex(img => img.url === currentImage) + 1} / {getAllImages().length}
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Product Info */}
@@ -390,7 +541,7 @@ export default function ProductDetail() {
                                     </div>
                                     
                                     {/* Price Range for Multiple Variants */}
-                                    {product.variants && product.variants.length > 1 && (
+                                    {getStorefrontVariants().length > 1 && (
                                         <div className="text-sm text-gray-600">
                                             <span>{product.price_range || `${formatPrice(product.min_price)} - ${formatPrice(product.max_price)}`}</span>
                                         </div>
@@ -404,19 +555,16 @@ export default function ProductDetail() {
                             </div>
 
                             {/* Variants */}
-                            {product.variants && product.variants.length > 0 && (
+                            {getStorefrontVariants().length > 0 && (
                                 <div className="space-y-3">
                                     <label className="text-base sm:text-sm font-normal text-gray-600">
                                         Pilih Variant
                                     </label>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
-                                        {product.variants.map((variant) => (
+                                        {getStorefrontVariants().map((variant) => (
                                             <button
                                                 key={variant.id}
-                                                onClick={() => {
-                                                    setSelectedVariant(variant);
-                                                    setQuantity(1); // Reset quantity when variant changes
-                                                }}
+                                                onClick={() => handleVariantSelect(variant)}
                                                 disabled={!variant.is_active || variant.stock <= 0}
                                                 className={`p-4 sm:p-3 text-left border rounded-lg sm:rounded-sm text-base sm:text-sm transition-all duration-200 ${
                                                     selectedVariant?.id === variant.id
@@ -428,8 +576,13 @@ export default function ProductDetail() {
                                                         : 'cursor-pointer'
                                                 }`}
                                             >
-                                                <div className="font-normal text-gray-800">
-                                                    {variant.variant_label}
+                                                <div className="flex items-center justify-between">
+                                                    <div className="font-normal text-gray-800">
+                                                        {variant.variant_label}
+                                                    </div>
+                                                    {variant.image && (
+                                                        <Icon icon="material-symbols:image" className="text-blue-500 text-sm" />
+                                                    )}
                                                 </div>
                                                 <div className="text-sm sm:text-xs text-gray-500 mt-1">
                                                     {variant.stock > 0 ? `Stok: ${variant.stock}` : 'Habis'}

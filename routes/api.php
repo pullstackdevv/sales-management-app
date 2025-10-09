@@ -91,6 +91,8 @@ Route::apiResource('products.variants', ProductVariantController::class);
 // Customer routes
 Route::apiResource('customers', CustomerController::class);
 Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
+Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
 
 // Other authenticated routes
 Route::middleware('auth:sanctum')->group(function () {

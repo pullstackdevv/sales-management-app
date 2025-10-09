@@ -18,7 +18,9 @@ class ProductVariant extends Model
         'base_price',
         'weight',
         'stock',
+        'image',
         'is_active',
+        'is_storefront',
         'created_by',
         'updated_by',
         'deleted_by',
@@ -30,6 +32,7 @@ class ProductVariant extends Model
         'weight' => 'decimal:3',
         'stock' => 'integer',
         'is_active' => 'boolean',
+        'is_storefront' => 'boolean',
     ];
 
     // Relationships

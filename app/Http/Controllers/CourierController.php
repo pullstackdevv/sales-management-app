@@ -35,6 +35,8 @@ class CourierController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'code' => 'nullable|string|max:50',
+            'cost' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:255',
             'is_active' => 'boolean'
         ]);
@@ -72,6 +74,8 @@ class CourierController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'code' => 'nullable|string|max:50',
+            'cost' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:255',
             'is_active' => 'boolean'
         ]);

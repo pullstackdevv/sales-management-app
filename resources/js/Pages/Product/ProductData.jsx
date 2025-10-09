@@ -301,6 +301,7 @@ export default function ProductData() {
                         <table className="w-full text-left border mt-2 text-xs">
                           <thead className="bg-gray-100">
                             <tr>
+                              <th className="px-3 py-2">Gambar</th>
                               <th className="px-3 py-2">Nama Varian</th>
                               <th className="px-3 py-2">SKU</th>
                               <th className="px-3 py-2">Harga Jual</th>
@@ -319,6 +320,24 @@ export default function ProductData() {
                               
                               return (
                                 <tr key={variant.id} className="border-b">
+                                  <td className="px-3 py-2">
+                                    {variant.image ? (
+                                      <img 
+                                        src={`/storage/${variant.image}`} 
+                                        alt={variant.variant_label}
+                                        className="w-10 h-10 object-cover rounded border"
+                                        onError={(e) => {
+                                          e.target.style.display = 'none';
+                                          e.target.nextSibling.style.display = 'flex';
+                                        }}
+                                      />
+                                    ) : null}
+                                    <div 
+                                      className={`w-10 h-10 bg-gray-200 rounded border flex items-center justify-center ${variant.image ? 'hidden' : 'flex'}`}
+                                    >
+                                      <Icon icon="mdi:image-outline" className="text-gray-400 text-sm" />
+                                    </div>
+                                  </td>
                                   <td className="px-3 py-2">{variant.name || variant.variant_label}</td>
                                   <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
                                   <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>

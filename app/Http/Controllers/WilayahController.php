@@ -97,7 +97,7 @@ class WilayahController extends Controller
     }
 
     /**
-     * Search regencies by name
+     * Search regencies and districts by name
      */
     public function searchRegencies(Request $request): JsonResponse
     {
@@ -111,26 +111,66 @@ class WilayahController extends Controller
         }
         
         try {
-            $regencies = Wilayah::kabupatenKota()
+            $results = collect();
+            
+            // Search districts first (kecamatan)
+            $districts = Wilayah::kecamatan()
                 ->where('nama', 'LIKE', '%' . $query . '%')
                 ->orderBy('nama')
-                ->limit(10)
+                ->limit(15)
                 ->get()
-                ->map(function ($regency) {
-                    $provinceCode = explode('.', $regency->kode)[0];
+                ->map(function ($district) {
+                    // Get regency code from district code (first 5 characters: xx.xx)
+                    $regencyCode = substr($district->kode, 0, 5);
+                    $regency = Wilayah::where('kode', $regencyCode)->first();
+                    
+                    // Get province code from regency code (first 2 characters: xx)
+                    $provinceCode = explode('.', $regencyCode)[0];
                     $province = Wilayah::where('kode', $provinceCode)->first();
                     
                     return [
-                        'code' => $regency->kode,
-                        'name' => $regency->nama,
+                        'code' => $district->kode,
+                        'name' => $district->nama,
+                        'type' => 'Kecamatan',
+                        'district_name' => $district->nama,
+                        'regency_name' => $regency ? $regency->nama : '',
+                        'regency_code' => $regencyCode,
                         'province_name' => $province ? $province->nama : '',
                         'province_code' => $provinceCode
                     ];
                 });
             
+            $results = $results->merge($districts);
+            
+            // Search regencies (kabupaten/kota) if not enough results
+            if ($results->count() < 10) {
+                $regencies = Wilayah::kabupatenKota()
+                    ->where('nama', 'LIKE', '%' . $query . '%')
+                    ->orderBy('nama')
+                    ->limit(10 - $results->count())
+                    ->get()
+                    ->map(function ($regency) {
+                        $provinceCode = explode('.', $regency->kode)[0];
+                        $province = Wilayah::where('kode', $provinceCode)->first();
+                        
+                        return [
+                            'code' => $regency->kode,
+                            'name' => $regency->nama,
+                            'type' => 'Kabupaten/Kota',
+                            'district_name' => '',
+                            'regency_name' => $regency->nama,
+                            'regency_code' => $regency->kode,
+                            'province_name' => $province ? $province->nama : '',
+                            'province_code' => $provinceCode
+                        ];
+                    });
+                
+                $results = $results->merge($regencies);
+            }
+            
             return response()->json([
                 'status' => 'success',
-                'data' => $regencies
+                'data' => $results->take(15)->values()
             ]);
             
         } catch (\Exception $e) {
@@ -167,6 +207,7 @@ class WilayahController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Get villages by district code

@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -147,11 +148,26 @@ class WebOrderController extends Controller
             
             // Apply voucher discount if any
             $discountAmount = 0;
+            $voucher = null;
             if ($request->voucher_id) {
-                // TODO: Implement voucher discount calculation
-                // $voucher = Voucher::findOrFail($request->voucher_id);
-                // $discountAmount = $voucher->calculateDiscount($totalPrice);
-                // $totalPrice -= $discountAmount;
+                $voucher = Voucher::findOrFail($request->voucher_id);
+                
+                // Validate voucher can be used
+                if (!$voucher->canBeUsed($totalPrice)) {
+                    return ResponseFormatter::error(
+                        'Voucher tidak dapat digunakan untuk pesanan ini',
+                        [
+                            'voucher_code' => $voucher->code,
+                            'minimum_amount' => $voucher->minimum_amount,
+                            'current_amount' => $totalPrice,
+                            'is_valid' => $voucher->isValid()
+                        ],
+                        422
+                    );
+                }
+                
+                $discountAmount = $voucher->calculateDiscount($totalPrice);
+                $totalPrice -= $discountAmount;
             }
 
             // Create order
@@ -180,6 +196,9 @@ class WebOrderController extends Controller
                 $variant = ProductVariant::findOrFail($item['product_variant_id']);
                 $variant->decrement('stock', $item['quantity']);
             }
+
+            // Note: Voucher used_count will be updated when payment is confirmed
+            // This prevents counting vouchers for unpaid orders
 
             DB::commit();
 
@@ -394,6 +413,27 @@ class WebOrderController extends Controller
                 [],
                 500
             );
+        }
+    }
+
+    /**
+     * Update voucher used count when payment is confirmed
+     * This method should be called from payment gateway webhooks
+     */
+    public static function updateVoucherUsedCount($orderId)
+    {
+        try {
+            $order = Order::with('voucher')->find($orderId);
+            
+            if ($order && $order->voucher && $order->isPaid()) {
+                $order->voucher->increment('used_count');
+                return true;
+            }
+            
+            return false;
+        } catch (\Exception $e) {
+            \Log::error('Failed to update voucher used count: ' . $e->getMessage());
+            return false;
         }
     }
 }

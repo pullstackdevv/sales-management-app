@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PaymentStatus;
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
+use App\Http\Controllers\WebOrderController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -199,6 +200,9 @@ class XenditController extends Controller
             // Update order status based on payment status
             if ($paymentStatus === PaymentStatus::PAID) {
                 $order->update(['status' => 'processing']); // Change to processing when paid
+                
+                // Update voucher used count if voucher was used
+                WebOrderController::updateVoucherUsedCount($order->id);
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
             }

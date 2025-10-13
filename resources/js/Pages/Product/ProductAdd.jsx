@@ -138,7 +138,7 @@ export default function ProductAdd() {
         showConfirmButton: false,
         timer: 1500
       }).then(() => {
-        router.visit('/product/data');
+        router.visit('/cms/product/data');
       });
     } catch (error) {
       if (error.response?.status === 422) {

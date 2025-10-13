@@ -13,6 +13,12 @@ const PaymentMethodCheckout = () => {
   const [shippingCost, setShippingCost] = useState(0);
   const [courierRates, setCourierRates] = useState([]);
   const [loadingShipping, setLoadingShipping] = useState(false);
+  
+  // Voucher states
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [loadingVoucher, setLoadingVoucher] = useState(false);
 
   useEffect(() => {
     // Ambil data checkout dari session
@@ -194,10 +200,78 @@ const PaymentMethodCheckout = () => {
     }
   };
 
-  // Calculate total including shipping
+  // Calculate total including shipping and discount
   const calculateTotal = () => {
     if (!checkoutData || !checkoutData.product) return 0;
-    return checkoutData.product.subtotal + shippingCost;
+    const subtotal = checkoutData.product.subtotal + shippingCost;
+    return subtotal - voucherDiscount;
+  };
+
+  // Function to validate and apply voucher
+  const applyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Kode Voucher Kosong',
+        text: 'Silakan masukkan kode voucher',
+        confirmButtonColor: '#3b82f6'
+      });
+      return;
+    }
+
+    setLoadingVoucher(true);
+    try {
+      const authToken = localStorage.getItem('auth_token');
+      const orderAmount = checkoutData.product.subtotal + shippingCost;
+      
+      const response = await axios.post('/api/vouchers/validate', {
+        code: voucherCode,
+        order_amount: orderAmount
+      }, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.data.status === 'success') {
+        const { voucher, discount_amount } = response.data.data;
+        setAppliedVoucher(voucher);
+        setVoucherDiscount(discount_amount);
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Voucher Berhasil Diterapkan!',
+          text: `Diskon Rp ${discount_amount.toLocaleString('id-ID')} telah diterapkan`,
+          confirmButtonColor: '#3b82f6'
+        });
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Voucher Tidak Valid',
+          text: response.data.message || 'Voucher tidak dapat digunakan',
+          confirmButtonColor: '#3b82f6'
+        });
+      }
+    } catch (error) {
+      console.error('Error validating voucher:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Memvalidasi Voucher',
+        text: error.response?.data?.message || 'Terjadi kesalahan saat memvalidasi voucher',
+        confirmButtonColor: '#3b82f6'
+      });
+    } finally {
+      setLoadingVoucher(false);
+    }
+  };
+
+  // Function to remove applied voucher
+  const removeVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherDiscount(0);
+    setVoucherCode('');
   };
 
 
@@ -270,6 +344,7 @@ const PaymentMethodCheckout = () => {
         sales_channel_id: 1, // Default sales channel
         items: items,
         shipping_cost: shippingCost, // Use calculated shipping cost
+        voucher_id: appliedVoucher ? appliedVoucher.id : null, // Add voucher if applied
         notes: 'Order dari marketplace - Payment via Xendit'
       };
       
@@ -492,27 +567,27 @@ const PaymentMethodCheckout = () => {
             {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
-                <h3 className="text-lg font-semibold mb-4">Ringkasan Pesanan</h3>
+                <h3 className="text-base font-semibold mb-3">Ringkasan Pesanan</h3>
                 
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Produk</span>
-                    <span className="font-medium">{checkoutData.product.name}</span>
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between items-start">
+                    <span className="text-sm text-gray-600">Produk</span>
+                    <span className="text-sm font-medium text-right flex-1 ml-2 truncate">{checkoutData.product.name}</span>
                   </div>
-                  {/* Tampilkan semua varian yang dipilih */}
+                  {/* Tampilkan semua varian yang dipilih - Compact */}
                 {checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0 ? (
-                    <div className="space-y-2">
-                      <span className="text-gray-600 text-sm font-medium">Varian yang dipilih:</span>
+                    <div className="space-y-1">
+                      <span className="text-xs text-gray-500 font-medium">Varian:</span>
                       {Object.values(checkoutData.product.selectedVariants).map(({ variant, quantity }) => (
-                        <div key={variant.id} className="bg-gray-50 p-3 rounded-lg">
+                        <div key={variant.id} className="bg-gray-50 p-2 rounded">
                           <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium text-sm">{variant.variant_label}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium truncate">{variant.variant_label}</div>
                               <div className="text-xs text-gray-500">
                                 Rp {variant.price.toLocaleString('id-ID')} × {quantity}
                               </div>
                             </div>
-                            <div className="text-sm font-medium">
+                            <div className="text-xs font-medium ml-2">
                               Rp {(variant.price * quantity).toLocaleString('id-ID')}
                             </div>
                           </div>
@@ -521,86 +596,147 @@ const PaymentMethodCheckout = () => {
                     </div>
                   ) : checkoutData.product.variant ? (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Varian</span>
-                      <span className="font-medium">{checkoutData.product.variant.variant_label}</span>
+                      <span className="text-sm text-gray-600">Varian</span>
+                      <span className="text-sm font-medium">{checkoutData.product.variant.variant_label}</span>
                     </div>
                   ) : (
-                    <div className="text-sm text-gray-500">
+                    <div className="text-xs text-gray-500">
                       Produk tanpa varian
                     </div>
                   )}
 
                   
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium">Rp {checkoutData.product.subtotal.toLocaleString('id-ID')}</span>
                   </div>
                   
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Ongkos Kirim</span>
                     <span className="font-medium">
                       {loadingShipping ? (
-                        <span className="text-sm text-gray-400">Menghitung...</span>
+                        <span className="text-xs text-gray-400">Menghitung...</span>
                       ) : (
                         `Rp ${shippingCost.toLocaleString('id-ID')}`
                       )}
                     </span>
                   </div>
+
+                  {/* Voucher Section - Compact & Responsive */}
+                  <div className="border-t pt-3 mt-3">
+                    <div className="mb-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Kode Voucher
+                      </label>
+                      {!appliedVoucher ? (
+                        <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                          <input
+                            type="text"
+                            value={voucherCode}
+                            onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                            placeholder="Masukkan kode"
+                            className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            disabled={loadingVoucher}
+                          />
+                          <button
+                            onClick={applyVoucher}
+                            disabled={loadingVoucher || !voucherCode.trim()}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            {loadingVoucher ? 'Validasi...' : 'Gunakan'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="bg-green-50 border border-green-200 rounded p-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-green-800 truncate">
+                                {appliedVoucher.code}
+                              </div>
+                              <div className="text-xs text-green-600">
+                                -{appliedVoucher.name}
+                              </div>
+                              <div className="text-xs text-green-700 font-medium">
+                                Diskon: Rp {voucherDiscount.toLocaleString('id-ID')}
+                              </div>
+                            </div>
+                            <button
+                              onClick={removeVoucher}
+                              className="text-red-600 hover:text-red-800 text-xs font-medium flex-shrink-0"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Show discount in summary */}
+                  {voucherDiscount > 0 && (
+                    <div className="flex justify-between text-green-600 text-sm">
+                      <span>Diskon Voucher</span>
+                      <span className="font-medium">-Rp {voucherDiscount.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
                   
-                  {/* Show shipping details if available */}
+                  {/* Show shipping details if available - Compact */}
                   {courierRates.length > 0 && !loadingShipping && (
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <div>Berat: {Math.ceil(calculateTotalWeight())} kg</div>
-                      <div>Kurir: {courierRates[0]?.courier?.name || 'Standard'}</div>
-                      <div>Layanan: {courierRates[0]?.service?.name || 'Regular'}</div>
+                    <div className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-100">
+                      <div className="grid grid-cols-2 gap-1 mb-1">
+                        <div>Berat: {Math.ceil(calculateTotalWeight())} kg</div>
+                        <div>Kurir: {courierRates[0]?.courier?.name || 'Standard'}</div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        Layanan: {courierRates[0]?.service?.name || 'Regular'}
+                      </div>
                       {checkoutData?.customer && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <div className="font-medium text-gray-600 mb-1">Tujuan Pengiriman:</div>
-                          <div>Kecamatan: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).district}</div>
-                          <div>Kota: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).city}</div>
-                          <div>Provinsi: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).province}</div>
+                        <div className="mt-1 pt-1 border-t border-gray-100">
+                          <div className="text-xs text-gray-400 truncate">
+                            Tujuan: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).district}, {(checkoutData.customer.addresses?.[0] || checkoutData.customer).city}
+                          </div>
                         </div>
                       )}
                     </div>
                   )}
                   
-                  {/* Show message when no shipping data available */}
+                  {/* Show message when no shipping data available - Compact */}
                   {courierRates.length === 0 && !loadingShipping && shippingCost === 0 && (
                     <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
-                      <div className="font-medium">⚠️ Ongkos kirim belum tersedia</div>
-                      <div>Data kecamatan diperlukan untuk menghitung ongkir yang akurat</div>
+                      <div className="font-medium">⚠️ Ongkir belum tersedia</div>
+                      <div className="text-xs">Perlu data kecamatan yang lengkap</div>
                     </div>
                   )}
                   
-                  <hr className="my-4" />
+                  <hr className="my-3" />
                   
-                  <div className="flex justify-between text-lg font-semibold">
+                  <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
                     <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
                   </div>
                 </div>
 
-                {/* Customer Info */}
-                <div className="border-t pt-4 mb-6">
-                  <h4 className="font-medium mb-2">Data Pemesan</h4>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p>{checkoutData.customer.name}</p>
+                {/* Customer Info - Compact */}
+                <div className="border-t pt-3 mb-4">
+                  <h4 className="text-sm font-medium mb-2 text-gray-700">Data Pemesan</h4>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <p className="font-medium">{checkoutData.customer.name}</p>
                     <p>{checkoutData.customer.whatsapp}</p>
-                    <p className="text-xs">{checkoutData.customer.address}, {checkoutData.customer.city}</p>
+                    <p className="text-xs text-gray-500 truncate">{checkoutData.customer.address}, {checkoutData.customer.city}</p>
                   </div>
                 </div>
 
                 <button
                   onClick={handleContinue}
                   disabled={submitting}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {submitting ? (
                     'Memproses...'
                   ) : (
                     <>
                       Lanjutkan ke Pembayaran
-                      <ArrowRight className="w-5 h-5 ml-2" />
+                      <ArrowRight className="w-4 h-4 ml-2" />
                     </>
                   )}
                 </button>

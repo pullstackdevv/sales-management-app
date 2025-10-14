@@ -30,7 +30,7 @@ class XenditController extends Controller
     {
         try {
             $order = Order::where('order_number', $orderNumber)
-                ->with(['customer', 'address', 'items.productVariant.product'])
+                ->with(['customer', 'address', 'items.productVariant.product', 'voucher'])
                 ->first();
 
             if (!$order) {
@@ -86,11 +86,47 @@ class XenditController extends Controller
                 ];
             }
 
+            // Log order details for debugging
+            Log::info('Xendit payment - Order details before processing', [
+                'order_number' => $order->order_number,
+                'order_id' => $order->id,
+                'voucher_id' => $order->voucher_id,
+                'has_voucher_relation' => $order->voucher ? true : false,
+                'voucher_code' => $order->voucher ? $order->voucher->code : null,
+                'discount_amount' => $order->discount_amount,
+                'total_price' => $order->total_price,
+                'shipping_cost' => $order->shipping_cost,
+            ]);
+
+            // Note: Xendit doesn't support negative prices for discount items
+            // Instead, we use the discounted total_price in the amount field
+            // The invoice description will show the discount information
+
+            // Calculate totals for logging
+            $originalTotal = $order->items->sum(function($item) {
+                return $item->price * $item->quantity;
+            }) + $order->shipping_cost;
+            
+            Log::info('Xendit payment creation details', [
+                'order_number' => $order->order_number,
+                'original_total' => $originalTotal,
+                'discount_amount' => $order->discount_amount,
+                'final_amount' => $order->total_price,
+                'voucher_code' => $order->voucher ? $order->voucher->code : null,
+                'items_count' => count($items)
+            ]);
+
+            // Prepare description with discount info if applicable
+            $description = 'Order Payment - ' . $order->order_number;
+            if ($order->voucher && $order->discount_amount > 0) {
+                $description .= ' (Diskon: ' . $order->voucher->code . ' -Rp' . number_format((float)$order->discount_amount, 0, ',', '.') . ')';
+            }
+
             // Prepare invoice data
             $invoiceData = [
                 'external_id' => $order->order_number,
                 'amount' => (int) $order->total_price,
-                'description' => 'Order Payment - ' . $order->order_number,
+                'description' => $description,
                 'invoice_duration' => 86400, // 24 hours
                 'customer' => [
                     'given_names' => $givenNames,
@@ -105,9 +141,21 @@ class XenditController extends Controller
                 'metadata' => [
                     'order_number' => $order->order_number,
                     'customer_id' => $order->customer_id,
-                    'address_id' => $order->address_id
+                    'address_id' => $order->address_id,
+                    'voucher_code' => $order->voucher ? $order->voucher->code : null,
+                    'discount_amount' => $order->discount_amount
                 ]
             ];
+            
+            // Add fees to show discount as negative fee (Xendit supports this)
+            if ($order->voucher && $order->discount_amount > 0) {
+                $invoiceData['fees'] = [
+                    [
+                        'type' => 'Voucher Discount - ' . $order->voucher->code,
+                        'value' => -(int) $order->discount_amount
+                    ]
+                ];
+            }
 
             // Create invoice via Xendit API
             $response = Http::withBasicAuth($this->secretKey, '')

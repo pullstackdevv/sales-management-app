@@ -24,7 +24,7 @@ const ViewVoucher = ({ voucherId }) => {
                     icon: 'error',
                     confirmButtonColor: '#ef4444'
                 });
-                router.visit('/voucher/data');
+                router.visit('/cms/voucher/data');
             }
         };
 
@@ -83,7 +83,7 @@ const ViewVoucher = ({ voucherId }) => {
                         <h2 className="text-xl font-semibold text-gray-900 mb-2">Voucher Tidak Ditemukan</h2>
                         <p className="text-gray-600 mb-4">Voucher yang Anda cari tidak dapat ditemukan.</p>
                         <button
-                            onClick={() => router.visit('/voucher/data')}
+                            onClick={() => router.visit('/cms/voucher/data')}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                             Kembali ke Daftar Voucher
@@ -116,7 +116,7 @@ const ViewVoucher = ({ voucherId }) => {
                             Edit
                         </button>
                         <button
-                            onClick={() => router.visit('/voucher/data')}
+                            onClick={() => router.visit('/cms/voucher/data')}
                             className="flex items-center gap-2 px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                             <Icon icon="solar:arrow-left-outline" className="w-4 h-4" />

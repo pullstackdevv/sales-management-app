@@ -132,7 +132,7 @@ export default function StockOpnameEdit({ stockOpname }) {
         text: 'Stok opname berhasil diperbarui.',
         icon: 'success'
       }).then(() => {
-        router.visit('/stock-opname/data');
+        router.visit('/cms/stock-opname/data');
       });
     } catch (error) {
       console.error('Error updating stock opname:', error);

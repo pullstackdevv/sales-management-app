@@ -94,13 +94,46 @@ class OrderController extends Controller
                 return $item['quantity'] * $item['price'];
             });
 
-            // For manual orders (no payment gateway), vouchers are not used
-            // Vouchers are only for web orders with payment gateway
-            $discountAmount = 0;
-            // Note: Manual orders don't use vouchers, only web orders do
+            // Calculate total before discount
+            $totalBeforeDiscount = $subtotal + $validated['shipping_cost'];
 
-            // Calculate total price (manual orders: subtotal + shipping_cost)
-            $totalPrice = $subtotal + $validated['shipping_cost'];
+            // Apply voucher discount if voucher_id is provided
+            $discountAmount = 0;
+            if (isset($validated['voucher_id'])) {
+                $voucher = \App\Models\Voucher::find($validated['voucher_id']);
+                
+                Log::info('OrderController - Voucher validation', [
+                    'voucher_id' => $validated['voucher_id'],
+                    'voucher_found' => $voucher ? true : false,
+                    'voucher_code' => $voucher ? $voucher->code : null,
+                    'total_before_discount' => $totalBeforeDiscount,
+                    'can_be_used' => $voucher ? $voucher->canBeUsed($totalBeforeDiscount) : false
+                ]);
+                
+                if ($voucher && $voucher->canBeUsed($totalBeforeDiscount)) {
+                    $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount);
+                    
+                    Log::info('OrderController - Voucher discount calculated', [
+                        'voucher_code' => $voucher->code,
+                        'discount_amount' => $discountAmount,
+                        'discount_type' => $voucher->type,
+                        'discount_value' => $voucher->value
+                    ]);
+                }
+            } else {
+                Log::info('OrderController - No voucher_id provided in request');
+            }
+
+            // Calculate final total price after discount
+            $totalPrice = $totalBeforeDiscount - $discountAmount;
+            
+            Log::info('OrderController - Order totals', [
+                'subtotal' => $subtotal,
+                'shipping_cost' => $validated['shipping_cost'],
+                'total_before_discount' => $totalBeforeDiscount,
+                'discount_amount' => $discountAmount,
+                'final_total_price' => $totalPrice
+            ]);
 
             // Create order
             $order = Order::create([

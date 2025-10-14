@@ -57,7 +57,7 @@ const EditVoucher = ({ voucherId }) => {
                     icon: 'error',
                     confirmButtonColor: '#ef4444'
                 });
-                router.visit('/voucher/data');
+                router.visit('/cms/cms/voucher/data');
             }
         };
 
@@ -94,7 +94,7 @@ const EditVoucher = ({ voucherId }) => {
                 });
                 
                 // Redirect to voucher list
-                router.visit('/voucher/data');
+                router.visit('/cms/voucher/data');
             }
         } catch (error) {
             console.error('Error updating voucher:', error);
@@ -154,7 +154,7 @@ const EditVoucher = ({ voucherId }) => {
                         </p>
                     </div>
                     <button
-                        onClick={() => router.visit('/voucher/data')}
+                        onClick={() => router.visit('/cms/voucher/data')}
                         className="flex items-center gap-2 px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                         <Icon icon="solar:arrow-left-outline" className="w-4 h-4" />
@@ -460,7 +460,7 @@ const EditVoucher = ({ voucherId }) => {
                         <div className="flex items-center justify-end gap-4 pt-6 border-t">
                             <button
                                 type="button"
-                                onClick={() => router.visit('/voucher/data')}
+                            onClick={() => router.visit('/cms/voucher/data')}
                                 className="px-6 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                             >
                                 Batal

@@ -38,7 +38,7 @@ const AddVoucher = () => {
                 });
                 
                 // Redirect to voucher list
-                router.visit('/voucher/data');
+                router.visit('/cms/voucher/data');
             }
         } catch (error) {
             console.error('Error creating voucher:', error);

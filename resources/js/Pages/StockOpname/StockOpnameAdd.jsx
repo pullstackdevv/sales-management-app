@@ -117,7 +117,7 @@ export default function StockOpnameAdd() {
         title: 'Berhasil',
         text: 'Stok opname berhasil dibuat'
       }).then(() => {
-        router.visit('/stock-opname/data');
+        router.visit('/cms/stock-opname/data');
       });
     } catch (error) {
       console.error('Error creating stock opname:', error);

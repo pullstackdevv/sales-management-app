@@ -38,12 +38,6 @@ export default function Profile() {
                             </div>
                         )}
                     </div>
-                    <Link
-                        href="/cms/logout"
-                        className="mt-4 sm:mt-0 sm:ml-auto inline-flex items-center px-3 py-2 rounded-md text-sm bg-red-50 text-red-600 hover:bg-red-100"
-                    >
-                        <LogOut className="h-4 w-4 mr-2" /> Logout
-                    </Link>
                 </div>
 
                 {/* Orders placeholder (no dummy) */}

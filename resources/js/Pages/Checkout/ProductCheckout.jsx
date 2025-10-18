@@ -258,7 +258,12 @@ const ProductCheckout = () => {
                   {/* Product Details */}
                   <div className="md:w-2/3">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h3>
-                    <p className="text-gray-600 mb-4">{product.description}</p>
+                    {product.description && (
+                      <div 
+                        className="text-gray-600 mb-4 prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: product.description }}
+                      />
+                    )}
 
                     {/* Variants */}
                     {product.variants && product.variants.length > 0 && (

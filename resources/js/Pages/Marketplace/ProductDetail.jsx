@@ -684,10 +684,17 @@ export default function ProductDetail() {
 
                         <div className="p-4 sm:p-4">
                             {activeTab === 'description' && (
-                                <div className="prose max-w-none">
-                                    <p className="text-gray-600 leading-relaxed text-base sm:text-sm">
-                                        {product.description || 'Deskripsi produk tidak tersedia.'}
-                                    </p>
+                                <div className="prose prose-sm max-w-none">
+                                    {product.description ? (
+                                        <div 
+                                            className="text-gray-600 leading-relaxed text-base sm:text-sm"
+                                            dangerouslySetInnerHTML={{ __html: product.description }}
+                                        />
+                                    ) : (
+                                        <p className="text-gray-600 leading-relaxed text-base sm:text-sm">
+                                            Deskripsi produk tidak tersedia.
+                                        </p>
+                                    )}
                                     {product.features && product.features.length > 0 && (
                                         <div className="mt-6">
                                             <h4 className="font-normal text-gray-800 mb-3 text-lg sm:text-base">Fitur Utama:</h4>

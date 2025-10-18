@@ -229,7 +229,10 @@ export default function ProductData() {
                         )}
                       </div>
                       {product.description && (
-                        <p className="text-xs text-gray-500 mt-1">{product.description}</p>
+                        <div 
+                          className="text-xs text-gray-500 mt-1 line-clamp-2 prose prose-sm max-w-none"
+                          dangerouslySetInnerHTML={{ __html: product.description }}
+                        />
                       )}
                     </div>
                     <div className="col-span-1">

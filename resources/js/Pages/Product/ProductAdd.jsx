@@ -4,6 +4,7 @@ import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
+import TiptapEditor from "@/Components/TiptapEditor";
 
 export default function ProductAdd() {
   const [product, setProduct] = useState({
@@ -235,15 +236,11 @@ export default function ProductAdd() {
 
                   <div>
                     <label className="block text-sm font-medium mb-1">Deskripsi</label>
-                    <textarea
-                      rows="4"
-                      className={`w-full border px-3 py-2 rounded-md ${
-                        errors.description ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Deskripsi produk..."
+                    <TiptapEditor
                       value={product.description}
-                      onChange={(e) => setProduct({ ...product, description: e.target.value })}
-                    ></textarea>
+                      onChange={(content) => setProduct({ ...product, description: content })}
+                      error={errors.description}
+                    />
                     {errors.description && (
                       <p className="text-red-500 text-xs mt-1">{errors.description[0]}</p>
                     )}

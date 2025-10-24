@@ -43,10 +43,7 @@ export default function MarketplaceLayout({ children }) {
                                 )}
                             </Link>
 
-                            {/* User Profile - Hidden on mobile, shown on desktop */}
-                            <Link href="/profile" className="hidden sm:block text-gray-700 hover:text-blue-600 p-2 transition-colors duration-200">
-                                <User className="h-6 w-6" />
-                            </Link>
+                            {/* User Profile - Hidden */}
 
                             {/* Mobile menu button */}
                             <button
@@ -88,15 +85,7 @@ export default function MarketplaceLayout({ children }) {
                                     </span>
                                 )}
                             </Link>
-                            <Link
-                                href="/profile"
-                                className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-3 rounded-lg text-base font-medium transition-all duration-200"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                <UserCircle className="h-5 w-5" />
-                                <span>Profil</span>
-                            </Link>
-                        </div>
+                                                    </div>
                     </div>
                 )}
             </header>

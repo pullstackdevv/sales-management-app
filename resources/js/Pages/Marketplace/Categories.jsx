@@ -65,24 +65,27 @@ export default function Categories() {
     const ProductCard = ({ product }) => {
         return (
         <Link href={`/products/${product.id}`} className="block group">
-            <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
-                <div className="relative overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm hover:shadow-lg border border-gray-100 hover:border-blue-200 transition-all duration-300 overflow-hidden h-full flex flex-col">
+                {/* Image Container - Fixed height */}
+                <div className="relative overflow-hidden bg-gray-100 h-40 sm:h-44">
                     <img 
                         src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
                         alt={product.name}
-                        className="w-full h-48 sm:h-52 object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300"></div>
                 </div>
-                <div className="p-4 sm:p-5">
-                    <h3 className="text-base sm:text-sm font-medium text-gray-900 mb-3 line-clamp-2 leading-relaxed group-hover:text-gray-700 transition-colors">{product.name}</h3>
-                    <div className="flex items-center justify-between">
-                        <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                
+                {/* Content Container */}
+                <div className="p-2.5 sm:p-3 flex flex-col flex-grow">
+                    {/* Product Name */}
+                    <h3 className="text-xs sm:text-xs font-medium text-gray-900 mb-1.5 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors flex-grow">{product.name}</h3>
+                    
+                    {/* Price */}
+                    <div className="flex items-end gap-1">
+                        <span className="text-sm sm:text-sm font-bold text-gray-900">
                             {formatPrice(product.base_price || product.price)}
                         </span>
-                        <button className="p-2 sm:p-2 rounded-full bg-gray-50 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 transform hover:scale-110" type="button">
-                            <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4" />
-                        </button>
                     </div>
                 </div>
             </div>
@@ -215,16 +218,12 @@ export default function Categories() {
                                 <div className="text-center py-12 px-4">
                                     <Filter className="mx-auto h-16 w-16 sm:h-12 sm:w-12 text-gray-300 mb-4" />
                                     <h3 className="text-xl sm:text-lg font-medium text-gray-900 mb-2">Tidak ada produk ditemukan</h3>
-                                    <p className="text-base sm:text-sm text-gray-500">Coba ubah filter atau kata kunci pencarian</p>
+                                    <p className="text-base sm:text-sm text-gray-500">Coba ubah kata kunci pencarian atau filter</p>
                                 </div>
                             ) : (
-                                <div className={
-                                    viewMode === 'grid' 
-                                        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6"
-                                        : "space-y-4"
-                                }>
+                                <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6" : "space-y-4"}>
                                     {products.map((product) => (
-                                        viewMode === 'grid' 
+                                        viewMode === 'grid'
                                             ? <ProductCard key={product.id} product={product} />
                                             : <ProductListItem key={product.id} product={product} />
                                     ))}

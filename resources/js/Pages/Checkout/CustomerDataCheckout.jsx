@@ -42,9 +42,11 @@ const CustomerDataCheckout = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [addressesLoading, setAddressesLoading] = useState(false);
   
-  // Phone verification for existing customer
+  // Verification for existing customer (phone or email)
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [verificationMethod, setVerificationMethod] = useState('phone'); // 'phone' or 'email'
   const [verificationPhone, setVerificationPhone] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
   const [pendingCustomer, setPendingCustomer] = useState(null);
   const [phoneVerificationError, setPhoneVerificationError] = useState('');
 
@@ -64,6 +66,13 @@ const CustomerDataCheckout = () => {
   });
   const [addressFormErrors, setAddressFormErrors] = useState({});
   const [savingAddress, setSavingAddress] = useState(false);
+  
+  // Location search for address form modal
+  const [modalLocationQuery, setModalLocationQuery] = useState('');
+  const [modalLocationResults, setModalLocationResults] = useState([]);
+  const [showModalLocationDropdown, setShowModalLocationDropdown] = useState(false);
+  const [searchingModalLocation, setSearchingModalLocation] = useState(false);
+  const modalLocationSearchTimeoutRef = useRef(null);
 
   // Location search for new customer (districts and regencies)
   const [locationQuery, setLocationQuery] = useState('');
@@ -83,6 +92,25 @@ const CustomerDataCheckout = () => {
     const last4 = digits.slice(-4);
     const maskedPrefixLength = Math.max(0, digits.length - 4);
     return `${'*'.repeat(maskedPrefixLength)}${last4}`;
+  };
+
+  // Mask email to show only first 2 characters and domain
+  const maskEmail = (email) => {
+    if (!email) return '';
+    const [localPart, domain] = email.split('@');
+    if (!domain) return email; // Invalid email format
+    
+    const visibleChars = Math.min(2, localPart.length);
+    const maskedLocal = localPart.substring(0, visibleChars) + '*'.repeat(Math.max(0, localPart.length - visibleChars));
+    
+    // Mask domain but keep first letter and TLD
+    const domainParts = domain.split('.');
+    const maskedDomain = domainParts.map((part, index) => {
+      if (index === domainParts.length - 1) return part; // Keep TLD (.com, .id, etc)
+      return part[0] + '*'.repeat(Math.max(0, part.length - 1));
+    }).join('.');
+    
+    return `${maskedLocal}@${maskedDomain}`;
   };
 
   // Helper function to get customer ID consistently
@@ -225,39 +253,65 @@ const CustomerDataCheckout = () => {
       if (locationSearchTimeoutRef.current) {
         clearTimeout(locationSearchTimeoutRef.current);
       }
+      if (modalLocationSearchTimeoutRef.current) {
+        clearTimeout(modalLocationSearchTimeoutRef.current);
+      }
     };
   }, []);
 
-  // Handle customer selection - show phone verification first
+  // Handle customer selection - show verification first
   const handleCustomerSelect = (customer) => {
     setPendingCustomer(customer);
     setVerificationPhone('');
+    setVerificationEmail('');
     setPhoneVerificationError('');
+    setVerificationMethod('phone'); // Default to phone
     setShowPhoneVerification(true);
     setCustomers([]);
   };
 
-  // Handle phone verification
-  const handlePhoneVerification = async () => {
-    if (!verificationPhone.trim()) {
-      setPhoneVerificationError('Nomor HP wajib diisi');
-      return;
+  // Handle verification (phone or email)
+  const handleVerification = async () => {
+    if (verificationMethod === 'phone') {
+      if (!verificationPhone.trim()) {
+        setPhoneVerificationError('Nomor HP wajib diisi');
+        return;
+      }
+
+      // Normalize phone numbers for comparison (remove spaces, dashes, etc.)
+      const normalizePhone = (phone) => {
+        return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+62/, '0').replace(/^62/, '0');
+      };
+
+      const customerPhone = normalizePhone(pendingCustomer.phone || '');
+      const inputPhone = normalizePhone(verificationPhone);
+
+      if (customerPhone !== inputPhone) {
+        setPhoneVerificationError('Nomor HP tidak sesuai dengan data customer');
+        return;
+      }
+    } else if (verificationMethod === 'email') {
+      if (!verificationEmail.trim()) {
+        setPhoneVerificationError('Email wajib diisi');
+        return;
+      }
+
+      // Normalize and compare emails (case insensitive)
+      const customerEmail = (pendingCustomer.email || '').toLowerCase().trim();
+      const inputEmail = verificationEmail.toLowerCase().trim();
+
+      if (!customerEmail) {
+        setPhoneVerificationError('Customer ini tidak memiliki email terdaftar');
+        return;
+      }
+
+      if (customerEmail !== inputEmail) {
+        setPhoneVerificationError('Email tidak sesuai dengan data customer');
+        return;
+      }
     }
 
-    // Normalize phone numbers for comparison (remove spaces, dashes, etc.)
-    const normalizePhone = (phone) => {
-      return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+62/, '0').replace(/^62/, '0');
-    };
-
-    const customerPhone = normalizePhone(pendingCustomer.phone || '');
-    const inputPhone = normalizePhone(verificationPhone);
-
-    if (customerPhone !== inputPhone) {
-      setPhoneVerificationError('Nomor HP tidak sesuai dengan data customer');
-      return;
-    }
-
-    // Phone verified, proceed with customer selection
+    // Verified, proceed with customer selection
     setSelectedCustomer(pendingCustomer);
     setSearchTerm(pendingCustomer.name);
     setShowPhoneVerification(false);
@@ -266,12 +320,14 @@ const CustomerDataCheckout = () => {
     await fetchCustomerAddressesAfterSelection(pendingCustomer.id);
   };
 
-  // Cancel phone verification
+  // Cancel verification
   const handleCancelVerification = () => {
     setShowPhoneVerification(false);
     setPendingCustomer(null);
     setVerificationPhone('');
+    setVerificationEmail('');
     setPhoneVerificationError('');
+    setVerificationMethod('phone');
   };
 
   // Add new customer address
@@ -391,10 +447,14 @@ const CustomerDataCheckout = () => {
       recipient_phone: selectedCustomer?.phone || '',
       address_detail: '',
       city: '',
+      district: '',
       province: '',
       postal_code: '',
       is_default: false
     });
+    setModalLocationQuery('');
+    setModalLocationResults([]);
+    setShowModalLocationDropdown(false);
     setAddressFormErrors({});
     setShowAddressForm(true);
   };
@@ -413,6 +473,11 @@ const CustomerDataCheckout = () => {
       postal_code: address.postal_code || '',
       is_default: address.is_default || false
     });
+    // Set the location query for edit mode
+    const locationName = address.district || address.city || '';
+    setModalLocationQuery(locationName);
+    setModalLocationResults([]);
+    setShowModalLocationDropdown(false);
     setAddressFormErrors({});
     setShowAddressForm(true);
   };
@@ -441,16 +506,10 @@ const CustomerDataCheckout = () => {
       errors.address_detail = 'Alamat lengkap wajib diisi';
     }
     
-    if (!newAddressData.city.trim()) {
-      errors.city = 'Kota wajib diisi';
-    }
-    
-    if (!newAddressData.district.trim()) {
-      errors.district = 'Kecamatan wajib diisi';
-    }
-    
-    if (!newAddressData.province.trim()) {
-      errors.province = 'Provinsi wajib diisi';
+    // Validate location - ensure it's selected from dropdown
+    if (!newAddressData.district.trim() || !newAddressData.city.trim() || !newAddressData.province.trim()) {
+      errors.district = 'Silakan cari dan pilih kecamatan dari dropdown';
+      errors.city = 'Silakan cari dan pilih kecamatan dari dropdown';
     }
     
     if (!newAddressData.postal_code.trim()) {
@@ -809,6 +868,22 @@ const CustomerDataCheckout = () => {
     const query = e.target.value;
     setLocationQuery(query);
 
+    // Clear location data when user types (force re-selection from dropdown)
+    setAddressData(prev => ({
+      ...prev,
+      district: '',
+      city: '',
+      province: ''
+    }));
+    
+    // Clear related errors
+    setErrors(prev => ({
+      ...prev,
+      district: null,
+      city: null,
+      province: null
+    }));
+
     if (locationSearchTimeoutRef.current) {
       clearTimeout(locationSearchTimeoutRef.current);
     }
@@ -832,6 +907,79 @@ const CustomerDataCheckout = () => {
     
     setShowLocationDropdown(false);
     setLocationResults([]);
+  };
+
+  // Handle location search in modal
+  const handleModalLocationSearch = (e) => {
+    const query = e.target.value;
+    setModalLocationQuery(query);
+
+    // Clear location data when user types
+    setNewAddressData(prev => ({
+      ...prev,
+      district: '',
+      city: '',
+      province: ''
+    }));
+    
+    // Clear related errors
+    setAddressFormErrors(prev => ({
+      ...prev,
+      district: null,
+      city: null,
+      province: null
+    }));
+
+    if (modalLocationSearchTimeoutRef.current) {
+      clearTimeout(modalLocationSearchTimeoutRef.current);
+    }
+
+    modalLocationSearchTimeoutRef.current = setTimeout(() => {
+      debouncedModalLocationSearch(query);
+    }, 300);
+  };
+
+  // Debounced location search for modal
+  const debouncedModalLocationSearch = useCallback(async (query) => {
+    if (query.length < 2) {
+      setModalLocationResults([]);
+      setShowModalLocationDropdown(false);
+      return;
+    }
+
+    setSearchingModalLocation(true);
+
+    try {
+      const response = await api.get('/wilayah/search-regencies', {
+        params: { q: query }
+      });
+
+      if (response.data.status === 'success') {
+        setModalLocationResults(response.data.data);
+        setShowModalLocationDropdown(true);
+      }
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      setModalLocationResults([]);
+    } finally {
+      setSearchingModalLocation(false);
+    }
+  }, []);
+
+  // Select location in modal
+  const selectModalLocation = (location) => {
+    setModalLocationQuery(location.name);
+    
+    // Auto-fill all address data based on selection
+    setNewAddressData(prev => ({
+      ...prev,
+      district: location.district_name || '',
+      city: location.regency_name,
+      province: location.province_name
+    }));
+    
+    setShowModalLocationDropdown(false);
+    setModalLocationResults([]);
   };
 
   // Validasi form
@@ -870,20 +1018,11 @@ const CustomerDataCheckout = () => {
         newErrors.recipient_phone = 'Nomor telepon penerima minimal 10 digit';
       }
 
-      // Validate address
-      if (!addressData.city.trim()) {
-        newErrors.city = 'Kota wajib diisi';
-        requiredFields.push('Kota/Kabupaten');
-      }
-
-      if (!addressData.district.trim()) {
-        newErrors.district = 'Kecamatan wajib diisi';
-        requiredFields.push('Kecamatan');
-      }
-
-      if (!addressData.province.trim()) {
-        newErrors.province = 'Provinsi wajib diisi';
-        requiredFields.push('Provinsi');
+      // Validate address - ensure location is selected from dropdown
+      if (!addressData.district.trim() || !addressData.city.trim() || !addressData.province.trim()) {
+        newErrors.district = 'Silakan cari dan pilih kecamatan dari dropdown';
+        newErrors.city = 'Silakan cari dan pilih kecamatan dari dropdown';
+        requiredFields.push('Lokasi (Kecamatan/Kota - wajib pilih dari dropdown pencarian)');
       }
 
       if (!addressData.postal_code.trim()) {
@@ -1319,18 +1458,25 @@ const CustomerDataCheckout = () => {
 
                         {/* Display Selected Location Info */}
                         {(addressData.district || addressData.city) && (
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                            <h4 className="text-sm font-medium text-blue-900 mb-2">Lokasi Terpilih:</h4>
-                            <div className="text-sm text-blue-800 space-y-1">
-                              {addressData.district && (
-                                <div><strong>Kecamatan:</strong> {addressData.district}</div>
-                              )}
-                              {addressData.city && (
-                                <div><strong>Kota/Kabupaten:</strong> {addressData.city}</div>
-                              )}
-                              {addressData.province && (
-                                <div><strong>Provinsi:</strong> {addressData.province}</div>
-                              )}
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <div className="flex items-start gap-2">
+                              <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium text-green-900 mb-2">✓ Lokasi Berhasil Dipilih:</h4>
+                                <div className="text-sm text-green-800 space-y-1">
+                                  {addressData.district && (
+                                    <div><strong>Kecamatan:</strong> {addressData.district}</div>
+                                  )}
+                                  {addressData.city && (
+                                    <div><strong>Kota/Kabupaten:</strong> {addressData.city}</div>
+                                  )}
+                                  {addressData.province && (
+                                    <div><strong>Provinsi:</strong> {addressData.province}</div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -1453,7 +1599,7 @@ const CustomerDataCheckout = () => {
                               <div className="font-medium text-gray-900">{customer.name}</div>
                               <div className="text-sm text-gray-500">{maskPhone(customer.phone)}</div>
                               {customer.email && (
-                                <div className="text-sm text-gray-500">{customer.email}</div>
+                                <div className="text-sm text-gray-500">{maskEmail(customer.email)}</div>
                               )}
                             </button>
                           ))}
@@ -1469,7 +1615,7 @@ const CustomerDataCheckout = () => {
                             <h4 className="font-medium text-blue-900">{selectedCustomer.name}</h4>
                             <p className="text-sm text-blue-700">{maskPhone(selectedCustomer.phone)}</p>
                             {selectedCustomer.email && (
-                              <p className="text-sm text-blue-700">{selectedCustomer.email}</p>
+                              <p className="text-sm text-blue-700">{maskEmail(selectedCustomer.email)}</p>
                             )}
                           </div>
                           <button
@@ -1669,39 +1815,106 @@ const CustomerDataCheckout = () => {
         </div>
       </div>
 
-      {/* Phone Verification Modal */}
+      {/* Verification Modal (Phone or Email) */}
       {showPhoneVerification && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Verifikasi Nomor HP</h3>
+            <h3 className="text-lg font-semibold mb-4">Verifikasi Customer</h3>
             <p className="text-gray-600 mb-4">
-              Untuk keamanan, silakan masukkan nomor HP yang terdaftar untuk customer <strong>{pendingCustomer?.name}</strong>
+              Untuk keamanan, silakan verifikasi identitas customer <strong>{pendingCustomer?.name}</strong>
             </p>
             
+            {/* Verification Method Selection */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nomor HP *
+                Metode Verifikasi
               </label>
-              <input
-                 type="tel"
-                 value={verificationPhone}
-                 onChange={(e) => {
-                   setVerificationPhone(e.target.value);
-                   setPhoneVerificationError('');
-                 }}
-                 onKeyDown={(e) => {
-                   if (e.key === 'Enter') {
-                     handlePhoneVerification();
-                   } else if (e.key === 'Escape') {
-                     handleCancelVerification();
-                   }
-                 }}
-                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                   phoneVerificationError ? 'border-red-500' : 'border-gray-300'
-                 }`}
-                 placeholder="Contoh: 08123456789"
-                 autoFocus
-               />
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerificationMethod('phone');
+                    setPhoneVerificationError('');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                    verificationMethod === 'phone'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
+                >
+                  <Phone className="w-4 h-4 inline-block mr-2" />
+                  No HP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerificationMethod('email');
+                    setPhoneVerificationError('');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                    verificationMethod === 'email'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                  }`}
+                  disabled={!pendingCustomer?.email}
+                >
+                  <Mail className="w-4 h-4 inline-block mr-2" />
+                  Email
+                </button>
+              </div>
+              {!pendingCustomer?.email && verificationMethod === 'email' && (
+                <p className="text-amber-600 text-xs mt-1">Customer ini tidak memiliki email terdaftar</p>
+              )}
+            </div>
+
+            {/* Input Field */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {verificationMethod === 'phone' ? 'Nomor HP *' : 'Email *'}
+              </label>
+              {verificationMethod === 'phone' ? (
+                <input
+                  type="tel"
+                  value={verificationPhone}
+                  onChange={(e) => {
+                    setVerificationPhone(e.target.value);
+                    setPhoneVerificationError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleVerification();
+                    } else if (e.key === 'Escape') {
+                      handleCancelVerification();
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    phoneVerificationError ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="Contoh: 08123456789"
+                  autoFocus
+                />
+              ) : (
+                <input
+                  type="email"
+                  value={verificationEmail}
+                  onChange={(e) => {
+                    setVerificationEmail(e.target.value);
+                    setPhoneVerificationError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleVerification();
+                    } else if (e.key === 'Escape') {
+                      handleCancelVerification();
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    phoneVerificationError ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="email@example.com"
+                  autoFocus
+                />
+              )}
               {phoneVerificationError && (
                 <p className="text-red-500 text-sm mt-1">{phoneVerificationError}</p>
               )}
@@ -1717,7 +1930,7 @@ const CustomerDataCheckout = () => {
               </button>
               <button
                 type="button"
-                onClick={handlePhoneVerification}
+                onClick={handleVerification}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Verifikasi
@@ -1791,75 +2004,123 @@ const CustomerDataCheckout = () => {
                 )}
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Kota *
-                  </label>
+              {/* Location Search */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cari Kecamatan/Kota *
+                  <span className="text-xs text-gray-500 ml-2">(Wajib pilih dari hasil pencarian)</span>
+                </label>
+                <div className="relative">
                   <input
                     type="text"
-                    value={newAddressData.city}
-                    onChange={(e) => handleAddressFormChange('city', e.target.value)}
-                    placeholder="Nama kota"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      addressFormErrors.city ? 'border-red-500' : 'border-gray-300'
+                    value={modalLocationQuery}
+                    onChange={handleModalLocationSearch}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      addressFormErrors.city || addressFormErrors.district 
+                        ? 'border-red-500' 
+                        : (newAddressData.district && newAddressData.city) 
+                          ? 'border-green-500 bg-green-50' 
+                          : 'border-gray-300'
                     }`}
+                    placeholder="Ketik nama kecamatan atau kota..."
+                    autoComplete="off"
                   />
-                  {addressFormErrors.city && (
-                    <p className="text-red-500 text-sm mt-1">{addressFormErrors.city}</p>
+                  {/* Success indicator */}
+                  {(newAddressData.district && newAddressData.city) && (
+                    <div className="absolute right-3 top-2.5 text-green-600">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Kecamatan *
-                  </label>
-                  <input
-                    type="text"
-                    value={newAddressData.district}
-                    onChange={(e) => handleAddressFormChange('district', e.target.value)}
-                    placeholder="Nama kecamatan"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      addressFormErrors.district ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {addressFormErrors.district && (
-                    <p className="text-red-500 text-sm mt-1">{addressFormErrors.district}</p>
-                  )}
+                {(addressFormErrors.city || addressFormErrors.district) && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {addressFormErrors.district || addressFormErrors.city}
+                  </p>
+                )}
+
+                {/* Location Dropdown */}
+                {showModalLocationDropdown && modalLocationResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {modalLocationResults.map((location, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => selectModalLocation(location)}
+                        className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 text-xs rounded ${
+                            location.type === 'Kecamatan' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {location.type}
+                          </span>
+                          <span className="font-medium">{location.name}</span>
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {location.type === 'Kecamatan' 
+                            ? `${location.regency_name}, ${location.province_name}`
+                            : location.province_name
+                          }
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {searchingModalLocation && !(newAddressData.district && newAddressData.city) && (
+                  <div className="absolute right-3 top-2.5 text-gray-400">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Display Selected Location Info */}
+              {(newAddressData.district || newAddressData.city) && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-green-900 mb-2">✓ Lokasi Berhasil Dipilih:</h4>
+                      <div className="text-sm text-green-800 space-y-1">
+                        {newAddressData.district && (
+                          <div><strong>Kecamatan:</strong> {newAddressData.district}</div>
+                        )}
+                        {newAddressData.city && (
+                          <div><strong>Kota/Kabupaten:</strong> {newAddressData.city}</div>
+                        )}
+                        {newAddressData.province && (
+                          <div><strong>Provinsi:</strong> {newAddressData.province}</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Provinsi *
-                  </label>
-                  <input
-                    type="text"
-                    value={newAddressData.province}
-                    onChange={(e) => handleAddressFormChange('province', e.target.value)}
-                    placeholder="Nama provinsi"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      addressFormErrors.province ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {addressFormErrors.province && (
-                    <p className="text-red-500 text-sm mt-1">{addressFormErrors.province}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Kode Pos *
-                  </label>
-                  <input
-                    type="text"
-                    value={newAddressData.postal_code}
-                    onChange={(e) => handleAddressFormChange('postal_code', e.target.value)}
-                    placeholder="12345"
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      addressFormErrors.postal_code ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                  />
-                  {addressFormErrors.postal_code && (
-                    <p className="text-red-500 text-sm mt-1">{addressFormErrors.postal_code}</p>
-                  )}
-                </div>
+              )}
+
+              {/* Postal Code */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Kode Pos *
+                </label>
+                <input
+                  type="text"
+                  value={newAddressData.postal_code}
+                  onChange={(e) => handleAddressFormChange('postal_code', e.target.value)}
+                  placeholder="12345"
+                  maxLength={5}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    addressFormErrors.postal_code ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {addressFormErrors.postal_code && (
+                  <p className="text-red-500 text-sm mt-1">{addressFormErrors.postal_code}</p>
+                )}
               </div>
               
               <div>

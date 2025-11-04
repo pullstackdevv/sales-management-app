@@ -18,17 +18,16 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         try {
-            // Get current month start and end dates
-            $currentMonth = Carbon::now()->startOfMonth();
-            $currentMonthEnd = Carbon::now()->endOfMonth();
+            // Get today's date
+            $today = Carbon::today();
             
             // Summary Cards Data
-            $totalOrders = Order::count();
+            $totalOrders = Order::whereDate('created_at', $today)->count();
             $totalCustomers = Customer::count();
             $activeProducts = Product::where('is_active', true)->count();
             
-            // Calculate monthly sales
-            $monthlySales = Order::whereBetween('created_at', [$currentMonth, $currentMonthEnd])
+            // Calculate today's sales
+            $todaySales = Order::whereDate('created_at', $today)
                 ->whereIn('status', ['paid', 'shipped'])
                 ->sum('total_price');
             
@@ -46,7 +45,7 @@ class DashboardController extends Controller
             
             $summaryCards = [
                 [
-                    'label' => 'Total Order',
+                    'label' => 'Total Order Hari Ini',
                     'icon' => 'mdi:cart-outline',
                     'value' => $totalOrders,
                     'color' => 'bg-blue-100 text-blue-800'
@@ -64,9 +63,9 @@ class DashboardController extends Controller
                     'color' => 'bg-yellow-100 text-yellow-800'
                 ],
                 [
-                    'label' => 'Penjualan Bulan Ini',
+                    'label' => 'Penjualan Hari Ini',
                     'icon' => 'mdi:cash-multiple',
-                    'value' => 'Rp ' . number_format($monthlySales, 0, ',', '.'),
+                    'value' => 'Rp ' . number_format($todaySales, 0, ',', '.'),
                     'color' => 'bg-purple-100 text-purple-800'
                 ]
             ];

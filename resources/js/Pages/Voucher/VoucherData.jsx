@@ -17,15 +17,15 @@ const VoucherData = () => {
     const [viewMode, setViewMode] = useState("table");
 
     const handleAddVoucher = () => {
-        router.visit('/voucher/create');
+        router.visit('/cms/voucher/create');
     };
 
     const handleEditVoucher = (id) => {
-        router.visit(`/voucher/edit/${id}`);
+        router.visit(`/cms/voucher/edit/${id}`);
     };
 
     const handleViewVoucher = (id) => {
-        router.visit(`/voucher/view/${id}`);
+        router.visit(`/cms/voucher/view/${id}`);
     };
 
     const deleteVoucher = async (id) => {

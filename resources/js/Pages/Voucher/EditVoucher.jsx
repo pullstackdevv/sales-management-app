@@ -57,7 +57,7 @@ const EditVoucher = ({ voucherId }) => {
                     icon: 'error',
                     confirmButtonColor: '#ef4444'
                 });
-                router.visit('/cms/cms/voucher/data');
+                router.visit('/cms/voucher/data');
             }
         };
 
@@ -257,6 +257,7 @@ const EditVoucher = ({ voucherId }) => {
                                         <option value="">Pilih tipe voucher</option>
                                         <option value="percentage">Persentase (%)</option>
                                         <option value="fixed">Nominal Tetap (Rp)</option>
+                                        <option value="free_sample">Free Sample (Bonus Produk)</option>
                                     </select>
                                     {errors.type && (
                                         <p className="text-red-500 text-sm mt-1">
@@ -265,51 +266,77 @@ const EditVoucher = ({ voucherId }) => {
                                     )}
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Nilai Diskon *
-                                    </label>
-                                    <div className="relative">
-                                        {voucherType === "fixed" && (
-                                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                                Rp
-                                            </span>
+                                {voucherType !== "free_sample" && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Nilai Diskon *
+                                        </label>
+                                        <div className="relative">
+                                            {voucherType === "fixed" && (
+                                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                                                    Rp
+                                                </span>
+                                            )}
+                                            {voucherType === "percentage" && (
+                                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                                                    %
+                                                </span>
+                                            )}
+                                            <input
+                                                type="number"
+                                                {...register("value", {
+                                                    required: voucherType !== "free_sample" ? "Nilai diskon harus diisi" : false,
+                                                    min: {
+                                                        value: 1,
+                                                        message: "Nilai harus lebih dari 0",
+                                                    },
+                                                    max:
+                                                        voucherType === "percentage"
+                                                            ? {
+                                                                  value: 100,
+                                                                  message: "Persentase maksimal 100%",
+                                                              }
+                                                            : undefined,
+                                                })}
+                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                    voucherType === "fixed" ? "pl-8" : "pr-8"
+                                                }`}
+                                                placeholder={
+                                                    voucherType === "percentage" ? "10" : "50000"
+                                                }
+                                            />
+                                        </div>
+                                        {errors.value && (
+                                            <p className="text-red-500 text-sm mt-1">
+                                                {errors.value.message}
+                                            </p>
                                         )}
-                                        {voucherType === "percentage" && (
-                                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                                %
-                                            </span>
-                                        )}
-                                        <input
-                                            type="number"
-                                            {...register("value", {
-                                                required: "Nilai diskon harus diisi",
-                                                min: {
-                                                    value: 1,
-                                                    message: "Nilai harus lebih dari 0",
-                                                },
-                                                max:
-                                                    voucherType === "percentage"
-                                                        ? {
-                                                              value: 100,
-                                                              message: "Persentase maksimal 100%",
-                                                          }
-                                                        : undefined,
-                                            })}
-                                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                voucherType === "fixed" ? "pl-8" : "pr-8"
-                                            }`}
-                                            placeholder={
-                                                voucherType === "percentage" ? "10" : "50000"
-                                            }
-                                        />
                                     </div>
-                                    {errors.value && (
-                                        <p className="text-red-500 text-sm mt-1">
-                                            {errors.value.message}
+                                )}
+
+                                {voucherType === "free_sample" && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Nama Produk Gratis *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            {...register("free_product_name", {
+                                                required: voucherType === "free_sample" ? "Nama produk gratis harus diisi" : false,
+                                            })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            placeholder="Contoh: Sample Parfum 5ml"
+                                        />
+                                        {errors.free_product_name && (
+                                            <p className="text-red-500 text-sm mt-1">
+                                                {errors.free_product_name.message}
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Produk bonus yang akan diberikan (tidak mengurangi harga)
                                         </p>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

@@ -4,7 +4,6 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/public/build/' : '/build/',
   //  server: {
   //   host: '0.0.0.0',
   //   port: 5173,
@@ -26,8 +25,8 @@ export default defineConfig({
     }),
   ],
   build: {
+    manifest: 'manifest.json',
     outDir: 'public/build',
-    manifest: true,
     rollupOptions: {
       output: {
         assetFileNames: 'assets/[name]-[hash][extname]',
@@ -35,8 +34,6 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
       },
     },
-    // Ensure manifest is in the correct location
-    manifestPath: 'manifest.json',
   },
   resolve: {
     alias: {

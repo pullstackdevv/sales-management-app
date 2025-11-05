@@ -15,27 +15,35 @@ export default defineConfig({
       port: 19068,
     },
   },
-
   plugins: [
     laravel({
       input: ['resources/js/app.jsx'],
       refresh: true,
+      buildDirectory: 'build',
     }),
-    react(),
+    react({
+      include: "**/*.{jsx,tsx}",
+      jsxRuntime: 'automatic'
+    }),
   ],
-
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'resources/js'),
-      'tailwindcss/version.js': path.resolve(__dirname, 'resources/js/fake-tailwind-version.js'),
+  build: {
+    manifest: 'manifest.json',
+    outDir: 'public/build',
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+      },
     },
   },
-
-  build: {
-    outDir: 'public/build',
-    manifest: true,
-    rollupOptions: {
-      input: ['resources/js/app.jsx'],
+  resolve: {
+    alias: {
+      'tailwindcss/version.js': path.resolve(__dirname, 'resources/js/fake-tailwind-version.js'),
+      '@': path.resolve(__dirname, 'resources/js'),
     },
+  },
+  optimizeDeps: {
+    include: ['flowbite-react'],
   },
 });

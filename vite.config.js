@@ -4,15 +4,16 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/public/build/' : '/build/',
-  //  server: {
-  //   host: '0.0.0.0',
-  //   port: 5173,
+  // server: {
+  //   host: '0.0.0.0',       // agar dapat diakses dari luar (bukan hanya localhost)
+  //   port: 19068,           // pastikan sama dengan yang kamu buka di firewall aaPanel
   //   strictPort: true,
+  //   cors: true,
   //   hmr: {
-  //     host: '192.168.19.165',
-  //     port: 5173,
-  //   }
+  //     host: '127.0.0.1', // domain kamu
+  //     protocol: 'wss',             // gunakan 'wss' karena situs kamu pakai HTTPS
+  //     port: 19068,
+  //   },
   // },
   plugins: [
     laravel({
@@ -26,8 +27,8 @@ export default defineConfig({
     }),
   ],
   build: {
+    manifest: 'manifest.json',
     outDir: 'public/build',
-    manifest: true,
     rollupOptions: {
       output: {
         assetFileNames: 'assets/[name]-[hash][extname]',
@@ -35,8 +36,6 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
       },
     },
-    // Ensure manifest is in the correct location
-    manifestPath: 'manifest.json',
   },
   resolve: {
     alias: {

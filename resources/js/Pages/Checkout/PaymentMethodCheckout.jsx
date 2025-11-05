@@ -565,6 +565,16 @@ const PaymentMethodCheckout = () => {
               </div>
             </div>
 
+            {/* Promo Info Box */}
+            <div className="lg:col-span-1">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <h3 className="font-semibold text-green-900 mb-2">🎉 Promosi Gratis Ongkir</h3>
+                <p className="text-sm text-green-800">
+                  Gratis ongkir untuk pembelian minimal Rp 100.000
+                </p>
+              </div>
+            </div>
+
             {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">

@@ -288,6 +288,10 @@ Route::get('/profile', function () {
 Route::post('/order/create', [WebOrderController::class, 'createOrder'])->name('marketplace.order.create');
 Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->name('marketplace.order.show');
 
+// Track Orders (public - for all customers)
+Route::get('/track-orders', [WebOrderController::class, 'trackOrdersPage'])->name('marketplace.track-orders');
+Route::post('/track-orders/search', [WebOrderController::class, 'searchTrackOrders'])->name('marketplace.track-orders.search');
+
 // User Orders (only for authenticated users)
 Route::middleware(['auth'])->group(function () {
     Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');

@@ -78,6 +78,14 @@ const CustomerDataCheckout = () => {
   const [locationQuery, setLocationQuery] = useState('');
   const [locationResults, setLocationResults] = useState([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+
+  // Dropshipper toggle
+  const [isDropshipper, setIsDropshipper] = useState(false);
+  const [recipientData, setRecipientData] = useState({
+    full_name: '',
+    phone: '',
+    email: ''
+  });
   const [searchingLocation, setSearchingLocation] = useState(false);
   const locationSearchTimeoutRef = useRef(null);
 
@@ -1336,6 +1344,51 @@ const CustomerDataCheckout = () => {
                     </button>
                   </div>
                 </div>
+
+                {/* Dropshipper Toggle */}
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isDropshipper}
+                      onChange={(e) => setIsDropshipper(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <span className="ml-3 text-sm font-medium text-gray-700">
+                      Ini adalah pesanan dropshipper (penerima berbeda dengan pemesan)
+                    </span>
+                  </label>
+                </div>
+
+                {/* Recipient Form (jika dropshipper aktif) */}
+                {isDropshipper && (
+                  <div className="mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <h3 className="text-sm font-semibold mb-4 text-amber-900">Data Penerima</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input
+                        type="text"
+                        placeholder="Nama Penerima"
+                        value={recipientData.full_name}
+                        onChange={(e) => setRecipientData({...recipientData, full_name: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="HP Penerima"
+                        value={recipientData.phone}
+                        onChange={(e) => setRecipientData({...recipientData, phone: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Email Penerima (opsional)"
+                        value={recipientData.email}
+                        onChange={(e) => setRecipientData({...recipientData, email: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 md:col-span-2"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* New Customer Form */}
                 {customerType === 'new' && (

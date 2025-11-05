@@ -5,7 +5,8 @@ import {
     User, 
     Menu,
     X,
-    UserCircle
+    UserCircle,
+    Package
 } from "lucide-react";
 import { AuthProvider } from "../contexts/AuthContext";
 import { useCart } from "../hooks/useCart";
@@ -33,6 +34,15 @@ export default function MarketplaceLayout({ children }) {
 
                         {/* Right side icons */}
                         <div className="flex items-center space-x-2 sm:space-x-4">
+                            {/* Pesanan Saya */}
+                            <Link 
+                                href="/orders" 
+                                className="hidden sm:block text-gray-700 hover:text-blue-600 p-2 transition-colors duration-200"
+                                title="Pesanan Saya"
+                            >
+                                <Package className="h-5 w-5 sm:h-6 sm:w-6" />
+                            </Link>
+
                             {/* Cart */}
                             <Link href="/cart" className="hidden sm:block text-gray-700 hover:text-blue-600 p-2 relative transition-colors duration-200">
                                 <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -66,6 +76,14 @@ export default function MarketplaceLayout({ children }) {
                     <div className="sm:hidden">
                         <div className="px-4 pt-2 pb-3 space-y-1 bg-white border-t border-gray-200 shadow-lg">
                             <Link
+                                href="/orders"
+                                className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-3 rounded-lg text-base font-medium transition-all duration-200"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                <Package className="h-5 w-5" />
+                                <span>Pesanan Saya</span>
+                            </Link>
+                            <Link
                                 href="/cart"
                                 className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-3 rounded-lg text-base font-medium transition-all duration-200"
                                 onClick={() => setIsMobileMenuOpen(false)}
@@ -85,7 +103,7 @@ export default function MarketplaceLayout({ children }) {
                                     </span>
                                 )}
                             </Link>
-                                                    </div>
+                        </div>
                     </div>
                 )}
             </header>

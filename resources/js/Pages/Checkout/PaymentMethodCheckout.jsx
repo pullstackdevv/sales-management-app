@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, CheckCircle, CreditCard } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
+import { formatCurrency } from '../../utils/helpers';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -243,7 +244,7 @@ const PaymentMethodCheckout = () => {
         Swal.fire({
           icon: 'success',
           title: 'Voucher Berhasil Diterapkan!',
-          text: `Diskon Rp ${discount_amount.toLocaleString('id-ID')} telah diterapkan`,
+          text: `Diskon ${formatCurrency(discount_amount)} telah diterapkan`,
           confirmButtonColor: '#3b82f6'
         });
       } else {

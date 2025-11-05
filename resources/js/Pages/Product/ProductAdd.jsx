@@ -4,7 +4,7 @@ import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
-import TiptapEditor from "@/Components/TiptapEditor";
+import TiptapEditor from "@/components/TiptapEditor";
 
 export default function ProductAdd() {
   const [product, setProduct] = useState({

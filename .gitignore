@@ -1,0 +1,37 @@
+# Dependencies
+node_modules
+vendor
+
+# Environment
+.env
+.env.backup
+.env.production
+
+# Laravel
+/storage/*.key
+/storage/logs
+/storage/framework/cache/data
+/storage/framework/sessions
+/storage/framework/testing
+/storage/framework/views
+/public/hot
+/public/storage
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build
+/public/build
+/public/css
+/public/js
+npm-debug.log
+yarn-error.log
+
+# PHP
+composer.phar
+*.log

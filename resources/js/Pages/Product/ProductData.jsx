@@ -4,8 +4,8 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
-import StockHistoryModal from "@/Components/StockHistoryModal";
-import StockAdjustmentModal from "@/Components/StockAdjustmentModal";
+import StockHistoryModal from "@/components/StockHistoryModal";
+import StockAdjustmentModal from "@/components/StockAdjustmentModal";
 
 export default function ProductData() {
   const [products, setProducts] = useState([]);

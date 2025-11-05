@@ -4,9 +4,9 @@ import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
-import TiptapEditor from "@/Components/TiptapEditor";
-import StockHistoryModal from "@/Components/StockHistoryModal";
-import StockAdjustmentModal from "@/Components/StockAdjustmentModal";
+import TiptapEditor from "@/components/TiptapEditor";
+import StockHistoryModal from "@/components/StockHistoryModal";
+import StockAdjustmentModal from "@/components/StockAdjustmentModal";
 
 export default function ProductEdit() {
   const [product, setProduct] = useState({

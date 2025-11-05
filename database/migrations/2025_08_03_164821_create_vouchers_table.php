@@ -16,10 +16,11 @@ return new class extends Migration
             $table->string('code', 50)->unique();
             $table->string('name');
             $table->text('description')->nullable();
-            $table->enum('type', ['percentage', 'fixed']);
+            $table->enum('type', ['percentage', 'fixed', 'free_sample']);
             $table->decimal('value', 10, 2);
             $table->decimal('minimum_amount', 10, 2)->nullable();
             $table->decimal('maximum_discount', 10, 2)->nullable();
+            $table->string('free_product_name')->nullable()->comment('For free_sample type vouchers');
             $table->integer('usage_limit')->nullable();
             $table->integer('used_count')->default(0);
             $table->datetime('start_date');

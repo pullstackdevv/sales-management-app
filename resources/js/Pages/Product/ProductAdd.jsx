@@ -4,12 +4,11 @@ import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
-import TiptapEditor from "@/Components/TiptapEditor";
+import TiptapEditor from "@/components/TiptapEditor";
 
 export default function ProductAdd() {
   const [product, setProduct] = useState({
     name: "",
-    sku: "",
     category: "",
     description: "",
     image: "",
@@ -31,17 +30,31 @@ export default function ProductAdd() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Generate auto SKU for variant
-  const generateVariantSKU = (productSku, variantIndex) => {
-    if (!productSku) return "";
+  // Format number to ribuan without decimal
+  const formatRibuan = (num) => {
+    if (!num || num === 0) return '';
+    return Math.floor(num).toLocaleString('id-ID');
+  };
+
+  // Parse ribuan format to number
+  const parseRibuan = (str) => {
+    if (!str) return 0;
+    return parseInt(str.toString().replace(/\./g, '')) || 0;
+  };
+
+  // Generate auto SKU for variant based on product name
+  const generateVariantSKU = (productName, variantIndex) => {
+    if (!productName) return "";
+    // Create SKU from first 3 letters of product name + index
+    const prefix = productName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
     const paddedIndex = String(variantIndex + 1).padStart(3, '0');
-    return `${productSku}-${paddedIndex}`;
+    return `${prefix}-${paddedIndex}`;
   };
 
   // Add new variant
   const addVariant = () => {
     const newVariantIndex = product.variants.length;
-    const newVariantSKU = generateVariantSKU(product.sku, newVariantIndex);
+    const newVariantSKU = generateVariantSKU(product.name, newVariantIndex);
     
     setProduct({
       ...product,
@@ -76,16 +89,16 @@ export default function ProductAdd() {
     setProduct({ ...product, variants: newVariants });
   };
 
-  // Update all variant SKUs when product SKU changes
-  const updateProductSKU = (newSku) => {
+  // Update all variant SKUs when product name changes
+  const updateProductName = (newName) => {
     const updatedVariants = product.variants.map((variant, index) => ({
       ...variant,
-      sku: generateVariantSKU(newSku, index)
+      sku: generateVariantSKU(newName, index)
     }));
     
     setProduct({ 
       ...product, 
-      sku: newSku,
+      name: newName,
       variants: updatedVariants
     });
   };
@@ -192,29 +205,13 @@ export default function ProductAdd() {
                       }`}
                       placeholder="Masukkan nama produk..."
                       value={product.name}
-                      onChange={(e) => setProduct({ ...product, name: e.target.value })}
+                      onChange={(e) => updateProductName(e.target.value)}
                       required
                     />
                     {errors.name && (
                       <p className="text-red-500 text-xs mt-1">{errors.name[0]}</p>
                     )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">SKU Produk*</label>
-                    <input
-                      type="text"
-                      className={`w-full border px-3 py-2 rounded-md ${
-                        errors.sku ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Masukkan SKU produk..."
-                      value={product.sku}
-                      onChange={(e) => updateProductSKU(e.target.value)}
-                      required
-                    />
-                    {errors.sku && (
-                      <p className="text-red-500 text-xs mt-1">{errors.sku[0]}</p>
-                    )}
+                    <p className="text-xs text-gray-500 mt-1">SKU varian akan otomatis dibuat dari nama produk</p>
                   </div>
 
                   <div>
@@ -362,36 +359,16 @@ export default function ProductAdd() {
                       </div>
 
                         <div>
-                          <label className="block text-sm font-medium mb-1">Harga Jual*</label>
-                          <input
-                            type="number"
-                            className={`w-full border px-3 py-2 rounded-md text-sm ${
-                              errors[`variants.${index}.price`] ? 'border-red-500' : 'border-gray-300'
-                            }`}
-                            placeholder="0"
-                            value={variant.price}
-                            onChange={(e) => updateVariant(index, 'price', parseFloat(e.target.value) || 0)}
-                            min="0"
-                            step="0.01"
-                            required
-                          />
-                          {errors[`variants.${index}.price`] && (
-                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
-                          )}
-                        </div>
-
-                        <div>
                           <label className="block text-sm font-medium mb-1">Harga Modal*</label>
                           <input
-                            type="number"
+                            type="text"
                             className={`w-full border px-3 py-2 rounded-md text-sm ${
                               errors[`variants.${index}.base_price`] ? 'border-red-500' : 'border-gray-300'
                             }`}
-                            placeholder="0"
-                            value={variant.base_price}
-                            onChange={(e) => updateVariant(index, 'base_price', parseFloat(e.target.value) || 0)}
-                            min="0"
-                            step="0.01"
+                            placeholder="Masukkan harga modal"
+                            value={formatRibuan(variant.base_price)}
+                            onChange={(e) => updateVariant(index, 'base_price', parseRibuan(e.target.value))}
+                            onFocus={() => { if (variant.base_price === 0) updateVariant(index, 'base_price', ''); }}
                             required
                           />
                           {errors[`variants.${index}.base_price`] && (
@@ -400,17 +377,34 @@ export default function ProductAdd() {
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium mb-1">Berat (kg)</label>
+                          <label className="block text-sm font-medium mb-1">Harga Jual*</label>
                           <input
-                            type="number"
+                            type="text"
+                            className={`w-full border px-3 py-2 rounded-md text-sm ${
+                              errors[`variants.${index}.price`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            placeholder="Masukkan harga jual"
+                            value={formatRibuan(variant.price)}
+                            onChange={(e) => updateVariant(index, 'price', parseRibuan(e.target.value))}
+                            onFocus={() => { if (variant.price === 0) updateVariant(index, 'price', ''); }}
+                            required
+                          />
+                          {errors[`variants.${index}.price`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Berat (gram)</label>
+                          <input
+                            type="text"
                             className={`w-full border px-3 py-2 rounded-md text-sm ${
                               errors[`variants.${index}.weight`] ? 'border-red-500' : 'border-gray-300'
                             }`}
-                            placeholder="0.000"
-                            value={variant.weight}
-                            onChange={(e) => updateVariant(index, 'weight', parseFloat(e.target.value) || 0)}
-                            min="0"
-                            step="0.001"
+                            placeholder="Masukkan berat"
+                            value={formatRibuan(variant.weight)}
+                            onChange={(e) => updateVariant(index, 'weight', parseRibuan(e.target.value))}
+                            onFocus={() => { if (variant.weight === 0) updateVariant(index, 'weight', ''); }}
                           />
                           {errors[`variants.${index}.weight`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.weight`][0]}</p>
@@ -420,14 +414,14 @@ export default function ProductAdd() {
                         <div>
                           <label className="block text-sm font-medium mb-1">Stok*</label>
                           <input
-                            type="number"
+                            type="text"
                             className={`w-full border px-3 py-2 rounded-md text-sm ${
                               errors[`variants.${index}.stock`] ? 'border-red-500' : 'border-gray-300'
                             }`}
-                            placeholder="0"
-                            value={variant.stock}
-                            onChange={(e) => updateVariant(index, 'stock', parseInt(e.target.value) || 0)}
-                            min="0"
+                            placeholder="Masukkan stok"
+                            value={formatRibuan(variant.stock)}
+                            onChange={(e) => updateVariant(index, 'stock', parseRibuan(e.target.value))}
+                            onFocus={() => { if (variant.stock === 0) updateVariant(index, 'stock', ''); }}
                             required
                           />
                           {errors[`variants.${index}.stock`] && (

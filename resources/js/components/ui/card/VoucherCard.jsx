@@ -19,8 +19,12 @@ const VoucherCard = ({ voucher, onEdit, onView, onDelete }) => {
     const baseClasses = "px-2 py-1 text-xs font-medium rounded";
     if (type === 'percentage') {
       return `${baseClasses} bg-blue-100 text-blue-800`;
-    } else {
+    } else if (type === 'fixed') {
       return `${baseClasses} bg-purple-100 text-purple-800`;
+    } else if (type === 'free_sample') {
+      return `${baseClasses} bg-green-100 text-green-800`;
+    } else {
+      return `${baseClasses} bg-gray-100 text-gray-800`;
     }
   };
 
@@ -68,13 +72,22 @@ const VoucherCard = ({ voucher, onEdit, onView, onDelete }) => {
 
         {/* Discount Info */}
         <div className="flex items-center gap-4 mb-4">
-          <div className="flex items-center gap-2">
-            <span className={getTypeBadge(voucher.type)}>
-              {voucher.type === 'percentage' ? 'Persentase' : 'Fixed'}
-            </span>
-            <div className="text-2xl font-bold text-gray-900">
-              {voucher.type === 'percentage' ? `${voucher.value}%` : formatRupiah(voucher.value)}
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className={getTypeBadge(voucher.type)}>
+                {voucher.type === 'percentage' ? 'Persentase' : voucher.type === 'fixed' ? 'Fixed' : 'Free Sample'}
+              </span>
             </div>
+            <div className="text-2xl font-bold text-gray-900 mt-2">
+              {voucher.type === 'percentage' 
+                ? `${voucher.value}%` 
+                : voucher.type === 'fixed' 
+                ? formatRupiah(voucher.value)
+                : voucher.free_product_name || 'Produk Gratis'}
+            </div>
+            {voucher.type === 'free_sample' && (
+              <p className="text-xs text-gray-500 mt-1">Bonus produk (diskon Rp 0)</p>
+            )}
           </div>
         </div>
 

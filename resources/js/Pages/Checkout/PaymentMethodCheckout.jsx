@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, CheckCircle, CreditCard } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
+import { formatCurrency } from '../../utils/helpers';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -243,7 +244,7 @@ const PaymentMethodCheckout = () => {
         Swal.fire({
           icon: 'success',
           title: 'Voucher Berhasil Diterapkan!',
-          text: `Diskon Rp ${discount_amount.toLocaleString('id-ID')} telah diterapkan`,
+          text: `Diskon ${formatCurrency(discount_amount)} telah diterapkan`,
           confirmButtonColor: '#3b82f6'
         });
       } else {
@@ -561,6 +562,16 @@ const PaymentMethodCheckout = () => {
                     <strong>Catatan:</strong> Setelah mengklik "Lanjutkan ke Pembayaran", Anda akan diarahkan ke halaman pembayaran Xendit untuk memilih metode pembayaran yang diinginkan.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* Promo Info Box */}
+            <div className="lg:col-span-1">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <h3 className="font-semibold text-green-900 mb-2">🎉 Promosi Gratis Ongkir</h3>
+                <p className="text-sm text-green-800">
+                  Gratis ongkir untuk pembelian minimal Rp 100.000
+                </p>
               </div>
             </div>
 

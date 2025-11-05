@@ -22,7 +22,7 @@ const route = (name, params = null) => {
     return '#';
 };
 
-export default function OrderCard({ order, onOrderUpdate }) {
+export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, isSelected = false, onSelect }) {
     const [localOrder, setLocalOrder] = useState(order);
 
 
@@ -321,10 +321,19 @@ export default function OrderCard({ order, onOrderUpdate }) {
     const validTransitions = getValidStatusTransitions(localOrder.raw_status || localOrder.status);
 
     return (
-        <div className={`border rounded-xl p-4 mb-4 bg-white shadow-sm text-sm ${orderSource.borderColor}`}>
+        <div className={`border rounded-xl p-4 mb-4 bg-white shadow-sm text-sm ${orderSource.borderColor} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
             <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center text-xs text-gray-600 border-b pb-4 mb-4">
                 <div className="grid">
                     <div className="flex items-center gap-2 mb-1">
+                        {showCheckbox && (
+                            <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => onSelect(localOrder.id)}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        )}
                         <Link
                             href={route('cms.orders.show', localOrder.id)}
                             className="text-blue-600 font-semibold text-base hover:text-blue-800"

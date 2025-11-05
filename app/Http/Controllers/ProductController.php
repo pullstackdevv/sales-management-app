@@ -99,7 +99,6 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'sku' => 'required|string|max:255|unique:products,sku',
             'description' => 'nullable|string',
             'category' => 'required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -128,7 +127,6 @@ class ProductController extends Controller
 
             $product = Product::create([
                 'name' => $validated['name'],
-                'sku' => $validated['sku'],
                 'description' => $validated['description'],
                 'category' => $validated['category'],
                 'image' => $imagePath,
@@ -193,7 +191,6 @@ class ProductController extends Controller
         // Custom validation for variants SKU
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'sku' => 'sometimes|required|string|max:100|unique:products,sku,' . $product->id,
             'description' => 'nullable|string',
             'category' => 'sometimes|required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
@@ -245,7 +242,6 @@ class ProductController extends Controller
 
             $product->update([
                 'name' => $validated['name'] ?? $product->name,
-                'sku' => $validated['sku'] ?? $product->sku,
                 'description' => $validated['description'] ?? $product->description,
                 'category' => $validated['category'] ?? $product->category,
                 'image' => $imagePath,

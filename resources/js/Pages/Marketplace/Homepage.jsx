@@ -373,8 +373,45 @@ const Homepage = () => {
         setPagination(prev => ({ ...prev, current_page: page }));
     };
 
+    // Helper to calculate variant price info (min price, has discount, etc)
+    const getVariantPriceInfo = useCallback((product) => {
+        if (!product.variants || product.variants.length === 0) {
+            return null;
+        }
+
+        let minPrice = Infinity;
+        let minOriginalPrice = Infinity;
+        let hasDiscount = false;
+
+        product.variants.forEach(variant => {
+            const price = variant.discount_price || variant.price;
+            const originalPrice = variant.price;
+            
+            if (price < minPrice) {
+                minPrice = price;
+            }
+            if (originalPrice < minOriginalPrice) {
+                minOriginalPrice = originalPrice;
+            }
+            if (variant.discount_price && variant.discount_price < variant.price) {
+                hasDiscount = true;
+            }
+        });
+
+        if (minPrice === Infinity) return null;
+
+        return {
+            minPrice,
+            minOriginalPrice,
+            hasDiscount
+        };
+    }, []);
+
 
     const ProductCard = memo(({ product }) => {
+        const variantInfo = getVariantPriceInfo(product);
+        const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
+        
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-lg border border-gray-100 hover:border-blue-200 transition-all duration-300 overflow-hidden h-full flex flex-col">
@@ -386,6 +423,11 @@ const Homepage = () => {
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300"></div>
+                        {variantInfo?.hasDiscount && (
+                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                Diskon
+                            </div>
+                        )}
                     </div>
                     
                     {/* Content Container */}
@@ -394,10 +436,21 @@ const Homepage = () => {
                         <h3 className="text-xs sm:text-xs font-medium text-gray-900 mb-1.5 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors flex-grow">{product.name}</h3>
                         
                         {/* Price */}
-                        <div className="flex items-end gap-1">
-                            <span className="text-sm sm:text-sm font-bold text-gray-900">
-                                {formatPrice(getProductPrice(product))}
-                            </span>
+                        <div className="flex flex-col gap-0.5">
+                            {variantInfo?.hasDiscount ? (
+                                <>
+                                    <span className="text-xs text-gray-400 line-through">
+                                        {formatPrice(variantInfo.minOriginalPrice)}
+                                    </span>
+                                    <span className="text-sm sm:text-sm font-bold text-red-600">
+                                        {formatPrice(displayPrice)}
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="text-sm sm:text-sm font-bold text-gray-900">
+                                    {formatPrice(displayPrice)}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -406,6 +459,9 @@ const Homepage = () => {
     });
 
     const ProductListItem = memo(({ product }) => {
+        const variantInfo = getVariantPriceInfo(product);
+        const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
+        
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden">
@@ -417,15 +473,31 @@ const Homepage = () => {
                                 className="w-24 h-24 sm:w-20 sm:h-20 object-cover transition-transform duration-300 group-hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg"></div>
+                            {variantInfo?.hasDiscount && (
+                                <div className="absolute top-1 right-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded font-medium">
+                                    Diskon
+                                </div>
+                            )}
                         </div>
                         <div className="flex-1 min-w-0">
                             <h3 className="text-base sm:text-sm font-medium text-gray-900 mb-2 sm:mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
                                 {product.name}
                             </h3>
-                            <div className="flex items-center justify-between">
-                                <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                    {formatPrice(getProductPrice(product))}
-                                </span>
+                            <div className="flex items-center gap-2">
+                                {variantInfo?.hasDiscount ? (
+                                    <>
+                                        <span className="text-sm text-gray-400 line-through">
+                                            {formatPrice(variantInfo.minOriginalPrice)}
+                                        </span>
+                                        <span className="text-lg font-semibold text-red-600">
+                                            {formatPrice(displayPrice)}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                        {formatPrice(displayPrice)}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

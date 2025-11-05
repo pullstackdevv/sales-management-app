@@ -283,11 +283,15 @@ class WebOrderController extends Controller
         try {
             $user = Auth::user();
             if (!$user) {
-                return ResponseFormatter::error(
-                    'Unauthorized',
-                    [],
-                    401
-                );
+                // Check if request expects JSON (AJAX)
+                if ($request->expectsJson() || $request->wantsJson()) {
+                    return ResponseFormatter::error(
+                        'Unauthorized',
+                        [],
+                        401
+                    );
+                }
+                return redirect()->route('login');
             }
 
             $orders = Order::where('user_id', $user->id)
@@ -295,17 +299,28 @@ class WebOrderController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->paginate(10);
 
+            // Return Inertia page for browser requests
+            if (!$request->expectsJson() && !$request->wantsJson()) {
+                return inertia('Marketplace/MyOrders', [
+                    'orders' => $orders
+                ]);
+            }
+
+            // Return JSON for AJAX/API requests
             return ResponseFormatter::success(
                 'Orders retrieved successfully',
                 $orders
             );
 
         } catch (\Exception $e) {
-            return ResponseFormatter::error(
-                'Failed to get orders',
-                [],
-                500
-            );
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return ResponseFormatter::error(
+                    'Failed to get orders',
+                    [],
+                    500
+                );
+            }
+            return redirect()->route('marketplace.home')->with('error', 'Failed to load orders');
         }
     }
 
@@ -434,6 +449,58 @@ class WebOrderController extends Controller
         } catch (\Exception $e) {
             \Log::error('Failed to update voucher used count: ' . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Show track orders page (public)
+     */
+    public function trackOrdersPage()
+    {
+        return inertia('Marketplace/TrackOrders');
+    }
+
+    /**
+     * Search orders by order number, email, or phone (public)
+     */
+    public function searchTrackOrders(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'search_query' => 'required|string|min:3',
+            ]);
+
+            if ($validator->fails()) {
+                return ResponseFormatter::error(
+                    'Validation Error',
+                    $validator->errors(),
+                    422
+                );
+            }
+
+            $query = $request->search_query;
+
+            // Search by order number, email, or phone
+            $orders = Order::with(['items.productVariant.product'])
+                ->where(function($q) use ($query) {
+                    $q->where('order_number', 'like', "%{$query}%")
+                      ->orWhere('customer_email', 'like', "%{$query}%")
+                      ->orWhere('customer_phone', 'like', "%{$query}%");
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+
+            return ResponseFormatter::success(
+                'Orders found',
+                $orders
+            );
+
+        } catch (\Exception $e) {
+            return ResponseFormatter::error(
+                'Failed to search orders',
+                [],
+                500
+            );
         }
     }
 }

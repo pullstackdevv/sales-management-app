@@ -13,6 +13,8 @@ export default function Order() {
   const [searchBy, setSearchBy] = useState('Order ID');
   const [pagination, setPagination] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -166,6 +168,68 @@ export default function Order() {
     return statusMap[status] || status;
   };
 
+  // Handle checkbox selection
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrders(prev => {
+      if (prev.includes(orderId)) {
+        return prev.filter(id => id !== orderId);
+      } else {
+        return [...prev, orderId];
+      }
+    });
+  };
+
+  // Handle select all
+  const handleSelectAll = () => {
+    const paidOrders = orders.filter(order => order.raw_status === 'paid');
+    if (selectedOrders.length === paidOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(paidOrders.map(order => order.id));
+    }
+  };
+
+  // Handle print and update status to processing
+  const handlePrintOrders = async () => {
+    if (selectedOrders.length === 0) return;
+
+    try {
+      setIsPrinting(true);
+      
+      // Update status to processing for selected orders
+      const updatePromises = selectedOrders.map(orderId =>
+        api.put(`/orders/${orderId}/status`, { status: 'processing' })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Open print window with selected orders
+      const printUrl = `/cms/order/print?orders=${selectedOrders.join(',')}`;
+      window.open(printUrl, '_blank');
+      
+      // Clear selection and refresh
+      setSelectedOrders([]);
+      await fetchOrders(currentPage);
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: `${selectedOrders.length} order berhasil diprint dan diproses`,
+        timer: 2000,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      console.error('Error printing orders:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal!',
+        text: 'Terjadi kesalahan saat memproses print'
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6">
@@ -223,6 +287,7 @@ export default function Order() {
               <option value="Order ID">Order ID</option>
               <option value="Customer">Customer</option>
               <option value="Phone">Phone</option>
+              <option value="Product">Product Name</option>
             </select>
             <input
               type="text"

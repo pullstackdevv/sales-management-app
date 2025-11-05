@@ -17,15 +17,15 @@ const VoucherData = () => {
     const [viewMode, setViewMode] = useState("table");
 
     const handleAddVoucher = () => {
-        router.visit('/voucher/create');
+        router.visit('/cms/voucher/create');
     };
 
     const handleEditVoucher = (id) => {
-        router.visit(`/voucher/edit/${id}`);
+        router.visit(`/cms/voucher/edit/${id}`);
     };
 
     const handleViewVoucher = (id) => {
-        router.visit(`/voucher/view/${id}`);
+        router.visit(`/cms/voucher/view/${id}`);
     };
 
     const deleteVoucher = async (id) => {
@@ -137,8 +137,12 @@ const VoucherData = () => {
         const baseClasses = "px-2 py-1 text-xs font-medium rounded";
         if (type === "percentage") {
             return `${baseClasses} bg-blue-100 text-blue-800`;
-        } else {
+        } else if (type === "fixed") {
             return `${baseClasses} bg-purple-100 text-purple-800`;
+        } else if (type === "free_sample") {
+            return `${baseClasses} bg-green-100 text-green-800`;
+        } else {
+            return `${baseClasses} bg-gray-100 text-gray-800`;
         }
     };
 
@@ -291,6 +295,7 @@ const VoucherData = () => {
                                     <option value="all">Semua Tipe</option>
                                     <option value="percentage">Persentase</option>
                                     <option value="fixed">Fixed Amount</option>
+                                    <option value="free_sample">Free Sample</option>
                                 </select>
                                 <select
                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -395,14 +400,16 @@ const VoucherData = () => {
                                                     >
                                                         {voucher.type === "percentage"
                                                             ? "Persentase"
-                                                            : "Fixed"}
+                                                            : voucher.type === "fixed"
+                                                            ? "Fixed"
+                                                            : "Free Sample"}
                                                     </span>
                                                     <div className="text-sm font-semibold text-gray-900">
                                                         {voucher.type === "percentage"
                                                             ? `${voucher.value}%`
-                                                            : formatRupiah(
-                                                                    voucher.value
-                                                                )}
+                                                            : voucher.type === "fixed"
+                                                            ? formatRupiah(voucher.value)
+                                                            : voucher.free_product_name || "Produk Gratis"}
                                                     </div>
                                                 </div>
                                             </td>

@@ -4,15 +4,17 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  //  server: {
-  //   host: '0.0.0.0',
-  //   port: 5173,
-  //   strictPort: true,
-  //   hmr: {
-  //     host: '192.168.19.165',
-  //     port: 5173,
-  //   }
-  // },
+  server: {
+    host: '0.0.0.0',       // agar dapat diakses dari luar (bukan hanya localhost)
+    port: 19068,           // pastikan sama dengan yang kamu buka di firewall aaPanel
+    strictPort: true,
+    cors: true,
+    hmr: {
+      host: 'app.pullstack.cloud', // domain kamu
+      protocol: 'wss',             // gunakan 'wss' karena situs kamu pakai HTTPS
+      port: 19068,
+    },
+  },
   plugins: [
     laravel({
       input: ['resources/js/app.jsx'],

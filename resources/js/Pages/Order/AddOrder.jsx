@@ -16,7 +16,6 @@ export default function AddOrder() {
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
         status: 'pending',
-        payment_status: 'pending',
         payment_bank_id: '',
         courier: ''
     });
@@ -615,67 +614,7 @@ export default function AddOrder() {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Status Pembayaran
-                                </label>
-                                <select 
-                                    value={formData.payment_status}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value, payment_bank_id: e.target.value === 'pending' ? '' : prev.payment_bank_id }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                >
-                                    <option value="pending">Pending</option>
-                                    <option value="paid">Paid</option>
-                                </select>
-                            </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Bank Pembayaran
-                                </label>
-                                <select 
-                                    value={formData.payment_bank_id}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                    disabled={formData.payment_status !== 'paid'}
-                                >
-                                    <option value="">Pilih bank</option>
-                                    {(() => {
-                                        console.log('🏦 All payment banks:', paymentBanks);
-                                        const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
-                                        console.log('🏦 Active banks:', activeBanks);
-                                        return activeBanks.map((bank) => (
-                                            <option key={bank.id} value={bank.id}>
-                                                {bank.bank_name} - {bank.account_number} ({bank.account_name})
-                                            </option>
-                                        ));
-                                    })()}
-                                </select>
-                                {loading.paymentBanks && (
-                                    <p className="text-gray-500 text-xs mt-1">Memuat payment banks...</p>
-                                )}
-                                {formData.payment_status !== 'paid' && (
-                                    <p className="text-gray-500 text-xs mt-1">Bank pembayaran hanya diperlukan untuk status 'paid'</p>
-                                )}
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Catatan
-                                </label>
-                                <textarea
-                                    rows="3"
-                                    placeholder="Catatan untuk order ini..."
-                                    value={formData.notes}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <input type="checkbox" />
-                                <label className="text-sm">Add To Print Label</label>
-                            </div>
                         </div>
                     </div>
 
@@ -873,6 +812,45 @@ export default function AddOrder() {
                                 <span>TOTAL</span>
                                 <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
+                        </div>
+
+                        {/* Bank Pembayaran */}
+                        <div className="bg-white p-4 rounded-lg border">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Bank Pembayaran
+                            </label>
+                            <select 
+                                value={formData.payment_bank_id}
+                                onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            >
+                                <option value="">Pilih bank</option>
+                                {(() => {
+                                    const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
+                                    return activeBanks.map((bank) => (
+                                        <option key={bank.id} value={bank.id}>
+                                            {bank.bank_name} - {bank.account_number} ({bank.account_name})
+                                        </option>
+                                    ));
+                                })()}
+                            </select>
+                            {loading.paymentBanks && (
+                                <p className="text-gray-500 text-xs mt-1">Memuat payment banks...</p>
+                            )}
+                        </div>
+
+                        {/* Catatan */}
+                        <div className="bg-white p-4 rounded-lg border">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Catatan
+                            </label>
+                            <textarea
+                                rows="3"
+                                placeholder="Catatan untuk order ini..."
+                                value={formData.notes}
+                                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            />
                         </div>
 
                         {/* Order Status */}

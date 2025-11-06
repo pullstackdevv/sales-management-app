@@ -19,7 +19,6 @@ export default function EditOrder() {
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
         status: 'pending',
-        payment_status: 'pending',
         payment_bank_id: '',
         courier: ''
     });
@@ -68,6 +67,7 @@ export default function EditOrder() {
             const paymentBankId = (order.payments && order.payments[0] && order.payments[0].payment_bank_id) ? order.payments[0].payment_bank_id.toString() : '';
             console.log('🏦 [EditOrder] Setting payment_bank_id from order:', paymentBankId, 'Order payments:', order.payments);
             console.log('📊 [EditOrder] Setting sales_channel_id from order:', order.sales_channel_id, 'Sales channel:', order.sales_channel);
+            console.log('📊 [EditOrder] Sales channel code:', order.sales_channel?.code);
             
             setFormData({
                 customer_id: order.customer_id,
@@ -77,7 +77,6 @@ export default function EditOrder() {
                 notes: order.notes || '',
                 order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
                 status: order.status || 'pending',
-                payment_status: order.payment_status || 'pending',
                 payment_bank_id: paymentBankId,
                 courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : ''
             });
@@ -354,7 +353,6 @@ export default function EditOrder() {
                 shipping_cost: formData.shipping_cost,
                 notes: formData.notes,
                 status: formData.status,
-                payment_status: formData.payment_status,
                 payment_bank_id: formData.payment_bank_id || null,
                 courier_id: formData.courier || null
             };
@@ -463,18 +461,48 @@ export default function EditOrder() {
         <DashboardLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => window.history.back()}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                        <Icon icon="solar:arrow-left-outline" className="w-5 h-5" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Edit Order #{originalOrder?.order_number || orderId}</h1>
-                        <p className="text-gray-600 mt-1">
-                            Edit order yang sudah ada
-                        </p>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => window.history.back()}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <Icon icon="solar:arrow-left-outline" className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Edit Order #{originalOrder?.order_number || orderId}</h1>
+                            <p className="text-gray-600 mt-1">
+                                Edit order yang sudah ada
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {/* Sales Channel & Source Badge */}
+                    <div className="flex items-center gap-3">
+                        {originalOrder?.sales_channel && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                                <p className="text-xs text-blue-600 font-medium">Sales Channel</p>
+                                <p className="text-sm font-semibold text-blue-900">{originalOrder.sales_channel.name}</p>
+                                <p className="text-xs text-blue-500 mt-1">Code: {originalOrder.sales_channel.code}</p>
+                            </div>
+                        )}
+                        
+                        {originalOrder?.sales_channel?.code && originalOrder.sales_channel.code === 'website' ? (
+                            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 max-w-xs">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+                                    <p className="text-xs text-red-600 font-medium">Website Resmi</p>
+                                </div>
+                                <p className="text-xs text-red-700">Hanya bisa update status order</p>
+                            </div>
+                        ) : originalOrder?.sales_channel ? (
+                            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                                    <p className="text-xs text-green-600 font-medium">Dapat Diedit</p>
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
@@ -632,7 +660,11 @@ export default function EditOrder() {
                                     value={formData.shipping_cost}
                                     onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
                                 />
+                                {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
+                                    <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
+                                )}
                             </div>
 
                             <div>
@@ -643,6 +675,7 @@ export default function EditOrder() {
                                     value={formData.courier}
                                     onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
                                 >
                                     <option value="">Pilih kurir</option>
                                     {couriers.map((courier) => (
@@ -654,64 +687,11 @@ export default function EditOrder() {
                                 {loading.couriers && (
                                     <p className="text-gray-500 text-xs mt-1">Memuat data kurir...</p>
                                 )}
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Status Pembayaran
-                                </label>
-                                <select
-                                    value={formData.payment_status}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value, payment_bank_id: e.target.value === 'pending' ? '' : prev.payment_bank_id }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                >
-                                    <option value="pending">Pending</option>
-                                    <option value="paid">Paid</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Bank Pembayaran
-                                </label>
-                                <select
-                                    value={formData.payment_bank_id}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                    disabled={formData.payment_status !== 'paid'}
-                                >
-                                    <option value="">Pilih bank</option>
-                                    {(() => {
-                                        console.log('🏦 [EditOrder] All payment banks:', paymentBanks);
-                                        const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
-                                        console.log('🏦 [EditOrder] Active banks:', activeBanks);
-                                        return activeBanks.map((bank) => (
-                                            <option key={bank.id} value={bank.id}>
-                                                {bank.bank_name} - {bank.account_name}
-                                            </option>
-                                        ));
-                                    })()}
-                                </select>
-                                {loading.paymentBanks && (
-                                    <p className="text-gray-500 text-xs mt-1">Memuat data bank...</p>
-                                )}
-                                {formData.payment_status !== 'paid' && (
-                                    <p className="text-gray-500 text-xs mt-1">Bank pembayaran hanya diperlukan untuk status 'paid'</p>
+                                {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
+                                    <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
                                 )}
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Catatan
-                                </label>
-                                <textarea
-                                    rows="3"
-                                    placeholder="Catatan untuk order ini..."
-                                    value={formData.notes}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                />
-                            </div>
                         </div>
                     </div>
 
@@ -719,6 +699,11 @@ export default function EditOrder() {
                     <div className="xl:col-span-2 space-y-6">
                         {/* Product Search */}
                         <div className="bg-white p-4 rounded-lg border">
+                            {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
+                                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <p className="text-xs text-red-700">Produk tidak dapat diubah untuk order dari website resmi</p>
+                                </div>
+                            )}
                             <div className="relative">
                                 <input
                                     type="text"
@@ -726,6 +711,7 @@ export default function EditOrder() {
                                     value={searchTerms.product}
                                     onChange={(e) => setSearchTerms(prev => ({ ...prev, product: e.target.value }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
                                 />
                                 {loading.products && (
                                     <div className="absolute right-3 top-3">
@@ -764,7 +750,7 @@ export default function EditOrder() {
                                                             <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
-                                                                disabled={variant.stock <= 0}
+                                                                disabled={variant.stock <= 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
                                                                 className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 disabled:bg-gray-300"
                                                             >
                                                                 {variant.stock <= 0 ? 'Habis' : 'Tambah'}
@@ -815,7 +801,8 @@ export default function EditOrder() {
                                                                 setOrderItems(updatedItems);
                                                             }
                                                         }}
-                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
+                                                        disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
+                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         <span className="text-lg font-bold">−</span>
                                                     </button>
@@ -840,7 +827,7 @@ export default function EditOrder() {
                                                                 });
                                                             }
                                                         }}
-                                                        disabled={item.quantity >= (item.variant_stock || 0)}
+                                                        disabled={item.quantity >= (item.variant_stock || 0) || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
                                                         className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                                                     >
                                                         <span className="text-lg font-bold">+</span>
@@ -863,7 +850,8 @@ export default function EditOrder() {
                                                             timer: 1500
                                                         });
                                                     }}
-                                                    className="text-red-500 hover:text-red-700 p-1"
+                                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
+                                                    className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
                                                     <Icon icon="solar:trash-bin-minimalistic-outline" className="w-4 h-4" />
                                                 </button>
@@ -896,6 +884,50 @@ export default function EditOrder() {
                                 <span>TOTAL</span>
                                 <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
+                        </div>
+
+                        {/* Bank Pembayaran */}
+                        <div className="bg-white p-4 rounded-lg border">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Bank Pembayaran
+                            </label>
+                            <select 
+                                value={formData.payment_bank_id}
+                                onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
+                            >
+                                <option value="">Pilih bank</option>
+                                {(() => {
+                                    const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
+                                    return activeBanks.map((bank) => (
+                                        <option key={bank.id} value={bank.id}>
+                                            {bank.bank_name} - {bank.account_number} ({bank.account_name})
+                                        </option>
+                                    ));
+                                })()}
+                            </select>
+                            {loading.paymentBanks && (
+                                <p className="text-gray-500 text-xs mt-1">Memuat payment banks...</p>
+                            )}
+                        </div>
+
+                        {/* Catatan */}
+                        <div className="bg-white p-4 rounded-lg border">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Catatan
+                            </label>
+                            <textarea
+                                rows="3"
+                                placeholder="Catatan untuk order ini..."
+                                value={formData.notes}
+                                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
+                            />
+                            {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
+                                <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
+                            )}
                         </div>
 
                         {/* Order Status */}

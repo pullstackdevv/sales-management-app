@@ -116,14 +116,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('roles/permissions', [RoleController::class, 'getPermissions']);
     Route::put('roles/{roleName}', [RoleController::class, 'update']);
 
-    // Customer address routes
-    Route::get('customers/{customer}/addresses', [AddressController::class, 'index']);
-    Route::post('customers/{customer}/addresses', [AddressController::class, 'store']);
-    Route::put('customers/{customer}/addresses/{address}', [AddressController::class, 'update']);
-    Route::delete('customers/{customer}/addresses/{address}', [AddressController::class, 'destroy']);
-    Route::post('customers/{customer}/addresses/{address}/set-default', [AddressController::class, 'setDefault']);
-
-
     // Stock movement routes
     Route::apiResource('stock-movements', StockMovementController::class);
 

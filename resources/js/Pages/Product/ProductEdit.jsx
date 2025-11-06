@@ -125,6 +125,7 @@ export default function ProductEdit() {
           sku: newVariantSKU,
           price: 0,
           base_price: 0,
+          discount_price: 0,
           weight: 0,
           stock: 0,
           is_active: true,
@@ -232,6 +233,7 @@ export default function ProductEdit() {
         formData.append(`variants[${index}][sku]`, variant.sku);
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price || 0);
+        formData.append(`variants[${index}][discount_price]`, variant.discount_price || '');
         formData.append(`variants[${index}][weight]`, variant.weight);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
@@ -543,6 +545,24 @@ export default function ProductEdit() {
                             {errors[`variants.${index}.price`] && (
                               <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
                             )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Harga Diskon</label>
+                            <input
+                              type="text"
+                              className={`w-full border px-3 py-2 rounded-md text-sm ${
+                                errors[`variants.${index}.discount_price`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                              placeholder="Masukkan harga diskon (opsional)"
+                              value={formatRibuan(variant.discount_price || 0)}
+                              onChange={(e) => updateVariant(index, 'discount_price', parseRibuan(e.target.value))}
+                              onFocus={() => { if (!variant.discount_price || variant.discount_price === 0) updateVariant(index, 'discount_price', ''); }}
+                            />
+                            {errors[`variants.${index}.discount_price`] && (
+                              <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.discount_price`][0]}</p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada diskon</p>
                           </div>
 
                           <div>

@@ -565,15 +565,7 @@ const PaymentMethodCheckout = () => {
               </div>
             </div>
 
-            {/* Promo Info Box */}
-            <div className="lg:col-span-1">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <h3 className="font-semibold text-green-900 mb-2">🎉 Promosi Gratis Ongkir</h3>
-                <p className="text-sm text-green-800">
-                  Gratis ongkir untuk pembelian minimal Rp 100.000
-                </p>
-              </div>
-            </div>
+         
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
@@ -635,6 +627,19 @@ const PaymentMethodCheckout = () => {
 
                   {/* Voucher Section - Compact & Responsive */}
                   <div className="border-t pt-3 mt-3">
+                    {/* Voucher Description - Show when voucher is applied */}
+                    {appliedVoucher && appliedVoucher.description && (
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-blue-600 text-sm">ℹ️</span>
+                          <div className="flex-1">
+                            <p className="text-xs font-medium text-blue-900 mb-1">Deskripsi Voucher:</p>
+                            <p className="text-xs text-blue-800">{appliedVoucher.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="mb-2">
                       <label className="block text-xs font-medium text-gray-600 mb-1">
                         Kode Voucher

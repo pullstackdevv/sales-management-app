@@ -88,6 +88,7 @@ export const useCart = () => {
             variant_id: variantId,
             quantity: Number(quantity) || 1,
             selected: true,
+            discount_price: selectedVariant?.discount_price || null,
         };
 
         const currentItems = loadCart();

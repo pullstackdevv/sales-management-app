@@ -1,19 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, router } from '@inertiajs/react';
-import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search, Phone, Mail } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { formatCurrency } from '@/utils/helpers';
+import checkoutSession from '@/utils/checkoutSession';
+import Swal from 'sweetalert2';
+import api from '@/api/axios';
 
-const MyOrders = ({ orders: initialOrders }) => {
+const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [showCustomerForm, setShowCustomerForm] = useState(needsCustomerData || false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [customers, setCustomers] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    
+    // Verification states
+    const [showVerification, setShowVerification] = useState(false);
+    const [verificationMethod, setVerificationMethod] = useState('phone');
+    const [verificationInput, setVerificationInput] = useState('');
+    const [verificationError, setVerificationError] = useState('');
+    const [pendingCustomer, setPendingCustomer] = useState(null);
 
-    const orders = initialOrders.data || [];
+    const orders = initialOrders?.data || [];
     const pagination = {
-        current_page: initialOrders.current_page,
-        last_page: initialOrders.last_page,
-        total: initialOrders.total
+        current_page: initialOrders?.current_page || 1,
+        last_page: initialOrders?.last_page || 1,
+        total: initialOrders?.total || 0
     };
+
+    useEffect(() => {
+        // Check if customer data exists in session
+        const sessionData = checkoutSession.get();
+        if (!sessionData || !sessionData.customer) {
+            setShowCustomerForm(true);
+        } else {
+            setShowCustomerForm(false);
+        }
+    }, []);
 
     const getStatusBadge = (status) => {
         const statusConfig = {
@@ -75,6 +99,306 @@ const MyOrders = ({ orders: initialOrders }) => {
             preserveState: true
         });
     };
+
+    // Search customers by name (using same method as CustomerDataCheckout)
+    const searchCustomers = async (query) => {
+        if (!query || query.trim().length < 2) {
+            setCustomers([]);
+            return;
+        }
+
+        setSearchLoading(true);
+        try {
+            const response = await api.get('/customers', {
+                params: {
+                    search: query,
+                    per_page: 10
+                }
+            });
+            if (response.data.status === 'success') {
+                setCustomers(response.data.data.data || []);
+            }
+        } catch (error) {
+            console.error('Error searching customers:', error);
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    // Handle customer selection - show verification modal
+    const handleCustomerSelect = (customer) => {
+        setPendingCustomer(customer);
+        setVerificationInput('');
+        setVerificationError('');
+        setVerificationMethod('phone'); // Default to phone
+        setShowVerification(true);
+        setCustomers([]);
+        setSearchTerm(customer.name || customer.full_name);
+    };
+
+    const handleVerification = () => {
+        setVerificationError('');
+
+        if (!verificationInput.trim()) {
+            setVerificationError(verificationMethod === 'phone' ? 'Nomor HP wajib diisi' : 'Email wajib diisi');
+            return;
+        }
+
+        // Normalize phone numbers for comparison
+        const normalizePhone = (phone) => {
+            return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+62/, '0').replace(/^62/, '0');
+        };
+
+        if (verificationMethod === 'phone') {
+            const customerPhone = normalizePhone(pendingCustomer.phone || '');
+            const inputPhone = normalizePhone(verificationInput);
+
+            if (customerPhone !== inputPhone) {
+                setVerificationError('Nomor HP tidak sesuai dengan data customer');
+                return;
+            }
+        } else {
+            const customerEmail = (pendingCustomer.email || '').toLowerCase().trim();
+            const inputEmail = verificationInput.toLowerCase().trim();
+
+            if (!customerEmail) {
+                setVerificationError('Customer ini tidak memiliki email terdaftar');
+                return;
+            }
+
+            if (customerEmail !== inputEmail) {
+                setVerificationError('Email tidak sesuai dengan data customer');
+                return;
+            }
+        }
+
+        // Verified, save to session
+        checkoutSession.updateStep('customer', {
+            phone: pendingCustomer.phone,
+            email: pendingCustomer.email,
+            customer_id: pendingCustomer.id
+        });
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Berhasil!',
+            text: 'Data berhasil diverifikasi',
+            showConfirmButton: false,
+            timer: 1500
+        });
+
+        setShowVerification(false);
+        setShowCustomerForm(false);
+        
+        // Reload page to fetch orders
+        router.reload();
+    };
+
+    const handleCancelVerification = () => {
+        setShowVerification(false);
+        setVerificationInput('');
+        setVerificationError('');
+        setPendingCustomer(null);
+    };
+
+    // Show customer data form if needed
+    if (showCustomerForm) {
+        return (
+            <MarketplaceLayout>
+                <div className="min-h-screen bg-gray-50 py-8">
+                    <div className="max-w-md mx-auto px-4">
+                        <div className="bg-white rounded-lg shadow-md p-8">
+                            <div className="text-center mb-6">
+                                <Package className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                                    Cari Data Customer
+                                </h2>
+                                <p className="text-gray-600">
+                                    Masukkan nama Anda untuk melihat riwayat pesanan
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                {/* Search Customer Input */}
+                                <div className="relative">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <Search className="w-4 h-4 inline mr-1" />
+                                        Nama Customer
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => {
+                                            setSearchTerm(e.target.value);
+                                            searchCustomers(e.target.value);
+                                        }}
+                                        placeholder="Cari berdasarkan nama..."
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        autoFocus
+                                    />
+                                    
+                                    {/* Customer Search Results Dropdown */}
+                                    {searchTerm && customers.length > 0 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                            {customers.map((customer) => (
+                                                <button
+                                                    key={customer.id}
+                                                    type="button"
+                                                    onClick={() => handleCustomerSelect(customer)}
+                                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                                                >
+                                                    <div className="font-medium text-gray-900">
+                                                        {customer.name || customer.full_name}
+                                                    </div>
+                                                    {customer.phone && (
+                                                        <div className="text-sm text-gray-600">
+                                                            HP: {customer.phone.substring(0, 4)}****{customer.phone.slice(-4)}
+                                                        </div>
+                                                    )}
+                                                    {customer.email && (
+                                                        <div className="text-sm text-gray-600">
+                                                            Email: {customer.email.substring(0, 2)}****@{customer.email.split('@')[1]}
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {searchLoading && (
+                                        <div className="absolute right-3 top-10 text-gray-400">
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                        </div>
+                                    )}
+                                    
+                                    {searchTerm && !searchLoading && customers.length === 0 && searchTerm.length >= 2 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
+                                            Tidak ada customer ditemukan
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p className="text-xs text-gray-500 text-center">
+                                    Ketik minimal 2 karakter untuk mencari
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Verification Modal */}
+                        {showVerification && pendingCustomer && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                                    <h3 className="text-lg font-semibold mb-4">Verifikasi Data Customer</h3>
+                                    
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                                        <p className="text-sm text-gray-600 mb-1">Customer Ditemukan:</p>
+                                        <p className="font-medium text-gray-900">{pendingCustomer.name || pendingCustomer.full_name}</p>
+                                        {pendingCustomer.phone && (
+                                            <p className="text-sm text-gray-600">
+                                                HP: {pendingCustomer.phone.substring(0, 4)}****{pendingCustomer.phone.slice(-4)}
+                                            </p>
+                                        )}
+                                        {pendingCustomer.email && (
+                                            <p className="text-sm text-gray-600">
+                                                Email: {pendingCustomer.email.substring(0, 2)}****@{pendingCustomer.email.split('@')[1]}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Verification Method Toggle */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Pilih Metode Verifikasi
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setVerificationMethod('phone');
+                                                    setVerificationError('');
+                                                }}
+                                                className={`px-4 py-2 rounded-lg border-2 transition-colors ${
+                                                    verificationMethod === 'phone'
+                                                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                                                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                                                }`}
+                                            >
+                                                <Phone className="w-4 h-4 inline-block mr-2" />
+                                                HP
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setVerificationMethod('email');
+                                                    setVerificationError('');
+                                                }}
+                                                className={`px-4 py-2 rounded-lg border-2 transition-colors ${
+                                                    verificationMethod === 'email'
+                                                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                                                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                                                }`}
+                                                disabled={!pendingCustomer.email}
+                                            >
+                                                <Mail className="w-4 h-4 inline-block mr-2" />
+                                                Email
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Verification Input */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            {verificationMethod === 'phone' ? 'Masukkan Nomor HP *' : 'Masukkan Email *'}
+                                        </label>
+                                        <input
+                                            type={verificationMethod === 'phone' ? 'tel' : 'email'}
+                                            value={verificationInput}
+                                            onChange={(e) => {
+                                                setVerificationInput(e.target.value);
+                                                setVerificationError('');
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleVerification();
+                                                } else if (e.key === 'Escape') {
+                                                    handleCancelVerification();
+                                                }
+                                            }}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                verificationError ? 'border-red-500' : 'border-gray-300'
+                                            }`}
+                                            placeholder={verificationMethod === 'phone' ? '08123456789' : 'email@example.com'}
+                                            autoFocus
+                                        />
+                                        {verificationError && (
+                                            <p className="text-red-500 text-sm mt-1">{verificationError}</p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelVerification}
+                                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                        >
+                                            Batal
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleVerification}
+                                            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            Verifikasi
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </MarketplaceLayout>
+        );
+    }
 
     return (
         <MarketplaceLayout>

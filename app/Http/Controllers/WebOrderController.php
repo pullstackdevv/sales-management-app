@@ -276,33 +276,60 @@ class WebOrderController extends Controller
     }
 
     /**
-     * Get user orders (for logged in users)
+     * Get user orders (based on session customer data)
      */
     public function getUserOrders(Request $request)
     {
         try {
-            $user = Auth::user();
-            if (!$user) {
-                // Check if request expects JSON (AJAX)
-                if ($request->expectsJson() || $request->wantsJson()) {
-                    return ResponseFormatter::error(
-                        'Unauthorized',
-                        [],
-                        401
-                    );
+            // Get customer data from session
+            $sessionCustomer = $request->session()->get('checkout.customer');
+            
+            // If no session data, show form to collect customer data
+            if (!$sessionCustomer || (!isset($sessionCustomer['phone']) && !isset($sessionCustomer['email']))) {
+                if (!$request->expectsJson() && !$request->wantsJson()) {
+                    return inertia('Marketplace/MyOrders', [
+                        'orders' => [
+                            'data' => [],
+                            'current_page' => 1,
+                            'last_page' => 1,
+                            'total' => 0
+                        ],
+                        'needsCustomerData' => true
+                    ]);
                 }
-                return redirect()->route('login');
+                
+                return ResponseFormatter::error(
+                    'Customer data required',
+                    [],
+                    400
+                );
             }
 
-            $orders = Order::where('user_id', $user->id)
-                ->with(['items.productVariant.product'])
-                ->orderBy('created_at', 'desc')
-                ->paginate(10);
+            // Build query to find orders by customer phone or email
+            $query = Order::with(['items.productVariant.product']);
+            
+            if (isset($sessionCustomer['phone']) && $sessionCustomer['phone']) {
+                $query->where('customer_phone', $sessionCustomer['phone']);
+            } elseif (isset($sessionCustomer['email']) && $sessionCustomer['email']) {
+                $query->where('customer_email', $sessionCustomer['email']);
+            }
+
+            // Apply filters
+            if ($request->has('status') && $request->status) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->has('search') && $request->search) {
+                $query->where('order_number', 'like', '%' . $request->search . '%');
+            }
+
+            $orders = $query->orderBy('created_at', 'desc')->paginate(10);
 
             // Return Inertia page for browser requests
             if (!$request->expectsJson() && !$request->wantsJson()) {
                 return inertia('Marketplace/MyOrders', [
-                    'orders' => $orders
+                    'orders' => $orders,
+                    'needsCustomerData' => false
                 ]);
             }
 
@@ -313,6 +340,8 @@ class WebOrderController extends Controller
             );
 
         } catch (\Exception $e) {
+            \Log::error('Error getting user orders: ' . $e->getMessage());
+            
             if ($request->expectsJson() || $request->wantsJson()) {
                 return ResponseFormatter::error(
                     'Failed to get orders',

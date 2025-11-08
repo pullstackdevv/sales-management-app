@@ -297,10 +297,8 @@ Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->nam
 Route::get('/track-orders', [WebOrderController::class, 'trackOrdersPage'])->name('marketplace.track-orders');
 Route::post('/track-orders/search', [WebOrderController::class, 'searchTrackOrders'])->name('marketplace.track-orders.search');
 
-// User Orders (only for authenticated users)
-Route::middleware(['auth'])->group(function () {
-    Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');
-});
+// User Orders (public - based on session customer data)
+Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');
 
 // Midtrans Payment Routes (tanpa middleware untuk callback)
 Route::prefix('payment')->name('payment.')->group(function () {

@@ -83,6 +83,26 @@ const SidebarContent = [
         ],
     },
     {
+        name: "Promosi",
+        icon: "solar:tag-price-outline",
+        id: uniqueId(),
+        permission: "promotions",
+        children: [
+            {
+                name: "Daftar Promosi",
+                icon: "solar:clipboard-list-outline",
+                id: uniqueId(),
+                url: "/cms/promotion/data",
+            },
+            {
+                name: "Tambah Promosi",
+                icon: "solar:add-circle-outline",
+                id: uniqueId(),
+                url: "/cms/promotion/create",
+            },
+        ],
+    },
+    {
         name: "Data Customer",
         icon: "flowbite:users-group-outline",
         id: uniqueId(),

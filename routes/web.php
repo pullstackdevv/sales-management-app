@@ -216,6 +216,11 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Voucher/ViewVoucher', ['voucherId' => $id]);
         })->name('vouchers.view');
 
+        // Promotion
+        Route::get('/promotion/data', [\App\Http\Controllers\PromotionController::class, 'data'])->name('promotions.index');
+        Route::get('/promotion/create', [\App\Http\Controllers\PromotionController::class, 'create'])->name('promotions.create');
+        Route::get('/promotion/edit/{promotion}', [\App\Http\Controllers\PromotionController::class, 'edit'])->name('promotions.edit');
+
         // analizer
         Route::get('/report', function () {
             return Inertia::render('Report/index');

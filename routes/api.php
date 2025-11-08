@@ -24,6 +24,7 @@ use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\StockOpnameDetailController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\XenditController;
@@ -163,6 +164,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('vouchers/{voucher}/toggle-status', [VoucherController::class, 'toggleStatus']);
     Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
     Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
+
+    // Promotion routes
+    Route::apiResource('promotions', PromotionController::class);
+    Route::post('promotions/{promotion}/toggle-status', [PromotionController::class, 'toggleStatus']);
+    Route::post('promotions/{promotion}/toggle-storefront', [PromotionController::class, 'toggleStorefront']);
+    Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);
 
     // Expense routes
     Route::apiResource('expenses', ExpenseController::class);

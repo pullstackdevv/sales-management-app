@@ -21,6 +21,10 @@ const PaymentMethodCheckout = () => {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [loadingVoucher, setLoadingVoucher] = useState(false);
 
+  // Promotion states
+  const [promotions, setPromotions] = useState([]);
+  const [loadingPromotions, setLoadingPromotions] = useState(false);
+
   useEffect(() => {
     // Ambil data checkout dari session
     const data = checkoutSession.get();
@@ -46,6 +50,7 @@ const PaymentMethodCheckout = () => {
   useEffect(() => {
     if (checkoutData && checkoutData.customer) {
       fetchCourierRates();
+      fetchActivePromotions();
     }
   }, [checkoutData]);
 
@@ -198,6 +203,22 @@ const PaymentMethodCheckout = () => {
       });
       
       setShippingCost(0);
+    }
+  };
+
+  // Function to fetch active promotions
+  const fetchActivePromotions = async () => {
+    setLoadingPromotions(true);
+    try {
+      const response = await axios.get('/api/promotions-active');
+      if (response.data.status === 'success') {
+        setPromotions(response.data.data);
+        console.log('Active promotions loaded:', response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching promotions:', error);
+    } finally {
+      setLoadingPromotions(false);
     }
   };
 
@@ -625,21 +646,55 @@ const PaymentMethodCheckout = () => {
                     </span>
                   </div>
 
-                  {/* Voucher Section - Compact & Responsive */}
-                  <div className="border-t pt-3 mt-3">
-                    {/* Voucher Description - Show when voucher is applied */}
-                    {appliedVoucher && appliedVoucher.description && (
-                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <span className="text-blue-600 text-sm">ℹ️</span>
-                          <div className="flex-1">
-                            <p className="text-xs font-medium text-blue-900 mb-1">Deskripsi Voucher:</p>
-                            <p className="text-xs text-blue-800">{appliedVoucher.description}</p>
-                          </div>
+                  {/* Promotions Section */}
+                  {promotions.length > 0 && (
+                    <div className="border-t pt-3 mt-3">
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-2">
+                          🎉 Promosi Aktif
+                        </label>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {promotions.map((promo) => (
+                            <div 
+                              key={promo.id} 
+                              className="p-3 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg"
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="text-orange-600 text-sm">🏷️</span>
+                                <div className="flex-1">
+                                  <p className="text-xs font-bold text-orange-900 mb-1">
+                                    {promo.title}
+                                  </p>
+                                  <p className="text-xs text-orange-800 leading-relaxed">
+                                    {promo.description}
+                                  </p>
+                                  {(promo.start_date || promo.end_date) && (
+                                    <div className="mt-2 text-xs text-orange-700">
+                                      <span className="font-medium">Periode: </span>
+                                      {promo.start_date && new Date(promo.start_date).toLocaleDateString('id-ID', { 
+                                        day: 'numeric', 
+                                        month: 'short', 
+                                        year: 'numeric' 
+                                      })}
+                                      {promo.start_date && promo.end_date && ' - '}
+                                      {promo.end_date && new Date(promo.end_date).toLocaleDateString('id-ID', { 
+                                        day: 'numeric', 
+                                        month: 'short', 
+                                        year: 'numeric' 
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    )}
-                    
+                    </div>
+                  )}
+
+                  {/* Voucher Section - Compact & Responsive */}
+                  <div className="border-t pt-3 mt-3">
                     <div className="mb-2">
                       <label className="block text-xs font-medium text-gray-600 mb-1">
                         Kode Voucher
@@ -672,7 +727,12 @@ const PaymentMethodCheckout = () => {
                               <div className="text-xs text-green-600">
                                 -{appliedVoucher.name}
                               </div>
-                              <div className="text-xs text-green-700 font-medium">
+                              {appliedVoucher.description && (
+                                <div className="text-xs text-green-700 mt-1 leading-relaxed">
+                                  {appliedVoucher.description}
+                                </div>
+                              )}
+                              <div className="text-xs text-green-700 font-medium mt-1">
                                 Diskon: Rp {voucherDiscount.toLocaleString('id-ID')}
                               </div>
                             </div>

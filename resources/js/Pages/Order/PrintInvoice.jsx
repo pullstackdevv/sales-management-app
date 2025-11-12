@@ -3,7 +3,7 @@ import { Head, usePage } from '@inertiajs/react';
 import { Icon } from '@iconify/react';
 import api from '@/api/axios';
 import { toast } from 'sonner';
-import html2pdf from 'html2pdf.js';
+import Swal from 'sweetalert2';
 
 const PrintInvoice = () => {
     const { orderId } = usePage().props;
@@ -101,48 +101,56 @@ const PrintInvoice = () => {
 
     const handlePrint = async () => {
         try {
+            // Log print action
+            console.log('🖨️ Print Invoice Triggered', {
+                orderId,
+                orderNumber: invoiceData?.invoice_number,
+                timestamp: new Date().toISOString()
+            });
+
             // Update order printed_at timestamp
-            await api.patch(`/orders/${orderId}`, {
+            const response = await api.patch(`/orders/${orderId}`, {
                 printed_at: new Date().toISOString()
+            });
+            
+            console.log('✅ Invoice Print Status Updated', {
+                orderId,
+                printed_at: response.data.data.printed_at
             });
             
             // Trigger print dialog
             window.print();
             
-            toast.success('Invoice berhasil diprint!');
-        } catch (error) {
-            console.error('Error updating print status:', error);
-            toast.error('Gagal memperbarui status print');
-            // Still print even if update fails
-            window.print();
-        }
-    };
-
-    const handleSaveInvoice = async () => {
-        try {
-            // Update order printed_at timestamp when saving
-            await api.patch(`/orders/${orderId}`, {
-                printed_at: new Date().toISOString()
+            // Success notification with Swal
+            await Swal.fire({
+                title: 'Berhasil!',
+                text: `Invoice ${invoiceData?.invoice_number} berhasil diprint`,
+                icon: 'success',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#3085d6',
+                timer: 3000,
+                timerProgressBar: true
             });
             
-            // Trigger browser download as PDF
-            const element = document.querySelector('.print-container');
-            const opt = {
-                margin: 10,
-                filename: `invoice-${invoiceData?.invoice_number || orderId}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
-            };
-            
-            // Dynamic import html2pdf
-            const html2pdf = (await import('html2pdf.js')).default;
-            html2pdf().set(opt).from(element).save();
-            
-            toast.success('Invoice berhasil disimpan!');
+            // Log successful print
+            console.log('✅ Print Dialog Triggered Successfully', {
+                orderId,
+                orderNumber: invoiceData?.invoice_number
+            });
         } catch (error) {
-            console.error('Error saving invoice:', error);
-            toast.error('Gagal menyimpan invoice');
+            console.error('❌ Error updating print status:', error);
+            
+            // Error alert with Swal
+            await Swal.fire({
+                title: 'Error!',
+                text: 'Gagal memperbarui status print',
+                icon: 'error',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
+            
+            // Still print even if update fails
+            window.print();
         }
     };
 
@@ -209,13 +217,6 @@ const PrintInvoice = () => {
                         >
                             <Icon icon="solar:printer-outline" className="w-5 h-5" />
                             Cetak Invoice
-                        </button>
-                        <button
-                            onClick={handleSaveInvoice}
-                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
-                        >
-                            <Icon icon="solar:download-outline" className="w-5 h-5" />
-                            Simpan Invoice
                         </button>
                         <button
                             onClick={() => setShowSettings(!showSettings)}

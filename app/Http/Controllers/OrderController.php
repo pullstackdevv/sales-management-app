@@ -262,7 +262,7 @@ class OrderController extends Controller
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
             'proof_image' => 'nullable|string',
-            'printed_at' => 'nullable|date_format:Y-m-d\TH:i:s.000\Z'
+            'printed_at' => 'nullable|date'
         ]);
 
         // Batasi edit order berdasarkan status dan payment gateway

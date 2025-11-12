@@ -131,7 +131,9 @@ export default function Order() {
           // Add shipping object with ID for update operations
           shipping: order.shipping,
           // Add payment bank details for detailed display
-          payment_bank: paymentBank
+          payment_bank: paymentBank,
+          // Add printed_at for print status tracking
+          printed_at: order.printed_at
         };
       });
       

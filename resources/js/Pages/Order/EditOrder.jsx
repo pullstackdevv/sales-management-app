@@ -481,13 +481,12 @@ export default function EditOrder() {
                     <div className="flex items-center gap-3">
                         {originalOrder?.sales_channel && (
                             <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-                                <p className="text-xs text-blue-600 font-medium">Sales Channel</p>
                                 <p className="text-sm font-semibold text-blue-900">{originalOrder.sales_channel.name}</p>
                                 <p className="text-xs text-blue-500 mt-1">Code: {originalOrder.sales_channel.code}</p>
                             </div>
                         )}
                         
-                        {originalOrder?.sales_channel?.code && originalOrder.sales_channel.code === 'website' ? (
+                        {originalOrder?.sales_channel?.code && originalOrder.sales_channel.code === 'WEBSITE' ? (
                             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 max-w-xs">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>

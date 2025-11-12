@@ -110,7 +110,7 @@ export default function Order() {
         return {
           id: order.id,
           number: order.order_number,
-          channel: order.sales_channel?.name || 'Website',
+          channel: order.sales_channel?.name || 'Website Resmi',
           date: formatDate(order.ordered_at),
           ordered_at: order.ordered_at, // Add raw date for PaymentHistoryModal
           customer: order.customer?.name || 'N/A',
@@ -127,7 +127,7 @@ export default function Order() {
           // Add fields needed for order source detection
           payment_url: order.payment_url,
           payment_status: order.payment_status, // Add payment status for display
-          sales_channel: order.sales_channel?.name || 'Website',
+          sales_channel: order.sales_channel?.code || 'WEBSITE',
           // Add shipping object with ID for update operations
           shipping: order.shipping,
           // Add payment bank details for detailed display

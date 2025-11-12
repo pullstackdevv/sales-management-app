@@ -3,6 +3,7 @@ import { Head, usePage } from '@inertiajs/react';
 import { Icon } from '@iconify/react';
 import api from '@/api/axios';
 import { toast } from 'sonner';
+import html2pdf from 'html2pdf.js';
 
 const PrintInvoice = () => {
     const { orderId } = usePage().props;
@@ -98,8 +99,51 @@ const PrintInvoice = () => {
         updatePrintSettings(newSettings);
     };
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = async () => {
+        try {
+            // Update order printed_at timestamp
+            await api.patch(`/orders/${orderId}`, {
+                printed_at: new Date().toISOString()
+            });
+            
+            // Trigger print dialog
+            window.print();
+            
+            toast.success('Invoice berhasil diprint!');
+        } catch (error) {
+            console.error('Error updating print status:', error);
+            toast.error('Gagal memperbarui status print');
+            // Still print even if update fails
+            window.print();
+        }
+    };
+
+    const handleSaveInvoice = async () => {
+        try {
+            // Update order printed_at timestamp when saving
+            await api.patch(`/orders/${orderId}`, {
+                printed_at: new Date().toISOString()
+            });
+            
+            // Trigger browser download as PDF
+            const element = document.querySelector('.print-container');
+            const opt = {
+                margin: 10,
+                filename: `invoice-${invoiceData?.invoice_number || orderId}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+            };
+            
+            // Dynamic import html2pdf
+            const html2pdf = (await import('html2pdf.js')).default;
+            html2pdf().set(opt).from(element).save();
+            
+            toast.success('Invoice berhasil disimpan!');
+        } catch (error) {
+            console.error('Error saving invoice:', error);
+            toast.error('Gagal menyimpan invoice');
+        }
     };
 
     if (loading) {
@@ -165,6 +209,13 @@ const PrintInvoice = () => {
                         >
                             <Icon icon="solar:printer-outline" className="w-5 h-5" />
                             Cetak Invoice
+                        </button>
+                        <button
+                            onClick={handleSaveInvoice}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
+                        >
+                            <Icon icon="solar:download-outline" className="w-5 h-5" />
+                            Simpan Invoice
                         </button>
                         <button
                             onClick={() => setShowSettings(!showSettings)}

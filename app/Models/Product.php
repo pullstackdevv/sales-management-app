@@ -14,6 +14,7 @@ class Product extends Model
         'name',
         'sku',
         'category',
+        'category_id',
         'description',
         'image',
         'is_active',
@@ -40,6 +41,11 @@ class Product extends Model
     public function variants()
     {
         return $this->hasMany(ProductVariant::class);
+    }
+
+    public function productCategory()
+    {
+        return $this->belongsTo(ProductCategory::class, 'category_id');
     }
 
     // Helper method to get the minimum selling price from variants

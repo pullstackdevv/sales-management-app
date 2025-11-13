@@ -117,6 +117,19 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Product/ProductEdit', ['productId' => $id]);
         })->name('products.edit');
 
+        // Product Category
+        Route::get('/product/category/data', function () {
+            return Inertia::render('Product/ProductCategoryData');
+        })->name('product-categories.index');
+
+        Route::get('/product/category/add', function () {
+            return Inertia::render('Product/ProductCategoryAdd');
+        })->name('product-categories.create');
+
+        Route::get('/product/category/edit/{id}', function ($id) {
+            return Inertia::render('Product/ProductCategoryEdit', ['categoryId' => $id]);
+        })->name('product-categories.edit');
+
         // stock opname
         Route::get('/stock-opname/data', function () {
             return Inertia::render('StockOpname/StockOpnameData');

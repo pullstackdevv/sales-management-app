@@ -52,7 +52,12 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/cms/product/data",
             },
-
+            {
+                name: "Kategori Produk",
+                icon: "solar:folder-outline",
+                id: uniqueId(),
+                url: "/cms/product/category/data",
+            },
         ],
     },
     {

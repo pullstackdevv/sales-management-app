@@ -13,6 +13,7 @@ use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\PaymentBankController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductVariantController;
+use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesChannelController;
@@ -89,6 +90,8 @@ Route::get('products/storefront', [ProductController::class, 'storefront']);
 // product
 Route::apiResource('products', ProductController::class);
 Route::apiResource('products.variants', ProductVariantController::class);
+// Product Category routes
+Route::apiResource('product-categories', ProductCategoryController::class);
 // Customer routes
 Route::apiResource('customers', CustomerController::class);
 Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);

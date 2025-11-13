@@ -39,10 +39,18 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
     }, [order]);
 
 
-
-    // Helper function to determine order source
     const getOrderSource = (order) => {
-
+        // Check if order has sales_channel and if it's WEBSITE
+        if (order.sales_channel && order.sales_channel === 'WEBSITE') {
+            return {
+                type: 'website',
+                label: 'Website Resmi',
+                icon: 'mdi:globe',
+                bgColor: 'bg-blue-100',
+                textColor: 'text-blue-700',
+                borderColor: 'border-blue-200'
+            };
+        }
 
         // Default to manual admin order
         return {
@@ -575,6 +583,12 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                         <Icon icon="mdi:printer" width="16" />
                         Print
                     </Link>
+                    {localOrder.printed_at && (
+                        <span className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                            <Icon icon="mdi:check-circle" width="14" />
+                            Sudah Diprint
+                        </span>
+                    )}
                     <button
                         onClick={() => setShowOrderHistory(true)}
                         className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"

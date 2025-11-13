@@ -49,13 +49,26 @@ const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity
                             <p className="text-sm text-gray-500 mt-1">{item.variant_label}</p>
                         )}
                         <div className="flex items-baseline gap-2 mt-2">
-                            <span className="text-lg font-semibold text-gray-900">
-                                {formatPrice(item.price || 0)}
-                            </span>
-                            {item.originalPrice && item.price && item.originalPrice > item.price && (
-                                <span className="text-sm text-gray-400 line-through">
-                                    {formatPrice(item.originalPrice)}
-                                </span>
+                            {item.discount_price && item.discount_price > 0 ? (
+                                <>
+                                    <span className="text-lg font-semibold text-gray-900">
+                                        {formatPrice(item.discount_price)}
+                                    </span>
+                                    <span className="text-sm text-gray-400 line-through">
+                                        {formatPrice(item.price || 0)}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-lg font-semibold text-gray-900">
+                                        {formatPrice(item.price || 0)}
+                                    </span>
+                                    {item.originalPrice && item.price && item.originalPrice > item.price && (
+                                        <span className="text-sm text-gray-400 line-through">
+                                            {formatPrice(item.originalPrice)}
+                                        </span>
+                                    )}
+                                </>
                             )}
                         </div>
                         <p className="text-sm text-gray-500 mt-1">

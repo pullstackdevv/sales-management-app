@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
@@ -9,6 +9,7 @@ import TiptapEditor from "@/components/TiptapEditor";
 export default function ProductAdd() {
   const [product, setProduct] = useState({
     name: "",
+    category_id: "",
     category: "",
     description: "",
     image: "",
@@ -20,6 +21,7 @@ export default function ProductAdd() {
         sku: "",
         price: 0,
         base_price: 0,
+        discount_price: 0,
         weight: 0,
         stock: 0,
         is_active: true,
@@ -29,6 +31,30 @@ export default function ProductAdd() {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await api.get('/product-categories?per_page=100&is_active=1');
+      setCategories(response.data.data.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      Swal.fire({
+        icon: 'warning',
+        title: 'Peringatan',
+        text: 'Gagal memuat daftar kategori'
+      });
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   // Format number to ribuan without decimal
   const formatRibuan = (num) => {
@@ -65,6 +91,7 @@ export default function ProductAdd() {
           sku: newVariantSKU,
           price: 0,
           base_price: 0,
+          discount_price: 0,
           weight: 0,
           stock: 0,
           is_active: true,
@@ -116,6 +143,7 @@ export default function ProductAdd() {
       formData.append('name', product.name);
       formData.append('sku', product.sku);
       formData.append('description', product.description);
+      formData.append('category_id', product.category_id);
       formData.append('category', product.category);
       formData.append('is_active', product.is_active ? '1' : '0');
       formData.append('is_storefront', product.is_storefront ? '1' : '0');
@@ -216,16 +244,32 @@ export default function ProductAdd() {
 
                   <div>
                     <label className="block text-sm font-medium mb-1">Kategori*</label>
-                    <input
-                      type="text"
+                    <select
                       className={`w-full border px-3 py-2 rounded-md ${
-                        errors.category ? 'border-red-500' : 'border-gray-300'
+                        errors.category_id ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      placeholder="Contoh: Perfume"
-                      value={product.category}
-                      onChange={(e) => setProduct({ ...product, category: e.target.value })}
+                      value={product.category_id}
+                      onChange={(e) => {
+                        const selectedCategory = categories.find(cat => cat.id === parseInt(e.target.value));
+                        setProduct({ 
+                          ...product, 
+                          category_id: e.target.value,
+                          category: selectedCategory?.name || ''
+                        });
+                      }}
                       required
-                    />
+                      disabled={loadingCategories}
+                    >
+                      <option value="">-- Pilih Kategori --</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.category_id && (
+                      <p className="text-red-500 text-xs mt-1">{errors.category_id[0]}</p>
+                    )}
                     {errors.category && (
                       <p className="text-red-500 text-xs mt-1">{errors.category[0]}</p>
                     )}
@@ -392,6 +436,24 @@ export default function ProductAdd() {
                           {errors[`variants.${index}.price`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.price`][0]}</p>
                           )}
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Harga Diskon</label>
+                          <input
+                            type="text"
+                            className={`w-full border px-3 py-2 rounded-md text-sm ${
+                              errors[`variants.${index}.discount_price`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            placeholder="Masukkan harga diskon (opsional)"
+                            value={formatRibuan(variant.discount_price)}
+                            onChange={(e) => updateVariant(index, 'discount_price', parseRibuan(e.target.value))}
+                            onFocus={() => { if (variant.discount_price === 0) updateVariant(index, 'discount_price', ''); }}
+                          />
+                          {errors[`variants.${index}.discount_price`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.discount_price`][0]}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada diskon</p>
                         </div>
 
                         <div>

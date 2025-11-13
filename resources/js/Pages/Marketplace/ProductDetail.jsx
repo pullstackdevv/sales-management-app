@@ -365,7 +365,9 @@ export default function ProductDetail() {
                 items: [{
                     product_variant_id: selectedVariant.id,
                     quantity: quantity,
-                    price: selectedVariant.price
+                    price: selectedVariant.discount_price && selectedVariant.discount_price > 0 
+                        ? selectedVariant.discount_price 
+                        : selectedVariant.price
                 }],
                 shipping_cost: orderFormData.shipping_cost,
                 notes: orderFormData.notes
@@ -535,9 +537,20 @@ export default function ProductDetail() {
                                 <div className="flex flex-col space-y-2">
                                     {/* Current Selected Price */}
                                     <div className="flex items-center space-x-3">
-                                        <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
-                                            {formatPrice(getCurrentPrice())}
-                                        </span>
+                                        {selectedVariant?.discount_price && selectedVariant.discount_price > 0 ? (
+                                            <>
+                                                <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
+                                                    {formatPrice(selectedVariant.discount_price)}
+                                                </span>
+                                                <span className="text-lg sm:text-base text-gray-500 line-through">
+                                                    {formatPrice(getCurrentPrice())}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
+                                                {formatPrice(getCurrentPrice())}
+                                            </span>
+                                        )}
                                     </div>
                                     
                                     {/* Price Range for Multiple Variants */}
@@ -587,8 +600,15 @@ export default function ProductDetail() {
                                                 <div className="text-sm sm:text-xs text-gray-500 mt-1">
                                                     {variant.stock > 0 ? `Stok: ${variant.stock}` : 'Habis'}
                                                 </div>
-                                                <div className="text-sm sm:text-xs text-gray-600 mt-1">
-                                                    {formatPrice(variant.price)}
+                                                <div className="text-sm sm:text-xs text-gray-600 mt-1 flex items-center gap-2">
+                                                    {variant.discount_price && variant.discount_price > 0 ? (
+                                                        <>
+                                                            <span className="font-medium text-gray-900">{formatPrice(variant.discount_price)}</span>
+                                                            <span className="line-through text-gray-500">{formatPrice(variant.price)}</span>
+                                                        </>
+                                                    ) : (
+                                                        <span>{formatPrice(variant.price)}</span>
+                                                    )}
                                                 </div>
                                             </button>
                                         ))}
@@ -745,7 +765,15 @@ export default function ProductDetail() {
                                             <p className="text-xs text-gray-500">{selectedVariant.variant_label}</p>
                                         )}
                                         <p className="text-xs text-gray-600">
-                                            {formatPrice(getCurrentPrice())} x {quantity} = {formatPrice(getCurrentPrice() * quantity)}
+                                            {selectedVariant?.discount_price && selectedVariant.discount_price > 0 ? (
+                                                <>
+                                                    <span className="font-medium">{formatPrice(selectedVariant.discount_price)}</span>
+                                                    <span className="line-through ml-1">{formatPrice(getCurrentPrice())}</span>
+                                                    <span className="ml-1">x {quantity} = {formatPrice(selectedVariant.discount_price * quantity)}</span>
+                                                </>
+                                            ) : (
+                                                <>{formatPrice(getCurrentPrice())} x {quantity} = {formatPrice(getCurrentPrice() * quantity)}</>
+                                            )}
                                         </p>
                                     </div>
                                 </div>

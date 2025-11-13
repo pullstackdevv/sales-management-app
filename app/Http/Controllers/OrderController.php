@@ -261,7 +261,8 @@ class OrderController extends Controller
             'payment_bank_id' => 'nullable|exists:payment_banks,id',
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
-            'proof_image' => 'nullable|string'
+            'proof_image' => 'nullable|string',
+            'printed_at' => 'nullable|date'
         ]);
 
         // Batasi edit order berdasarkan status dan payment gateway
@@ -406,6 +407,11 @@ class OrderController extends Controller
                         'shipped_at' => $order->shipping->shipped_at ?? now()
                     ]
                 );
+            }
+
+            // Update printed_at if provided
+            if (isset($validated['printed_at'])) {
+                $order->update(['printed_at' => $validated['printed_at']]);
             }
 
             // Update timestamp

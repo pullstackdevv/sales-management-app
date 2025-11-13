@@ -23,6 +23,7 @@ class Order extends Model
         'shipping_cost',
         'status',
         'ordered_at',
+        'printed_at',
         'updated_by',
         'guest_email',
         'guest_phone',
@@ -37,6 +38,7 @@ class Order extends Model
         'discount_amount' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'ordered_at' => 'datetime',
+        'printed_at' => 'datetime',
         'payment_status' => PaymentStatus::class,
     ];
 

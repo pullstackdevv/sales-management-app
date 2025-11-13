@@ -31,6 +31,7 @@ class RoleSeeder extends Seeder
                     'customers',
                     'stock',
                     'vouchers',
+                    'promotions',
                     'expenses',
                     'reports',
                     'settings'

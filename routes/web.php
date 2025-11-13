@@ -117,6 +117,19 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Product/ProductEdit', ['productId' => $id]);
         })->name('products.edit');
 
+        // Product Category
+        Route::get('/product/category/data', function () {
+            return Inertia::render('Product/ProductCategoryData');
+        })->name('product-categories.index');
+
+        Route::get('/product/category/add', function () {
+            return Inertia::render('Product/ProductCategoryAdd');
+        })->name('product-categories.create');
+
+        Route::get('/product/category/edit/{id}', function ($id) {
+            return Inertia::render('Product/ProductCategoryEdit', ['categoryId' => $id]);
+        })->name('product-categories.edit');
+
         // stock opname
         Route::get('/stock-opname/data', function () {
             return Inertia::render('StockOpname/StockOpnameData');
@@ -216,6 +229,11 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Voucher/ViewVoucher', ['voucherId' => $id]);
         })->name('vouchers.view');
 
+        // Promotion
+        Route::get('/promotion/data', [\App\Http\Controllers\PromotionController::class, 'data'])->name('promotions.index');
+        Route::get('/promotion/create', [\App\Http\Controllers\PromotionController::class, 'create'])->name('promotions.create');
+        Route::get('/promotion/edit/{promotion}', [\App\Http\Controllers\PromotionController::class, 'edit'])->name('promotions.edit');
+
         // analizer
         Route::get('/report', function () {
             return Inertia::render('Report/index');
@@ -292,10 +310,8 @@ Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->nam
 Route::get('/track-orders', [WebOrderController::class, 'trackOrdersPage'])->name('marketplace.track-orders');
 Route::post('/track-orders/search', [WebOrderController::class, 'searchTrackOrders'])->name('marketplace.track-orders.search');
 
-// User Orders (only for authenticated users)
-Route::middleware(['auth'])->group(function () {
-    Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');
-});
+// User Orders (public - based on session customer data)
+Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');
 
 // Midtrans Payment Routes (tanpa middleware untuk callback)
 Route::prefix('payment')->name('payment.')->group(function () {

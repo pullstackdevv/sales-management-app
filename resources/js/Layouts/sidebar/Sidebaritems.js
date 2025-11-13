@@ -52,7 +52,12 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/cms/product/data",
             },
-
+            {
+                name: "Kategori Produk",
+                icon: "solar:folder-outline",
+                id: uniqueId(),
+                url: "/cms/product/category/data",
+            },
         ],
     },
     {
@@ -79,6 +84,26 @@ const SidebarContent = [
                 icon: "solar:add-circle-outline",
                 id: uniqueId(),
                 url: "/cms/voucher/create",
+            },
+        ],
+    },
+    {
+        name: "Promosi",
+        icon: "solar:tag-price-outline",
+        id: uniqueId(),
+        permission: "promotions",
+        children: [
+            {
+                name: "Daftar Promosi",
+                icon: "solar:clipboard-list-outline",
+                id: uniqueId(),
+                url: "/cms/promotion/data",
+            },
+            {
+                name: "Tambah Promosi",
+                icon: "solar:add-circle-outline",
+                id: uniqueId(),
+                url: "/cms/promotion/create",
             },
         ],
     },

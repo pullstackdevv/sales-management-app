@@ -3,6 +3,7 @@ import { Head, usePage } from '@inertiajs/react';
 import { Icon } from '@iconify/react';
 import api from '@/api/axios';
 import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 
 const PrintInvoice = () => {
     const { orderId } = usePage().props;
@@ -98,8 +99,59 @@ const PrintInvoice = () => {
         updatePrintSettings(newSettings);
     };
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = async () => {
+        try {
+            // Log print action
+            console.log('🖨️ Print Invoice Triggered', {
+                orderId,
+                orderNumber: invoiceData?.invoice_number,
+                timestamp: new Date().toISOString()
+            });
+
+            // Update order printed_at timestamp
+            const response = await api.patch(`/orders/${orderId}`, {
+                printed_at: new Date().toISOString()
+            });
+            
+            console.log('✅ Invoice Print Status Updated', {
+                orderId,
+                printed_at: response.data.data.printed_at
+            });
+            
+            // Trigger print dialog
+            window.print();
+            
+            // Success notification with Swal
+            await Swal.fire({
+                title: 'Berhasil!',
+                text: `Invoice ${invoiceData?.invoice_number} berhasil diprint`,
+                icon: 'success',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#3085d6',
+                timer: 3000,
+                timerProgressBar: true
+            });
+            
+            // Log successful print
+            console.log('✅ Print Dialog Triggered Successfully', {
+                orderId,
+                orderNumber: invoiceData?.invoice_number
+            });
+        } catch (error) {
+            console.error('❌ Error updating print status:', error);
+            
+            // Error alert with Swal
+            await Swal.fire({
+                title: 'Error!',
+                text: 'Gagal memperbarui status print',
+                icon: 'error',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
+            
+            // Still print even if update fails
+            window.print();
+        }
     };
 
     if (loading) {

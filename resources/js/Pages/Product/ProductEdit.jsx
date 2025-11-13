@@ -11,6 +11,7 @@ import StockAdjustmentModal from "@/components/StockAdjustmentModal";
 export default function ProductEdit() {
   const [product, setProduct] = useState({
     name: "",
+    category_id: "",
     category: "",
     description: "",
     image: "",
@@ -23,6 +24,8 @@ export default function ProductEdit() {
   const [errors, setErrors] = useState({});
   const [productId, setProductId] = useState(null);
   const [productImagePreview, setProductImagePreview] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   // Format number to ribuan without decimal
   const formatRibuan = (num) => {
@@ -54,6 +57,7 @@ export default function ProductEdit() {
     if (id && id !== 'edit') {
       setProductId(id);
       fetchProduct(id);
+      fetchCategories();
     } else {
       Swal.fire({
         icon: 'error',
@@ -65,6 +69,19 @@ export default function ProductEdit() {
     }
   }, []);
 
+  // Fetch categories
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await api.get('/product-categories?per_page=100&is_active=1');
+      setCategories(response.data.data.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
   // Fetch product data
   const fetchProduct = async (id) => {
     try {
@@ -74,6 +91,7 @@ export default function ProductEdit() {
       
       setProduct({
         name: productData?.name || "",
+        category_id: productData?.category_id || "",
         category: productData?.category || "",
         description: productData?.description || "",
         // keep existing image path so it can be previewed
@@ -215,6 +233,7 @@ export default function ProductEdit() {
       // Append basic product data
       formData.append('name', product.name);
       formData.append('description', product.description);
+      formData.append('category_id', product.category_id);
       formData.append('category', product.category);
       formData.append('is_active', product.is_active ? '1' : '0');
       formData.append('is_storefront', product.is_storefront ? '1' : '0');
@@ -335,16 +354,32 @@ export default function ProductEdit() {
 
                   <div>
                     <label className="block text-sm font-medium mb-1">Kategori*</label>
-                    <input
-                      type="text"
+                    <select
                       className={`w-full border px-3 py-2 rounded-md ${
-                        errors.category ? 'border-red-500' : 'border-gray-300'
+                        errors.category_id ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      placeholder="Contoh: Perfume"
-                      value={product.category}
-                      onChange={(e) => setProduct({ ...product, category: e.target.value })}
+                      value={product.category_id}
+                      onChange={(e) => {
+                        const selectedCategory = categories.find(cat => cat.id === parseInt(e.target.value));
+                        setProduct({ 
+                          ...product, 
+                          category_id: e.target.value,
+                          category: selectedCategory?.name || ''
+                        });
+                      }}
                       required
-                    />
+                      disabled={loadingCategories}
+                    >
+                      <option value="">-- Pilih Kategori --</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.category_id && (
+                      <p className="text-red-500 text-xs mt-1">{errors.category_id[0]}</p>
+                    )}
                     {errors.category && (
                       <p className="text-red-500 text-xs mt-1">{errors.category[0]}</p>
                     )}

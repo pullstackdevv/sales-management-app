@@ -81,6 +81,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Order/EditOrder', ['orderId' => $id]);
         })->name('orders.edit');
 
+        Route::get('/order/manage/{id}', function ($id) {
+            return Inertia::render('Order/EditOrder', ['orderId' => $id]);
+        })->name('order.manage');
+
         Route::get('/order/detail/{id}', function ($id) {
             return Inertia::render('Order/OrderDetail', ['orderId' => $id]);
         })->name('orders.detail');

@@ -527,9 +527,10 @@ export default function EditOrder() {
                                             setCustomerAddresses([]);
                                         }
                                     }}
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
                                     className={`w-full px-3 py-2 border rounded-lg ${
                                         errors.customer_id ? 'border-red-500' : 'border-gray-300'
-                                    }`}
+                                    } ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                                 />
                                 {loading.customers && (
                                     <div className="absolute right-3 top-3">
@@ -569,8 +570,8 @@ export default function EditOrder() {
                                 onChange={(e) => setFormData(prev => ({ ...prev, address_id: e.target.value }))}
                                 className={`w-full px-3 py-2 border rounded-lg ${
                                     errors.address_id ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                                disabled={!selectedCustomer || customerAddresses.length === 0}
+                                } ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
+                                disabled={!selectedCustomer || customerAddresses.length === 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE')}
                             >
                                 <option value="">Pilih alamat pengiriman</option>
                                 {customerAddresses.map((address) => (
@@ -597,10 +598,10 @@ export default function EditOrder() {
                                     Pengiriman Dari
                                 </label>
                                 <select 
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
                                     value={formData.origin_setting_id}
                                     onChange={(e) => setFormData(prev => ({ ...prev, origin_setting_id: e.target.value }))}
-                                    disabled={loading.origins}
+                                    disabled={loading.origins || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE')}
                                 >
                                     <option value="">Pilih Pengiriman Dari</option>
                                     {origins.map(origin => (
@@ -619,7 +620,8 @@ export default function EditOrder() {
                                     type="date"
                                     value={formData.order_date}
                                     onChange={(e) => setFormData(prev => ({ ...prev, order_date: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
                                 />
                             </div>
 
@@ -632,7 +634,8 @@ export default function EditOrder() {
                                     onChange={(e) => setFormData(prev => ({ ...prev, sales_channel_id: e.target.value }))}
                                     className={`w-full px-3 py-2 border rounded-lg ${
                                         errors.sales_channel_id ? 'border-red-500' : 'border-gray-300'
-                                    }`}
+                                    } ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
                                 >
                                     <option value="">Pilih sales channel</option>
                                     {salesChannels.map((channel) => (
@@ -658,10 +661,10 @@ export default function EditOrder() {
                                     placeholder="0"
                                     value={formData.shipping_cost}
                                     onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
+                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
                                 />
-                                {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
+                                {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' && (
                                     <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
                                 )}
                             </div>
@@ -673,8 +676,8 @@ export default function EditOrder() {
                                 <select
                                     value={formData.courier}
                                     onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
+                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
+                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
                                 >
                                     <option value="">Pilih kurir</option>
                                     {couriers.map((courier) => (
@@ -980,7 +983,7 @@ export default function EditOrder() {
                             <button 
                                 type="button"
                                 onClick={handleSubmit}
-                                disabled={loading.submitting || orderItems.length === 0}
+                                disabled={loading.submitting || orderItems.length === 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE')}
                                 className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {loading.submitting && (

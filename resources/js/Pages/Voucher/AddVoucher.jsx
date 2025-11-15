@@ -63,7 +63,10 @@ const AddVoucher = () => {
     };
 
     const generateVoucherCode = () => {
-        const prefix = voucherType === "percentage" ? "DISC" : "SAVE";
+        let prefix = "DISC";
+        if (voucherType === "fixed") prefix = "SAVE";
+        if (voucherType === "shipping") prefix = "SHIP";
+        if (voucherType === "free_sample") prefix = "FREE";
         const randomNum = Math.floor(Math.random() * 10000);
         return `${prefix}${randomNum}`;
     };
@@ -200,6 +203,9 @@ const AddVoucher = () => {
                                         <option value="fixed">
                                             Potongan Harga Tetap (Rp)
                                         </option>
+                                        <option value="shipping">
+                                            Potongan Ongkir
+                                        </option>
                                         <option value="free_sample">
                                             Free Sample (Bonus Produk)
                                         </option>
@@ -214,7 +220,7 @@ const AddVoucher = () => {
                                 {voucherType !== "free_sample" && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Nilai Diskon *
+                                            {voucherType === "shipping" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
                                         </label>
                                         <div className="relative">
                                             {voucherType === "percentage" && (
@@ -224,7 +230,7 @@ const AddVoucher = () => {
                                                     </span>
                                                 </div>
                                             )}
-                                            {voucherType === "fixed" && (
+                                            {(voucherType === "fixed" || voucherType === "shipping") && (
                                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                     <span className="text-gray-500 text-sm">
                                                         Rp
@@ -233,6 +239,7 @@ const AddVoucher = () => {
                                             )}
                                             <input
                                                 type="number"
+                                                step="1"
                                                 {...register("value", {
                                                     required: voucherType !== "free_sample" ? "Nilai diskon harus diisi" : false,
                                                     min: {
@@ -250,7 +257,7 @@ const AddVoucher = () => {
                                                             : undefined,
                                                 })}
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    voucherType === "fixed"
+                                                    voucherType === "fixed" || voucherType === "shipping"
                                                         ? "pl-8"
                                                         : "pr-8"
                                                 }`}
@@ -307,6 +314,7 @@ const AddVoucher = () => {
                                     </label>
                                     <input
                                         type="number"
+                                        step="1"
                                         {...register("min_purchase", {
                                             required:
                                                 "Minimal pembelian harus diisi",
@@ -333,6 +341,7 @@ const AddVoucher = () => {
                                         </label>
                                         <input
                                             type="number"
+                                            step="1"
                                             {...register("max_discount", {
                                                 min: {
                                                     value: 0,

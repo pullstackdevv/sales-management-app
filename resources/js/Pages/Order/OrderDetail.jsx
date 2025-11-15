@@ -81,7 +81,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
 
     const handleManageOrder = () => {
         if (orderData?.id) {
-            router.visit(`/order/manage/${orderData.id}`);
+            router.visit(`/cms/order/manage/${orderData.id}`);
         }
     };
 

@@ -117,7 +117,8 @@ class WebOrderController extends Controller
             
             foreach ($request->items as $item) {
                 $variant = ProductVariant::findOrFail($item['product_variant_id']);
-                $price = $variant->price;
+                // Use discount_price if available, otherwise use regular price
+                $price = $variant->discount_price ?? $variant->price;
                 $productName = $variant->product->name . ' - ' . $variant->variant_label;
                 
                 // Check stock availability
@@ -166,7 +167,8 @@ class WebOrderController extends Controller
                     );
                 }
                 
-                $discountAmount = $voucher->calculateDiscount($totalPrice);
+                // Calculate discount with shipping cost for shipping vouchers
+                $discountAmount = $voucher->calculateDiscount($totalPrice, $request->shipping_cost);
                 $totalPrice -= $discountAmount;
             }
 

@@ -200,7 +200,8 @@ class VoucherController extends Controller
     {
         $validated = $request->validate([
             'code' => 'required|string',
-            'order_amount' => 'required|numeric|min:0'
+            'order_amount' => 'required|numeric|min:0',
+            'shipping_cost' => 'nullable|numeric|min:0'
         ]);
 
         $voucher = Voucher::where('code', $validated['code'])->first();
@@ -219,7 +220,8 @@ class VoucherController extends Controller
             ], 422);
         }
 
-        $discount = $voucher->calculateDiscount($validated['order_amount']);
+        $shippingCost = $validated['shipping_cost'] ?? 0;
+        $discount = $voucher->calculateDiscount($validated['order_amount'], $shippingCost);
 
         return response()->json([
             'status' => 'success',

@@ -92,10 +92,14 @@ class OrderController extends Controller
             // Generate order number
             $orderNumber = 'ORD-' . date('Ymd') . '-' . str_pad(Order::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT);
 
-            // Calculate subtotal
-            $subtotal = collect($validated['items'])->sum(function ($item) {
-                return $item['quantity'] * $item['price'];
-            });
+            // Calculate subtotal with discount_price if available
+            $subtotal = 0;
+            foreach ($validated['items'] as $item) {
+                $variant = ProductVariant::findOrFail($item['product_variant_id']);
+                // Use discount_price if available, otherwise use provided price
+                $price = $variant->discount_price ?? $item['price'];
+                $subtotal += $item['quantity'] * $price;
+            }
 
             // Calculate total before discount
             $totalBeforeDiscount = $subtotal + $validated['shipping_cost'];
@@ -109,18 +113,23 @@ class OrderController extends Controller
                     'voucher_id' => $validated['voucher_id'],
                     'voucher_found' => $voucher ? true : false,
                     'voucher_code' => $voucher ? $voucher->code : null,
+                    'voucher_type' => $voucher ? $voucher->type : null,
                     'total_before_discount' => $totalBeforeDiscount,
+                    'shipping_cost' => $validated['shipping_cost'],
                     'can_be_used' => $voucher ? $voucher->canBeUsed($totalBeforeDiscount) : false
                 ]);
                 
                 if ($voucher && $voucher->canBeUsed($totalBeforeDiscount)) {
-                    $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount);
+                    // Pass shipping_cost to calculateDiscount for shipping vouchers
+                    $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount, $validated['shipping_cost']);
                     
                     Log::info('OrderController - Voucher discount calculated', [
                         'voucher_code' => $voucher->code,
+                        'voucher_type' => $voucher->type,
                         'discount_amount' => $discountAmount,
                         'discount_type' => $voucher->type,
-                        'discount_value' => $voucher->value
+                        'discount_value' => $voucher->value,
+                        'shipping_cost' => $validated['shipping_cost']
                     ]);
                 }
             } else {
@@ -164,14 +173,18 @@ class OrderController extends Controller
                     ]);
                 }
 
+                // Use discount_price if available, otherwise use provided price
+                $price = $variant->discount_price ?? $item['price'];
+                $subtotal = $item['quantity'] * $price;
+
                 $order->items()->create([
                     'product_variant_id' => $item['product_variant_id'],
                     'product_name_snapshot' => $variant->product->name,
                     'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
-                    'price' => $item['price'],
+                    'price' => $price,
                     'base_price' => $variant->product->base_price,
-                    'subtotal' => $item['quantity'] * $item['price']
+                    'subtotal' => $subtotal
                 ]);
 
                 // Update stock

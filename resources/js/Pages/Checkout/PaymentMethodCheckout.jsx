@@ -585,10 +585,7 @@ const PaymentMethodCheckout = () => {
                   </p>
                 </div>
               </div>
-            </div>
-
-         
-
+            </div>        
             {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">

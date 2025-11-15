@@ -424,7 +424,7 @@ const Homepage = () => {
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300"></div>
                         {variantInfo?.hasDiscount && (
-                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                            <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
                                 Diskon
                             </div>
                         )}
@@ -442,7 +442,7 @@ const Homepage = () => {
                                     <span className="text-xs text-gray-400 line-through">
                                         {formatPrice(variantInfo.minOriginalPrice)}
                                     </span>
-                                    <span className="text-sm sm:text-sm font-bold text-red-600">
+                                    <span className="text-sm sm:text-sm font-bold text-green-600">
                                         {formatPrice(displayPrice)}
                                     </span>
                                 </>
@@ -474,7 +474,7 @@ const Homepage = () => {
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg"></div>
                             {variantInfo?.hasDiscount && (
-                                <div className="absolute top-1 right-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded font-medium">
+                                <div className="absolute top-1 right-1 bg-green-500 text-white text-xs px-2 py-0.5 rounded font-medium">
                                     Diskon
                                 </div>
                             )}
@@ -489,7 +489,7 @@ const Homepage = () => {
                                         <span className="text-sm text-gray-400 line-through">
                                             {formatPrice(variantInfo.minOriginalPrice)}
                                         </span>
-                                        <span className="text-lg font-semibold text-red-600">
+                                        <span className="text-lg font-semibold text-green-600">
                                             {formatPrice(displayPrice)}
                                         </span>
                                     </>

@@ -93,14 +93,11 @@ class XenditController extends Controller
                 'voucher_id' => $order->voucher_id,
                 'has_voucher_relation' => $order->voucher ? true : false,
                 'voucher_code' => $order->voucher ? $order->voucher->code : null,
+                'voucher_type' => $order->voucher ? $order->voucher->type : null,
                 'discount_amount' => $order->discount_amount,
                 'total_price' => $order->total_price,
                 'shipping_cost' => $order->shipping_cost,
             ]);
-
-            // Note: Xendit doesn't support negative prices for discount items
-            // Instead, we use the discounted total_price in the amount field
-            // The invoice description will show the discount information
 
             // Calculate totals for logging
             $originalTotal = $order->items->sum(function($item) {
@@ -113,13 +110,15 @@ class XenditController extends Controller
                 'discount_amount' => $order->discount_amount,
                 'final_amount' => $order->total_price,
                 'voucher_code' => $order->voucher ? $order->voucher->code : null,
+                'voucher_type' => $order->voucher ? $order->voucher->type : null,
                 'items_count' => count($items)
             ]);
 
             // Prepare description with discount info if applicable
             $description = 'Order Payment - ' . $order->order_number;
             if ($order->voucher && $order->discount_amount > 0) {
-                $description .= ' (Diskon: ' . $order->voucher->code . ' -Rp' . number_format((float)$order->discount_amount, 0, ',', '.') . ')';
+                $discountType = $order->voucher->type === 'shipping' ? 'Diskon Ongkir' : 'Diskon';
+                $description .= ' (' . $discountType . ': ' . $order->voucher->code . ' -Rp' . number_format((float)$order->discount_amount, 0, ',', '.') . ')';
             }
 
             // Prepare invoice data
@@ -143,15 +142,20 @@ class XenditController extends Controller
                     'customer_id' => $order->customer_id,
                     'address_id' => $order->address_id,
                     'voucher_code' => $order->voucher ? $order->voucher->code : null,
+                    'voucher_type' => $order->voucher ? $order->voucher->type : null,
                     'discount_amount' => $order->discount_amount
                 ]
             ];
             
-            // Add fees to show discount as negative fee (Xendit supports this)
+            // Add discount as negative fee (Xendit supports this)
             if ($order->voucher && $order->discount_amount > 0) {
+                $discountLabel = $order->voucher->type === 'shipping' 
+                    ? 'Shipping Discount - ' . $order->voucher->code
+                    : 'Voucher Discount - ' . $order->voucher->code;
+                    
                 $invoiceData['fees'] = [
                     [
-                        'type' => 'Voucher Discount - ' . $order->voucher->code,
+                        'type' => $discountLabel,
                         'value' => -(int) $order->discount_amount
                     ]
                 ];

@@ -139,6 +139,8 @@ const VoucherData = () => {
             return `${baseClasses} bg-blue-100 text-blue-800`;
         } else if (type === "fixed") {
             return `${baseClasses} bg-purple-100 text-purple-800`;
+        } else if (type === "shipping") {
+            return `${baseClasses} bg-orange-100 text-orange-800`;
         } else if (type === "free_sample") {
             return `${baseClasses} bg-green-100 text-green-800`;
         } else {
@@ -402,12 +404,14 @@ const VoucherData = () => {
                                                             ? "Persentase"
                                                             : voucher.type === "fixed"
                                                             ? "Fixed"
+                                                            : voucher.type === "shipping"
+                                                            ? "Potongan Ongkir"
                                                             : "Free Sample"}
                                                     </span>
                                                     <div className="text-sm font-semibold text-gray-900">
                                                         {voucher.type === "percentage"
                                                             ? `${voucher.value}%`
-                                                            : voucher.type === "fixed"
+                                                            : voucher.type === "fixed" || voucher.type === "shipping"
                                                             ? formatRupiah(voucher.value)
                                                             : voucher.free_product_name || "Produk Gratis"}
                                                     </div>

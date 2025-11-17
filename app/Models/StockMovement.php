@@ -13,6 +13,7 @@ class StockMovement extends Model
 
     protected $fillable = [
         'product_variant_id',
+        'order_id',
         'type',
         'quantity',
         'note',
@@ -28,6 +29,11 @@ class StockMovement extends Model
     public function productVariant()
     {
         return $this->belongsTo(ProductVariant::class);
+    }
+
+    public function order()
+    {
+        return $this->belongsTo(Order::class);
     }
 
     public function creator()

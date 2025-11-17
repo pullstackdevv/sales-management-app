@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import DashboardLayout from '@/Layouts/DashboardLayout.jsx';
-import { ChevronLeft, MessageCircle, Copy, Settings, Eye, Truck, ExternalLink, RefreshCw } from 'lucide-react';
+import { ChevronLeft, MessageCircle, Copy, Settings, Eye, Truck, ExternalLink, RefreshCw, DollarSign, Briefcase, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api/axios';
 import PaymentHistoryModal from '../../components/ui/modal/PaymentHistoryModal';
@@ -81,7 +81,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
 
     const handleManageOrder = () => {
         if (orderData?.id) {
-            router.visit(`/order/manage/${orderData.id}`);
+            router.visit(`/cms/order/manage/${orderData.id}`);
         }
     };
 
@@ -218,7 +218,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                         <div className="bg-white p-6 rounded-lg shadow-sm">
                             <div className="flex items-center space-x-3">
                                 <div className="p-2 bg-gray-100 rounded-lg">
-                                    <span className="text-2xl">💰</span>
+                                    <DollarSign className="w-6 h-6 text-gray-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-600">Total harga jual produk</p>
@@ -230,7 +230,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                         <div className="bg-white p-6 rounded-lg shadow-sm">
                             <div className="flex items-center space-x-3">
                                 <div className="p-2 bg-blue-100 rounded-lg">
-                                    <span className="text-2xl">💼</span>
+                                    <Briefcase className="w-6 h-6 text-blue-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-600">Total harga modal produk</p>
@@ -242,7 +242,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                         <div className="bg-white p-6 rounded-lg shadow-sm">
                             <div className="flex items-center space-x-3">
                                 <div className="p-2 bg-green-100 rounded-lg">
-                                    <span className="text-2xl">📈</span>
+                                    <TrendingUp className="w-6 h-6 text-green-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-600">Profit</p>

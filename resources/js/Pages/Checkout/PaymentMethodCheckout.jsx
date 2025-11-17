@@ -248,7 +248,8 @@ const PaymentMethodCheckout = () => {
       
       const response = await axios.post('/api/vouchers/validate', {
         code: voucherCode,
-        order_amount: orderAmount
+        order_amount: orderAmount,
+        shipping_cost: shippingCost
       }, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -584,10 +585,7 @@ const PaymentMethodCheckout = () => {
                   </p>
                 </div>
               </div>
-            </div>
-
-         
-
+            </div>        
             {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
@@ -727,6 +725,11 @@ const PaymentMethodCheckout = () => {
                               <div className="text-xs text-green-600">
                                 -{appliedVoucher.name}
                               </div>
+                              {appliedVoucher.type === 'shipping' && (
+                                <div className="text-xs text-orange-600 font-medium mt-1">
+                                  🚚 Potongan Ongkir
+                                </div>
+                              )}
                               {appliedVoucher.description && (
                                 <div className="text-xs text-green-700 mt-1 leading-relaxed">
                                   {appliedVoucher.description}
@@ -751,7 +754,9 @@ const PaymentMethodCheckout = () => {
                   {/* Show discount in summary */}
                   {voucherDiscount > 0 && (
                     <div className="flex justify-between text-green-600 text-sm">
-                      <span>Diskon Voucher</span>
+                      <span>
+                        {appliedVoucher?.type === 'shipping' ? 'Diskon Ongkir' : 'Diskon Voucher'}
+                      </span>
                       <span className="font-medium">-Rp {voucherDiscount.toLocaleString('id-ID')}</span>
                     </div>
                   )}

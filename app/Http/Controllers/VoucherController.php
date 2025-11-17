@@ -52,7 +52,7 @@ class VoucherController extends Controller
             'code' => 'required|string|max:50|unique:vouchers,code',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'required|in:percentage,fixed,free_sample',
+            'type' => 'required|in:percentage,fixed,shipping,free_sample',
             'value' => 'required|numeric|min:0',
             'minimum_amount' => 'nullable|numeric|min:0',
             'maximum_discount' => 'nullable|numeric|min:0',
@@ -108,7 +108,7 @@ class VoucherController extends Controller
             'code' => 'sometimes|required|string|max:50|unique:vouchers,code,' . $voucher->id,
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'sometimes|required|in:percentage,fixed,free_sample',
+            'type' => 'sometimes|required|in:percentage,fixed,shipping,free_sample',
             'value' => 'sometimes|required|numeric|min:0',
             'minimum_amount' => 'nullable|numeric|min:0',
             'maximum_discount' => 'nullable|numeric|min:0',
@@ -200,7 +200,8 @@ class VoucherController extends Controller
     {
         $validated = $request->validate([
             'code' => 'required|string',
-            'order_amount' => 'required|numeric|min:0'
+            'order_amount' => 'required|numeric|min:0',
+            'shipping_cost' => 'nullable|numeric|min:0'
         ]);
 
         $voucher = Voucher::where('code', $validated['code'])->first();
@@ -219,7 +220,8 @@ class VoucherController extends Controller
             ], 422);
         }
 
-        $discount = $voucher->calculateDiscount($validated['order_amount']);
+        $shippingCost = $validated['shipping_cost'] ?? 0;
+        $discount = $voucher->calculateDiscount($validated['order_amount'], $shippingCost);
 
         return response()->json([
             'status' => 'success',

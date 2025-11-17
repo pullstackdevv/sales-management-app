@@ -257,6 +257,7 @@ const EditVoucher = ({ voucherId }) => {
                                         <option value="">Pilih tipe voucher</option>
                                         <option value="percentage">Persentase (%)</option>
                                         <option value="fixed">Nominal Tetap (Rp)</option>
+                                        <option value="shipping">Potongan Ongkir</option>
                                         <option value="free_sample">Free Sample (Bonus Produk)</option>
                                     </select>
                                     {errors.type && (
@@ -269,10 +270,10 @@ const EditVoucher = ({ voucherId }) => {
                                 {voucherType !== "free_sample" && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Nilai Diskon *
+                                            {voucherType === "shipping" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
                                         </label>
                                         <div className="relative">
-                                            {voucherType === "fixed" && (
+                                            {(voucherType === "fixed" || voucherType === "shipping") && (
                                                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
                                                     Rp
                                                 </span>
@@ -284,6 +285,7 @@ const EditVoucher = ({ voucherId }) => {
                                             )}
                                             <input
                                                 type="number"
+                                                step="1"
                                                 {...register("value", {
                                                     required: voucherType !== "free_sample" ? "Nilai diskon harus diisi" : false,
                                                     min: {
@@ -299,7 +301,7 @@ const EditVoucher = ({ voucherId }) => {
                                                             : undefined,
                                                 })}
                                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    voucherType === "fixed" ? "pl-8" : "pr-8"
+                                                    voucherType === "fixed" || voucherType === "shipping" ? "pl-8" : "pr-8"
                                                 }`}
                                                 placeholder={
                                                     voucherType === "percentage" ? "10" : "50000"
@@ -352,6 +354,7 @@ const EditVoucher = ({ voucherId }) => {
                                     </label>
                                     <input
                                         type="number"
+                                        step="1"
                                         {...register("minimum_amount", {
                                             required: "Minimal pembelian harus diisi",
                                             min: {
@@ -376,6 +379,7 @@ const EditVoucher = ({ voucherId }) => {
                                         </label>
                                         <input
                                             type="number"
+                                            step="1"
                                             {...register("maximum_discount", {
                                                 min: {
                                                     value: 0,

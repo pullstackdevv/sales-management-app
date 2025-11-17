@@ -30,6 +30,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\XenditController;
 use App\Http\Controllers\MidtransController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\WilayahController;
 use App\Http\Controllers\ProductSettingController;
 use App\Http\Controllers\OriginSettingController;
@@ -194,17 +195,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Payment Gateway Routes (public access for webhooks and order payment)
 Route::prefix('payment')->name('payment.')->group(function () {
-    // Web Order Payment Routes (can be used by guests)
-    Route::post('/create/{orderNumber}', [WebOrderController::class, 'createPayment'])->name('web.create');
-    Route::get('/status/{orderNumber}', [WebOrderController::class, 'checkPaymentStatus'])->name('web.status');
+    // Unified Payment Routes (supports both Xendit and Midtrans based on config)
+    Route::post('/create/{orderNumber}', [PaymentController::class, 'createPayment'])->name('create');
+    Route::get('/status/{orderNumber}', [PaymentController::class, 'checkPaymentStatus'])->name('status');
+    Route::post('/webhook', [PaymentController::class, 'handleWebhook'])->name('webhook');
 
-    // Xendit specific routes
+    // Xendit specific routes (legacy support)
     Route::prefix('xendit')->name('xendit.')->group(function () {
         Route::post('/webhook', [XenditController::class, 'handleWebhook'])->name('webhook');
         Route::get('/status/{orderNumber}', [XenditController::class, 'checkPaymentStatus'])->name('status');
     });
 
-    // Midtrans specific routes (existing routes from web.php can be moved here if needed)
+    // Midtrans specific routes (legacy support)
     Route::prefix('midtrans')->name('midtrans.')->group(function () {
         Route::post('/webhook', [MidtransController::class, 'handleNotification'])->name('webhook');
         Route::get('/status/{orderNumber}', [MidtransController::class, 'checkPaymentStatus'])->name('status');

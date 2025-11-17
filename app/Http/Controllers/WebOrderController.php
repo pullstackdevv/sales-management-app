@@ -361,54 +361,9 @@ class WebOrderController extends Controller
     public function createPayment(Request $request, $orderNumber)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'payment_gateway' => 'required|in:midtrans,xendit',
-            ]);
-
-            if ($validator->fails()) {
-                return ResponseFormatter::error(
-                    'Validation Error',
-                    $validator->errors(),
-                    422
-                );
-            }
-
-            $order = Order::where('order_number', $orderNumber)
-                ->with(['customer', 'address', 'items.productVariant.product'])
-                ->first();
-
-            if (!$order) {
-                return ResponseFormatter::error(
-                    'Order not found',
-                    [],
-                    404
-                );
-            }
-
-            if ($order->isPaid()) {
-                return ResponseFormatter::error(
-                    'Order already paid',
-                    [],
-                    400
-                );
-            }
-
-            // Route to appropriate payment gateway
-            $paymentGateway = $request->payment_gateway;
-            
-            if ($paymentGateway === 'midtrans') {
-                $midtransController = new MidtransController();
-                return $midtransController->createPayment($request, $orderNumber);
-            } elseif ($paymentGateway === 'xendit') {
-                $xenditController = new XenditController();
-                return $xenditController->createPayment($request, $orderNumber);
-            }
-
-            return ResponseFormatter::error(
-                'Invalid payment gateway',
-                [],
-                400
-            );
+            // Use unified PaymentController instead of individual gateway controllers
+            $paymentController = new PaymentController();
+            return $paymentController->createPayment($request, $orderNumber);
 
         } catch (\Exception $e) {
             return ResponseFormatter::error(
@@ -425,33 +380,9 @@ class WebOrderController extends Controller
     public function checkPaymentStatus(Request $request, $orderNumber)
     {
         try {
-            $order = Order::where('order_number', $orderNumber)->first();
-
-            if (!$order) {
-                return ResponseFormatter::error(
-                    'Order not found',
-                    [],
-                    404
-                );
-            }
-
-            // Determine which gateway was used based on payment_token or payment_url
-            if ($order->payment_token && strpos($order->payment_url, 'midtrans') !== false) {
-                $midtransController = new MidtransController();
-                return $midtransController->checkPaymentStatus($request, $orderNumber);
-            } elseif ($order->payment_token && strpos($order->payment_url, 'xendit') !== false) {
-                $xenditController = new XenditController();
-                return $xenditController->checkPaymentStatus($request, $orderNumber);
-            }
-
-            return ResponseFormatter::success(
-                'Payment status retrieved',
-                [
-                    'order_number' => $order->order_number,
-                    'payment_status' => $order->payment_status,
-                    'order_status' => $order->status,
-                ]
-            );
+            // Use unified PaymentController instead of individual gateway controllers
+            $paymentController = new PaymentController();
+            return $paymentController->checkPaymentStatus($orderNumber);
 
         } catch (\Exception $e) {
             return ResponseFormatter::error(

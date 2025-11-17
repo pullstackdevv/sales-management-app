@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
+import { router } from "@inertiajs/react";
 import api from "@/api/axios";
 import { formatCurrency, formatDate } from "@/utils/helpers";
 
@@ -103,6 +104,27 @@ export default function StockHistoryModal({
     }
   };
 
+  const handleOrderClick = (orderId) => {
+    if (orderId) {
+      router.visit(`/cms/order/detail/${orderId}`);
+    }
+  };
+
+  const renderNote = (movement) => {
+    if (!movement.order_id) {
+      return movement.note || 'Tidak ada catatan';
+    }
+    
+    return (
+      <button
+        onClick={() => handleOrderClick(movement.order_id)}
+        className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+      >
+        {movement.note || 'Lihat Order'}
+      </button>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -189,7 +211,7 @@ export default function StockHistoryModal({
                           </span>
                         </div>
                         <p className="text-sm text-gray-900 mb-1">
-                          {movement.note || 'Tidak ada catatan'}
+                          {renderNote(movement)}
                         </p>
                         {movement.created_by && (
                           <p className="text-xs text-gray-500">

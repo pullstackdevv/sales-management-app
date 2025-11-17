@@ -195,7 +195,8 @@ class OrderController extends Controller
                     $item['product_variant_id'],
                     StockMovementType::OUT,
                     $item['quantity'],
-                    "Order #{$order->id} - {$order->customer->name}"
+                    "Order #{$order->order_number} - {$order->customer->name}",
+                    $order->id
                 );
             }
 
@@ -541,10 +542,11 @@ class OrderController extends Controller
     /**
      * Record stock movement for order operations
      */
-    private function recordStockMovement($productVariantId, $type, $quantity, $note)
+    private function recordStockMovement($productVariantId, $type, $quantity, $note, $orderId = null)
     {
         StockMovement::create([
             'product_variant_id' => $productVariantId,
+            'order_id' => $orderId,
             'type' => $type,
             'quantity' => $quantity,
             'note' => $note,

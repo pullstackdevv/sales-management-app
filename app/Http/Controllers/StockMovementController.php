@@ -13,7 +13,7 @@ class StockMovementController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $movements = StockMovement::with(['productVariant.product', 'createdBy'])
+        $movements = StockMovement::with(['productVariant.product', 'createdBy', 'order'])
             ->when($request->product_variant_id, function ($query, $variantId) {
                 $query->where('product_variant_id', $variantId);
             })

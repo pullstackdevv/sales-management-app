@@ -567,7 +567,7 @@ const PaymentMethodCheckout = () => {
                       <CreditCard className="w-8 h-8" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">Xendit Payment Gateway</h3>
+                      {/* <h3 className="text-lg font-semibold text-gray-900">Xendit Payment Gateway</h3> */}
                       <p className="text-gray-600 mt-1">Pembayaran aman melalui berbagai metode:</p>
                       <ul className="text-sm text-gray-600 mt-2 space-y-1">
                         <li>• Virtual Account (BCA, BNI, BRI, Mandiri, dll)</li>
@@ -581,7 +581,7 @@ const PaymentMethodCheckout = () => {
                 
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600">
-                    <strong>Catatan:</strong> Setelah mengklik "Lanjutkan ke Pembayaran", Anda akan diarahkan ke halaman pembayaran Xendit untuk memilih metode pembayaran yang diinginkan.
+                    <strong>Catatan:</strong> Setelah mengklik "Lanjutkan ke Pembayaran", Anda akan diarahkan ke halaman pembayaran untuk memilih metode pembayaran yang diinginkan.
                   </p>
                 </div>
               </div>

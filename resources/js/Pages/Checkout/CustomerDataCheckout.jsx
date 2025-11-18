@@ -1009,7 +1009,10 @@ const CustomerDataCheckout = () => {
         newErrors.phone = 'Nomor telepon minimal 10 digit';
       }
 
-      if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      if (!formData.email.trim()) {
+        newErrors.email = 'Email wajib diisi';
+        requiredFields.push('Email');
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         newErrors.email = 'Format email tidak valid';
       }
 
@@ -1064,14 +1067,7 @@ const CustomerDataCheckout = () => {
       Swal.fire({
         icon: 'warning',
         title: 'Field Wajib Belum Diisi',
-        html: `
-          <div class="text-left">
-            <p class="mb-3">Mohon lengkapi field berikut:</p>
-            <ul class="list-disc list-inside space-y-1">
-              ${requiredFields.map(field => `<li>${field}</li>`).join('')}
-            </ul>
-          </div>
-        `,
+        text: `Mohon lengkapi: ${requiredFields.join(', ')}`,
         confirmButtonColor: '#3b82f6',
         confirmButtonText: 'OK, Saya Mengerti'
       });
@@ -1431,7 +1427,7 @@ const CustomerDataCheckout = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Mail className="w-4 h-4 inline mr-1" />
-                        Email (Opsional)
+                        Email *
                       </label>
                       <input
                         type="email"

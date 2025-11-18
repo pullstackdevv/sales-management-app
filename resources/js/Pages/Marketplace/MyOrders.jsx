@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, router } from '@inertiajs/react';
-import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search, Phone, Mail, ExternalLink, RefreshCw } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search, Phone, Mail, ExternalLink, RefreshCw, LogOut } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { formatCurrency } from '@/utils/helpers';
 import checkoutSession from '@/utils/checkoutSession';
@@ -135,6 +135,24 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
 
     const handlePageChange = (page) => {
         setCurrentPage(page);
+    };
+
+    const handleResetCheckoutSession = () => {
+        Swal.fire({
+            title: 'Logout dari Riwayat Pesanan?',
+            text: 'Ini akan menghapus data customer (checkout_data) yang tersimpan di session dan Anda perlu login/pilih customer lagi.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Ya, logout',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                checkoutSession.clear();
+                window.location.reload();
+            }
+        });
     };
 
     const isWebOrder = (order) => {
@@ -464,9 +482,19 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
             <div className="min-h-screen bg-gray-50 py-8">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Pesanan Saya</h1>
-                        <p className="text-gray-600">Kelola dan pantau status pesanan Anda</p>
+                    <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-1">Pesanan Saya</h1>
+                            <p className="text-gray-600">Kelola dan pantau status pesanan Anda</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleResetCheckoutSession}
+                            className="inline-flex items-center px-3 py-2 text-xs font-medium text-primary border border-primary rounded-lg hover:bg-primary hover:text-white"
+                        >
+                            <LogOut className="w-4 h-4 mr-1" />
+                            Logout
+                        </button>
                     </div>
 
                     {/* Search and Filter */}

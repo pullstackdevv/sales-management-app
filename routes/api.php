@@ -99,6 +99,8 @@ Route::post('customers/{customer}/toggle-status', [CustomerController::class, 't
 Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
 Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
 
+Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);
+
 // Other authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
     // User routes
@@ -174,7 +176,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('promotions', PromotionController::class);
     Route::post('promotions/{promotion}/toggle-status', [PromotionController::class, 'toggleStatus']);
     Route::post('promotions/{promotion}/toggle-storefront', [PromotionController::class, 'toggleStorefront']);
-    Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);
 
     // Expense routes
     Route::apiResource('expenses', ExpenseController::class);

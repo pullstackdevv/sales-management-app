@@ -15,6 +15,7 @@ import { productsAPI } from "@/api/products";
 
 // Cart item row component, memoized to avoid unnecessary re-renders
 const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity, onRemove, onProceed, formatPrice }) {
+    console.log(item)
     return (
         <div className="p-4 sm:p-5 hover:bg-gray-50/50 transition-colors duration-200">
             <div className="flex items-center gap-3 sm:gap-4">
@@ -150,6 +151,8 @@ export default function Cart() {
                         const image = imagePath || it.image || '/assets/images/products/placeholder.jpg';
                         const price = (variant?.price ?? product?.price ?? product?.min_price ?? product?.base_price ?? 0);
                         const stock = (typeof variant?.stock === 'number' ? variant.stock : (typeof product?.stock === 'number' ? product.stock : null));
+                        const weightRaw = (variant?.weight ?? product?.weight ?? null);
+                        const weight = (weightRaw !== null && !Number.isNaN(Number(weightRaw))) ? Number(weightRaw) : null;
                         const variantLabel = variant?.variant_label || variant?.name || it.variant_label;
                         const name = product?.name || it.name || 'Produk';
                         return {
@@ -157,6 +160,7 @@ export default function Cart() {
                             name,
                             image,
                             price: Number(price) || 0,
+                            weight: typeof weight === 'number' ? Number(weight) : null,
                             stock,
                             variant_label: variantLabel,
                         };
@@ -208,6 +212,8 @@ export default function Cart() {
                     variant_id: it.variant_id ?? it.id,
                     quantity: it.quantity,
                     selected: it.selected,
+                    discount_price: typeof it.discount_price !== 'undefined' && it.discount_price !== null ? Number(it.discount_price) : null,
+                    weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
                 }));
                 sessionStorage.setItem('cart', JSON.stringify(minimal));
             } catch {}
@@ -227,6 +233,8 @@ export default function Cart() {
                     variant_id: it.variant_id ?? it.id,
                     quantity: it.quantity,
                     selected: it.selected,
+                    discount_price: typeof it.discount_price !== 'undefined' && it.discount_price !== null ? Number(it.discount_price) : null,
+                    weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
                 }));
                 sessionStorage.setItem('cart', JSON.stringify(minimal));
             } catch {}
@@ -236,9 +244,16 @@ export default function Cart() {
 
     // Derived values memoized to avoid recalculation on unrelated renders
     const selectedItems = useMemo(() => localCartItems.filter(item => item.selected), [localCartItems]);
-    const subtotal = useMemo(() => selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0), [selectedItems]);
-    const shippingCost = useMemo(() => (selectedItems.length > 0 ? 15000 : 0), [selectedItems.length]);
+    const subtotal = useMemo(() => selectedItems.reduce((sum, item) => {
+        const price = item.discount_price && item.discount_price > 0 ? item.discount_price : item.price;
+        return sum + (price * item.quantity);
+    }, 0), [selectedItems]);
+    const shippingCost = useMemo(() => (selectedItems.length > 0 ? 0 : 0), [selectedItems.length]);
     const total = useMemo(() => subtotal + shippingCost, [subtotal, shippingCost]);
+    const totalWeight = useMemo(() => selectedItems.reduce((sum, item) => {
+        const w = (item && item.weight != null && !Number.isNaN(Number(item.weight))) ? Number(item.weight) : 0.5;
+        return sum + (w * item.quantity);
+    }, 0), [selectedItems]);
 
     return (
         <MarketplaceLayout>
@@ -324,12 +339,15 @@ export default function Cart() {
                                                     const productPayload = {
                                                         id: it.product_id ?? it.id,
                                                         name: it.name,
-                                                        price: it.price,
+                                                        price: it.discount_price && it.discount_price > 0 ? it.discount_price : it.price,
+                                                        discount_price: it.discount_price || null,
                                                         image: it.image,
                                                         quantity: it.quantity,
                                                         stock: it.stock,
+                                                        weight: it.weight || null,
                                                         variant_id: it.variant_id ?? it.id,
                                                         variant_label: it.variant_label,
+                                                        variant: { id: it.variant_id ?? it.id, weight: it.weight || null }
                                                     };
                                                     sessionStorage.setItem('checkout_data', JSON.stringify({ product: productPayload }));
                                                     window.location.href = '/checkout/product';
@@ -357,6 +375,11 @@ export default function Cart() {
                                             <span className="text-gray-600">Ongkos kirim</span>
                                             <span className="font-medium text-gray-900">{formatPrice(shippingCost)}</span>
                                         </div>
+                                        <div className="flex justify-between text-base sm:text-sm">
+                                            <span className="text-gray-600">Total Berat</span>
+                                            <span className="font-medium text-gray-900">{totalWeight.toFixed(1)} kg</span>
+                                        </div>
+
                                         <div className="border-t border-gray-100 pt-3">
                                             <div className="flex justify-between text-lg sm:text-base font-semibold text-gray-900">
                                                 <span>Total</span>
@@ -401,9 +424,10 @@ export default function Cart() {
                                                     quantity: item.quantity,
                                                     name: item.name,
                                                     variant_label: item.variant_label,
-                                                    price: item.price,
+                                                    price: item.discount_price && item.discount_price > 0 ? item.discount_price : item.price,
                                                     image: item.image,
-                                                    stock: item.stock
+                                                    stock: item.stock,
+                                                    weight: item.weight || null
                                                 })),
                                                 subtotal: subtotal,
                                                 total: total,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, router } from '@inertiajs/react';
-import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search, Phone, Mail } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search, Phone, Mail, ExternalLink, RefreshCw, LogOut } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { formatCurrency } from '@/utils/helpers';
 import checkoutSession from '@/utils/checkoutSession';
@@ -22,15 +22,19 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
     const [verificationError, setVerificationError] = useState('');
     const [pendingCustomer, setPendingCustomer] = useState(null);
 
-    const orders = initialOrders?.data || [];
-    const pagination = {
+    const [orders, setOrders] = useState(initialOrders?.data || []);
+    const [pagination, setPagination] = useState({
         current_page: initialOrders?.current_page || 1,
         last_page: initialOrders?.last_page || 1,
         total: initialOrders?.total || 0
-    };
+    });
+    const [currentPage, setCurrentPage] = useState(initialOrders?.current_page || 1);
+    const [loadingOrders, setLoadingOrders] = useState(false);
+    const [expandedOrderId, setExpandedOrderId] = useState(null);
+    const [checkingPaymentOrderId, setCheckingPaymentOrderId] = useState(null);
 
     useEffect(() => {
-        // Check if customer data exists in session
+        // Check if customer data exists in checkout session
         const sessionData = checkoutSession.get();
         if (!sessionData || !sessionData.customer) {
             setShowCustomerForm(true);
@@ -38,6 +42,55 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
             setShowCustomerForm(false);
         }
     }, []);
+
+    // Fetch orders based on customer_id from checkout session
+    useEffect(() => {
+        const fetchOrders = async () => {
+            try {
+                setLoadingOrders(true);
+
+                const sessionData = checkoutSession.get();
+                const customer = sessionData?.customer || {};
+                const customerId = customer.customer_id ?? sessionData?.customer_id ?? null;
+
+                if (!customerId) {
+                    setOrders([]);
+                    setPagination({ current_page: 1, last_page: 1, total: 0 });
+                    return;
+                }
+
+                const response = await api.get('/order-histories', {
+                    params: {
+                        customer_id: customerId,
+                        status: statusFilter !== 'all' ? statusFilter : undefined,
+                        search: searchQuery || undefined,
+                        page: currentPage,
+                    },
+                });
+
+                if (response.data.status === 'success') {
+                    const data = response.data.data;
+                    setOrders(data.data || []);
+                    setPagination({
+                        current_page: data.current_page || 1,
+                        last_page: data.last_page || 1,
+                        total: data.total || 0,
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load orders history:', error);
+                setOrders([]);
+                setPagination({ current_page: 1, last_page: 1, total: 0 });
+            } finally {
+                setLoadingOrders(false);
+            }
+        };
+
+        // Hanya fetch ketika form customer tidak sedang ditampilkan (customer sudah terverifikasi)
+        if (!showCustomerForm) {
+            fetchOrders();
+        }
+    }, [searchQuery, statusFilter, currentPage, showCustomerForm]);
 
     const getStatusBadge = (status) => {
         const statusConfig = {
@@ -72,32 +125,56 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
 
     const handleSearch = (e) => {
         e.preventDefault();
-        router.get('/orders', { 
-            search: searchQuery,
-            status: statusFilter !== 'all' ? statusFilter : undefined
-        }, {
-            preserveState: true
-        });
+        setCurrentPage(1);
     };
 
     const handleStatusChange = (status) => {
         setStatusFilter(status);
-        router.get('/orders', { 
-            status: status !== 'all' ? status : undefined,
-            search: searchQuery || undefined
-        }, {
-            preserveState: true
-        });
+        setCurrentPage(1);
     };
 
     const handlePageChange = (page) => {
-        router.get('/orders', { 
-            page,
-            status: statusFilter !== 'all' ? statusFilter : undefined,
-            search: searchQuery || undefined
-        }, {
-            preserveState: true
+        setCurrentPage(page);
+    };
+
+    const handleResetCheckoutSession = () => {
+        Swal.fire({
+            title: 'Logout dari Riwayat Pesanan?',
+            text: 'Ini akan menghapus data customer (checkout_data) yang tersimpan di session dan Anda perlu login/pilih customer lagi.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Ya, logout',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                checkoutSession.clear();
+                window.location.reload();
+            }
         });
+    };
+
+    const isWebOrder = (order) => {
+        return order?.payment_url && order.payment_url.trim() !== '';
+    };
+
+    const handleCheckPaymentStatus = async (order) => {
+        if (!order?.order_number) return;
+        try {
+            setCheckingPaymentOrderId(order.id);
+            const response = await api.get(`/payment/status/${order.order_number}`);
+            const data = response?.data?.data || response?.data || {};
+            const newStatus = data.payment_status || data.order?.payment_status || order.payment_status;
+
+            if (newStatus) {
+                setOrders(prev => prev.map(o => o.id === order.id ? { ...o, payment_status: newStatus } : o));
+            }
+        } catch (error) {
+            console.error('Failed to check payment status:', error);
+        } finally {
+            setCheckingPaymentOrderId(null);
+        }
     };
 
     // Search customers by name (using same method as CustomerDataCheckout)
@@ -405,9 +482,19 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
             <div className="min-h-screen bg-gray-50 py-8">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Pesanan Saya</h1>
-                        <p className="text-gray-600">Kelola dan pantau status pesanan Anda</p>
+                    <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900 mb-1">Pesanan Saya</h1>
+                            <p className="text-gray-600">Kelola dan pantau status pesanan Anda</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleResetCheckoutSession}
+                            className="inline-flex items-center px-3 py-2 text-xs font-medium text-primary border border-primary rounded-lg hover:bg-primary hover:text-white"
+                        >
+                            <LogOut className="w-4 h-4 mr-1" />
+                            Logout
+                        </button>
                     </div>
 
                     {/* Search and Filter */}
@@ -445,7 +532,12 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                     </div>
 
                     {/* Orders List */}
-                    {orders.length === 0 ? (
+                    {loadingOrders ? (
+                        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                            <p className="text-gray-600">Memuat pesanan...</p>
+                        </div>
+                    ) : orders.length === 0 ? (
                         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
                             <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                             <h3 className="text-xl font-semibold text-gray-900 mb-2">Belum Ada Pesanan</h3>
@@ -514,15 +606,139 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                             )}
                                         </div>
 
+                                        {/* Order Detail Summary (expand on click) */}
+                                        {expandedOrderId === order.id && (
+                                            <div className="space-y-4 mb-4 text-sm text-gray-700 bg-gray-50 rounded-lg p-4">
+                                                {/* Informasi Order */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Order</p>
+                                                        <p className="text-sm font-medium text-gray-900 mb-1">
+                                                            ID #{order.order_number}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mb-2">
+                                                            {order.ordered_at
+                                                                ? formatDate(order.ordered_at)
+                                                                : formatDate(order.created_at)}
+                                                        </p>
+
+                                                        <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Status bayar & Total Bayar</p>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="capitalize text-gray-700">
+                                                                {order.payment_status || 'Tidak diketahui'}
+                                                            </span>
+                                                            <span className="font-semibold text-gray-900">
+                                                                {formatCurrency(order.total_price || 0)}
+                                                            </span>
+                                                        </div>
+                                                        {order.payments && order.payments.length > 0 && (
+                                                            <p className="text-xs text-gray-500 mt-1">
+                                                                Dibayar pada: {order.payments[0].paid_at
+                                                                    ? formatDate(order.payments[0].paid_at)
+                                                                    : '-'}
+                                                            </p>
+                                                        )}
+                                                        {order.voucher && (
+                                                            <p className="mt-2 text-xs text-gray-500">
+                                                                Voucher: <span className="font-medium">{order.voucher.code}</span>
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Kurir</p>
+                                                        <p className="flex justify-between mb-1">
+                                                            <span className="text-gray-700">
+                                                                {order.shipping?.courier?.name || 'Kurir - Reguler'}
+                                                            </span>
+                                                            <span className="font-medium">
+                                                                {formatCurrency(order.shipping_cost || 0)}
+                                                            </span>
+                                                        </p>
+                                                        {order.shipping?.tracking_number && (
+                                                            <p className="flex justify-between mt-1 text-xs">
+                                                                <span className="text-gray-600">Resi</span>
+                                                                <span className="font-mono">{order.shipping.tracking_number}</span>
+                                                            </p>
+                                                        )}
+                                                        <p className="mt-3 text-xs font-semibold text-gray-500 uppercase mb-1">Metode Bayar</p>
+                                                        <p className="flex justify-between">
+                                                            <span className="text-gray-700">
+                                                                {order.payments && order.payments.length > 0
+                                                                    ? (order.payments[0].payment_bank?.name || 'Manual Transfer')
+                                                                    : 'Tidak diketahui'}
+                                                            </span>
+                                                        </p>
+                                                        {isWebOrder(order) && (
+                                                            <div className="mt-2 flex flex-wrap gap-3">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCheckPaymentStatus(order)}
+                                                                    disabled={checkingPaymentOrderId === order.id}
+                                                                    className="inline-flex items-center space-x-1 text-green-600 hover:text-green-800 text-xs disabled:opacity-50"
+                                                                >
+                                                                    <RefreshCw className={`w-4 h-4 ${checkingPaymentOrderId === order.id ? 'animate-spin' : ''}`} />
+                                                                    <span>{checkingPaymentOrderId === order.id ? 'Mengecek...' : 'Cek Status'}</span>
+                                                                </button>
+                                                                <a
+                                                                    href={order.payment_url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-xs"
+                                                                >
+                                                                    <ExternalLink className="w-4 h-4" />
+                                                                    <span>Payment URL</span>
+                                                                </a>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Dikirim Ke & Catatan */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Dikirim Ke</p>
+                                                        <p className="text-sm font-medium text-gray-900">
+                                                            {order.address?.recipient_name || order.customer?.name || '-'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-600 mt-1 whitespace-pre-line">
+                                                            {order.address ? (
+                                                                [
+                                                                    order.address.address_line_1,
+                                                                    order.address.address_line_2,
+                                                                    `${order.address.city || ''}${order.address.city && order.address.state ? ', ' : ''}${order.address.state || ''}`,
+                                                                    order.address.postal_code
+                                                                ].filter(Boolean).join('\n')
+                                                            ) : '-'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-600 mt-1">
+                                                            Telp: {order.customer?.phone || '-'}
+                                                        </p>
+                                                    </div>
+
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Catatan</p>
+                                                        <p className="text-sm text-gray-700 min-h-[1.5rem]">
+                                                            {order.notes || '-'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-2">
+                                                            Admin: {order.createdBy?.name || '-'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Actions */}
                                         <div className="flex justify-end">
-                                            <Link
-                                                href={`/orders/${order.order_number}`}
+                                            <button
+                                                type="button"
+                                                onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
                                                 className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                                             >
-                                                Lihat Detail
+                                                {expandedOrderId === order.id ? 'Tutup Detail' : 'Lihat Detail'}
                                                 <ChevronRight className="w-4 h-4 ml-1" />
-                                            </Link>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

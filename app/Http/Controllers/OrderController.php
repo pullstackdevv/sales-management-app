@@ -65,6 +65,49 @@ class OrderController extends Controller
         ]);
     }
 
+    /**
+     * Get order histories for a specific customer.
+     */
+    public function histories(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'search' => 'nullable|string',
+            'status' => 'nullable|string',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        $orders = Order::with([
+                'customer',
+                'address',
+                'shipping.courier',
+                'items.productVariant.product',
+                'payments.paymentBank',
+                'voucher',
+                'createdBy',
+                'salesChannel'
+            ])
+            ->where('customer_id', $validated['customer_id'])
+            ->when($validated['search'] ?? null, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('order_number', 'like', "%{$search}%")
+                        ->orWhereHas('items', function ($q) use ($search) {
+                            $q->where('product_name_snapshot', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($validated['status'] ?? null, function ($query, $status) {
+                $query->where('status', $status);
+            })
+            ->latest()
+            ->paginate($validated['per_page'] ?? 10);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $orders,
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([

@@ -146,6 +146,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Order routes
     Route::apiResource('orders', OrderController::class);
+    Route::get('order-histories', [OrderController::class, 'histories']);
     Route::post('orders/{order}/update-status', [OrderController::class, 'updateStatus']);
     Route::put('orders/{order}/shipping', [OrderController::class, 'updateShipping']);
     Route::get('orders/{order}/generate-shipping-label', [OrderController::class, 'generateShippingLabel']);

@@ -468,6 +468,7 @@ export default function ProductAdd() {
                             value={formatRibuan(variant.weight)}
                             onChange={(e) => updateVariant(index, 'weight', parseRibuan(e.target.value))}
                             onFocus={() => { if (variant.weight === 0) updateVariant(index, 'weight', ''); }}
+                            required
                           />
                           {errors[`variants.${index}.weight`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.weight`][0]}</p>

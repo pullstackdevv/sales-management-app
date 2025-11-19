@@ -3,6 +3,7 @@ import { Link } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import api from "@/api/axios";
+import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
 import StockHistoryModal from "@/components/StockHistoryModal";
 import StockAdjustmentModal from "@/components/StockAdjustmentModal";
@@ -219,7 +220,7 @@ export default function ProductData() {
                               : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`
                           ) : 'Belum ada harga'}
                         </p>
-                        {minBasePrice > 0 && (
+                        {canViewBasePrice && minBasePrice > 0 && (
                           <p className="text-gray-500 text-xs">
                             Modal: {minBasePrice === maxBasePrice 
                               ? formatCurrency(minBasePrice)
@@ -308,8 +309,8 @@ export default function ProductData() {
                               <th className="px-3 py-2">Nama Varian</th>
                               <th className="px-3 py-2">SKU</th>
                               <th className="px-3 py-2">Harga Jual</th>
-                              <th className="px-3 py-2">Harga Modal</th>
-                              <th className="px-3 py-2">Margin</th>
+                              {canViewBasePrice && (<th className="px-3 py-2">Harga Modal</th>)}
+                              {canViewBasePrice && (<th className="px-3 py-2">Margin</th>)}
                               <th className="px-3 py-2">Stok</th>
                               <th className="px-3 py-2">Status</th>
                               <th className="px-3 py-2">Aksi</th>
@@ -344,22 +345,26 @@ export default function ProductData() {
                                   <td className="px-3 py-2">{variant.name || variant.variant_label}</td>
                                   <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
                                   <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>
-                                  <td className="px-3 py-2 text-gray-600">
-                                    {variant.base_price > 0 ? formatCurrency(variant.base_price) : '-'}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    {variant.base_price > 0 ? (
-                                      <span className={`text-xs px-2 py-1 rounded ${
-                                        profitMargin >= 30 ? 'bg-green-100 text-green-800' :
-                                        profitMargin >= 15 ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-red-100 text-red-800'
-                                      }`}>
-                                        +{profitMargin}%
-                                      </span>
-                                    ) : (
-                                      <span className="text-gray-400 text-xs">-</span>
-                                    )}
-                                  </td>
+                                  {canViewBasePrice && (
+                                    <td className="px-3 py-2 text-gray-600">
+                                      {variant.base_price > 0 ? formatCurrency(variant.base_price) : '-'}
+                                    </td>
+                                  )}
+                                  {canViewBasePrice && (
+                                    <td className="px-3 py-2">
+                                      {variant.base_price > 0 ? (
+                                        <span className={`text-xs px-2 py-1 rounded ${
+                                          profitMargin >= 30 ? 'bg-green-100 text-green-800' :
+                                          profitMargin >= 15 ? 'bg-yellow-100 text-yellow-800' :
+                                          'bg-red-100 text-red-800'
+                                        }`}>
+                                          +{profitMargin}%
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400 text-xs">-</span>
+                                      )}
+                                    </td>
+                                  )}
                                   <td className="px-3 py-2">
                                     <button
                                       onClick={() => openStockHistoryModal({ ...variant, product })}
@@ -422,3 +427,5 @@ export default function ProductData() {
     </DashboardLayout>
   );
 }
+  const currentUser = AuthAPI.getUser();
+  const canViewBasePrice = currentUser?.role_id === 1;

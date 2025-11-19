@@ -57,6 +57,7 @@ const EditVoucher = ({ voucherId }) => {
                 setValue('valid_from', formatDateForInput(voucher.start_date));
                 setValue('valid_until', formatDateForInput(voucher.end_date));
                 setValue('is_active', voucher.is_active);
+                setValue('free_product_name', voucher.free_product_name);
                 
                 setIsLoading(false);
             } catch (error) {
@@ -363,7 +364,7 @@ const EditVoucher = ({ voucherId }) => {
                                         type="text"
                                         value={formatRibuan(watch('minimum_amount'))}
                                         {...register('minimum_amount', {
-                                            required: "Minimal pembelian harus diisi",
+                                            // required: "Minimal pembelian harus diisi",
                                             min: { value: 0, message: "Minimal pembelian tidak boleh negatif" },
                                             setValueAs: (v) => parseRibuan(v)
                                         })}

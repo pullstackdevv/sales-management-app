@@ -527,6 +527,10 @@ class PaymentController extends Controller
                     'payment_status' => $paymentStatus,
                     'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
                 ]);
+
+                if ($paymentStatus === PaymentStatus::PAID) {
+                    WebOrderController::updateVoucherUsedCount($order->id);
+                }
             }
 
             return response()->json([
@@ -564,6 +568,10 @@ class PaymentController extends Controller
                     'payment_status' => $paymentStatus,
                     'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
                 ]);
+
+                if ($paymentStatus === PaymentStatus::PAID) {
+                    WebOrderController::updateVoucherUsedCount($order->id);
+                }
             }
 
             return response()->json([

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
+import * as AuthAPI from "@/api/auth";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
 import TiptapEditor from "@/components/TiptapEditor";
@@ -547,23 +548,25 @@ export default function ProductEdit() {
                             )}
                           </div>
 
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Harga Modal*</label>
-                            <input
-                              type="text"
-                              className={`w-full border px-3 py-2 rounded-md text-sm ${
-                                errors[`variants.${index}.base_price`] ? 'border-red-500' : 'border-gray-300'
-                              }`}
-                              placeholder="Masukkan harga modal"
-                              value={formatRibuan(variant.base_price)}
-                              onChange={(e) => updateVariant(index, 'base_price', parseRibuan(e.target.value))}
-                              onFocus={() => { if (variant.base_price === 0) updateVariant(index, 'base_price', ''); }}
-                              required
-                            />
-                            {errors[`variants.${index}.base_price`] && (
-                              <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.base_price`][0]}</p>
-                            )}
-                          </div>
+                          {canViewBasePrice && (
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Harga Modal*</label>
+                              <input
+                                type="text"
+                                className={`w-full border px-3 py-2 rounded-md text-sm ${
+                                  errors[`variants.${index}.base_price`] ? 'border-red-500' : 'border-gray-300'
+                                }`}
+                                placeholder="Masukkan harga modal"
+                                value={formatRibuan(variant.base_price)}
+                                onChange={(e) => updateVariant(index, 'base_price', parseRibuan(e.target.value))}
+                                onFocus={() => { if (variant.base_price === 0) updateVariant(index, 'base_price', ''); }}
+                                required
+                              />
+                              {errors[`variants.${index}.base_price`] && (
+                                <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.base_price`][0]}</p>
+                              )}
+                            </div>
+                          )}
 
                           <div>
                             <label className="block text-sm font-medium mb-1">Harga Jual*</label>
@@ -781,3 +784,5 @@ export default function ProductEdit() {
     </DashboardLayout>
   );
 }
+  const currentUser = AuthAPI.getUser();
+  const canViewBasePrice = currentUser?.role_id === 1;

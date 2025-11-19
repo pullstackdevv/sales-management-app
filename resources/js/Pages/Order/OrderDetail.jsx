@@ -213,44 +213,6 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                         </div>
                     </div>
 
-                    {/* Statistics */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="bg-white p-6 rounded-lg shadow-sm">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-2 bg-gray-100 rounded-lg">
-                                    <DollarSign className="w-6 h-6 text-gray-600" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-600">Total harga jual produk</p>
-                                    <p className="text-xl font-bold">Rp{totalSellingPrice.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-white p-6 rounded-lg shadow-sm">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                    <Briefcase className="w-6 h-6 text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-600">Total harga modal produk</p>
-                                    <p className="text-xl font-bold">Rp{totalProductCost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-white p-6 rounded-lg shadow-sm">
-                            <div className="flex items-center space-x-3">
-                                <div className="p-2 bg-green-100 rounded-lg">
-                                    <TrendingUp className="w-6 h-6 text-green-600" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-600">Profit</p>
-                                    <p className="text-xl font-bold">Rp{profit.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column */}

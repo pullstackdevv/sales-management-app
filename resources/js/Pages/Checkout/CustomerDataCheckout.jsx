@@ -1239,9 +1239,10 @@ const CustomerDataCheckout = () => {
 
   // Handle kembali ke step sebelumnya
   const handleBack = () => {
-    if (productData) {
-      router.visit(route('checkout.product'));
-    }
+    if (!productData) return;
+    const isMulti = (productData.id === 'multi-product') || (Array.isArray(productData.multiProducts) && productData.multiProducts.length > 0);
+    const backRoute = isMulti ? 'checkout.multi-product' : 'checkout.product';
+    router.visit(route(backRoute));
   };
 
   if (!productData) {

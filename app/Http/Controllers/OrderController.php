@@ -564,7 +564,7 @@ class OrderController extends Controller
                         $item->product_variant_id,
                         StockMovementType::IN,
                         $item->quantity,
-                        "Order #{$order->id} cancelled - Stock returned"
+                        "Order #{$order->order_number} cancelled - Stock returned"
                     );
                 }
             }

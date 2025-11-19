@@ -151,9 +151,12 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
 
     // Get valid status transitions - allow all status changes
     const getValidStatusTransitions = (currentStatus) => {
+        const isWebOrder = !!localOrder.payment_url || localOrder.sales_channel === 'WEBSITE';
+        if (currentStatus === 'delivered') return [];
         const allStatuses = ["pending", "paid", "shipped", "delivered", "cancelled"];
-        // Return all statuses except the current one
-        return allStatuses.filter((status) => status !== currentStatus);
+        if (isWebOrder && currentStatus === 'pending') return [];
+        const base = allStatuses.filter((status) => status !== currentStatus);
+        return isWebOrder ? base.filter((s) => s !== 'cancelled') : base;
     };
 
     // Helper function to get status label in Indonesian

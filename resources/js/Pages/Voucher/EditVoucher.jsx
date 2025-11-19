@@ -47,11 +47,14 @@ const EditVoucher = ({ voucherId }) => {
                 setValue('minimum_amount', voucher.minimum_amount);
                 setValue('maximum_discount', voucher.maximum_discount);
                 setValue('usage_limit', voucher.usage_limit);
-                // Format tanggal untuk input type="date" (YYYY-MM-DD)
+                // Format tanggal untuk input type="date" (YYYY-MM-DD) tanpa pergeseran timezone
                 const formatDateForInput = (dateString) => {
                     if (!dateString) return '';
-                    const date = new Date(dateString);
-                    return date.toISOString().split('T')[0];
+                    const d = new Date(dateString);
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
                 };
                 
                 setValue('valid_from', formatDateForInput(voucher.start_date));
@@ -363,11 +366,12 @@ const EditVoucher = ({ voucherId }) => {
                                     <input
                                         type="text"
                                         value={formatRibuan(watch('minimum_amount'))}
-                                        {...register('minimum_amount', {
-                                            // required: "Minimal pembelian harus diisi",
-                                            min: { value: 0, message: "Minimal pembelian tidak boleh negatif" },
-                                            setValueAs: (v) => parseRibuan(v)
-                                        })}
+                                        // {...register('minimum_amount', {
+                                        //     // required: "Minimal pembelian harus diisi",
+                                        //     min: { value: 0, message: "Minimal pembelian tidak boleh negatif" },
+                                        //     setValueAs: (v) => parseRibuan(v)
+                                        // })}
+                                        
                                         onChange={(e) => setValue('minimum_amount', parseRibuan(e.target.value), { shouldValidate: true })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="100000"

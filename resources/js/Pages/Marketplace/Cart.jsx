@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback, memo, useEffect } from "react";
 import { Link } from "@inertiajs/react";
 import MarketplaceLayout from "../../Layouts/MarketplaceLayout";
-import { 
-    Trash2, 
-    Plus, 
-    Minus, 
+import {
+    Trash2,
+    Plus,
+    Minus,
     ArrowLeft,
     CreditCard,
     Truck,
@@ -12,10 +12,11 @@ import {
 } from "lucide-react";
 import useCart from "@/hooks/useCart";
 import { productsAPI } from "@/api/products";
+import axios from "axios";
 
 // Cart item row component, memoized to avoid unnecessary re-renders
 const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity, onRemove, onProceed, formatPrice }) {
-    console.log(item)
+
     return (
         <div className="p-4 sm:p-5 hover:bg-gray-50/50 transition-colors duration-200">
             <div className="flex items-center gap-3 sm:gap-4">
@@ -119,11 +120,29 @@ export default function Cart() {
     const { cartItems, updateQuantity, removeFromCart, clearCart, loadCart, saveCart } = useCart();
     const [localCartItems, setLocalCartItems] = useState([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
+    const [promotions, setPromotions] = useState([]);
+    const [loadingPromotions, setLoadingPromotions] = useState(false);
+
+    const fetchActivePromotions = async () => {
+        setLoadingPromotions(true);
+        try {
+            const response = await axios.get('/api/promotions-active');
+            if (response.data.status === 'success') {
+                setPromotions(response.data.data);
+                console.log('Active promotions loaded:', response.data.data);
+            }
+        } catch (error) {
+            console.error('Error fetching promotions:', error);
+        } finally {
+            setLoadingPromotions(false);
+        }
+    };
 
     // Load cart items on component mount
     useEffect(() => {
         const items = loadCart();
         setLocalCartItems(items);
+        fetchActivePromotions();
     }, [loadCart]);
 
     // Update local state when cart items change
@@ -142,7 +161,7 @@ export default function Cart() {
                         const resp = await productsAPI.getProduct(it.product_id);
                         // productsAPI.getProduct returns response.data from axios
                         // API shape example provided: { status: "success", data: { ...product } }
-                        const productPayload = resp?.data ?? resp; 
+                        const productPayload = resp?.data ?? resp;
                         const product = productPayload?.data || productPayload?.product || productPayload;
                         if (!product) return it;
                         const variants = product.variants || [];
@@ -199,8 +218,8 @@ export default function Cart() {
 
     const toggleSelect = useCallback((id) => {
         setLocalCartItems(prev => {
-            const next = prev.map(item => 
-                item.id === id 
+            const next = prev.map(item =>
+                item.id === id
                     ? { ...item, selected: !item.selected }
                     : item
             );
@@ -216,7 +235,7 @@ export default function Cart() {
                     weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
                 }));
                 sessionStorage.setItem('cart', JSON.stringify(minimal));
-            } catch {}
+            } catch { }
             return next;
         });
     }, []);
@@ -237,7 +256,7 @@ export default function Cart() {
                     weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
                 }));
                 sessionStorage.setItem('cart', JSON.stringify(minimal));
-            } catch {}
+            } catch { }
             return next;
         });
     }, []);
@@ -261,7 +280,7 @@ export default function Cart() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
                     <div className="mb-6 sm:mb-8">
-                        <Link 
+                        <Link
                             href="/"
                             className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4 sm:mb-5 text-sm sm:text-base"
                         >
@@ -286,7 +305,7 @@ export default function Cart() {
                                 <p className="text-gray-600 mb-5 text-base sm:text-sm">
                                     Belum ada produk yang Anda pilih.
                                 </p>
-                                <Link 
+                                <Link
                                     href="/"
                                     className="inline-flex items-center justify-center px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-md transition-colors text-sm"
                                 >
@@ -313,7 +332,7 @@ export default function Cart() {
                                                     Pilih semua ({localCartItems.length})
                                                 </span>
                                             </div>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     clearCart();
                                                     setLocalCartItems([]);
@@ -365,7 +384,7 @@ export default function Cart() {
                                     <h3 className="text-xl sm:text-lg font-semibold text-gray-900 mb-4">
                                         Ringkasan
                                     </h3>
-                                    
+
                                     <div className="space-y-3 mb-5">
                                         <div className="flex justify-between text-base sm:text-sm">
                                             <span className="text-gray-600">Subtotal ({selectedItems.length} item)</span>
@@ -389,18 +408,63 @@ export default function Cart() {
                                     </div>
 
                                     {/* Shipping Info */}
-                                    <div className="bg-blue-50 rounded-md p-3 mb-4">
-                                        <div className="flex items-center mb-1.5">
+                                    <div className="rounded-md p-3 mb-4">
+                                        {/* <div className="flex items-center mb-1.5">
                                             <Truck className="h-5 w-5 text-blue-600 mr-2" />
                                             <span className="text-sm font-medium text-blue-900">Gratis ongkir</span>
                                         </div>
                                         <p className="text-sm text-blue-700">
                                             Untuk pembelian di atas Rp 100.000
-                                        </p>
+                                        </p> */}
+                                        {promotions.length > 0 && (
+                                            <div className="border-t pt-3">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                                                        🎉 Promosi Aktif
+                                                    </label>
+                                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                        {promotions.map((promo) => (
+                                                            <div
+                                                                key={promo.id}
+                                                                className="p-3 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg"
+                                                            >
+                                                                <div className="flex items-start gap-2">
+                                                                    <span className="text-orange-600 text-sm">🏷️</span>
+                                                                    <div className="flex-1">
+                                                                        <p className="text-xs font-bold text-orange-900 mb-1">
+                                                                            {promo.title}
+                                                                        </p>
+                                                                        <p className="text-xs text-orange-800 leading-relaxed">
+                                                                            {promo.description}
+                                                                        </p>
+                                                                        {(promo.start_date || promo.end_date) && (
+                                                                            <div className="mt-2 text-xs text-orange-700">
+                                                                                <span className="font-medium">Periode: </span>
+                                                                                {promo.start_date && new Date(promo.start_date).toLocaleDateString('id-ID', {
+                                                                                    day: 'numeric',
+                                                                                    month: 'short',
+                                                                                    year: 'numeric'
+                                                                                })}
+                                                                                {promo.start_date && promo.end_date && ' - '}
+                                                                                {promo.end_date && new Date(promo.end_date).toLocaleDateString('id-ID', {
+                                                                                    day: 'numeric',
+                                                                                    month: 'short',
+                                                                                    year: 'numeric'
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Security Info */}
-                                    <div className="bg-green-50 rounded-md p-3 mb-5">
+                                    <div className="bg-green-50 rounded-md p-3 mb-5 mx-2">
                                         <div className="flex items-center mb-1.5">
                                             <Shield className="h-5 w-5 text-green-600 mr-2" />
                                             <span className="text-sm font-medium text-green-900">Pembayaran aman</span>
@@ -415,7 +479,7 @@ export default function Cart() {
                                         onClick={(e) => {
                                             e.preventDefault();
                                             if (selectedItems.length === 0) return;
-                                            
+
                                             // Save multi-product checkout data
                                             const checkoutData = {
                                                 products: selectedItems.map(item => ({
@@ -433,7 +497,7 @@ export default function Cart() {
                                                 total: total,
                                                 shipping_cost: shippingCost
                                             };
-                                            
+
                                             try {
                                                 sessionStorage.setItem('checkout_data', JSON.stringify(checkoutData));
                                                 window.location.href = '/checkout/multi-product';
@@ -443,11 +507,10 @@ export default function Cart() {
                                             }
                                         }}
                                         disabled={selectedItems.length === 0}
-                                        className={`w-full py-3 px-4 rounded-md font-medium text-center transition-colors text-sm ${
-                                            selectedItems.length > 0
-                                                ? 'bg-gray-900 text-white hover:bg-gray-800'
-                                                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                        }`}
+                                        className={`w-full py-3 px-4 rounded-md font-medium text-center transition-colors text-sm ${selectedItems.length > 0
+                                            ? 'bg-gray-900 text-white hover:bg-gray-800'
+                                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                            }`}
                                     >
                                         <div className="flex items-center justify-center">
                                             <CreditCard className="h-5 w-5 mr-2" />

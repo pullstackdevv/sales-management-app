@@ -35,6 +35,16 @@ export default function ExpensePage() {
     const [perPage, setPerPage] = useState(10);
     const [totalItems, setTotalItems] = useState(0);
 
+    const formatRibuan = (num) => {
+        if (!num || num === 0) return '';
+        return Math.floor(num).toLocaleString('id-ID');
+    };
+
+    const parseRibuan = (str) => {
+        if (!str) return 0;
+        return parseInt(str.toString().replace(/\./g, '')) || 0;
+    };
+
     const subtotal = amount * qty;
 
     // Fetch expenses data
@@ -594,11 +604,10 @@ export default function ExpensePage() {
                                         Biaya
                                     </label>
                                     <input
-                                        type="number"
-                                        value={amount}
-                                        onChange={(e) =>
-                                            setAmount(Number(e.target.value))
-                                        }
+                                        type="text"
+                                        value={formatRibuan(amount)}
+                                        onChange={(e) => setAmount(parseRibuan(e.target.value))}
+                                        onFocus={() => { if (amount === 0) setAmount(''); }}
                                         placeholder="Rp 0"
                                         className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                             errors.amount ? 'border-red-500' : 'border-gray-300'
@@ -613,13 +622,11 @@ export default function ExpensePage() {
                                         Jumlah
                                     </label>
                                     <input
-                                        type="number"
-                                        value={qty}
-                                        onChange={(e) =>
-                                            setQty(Number(e.target.value))
-                                        }
+                                        type="text"
+                                        value={formatRibuan(qty)}
+                                        onChange={(e) => setQty(Math.max(1, parseRibuan(e.target.value)))}
+                                        onFocus={() => { if (qty === 0) setQty(''); }}
                                         placeholder="1"
-                                        min="1"
                                         className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                             errors.quantity ? 'border-red-500' : 'border-gray-300'
                                         }`}

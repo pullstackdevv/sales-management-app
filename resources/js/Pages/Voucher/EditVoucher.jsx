@@ -21,6 +21,16 @@ const EditVoucher = ({ voucherId }) => {
 
     const voucherType = watch("type", "percentage");
 
+    const formatRibuan = (num) => {
+        if (!num || num === 0) return '';
+        return Math.floor(num).toLocaleString('id-ID');
+    };
+
+    const parseRibuan = (str) => {
+        if (!str) return 0;
+        return parseInt(str.toString().replace(/\./g, '')) || 0;
+    };
+
     // Load voucher data
     useEffect(() => {
         const fetchVoucher = async () => {
@@ -283,30 +293,27 @@ const EditVoucher = ({ voucherId }) => {
                                                     %
                                                 </span>
                                             )}
-                                            <input
-                                                type="number"
-                                                step="1"
-                                                {...register("value", {
-                                                    required: voucherType !== "free_sample" ? "Nilai diskon harus diisi" : false,
-                                                    min: {
-                                                        value: 1,
-                                                        message: "Nilai harus lebih dari 0",
-                                                    },
-                                                    max:
-                                                        voucherType === "percentage"
-                                                            ? {
-                                                                  value: 100,
-                                                                  message: "Persentase maksimal 100%",
-                                                              }
-                                                            : undefined,
-                                                })}
-                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    voucherType === "fixed" || voucherType === "shipping" ? "pl-8" : "pr-8"
-                                                }`}
-                                                placeholder={
-                                                    voucherType === "percentage" ? "10" : "50000"
-                                                }
-                                            />
+                                            {voucherType === 'percentage' ? (
+                                                <input
+                                                    type="number"
+                                                    step="1"
+                                                    {...register("value", {
+                                                        required: "Nilai diskon harus diisi",
+                                                        min: { value: 1, message: "Nilai harus lebih dari 0" },
+                                                        max: { value: 100, message: "Persentase maksimal 100%" }
+                                                    })}
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8`}
+                                                    placeholder="10"
+                                                />
+                                            ) : (
+                                                <input
+                                                    type="text"
+                                                    value={formatRibuan(watch('value'))}
+                                                    onChange={(e) => setValue('value', parseRibuan(e.target.value), { shouldValidate: true })}
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-8`}
+                                                    placeholder="50000"
+                                                />
+                                            )}
                                         </div>
                                         {errors.value && (
                                             <p className="text-red-500 text-sm mt-1">
@@ -353,15 +360,14 @@ const EditVoucher = ({ voucherId }) => {
                                         Minimal Pembelian (Rp) *
                                     </label>
                                     <input
-                                        type="number"
-                                        step="1"
-                                        {...register("minimum_amount", {
+                                        type="text"
+                                        value={formatRibuan(watch('minimum_amount'))}
+                                        {...register('minimum_amount', {
                                             required: "Minimal pembelian harus diisi",
-                                            min: {
-                                                value: 0,
-                                                message: "Minimal pembelian tidak boleh negatif",
-                                            },
+                                            min: { value: 0, message: "Minimal pembelian tidak boleh negatif" },
+                                            setValueAs: (v) => parseRibuan(v)
                                         })}
+                                        onChange={(e) => setValue('minimum_amount', parseRibuan(e.target.value), { shouldValidate: true })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="100000"
                                     />
@@ -378,14 +384,13 @@ const EditVoucher = ({ voucherId }) => {
                                             Maksimal Diskon (Rp)
                                         </label>
                                         <input
-                                            type="number"
-                                            step="1"
-                                            {...register("maximum_discount", {
-                                                min: {
-                                                    value: 0,
-                                                    message: "Maksimal diskon tidak boleh negatif",
-                                                },
+                                            type="text"
+                                            value={formatRibuan(watch('maximum_discount'))}
+                                            {...register('maximum_discount', {
+                                                min: { value: 0, message: "Maksimal diskon tidak boleh negatif" },
+                                                setValueAs: (v) => parseRibuan(v)
                                             })}
+                                            onChange={(e) => setValue('maximum_discount', parseRibuan(e.target.value), { shouldValidate: true })}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             placeholder="500000"
                                         />
@@ -405,14 +410,14 @@ const EditVoucher = ({ voucherId }) => {
                                         Batas Penggunaan *
                                     </label>
                                     <input
-                                        type="number"
-                                        {...register("usage_limit", {
+                                        type="text"
+                                        value={formatRibuan(watch('usage_limit'))}
+                                        {...register('usage_limit', {
                                             required: "Batas penggunaan harus diisi",
-                                            min: {
-                                                value: 1,
-                                                message: "Batas penggunaan minimal 1",
-                                            },
+                                            min: { value: 1, message: "Batas penggunaan minimal 1" },
+                                            setValueAs: (v) => parseRibuan(v)
                                         })}
+                                        onChange={(e) => setValue('usage_limit', Math.max(1, parseRibuan(e.target.value)), { shouldValidate: true })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="100"
                                     />

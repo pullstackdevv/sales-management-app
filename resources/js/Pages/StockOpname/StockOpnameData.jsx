@@ -26,6 +26,16 @@ export default function StockOpnamePage() {
     const [selectedStockOpname, setSelectedStockOpname] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
 
+    const formatRibuan = (num) => {
+        if (!num || num === 0) return '';
+        return Math.floor(num).toLocaleString('id-ID');
+    };
+
+    const parseRibuan = (str) => {
+        if (!str) return 0;
+        return parseInt(str.toString().replace(/\./g, '')) || 0;
+    };
+
     useEffect(() => {
         fetchStockOpnames();
     }, [searchTerm, filters, pagination.current_page]);
@@ -480,17 +490,17 @@ export default function StockOpnamePage() {
                                                 <p className="text-gray-900">{detail.product_variant?.variant_label || 'Default'}</p>
                                             </div>
                                             <div className="col-span-2">
-                                                <p className="text-gray-900">{detail.system_stock}</p>
+                                                <p className="text-gray-900">{formatRibuan(detail.system_stock)}</p>
                                             </div>
                                             <div className="col-span-2">
-                                                <p className="text-gray-900">{detail.real_stock}</p>
+                                                <p className="text-gray-900">{formatRibuan(detail.real_stock)}</p>
                                             </div>
                                             <div className="col-span-2">
                                                 <p className={`font-medium ${
                                                     detail.difference > 0 ? 'text-green-600' : 
                                                     detail.difference < 0 ? 'text-red-600' : 'text-gray-600'
                                                 }`}>
-                                                    {detail.difference > 0 ? '+' : ''}{detail.difference}
+                                                    {detail.difference > 0 ? '+' : ''}{formatRibuan(detail.difference)}
                                                 </p>
                                             </div>
                                             <div className="col-span-1">

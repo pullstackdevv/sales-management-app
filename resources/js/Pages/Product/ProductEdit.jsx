@@ -253,7 +253,8 @@ export default function ProductEdit() {
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price || 0);
         formData.append(`variants[${index}][discount_price]`, variant.discount_price || '');
-        formData.append(`variants[${index}][weight]`, variant.weight);
+        const weightKg = variant.weight ? Number(variant.weight) / 1000 : 0;
+        formData.append(`variants[${index}][weight]`, weightKg);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
         formData.append(`variants[${index}][is_storefront]`, variant.is_storefront ? '1' : '0');

@@ -141,7 +141,7 @@ export default function ProductAdd() {
       
       // Append basic product data
       formData.append('name', product.name);
-      formData.append('sku', product.sku);
+      // formData.append('sku', product.sku);
       formData.append('description', product.description);
       formData.append('category_id', product.category_id);
       formData.append('category', product.category);
@@ -159,7 +159,8 @@ export default function ProductAdd() {
         formData.append(`variants[${index}][sku]`, variant.sku);
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price);
-        formData.append(`variants[${index}][weight]`, variant.weight);
+        const weightKg = variant.weight ? Number(variant.weight) / 1000 : 0;
+        formData.append(`variants[${index}][weight]`, weightKg);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
         formData.append(`variants[${index}][is_storefront]`, variant.is_storefront ? '1' : '0');

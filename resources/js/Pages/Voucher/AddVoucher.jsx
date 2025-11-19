@@ -12,6 +12,7 @@ const AddVoucher = () => {
         register,
         handleSubmit,
         watch,
+        setValue,
         formState: { errors },
         reset,
     } = useForm();
@@ -19,15 +20,30 @@ const AddVoucher = () => {
 
     const voucherType = watch("type", "percentage");
 
+    const formatRibuan = (num) => {
+        if (!num || num === 0) return '';
+        return Math.floor(num).toLocaleString('id-ID');
+    };
+
+    const parseRibuan = (str) => {
+        if (!str) return 0;
+        return parseInt(str.toString().replace(/\./g, '')) || 0;
+    };
+
     const onSubmit = async (data) => {
         setIsSubmitting(true);
         console.log("Form Data:", data);
 
         try {
-            const response = await axios.post('/api/vouchers', {
+            const payload = {
                 ...data,
                 is_active: data.is_active || true
-            });
+            };
+            if (payload.type === 'free_sample') {
+                payload.value = payload.value ? Number(payload.value) : 1;
+            }
+
+            const response = await axios.post('/api/vouchers', payload);
 
             if (response.data.status === 'success') {
                 await Swal.fire({
@@ -237,36 +253,32 @@ const AddVoucher = () => {
                                                     </span>
                                                 </div>
                                             )}
-                                            <input
-                                                type="number"
-                                                step="1"
-                                                {...register("value", {
-                                                    required: voucherType !== "free_sample" ? "Nilai diskon harus diisi" : false,
-                                                    min: {
-                                                        value: 1,
-                                                        message:
-                                                            "Nilai harus lebih dari 0",
-                                                    },
-                                                    max:
-                                                        voucherType === "percentage"
-                                                            ? {
-                                                                  value: 100,
-                                                                  message:
-                                                                      "Persentase maksimal 100%",
-                                                              }
-                                                            : undefined,
-                                                })}
-                                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                    voucherType === "fixed" || voucherType === "shipping"
-                                                        ? "pl-8"
-                                                        : "pr-8"
-                                                }`}
-                                                placeholder={
-                                                    voucherType === "percentage"
-                                                        ? "10"
-                                                        : "50000"
-                                                }
-                                            />
+                                            {voucherType === 'percentage' ? (
+                                                <input
+                                                    type="number"
+                                                    step="1"
+                                                    {...register("value", {
+                                                        required: "Nilai diskon harus diisi",
+                                                        min: { value: 1, message: "Nilai harus lebih dari 0" },
+                                                        
+                                                    })}
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8`}
+                                                    placeholder="10"
+                                                />
+                                            ) : (
+                                                <input
+                                                    type="text"
+                                                    value={formatRibuan(watch('value'))}
+                                                    {...register('value', {
+                                                        required: "Nilai diskon harus diisi",
+                                                        min: { value: 1, message: "Nilai harus lebih dari 0" },
+                                                        setValueAs: (v) => parseRibuan(v)
+                                                    })}
+                                                    onChange={(e) => setValue('value', parseRibuan(e.target.value), { shouldValidate: true })}
+                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-8`}
+                                                    placeholder="50000"
+                                                />
+                                            )}
                                         </div>
                                         {errors.value && (
                                             <p className="text-red-500 text-sm mt-1">
@@ -313,17 +325,9 @@ const AddVoucher = () => {
                                         Minimal Pembelian (Rp) *
                                     </label>
                                     <input
-                                        type="number"
-                                        step="1"
-                                        {...register("min_purchase", {
-                                            required:
-                                                "Minimal pembelian harus diisi",
-                                            min: {
-                                                value: 0,
-                                                message:
-                                                    "Nilai tidak boleh negatif",
-                                            },
-                                        })}
+                                        type="text"
+                                        value={formatRibuan(watch('min_purchase'))}
+                                        onChange={(e) => setValue('min_purchase', parseRibuan(e.target.value), { shouldValidate: true })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="100000"
                                     />
@@ -340,15 +344,13 @@ const AddVoucher = () => {
                                             Maksimal Potongan (Rp)
                                         </label>
                                         <input
-                                            type="number"
-                                            step="1"
-                                            {...register("max_discount", {
-                                                min: {
-                                                    value: 0,
-                                                    message:
-                                                        "Nilai tidak boleh negatif",
-                                                },
+                                            type="text"
+                                            value={formatRibuan(watch('max_discount'))}
+                                            {...register('max_discount', {
+                                                min: { value: 0, message: "Nilai tidak boleh negatif" },
+                                                setValueAs: (v) => parseRibuan(v)
                                             })}
+                                            onChange={(e) => setValue('max_discount', parseRibuan(e.target.value), { shouldValidate: true })}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             placeholder="50000"
                                         />
@@ -369,16 +371,14 @@ const AddVoucher = () => {
                                         Batas Penggunaan *
                                     </label>
                                     <input
-                                        type="number"
-                                        {...register("usage_limit", {
-                                            required:
-                                                "Batas penggunaan harus diisi",
-                                            min: {
-                                                value: 1,
-                                                message:
-                                                    "Minimal 1 kali penggunaan",
-                                            },
+                                        type="text"
+                                        value={formatRibuan(watch('usage_limit'))}
+                                        {...register('usage_limit', {
+                                            required: "Batas penggunaan harus diisi",
+                                            min: { value: 1, message: "Minimal 1 kali penggunaan" },
+                                            setValueAs: (v) => parseRibuan(v)
                                         })}
+                                        onChange={(e) => setValue('usage_limit', Math.max(1, parseRibuan(e.target.value)), { shouldValidate: true })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="100"
                                     />

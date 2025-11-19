@@ -33,6 +33,8 @@ export const useCart = () => {
                 variant_id: it.variant_id ?? it.id,
                 quantity: Number(it.quantity ?? 1),
                 selected: typeof it.selected === 'boolean' ? it.selected : true,
+                discount_price: typeof it.discount_price !== 'undefined' && it.discount_price !== null ? Number(it.discount_price) : null,
+                weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
             }));
 
             setCartItems(mapped);
@@ -60,6 +62,8 @@ export const useCart = () => {
                 variant_id: it.variant_id ?? it.id,
                 quantity: it.quantity,
                 selected: typeof it.selected === 'boolean' ? it.selected : true,
+                discount_price: typeof it.discount_price !== 'undefined' && it.discount_price !== null ? Number(it.discount_price) : null,
+                weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
             }));
             sessionStorage.setItem('cart', JSON.stringify(payload));
             
@@ -89,6 +93,7 @@ export const useCart = () => {
             quantity: Number(quantity) || 1,
             selected: true,
             discount_price: selectedVariant?.discount_price || null,
+            weight: (selectedVariant?.weight ?? product?.weight ?? null)
         };
 
         const currentItems = loadCart();

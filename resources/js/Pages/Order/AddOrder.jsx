@@ -30,6 +30,15 @@ export default function AddOrder() {
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     const [isShippingCostManuallyEdited, setIsShippingCostManuallyEdited] = useState(false);
+    const formatRibuan = (num) => {
+        if (!num || num === 0) return '';
+        return Math.floor(num).toLocaleString('id-ID');
+    };
+
+    const parseRibuan = (str) => {
+        if (!str) return 0;
+        return parseInt(str.toString().replace(/\./g, '')) || 0;
+    };
     
     // Loading states
     const [loading, setLoading] = useState({
@@ -196,7 +205,7 @@ export default function AddOrder() {
     // Handle manual shipping cost change
     const handleShippingCostChange = (value) => {
         setIsShippingCostManuallyEdited(true);
-        setFormData(prev => ({ ...prev, shipping_cost: parseInt(value) || 0 }));
+        setFormData(prev => ({ ...prev, shipping_cost: parseRibuan(value) }));
     };
 
     // Reset shipping cost to courier default
@@ -580,9 +589,9 @@ export default function AddOrder() {
                                 </label>
                                 <div className="flex gap-2">
                                     <input
-                                        type="number"
+                                        type="text"
                                         placeholder="0"
-                                        value={formData.shipping_cost}
+                                        value={formatRibuan(formData.shipping_cost)}
                                         onChange={(e) => handleShippingCostChange(e.target.value)}
                                         className={`flex-1 px-3 py-2 border rounded-lg ${
                                             isShippingCostManuallyEdited ? 'border-blue-300 bg-blue-50' : 'border-gray-300'

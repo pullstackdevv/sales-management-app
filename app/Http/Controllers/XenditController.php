@@ -304,8 +304,12 @@ class XenditController extends Controller
                 if ($order->payment_status !== $paymentStatus) {
                     $order->update([
                         'payment_status' => $paymentStatus,
-                        'status' => $paymentStatus === 'paid' ? 'processing' : $order->status
+                        'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
                     ]);
+
+                    if ($paymentStatus === PaymentStatus::PAID) {
+                        WebOrderController::updateVoucherUsedCount($order->id);
+                    }
                 }
                 
                 return response()->json([

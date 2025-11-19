@@ -262,11 +262,17 @@ const PaymentMethodCheckout = () => {
         const { voucher, discount_amount } = response.data.data;
         setAppliedVoucher(voucher);
         setVoucherDiscount(discount_amount);
-        
+
+        const notifText = voucher.type === 'free_sample'
+          ? `Anda mendapatkan bonus produk: ${voucher.free_product_name || 'Produk Gratis'}`
+          : voucher.type === 'shipping'
+            ? `Potongan ongkir ${formatCurrency(discount_amount)} telah diterapkan`
+            : `Diskon ${formatCurrency(discount_amount)} telah diterapkan`;
+
         Swal.fire({
           icon: 'success',
           title: 'Voucher Berhasil Diterapkan!',
-          text: `Diskon ${formatCurrency(discount_amount)} telah diterapkan`,
+          text: notifText,
           confirmButtonColor: '#3b82f6'
         });
       } else {
@@ -735,9 +741,15 @@ const PaymentMethodCheckout = () => {
                                   {appliedVoucher.description}
                                 </div>
                               )}
-                              <div className="text-xs text-green-700 font-medium mt-1">
-                                Diskon: Rp {voucherDiscount.toLocaleString('id-ID')}
-                              </div>
+                              {appliedVoucher.type === 'free_sample' ? (
+                                <div className="text-xs text-blue-700 font-medium mt-1">
+                                  🎁 Bonus Produk: {appliedVoucher.free_product_name || 'Produk Gratis'}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-green-700 font-medium mt-1">
+                                  Diskon: Rp {voucherDiscount.toLocaleString('id-ID')}
+                                </div>
+                              )}
                             </div>
                             <button
                               onClick={removeVoucher}

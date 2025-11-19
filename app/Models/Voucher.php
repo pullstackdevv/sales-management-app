@@ -35,8 +35,8 @@ class Voucher extends Model
         'maximum_discount' => 'decimal:2',
         'usage_limit' => 'integer',
         'used_count' => 'integer',
-        'start_date' => 'datetime',
-        'end_date' => 'datetime',
+        'start_date' => 'date',
+        'end_date' => 'date',
         'is_active' => 'boolean',
     ];
 

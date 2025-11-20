@@ -30,7 +30,7 @@ class StoreRequest extends FormRequest
             'province' => 'required|string|max:100',
             'city' => 'required|string|max:100',
             'district' => 'required|string|max:100',
-            'postal_code' => 'required|string|max:10',
+            'postal_code' => 'nullable|string|regex:/^\d{5}$/',
             'is_default' => 'boolean',
         ];
     }

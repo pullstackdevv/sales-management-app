@@ -61,7 +61,7 @@ class CustomerController extends Controller
                 'addresses.*.province' => 'required|string|max:255',
                 'addresses.*.city' => 'required|string|max:255',
                 'addresses.*.district' => 'required|string|max:255',
-                'addresses.*.postal_code' => 'required|string|max:10',
+                'addresses.*.postal_code' => 'nullable|string|regex:/^\d{5}$/',
                 'addresses.*.address_detail' => 'required|string',
                 'addresses.*.is_default' => 'boolean'
             ], [
@@ -72,7 +72,7 @@ class CustomerController extends Controller
                 'addresses.*.province.required' => 'Provinsi wajib diisi',
                 'addresses.*.city.required' => 'Kota/Kabupaten wajib diisi',
                 'addresses.*.district.required' => 'Kecamatan wajib diisi',
-                'addresses.*.postal_code.required' => 'Kode pos wajib diisi',
+                'addresses.*.postal_code.regex' => 'Kode pos harus 5 digit angka',
                 'addresses.*.address_detail.required' => 'Alamat lengkap wajib diisi',
                 'email.unique' => 'Email sudah terdaftar, gunakan email lain'
             ]);
@@ -102,7 +102,7 @@ class CustomerController extends Controller
                         'province' => $addressData['province'],
                         'city' => $addressData['city'],
                         'district' => $addressData['district'],
-                        'postal_code' => $addressData['postal_code'],
+                        'postal_code' => $addressData['postal_code'] ?? null,
                         'address_detail' => $addressData['address_detail'],
                         'is_default' => $addressData['is_default'] ?? ($index === 0) // First address is default if not specified
                     ]);
@@ -166,7 +166,7 @@ class CustomerController extends Controller
             'addresses.*.province' => 'required_with:addresses|string|max:255',
             'addresses.*.city' => 'required_with:addresses|string|max:255',
             'addresses.*.district' => 'required_with:addresses|string|max:255',
-            'addresses.*.postal_code' => 'required_with:addresses|string|max:10',
+            'addresses.*.postal_code' => 'nullable|string|regex:/^\d{5}$/',
             'addresses.*.address_detail' => 'required_with:addresses|string',
             'addresses.*.is_default' => 'boolean'
         ]);
@@ -193,7 +193,7 @@ class CustomerController extends Controller
                         'province' => $addressData['province'],
                         'city' => $addressData['city'],
                         'district' => $addressData['district'],
-                        'postal_code' => $addressData['postal_code'],
+                        'postal_code' => $addressData['postal_code'] ?? null,
                         'address_detail' => $addressData['address_detail'],
                         'is_default' => $addressData['is_default'] ?? ($index === 0) // First address is default if not specified
                     ]);

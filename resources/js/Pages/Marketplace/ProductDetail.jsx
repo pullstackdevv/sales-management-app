@@ -470,7 +470,10 @@ export default function ProductDetail() {
                         {/* Product Image Gallery */}
                         <div className="space-y-4">
                             {/* Main Image */}
-                            <div className="aspect-square w-full rounded-sm overflow-hidden bg-white border border-gray-100 relative">
+                            <div
+                                className="w-full rounded-sm overflow-hidden bg-white border border-gray-100 relative mx-auto"
+                                style={{ aspectRatio: '1 / 1', maxWidth: 400, maxHeight: 400 }}
+                            >
                                 {imageLoading && (
                                     <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>

@@ -47,7 +47,7 @@ class WebOrderController extends Controller
                 'address_street' => 'required_without:address_id|string',
                 'address_city' => 'required_without:address_id|string|max:100',
                 'address_province' => 'required_without:address_id|string|max:100',
-                'address_postal_code' => 'required_without:address_id|string|max:10',
+                'address_postal_code' => 'nullable|string|regex:/^\d{5}$/',
             ]);
 
             if ($validator->fails()) {

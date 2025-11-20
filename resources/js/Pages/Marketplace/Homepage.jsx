@@ -415,8 +415,11 @@ const Homepage = () => {
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-lg border border-gray-100 hover:border-blue-200 transition-all duration-300 overflow-hidden h-full flex flex-col">
-                    {/* Image Container - Fixed height */}
-                    <div className="relative overflow-hidden bg-gray-100 h-40 sm:h-44">
+                    {/* Image Container - Square ratio */}
+                    <div
+                        className="relative overflow-hidden bg-gray-100"
+                        style={{ aspectRatio: '1 / 1'  , maxWidth: 800, maxHeight: 800}}
+                    >
                         <img 
                             src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
                             alt={product.name}
@@ -678,7 +681,7 @@ const Homepage = () => {
                             ) : (
                                 <div className={
                                     viewMode === 'grid'
-                                        ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6"
+                                        ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6"
                                         : "space-y-4"
                                 }>
                                     {sortedProducts.map((product) => (

@@ -17,9 +17,9 @@ class StoreRequest extends FormRequest
             'address' => 'required|string|max:255',
             'city' => 'required|string|max:100',
             'province' => 'required|string|max:100',
-            'postal_code' => 'required|string|max:10',
+            'postal_code' => 'nullable|string|regex:/^\d{5}$/',
             'is_default' => 'boolean',
             'notes' => 'nullable|string|max:255'
         ];
     }
-} 
+}

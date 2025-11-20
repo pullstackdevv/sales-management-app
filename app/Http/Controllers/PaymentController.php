@@ -408,7 +408,7 @@ class PaymentController extends Controller
 
         // Update order payment status
         $order->update([
-            'payment_status' => $paymentStatus,
+            'payment_status' => $paymentStatus->value,
         ]);
 
         // Update order status based on payment status
@@ -432,7 +432,14 @@ class PaymentController extends Controller
      */
     private function handleMidtransWebhook(Request $request)
     {
-        $payload = $request->all();
+        Log::info('Midtrans webhook raw content', [
+            'content' => $request->getContent(),
+            'headers' => $request->headers->all()
+        ]);
+        $payload = json_decode($request->getContent(), true);
+        if (!is_array($payload) || empty($payload)) {
+            $payload = $request->all();
+        }
 
         Log::info('Midtrans webhook received', $payload);
 
@@ -561,24 +568,37 @@ class PaymentController extends Controller
             $transactionData = \Midtrans\Transaction::status($order->order_number);
             $status = $transactionData->transaction_status ?? null;
 
-            $paymentStatus = $this->mapMidtransStatus($status);
+            $paymentStatusFromGateway = $this->mapMidtransStatus($status);
 
-            if ($order->payment_status !== $paymentStatus) {
+            $currentOrder = $order->fresh();
+            $currentStatus = $currentOrder->payment_status;
+
+            $shouldUpdate = false;
+            if ($currentStatus !== $paymentStatusFromGateway) {
+                if (in_array($paymentStatusFromGateway, [PaymentStatus::PAID, PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
+                    $shouldUpdate = true;
+                } elseif ($currentStatus === PaymentStatus::PENDING && $paymentStatusFromGateway === PaymentStatus::PENDING) {
+                    $shouldUpdate = false;
+                }
+            }
+
+            if ($shouldUpdate) {
                 $order->update([
-                    'payment_status' => $paymentStatus,
-                    'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
+                    'payment_status' => $paymentStatusFromGateway,
+                    'status' => $paymentStatusFromGateway === PaymentStatus::PAID ? 'processing' : $currentOrder->status
                 ]);
 
-                if ($paymentStatus === PaymentStatus::PAID) {
+                if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
                 }
+                $currentOrder = $order->fresh();
             }
 
             return response()->json([
                 'status' => 'success',
-                'payment_status' => $paymentStatus,
+                'payment_status' => $currentOrder->payment_status,
                 'midtrans_status' => $status,
-                'order' => $order->fresh()
+                'order' => $currentOrder
             ]);
 
         } catch (\Exception $e) {

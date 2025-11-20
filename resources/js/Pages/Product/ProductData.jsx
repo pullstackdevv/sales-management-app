@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
@@ -15,6 +15,12 @@ export default function ProductData() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [pagination, setPagination] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState("");
+  const [importJobId, setImportJobId] = useState(null);
+  const fileInputRef = useRef(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
   
   // Modal states
   const [stockHistoryModal, setStockHistoryModal] = useState({ isOpen: false, variant: null });
@@ -80,6 +86,94 @@ export default function ProductData() {
     fetchProducts(searchTerm, category);
   };
 
+  const handleImportClick = () => {
+    setShowImportModal(true);
+  };
+
+  const startPollingImportStatus = (jobId) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get(`/products/import-status/${jobId}`);
+        const status = res.data.data?.status;
+        const message = res.data.data?.message;
+        const lastId = res.data.data?.last_variant_id;
+        const lastAction = res.data.data?.last_action;
+        const lastSku = res.data.data?.last_sku;
+        const lastSkipReason = res.data.data?.last_skip_reason;
+        const importedCount = res.data.data?.imported;
+        const skippedCount = res.data.data?.skipped;
+        setImportStatus(message || "");
+        if (lastId || lastAction || lastSku) {
+          console.log("Status impor produk", {
+            jobId,
+            status,
+            message,
+            last_variant_id: lastId,
+            last_action: lastAction,
+            last_sku: lastSku,
+            last_skip_reason: lastSkipReason,
+            imported: importedCount,
+            skipped: skippedCount,
+          });
+        } else {
+          console.log("Status impor produk", { jobId, status, message });
+        }
+        if (status === "completed") {
+          clearInterval(interval);
+          setImporting(false);
+          setImportJobId(null);
+          console.log("Impor produk selesai", { jobId, imported: importedCount, skipped: skippedCount });
+          if (skippedCount && skippedCount > 0) {
+            Swal.fire({
+              icon: "warning",
+              title: "Selesai dengan peringatan",
+              html: `Imported: ${importedCount || 0}<br/>Skipped: ${skippedCount}<br/>${lastSkipReason ? `Alasan terakhir: ${lastSkipReason}` : ''}`,
+              confirmButtonColor: "#3b82f6"
+            });
+          } else {
+            Swal.fire({ icon: "success", title: "Berhasil", text: `Impor produk selesai. Imported: ${importedCount || 0}` });
+          }
+          fetchProducts(search, category);
+        } else if (status === "failed") {
+          clearInterval(interval);
+          setImporting(false);
+          setImportJobId(null);
+          console.log("Impor produk gagal", { jobId, message });
+          Swal.fire({ icon: "error", title: "Gagal", text: message || "Impor produk gagal" });
+        }
+      } catch (err) {
+        clearInterval(interval);
+        setImporting(false);
+        setImportJobId(null);
+        console.log("Gagal memeriksa status impor", { jobId, error: err?.message });
+        Swal.fire({ icon: "error", title: "Gagal", text: "Tidak dapat memeriksa status impor" });
+      }
+    }, 2000);
+  };
+
+  const submitImport = async () => {
+    if (!importFile) return;
+    const formData = new FormData();
+    formData.append("file", importFile);
+    try {
+      setImporting(true);
+      setImportStatus("Mengirim file impor...");
+      const res = await api.post("/products/import", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      const jobId = res.data.data?.job_id;
+      setImportJobId(jobId);
+      console.log("Upload impor produk dikirim", { jobId, fileName: importFile?.name });
+      setImportStatus("File dikirim. Memproses...");
+      setShowImportModal(false);
+      setImportFile(null);
+      startPollingImportStatus(jobId);
+    } catch (error) {
+      setImporting(false);
+      setImportJobId(null);
+      console.log("Gagal mengirim file impor", { error: error?.message });
+      Swal.fire({ icon: "error", title: "Error", text: "Gagal mengirim file impor" });
+    }
+  };
+
   // Modal handlers
   const openStockHistoryModal = (variant) => {
     setStockHistoryModal({ isOpen: true, variant });
@@ -121,8 +215,8 @@ export default function ProductData() {
           <h1 className="text-2xl font-semibold">Produk</h1>
 
           <div className="flex gap-2">
-            <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
-              Impor & Ekspor
+            <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100" onClick={handleImportClick} disabled={importing}>
+              {importing ? "Mengimpor..." : "Impor Produk"}
             </button>
             <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
               Filter
@@ -409,6 +503,39 @@ export default function ProductData() {
           )}
         </div>
       </div>
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Impor Produk</h3>
+              <button onClick={() => { setShowImportModal(false); setImportFile(null); }} className="text-gray-400 hover:text-gray-600">
+                <Icon icon="solar:close-circle-outline" className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="w-full" />
+                <p className="text-xs text-gray-500 mt-1">Format yang didukung: Excel (.xlsx, .xls) atau CSV (.csv)</p>
+              </div>
+              <div className="border rounded-lg p-4 bg-blue-50">
+                <p className="font-medium text-sm mb-2">Format File yang Diharapkan:</p>
+                <ul className="text-xs text-gray-700 space-y-1">
+                  <li>Header: baris pertama berisi judul kolom</li>
+                  <li>Kolom: Nama Produk, Kategori Produk, Deskripsi Produk</li>
+                  <li>Kolom: Produk Aktif, Tampil di etalase, Harga Modal</li>
+                  <li>Kolom: Nama Varian, Harga Varian, Harga Modal Varian, Harga Diskon Varian</li>
+                  <li>Kolom: Berat Varian, Stok Varian, Varian Aktif, Varian Tampil di Etalase</li>
+                  <li>Ukuran maksimal file 10MB</li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => { setShowImportModal(false); setImportFile(null); }} className="px-4 py-2 border rounded-md">Batal</button>
+              <button onClick={submitImport} disabled={!importFile || importing} className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50">Import</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Stock History Modal */}
       <StockHistoryModal

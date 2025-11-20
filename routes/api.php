@@ -91,6 +91,9 @@ Route::get('products/storefront', [ProductController::class, 'storefront']);
 // product
 Route::apiResource('products', ProductController::class);
 Route::apiResource('products.variants', ProductVariantController::class);
+Route::post('products/import', [ProductController::class, 'import']);
+Route::get('products/import-status/{jobId}', [ProductController::class, 'importStatus']);
+Route::get('products/active-imports', [ProductController::class, 'activeImports']);
 // Product Category routes
 Route::apiResource('product-categories', ProductCategoryController::class);
 // Customer routes

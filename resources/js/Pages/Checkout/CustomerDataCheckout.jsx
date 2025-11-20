@@ -1304,13 +1304,6 @@ const CustomerDataCheckout = () => {
                 </div>
                 <span className="ml-2 text-sm text-gray-500">Pembayaran</span>
               </div>
-              <div className="flex-1 mx-4 h-1 bg-gray-200 rounded"></div>
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center text-sm font-medium">
-                  4
-                </div>
-                <span className="ml-2 text-sm text-gray-500">Selesai</span>
-              </div>
             </div>
           </div>
 

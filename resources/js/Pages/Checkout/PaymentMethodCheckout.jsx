@@ -14,6 +14,7 @@ const PaymentMethodCheckout = () => {
   const [shippingCost, setShippingCost] = useState(0);
   const [courierRates, setCourierRates] = useState([]);
   const [loadingShipping, setLoadingShipping] = useState(false);
+  const [selectedRateIndex, setSelectedRateIndex] = useState(null);
   
   // Voucher states
   const [voucherCode, setVoucherCode] = useState('');
@@ -89,15 +90,24 @@ const PaymentMethodCheckout = () => {
         return;
       }
       
-      const response = await axios.get(`/api/courier-rates?page=1&per_page=10&district=${encodeURIComponent(district)}`);
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', '1');
+      queryParams.append('per_page', '50');
+      queryParams.append('sort_by', 'base_price');
+      queryParams.append('sort_order', 'asc');
+      if (district) queryParams.append('district', district);
+      if (city) queryParams.append('city', city);
+      queryParams.append('origin_city', 'Jakarta');
+      const response = await axios.get(`/api/courier-rates?${queryParams.toString()}`);
       console.log('Courier rates API response:', response.data);
       
       if (response.data && response.data.success && response.data.data && response.data.data.rates) {
         const rates = response.data.data.rates;
         console.log(`Found ${rates.length} courier rates for district: ${district}`);
         setCourierRates(rates);
-        // Calculate shipping cost after getting rates
-        calculateShippingCost(rates, district);
+        const defaultIndex = selectDefaultRateIndex(rates);
+        setSelectedRateIndex(defaultIndex);
+        calculateShippingCost(rates, district, defaultIndex);
       } else {
         console.log(`No courier rates found for district: ${district}`);
         
@@ -164,46 +174,90 @@ const PaymentMethodCheckout = () => {
     return totalWeight;
   };
 
+  const getRoundedWeight = (totalWeight, rate) => {
+    const courierName = rate?.courier?.name?.toLowerCase() || '';
+    if (courierName.includes('tiki')) {
+      if (totalWeight <= 1.5) return 1;
+      return Math.ceil(totalWeight);
+    }
+    return Math.ceil(totalWeight);
+  };
+
   // Function to calculate shipping cost based on weight and courier rates
-  const calculateShippingCost = (rates, district) => {
+  const calculateShippingCost = (rates, district, indexOverride = null) => {
     if (!rates || rates.length === 0) {
       console.log('No rates available for shipping calculation');
       setShippingCost(0);
       return;
     }
-    
+
     const totalWeight = calculateTotalWeight();
-    // Round up weight (if 1.1kg, becomes 2kg)
-    const roundedWeight = Math.ceil(totalWeight);
-    
+    const idx = typeof indexOverride === 'number' ? indexOverride : (typeof selectedRateIndex === 'number' ? selectedRateIndex : 0);
+    const courierRate = rates[idx];
+    if (!courierRate) {
+      setShippingCost(0);
+      return;
+    }
+    const pricing = courierRate.pricing || {};
+    const availability = courierRate.availability || {};
+    const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
+    const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
+    const roundedWeight = getRoundedWeight(totalWeight, courierRate);
     console.log(`Calculating shipping for district "${district}": Weight=${totalWeight}kg, Rounded=${roundedWeight}kg`);
-    
-    // Use first available courier rate for the district
-    const courierRate = rates[0];
-    console.log('Using courier rate for district:', { district, courierRate });
-    
-    // Check for price_per_kg in the correct nested structure
-    const pricePerKg = courierRate?.pricing?.price_per_kg || courierRate?.price_per_kg;
-    
-    if (courierRate && pricePerKg) {
-      const calculatedCost = roundedWeight * pricePerKg;
-      console.log(`Shipping calculation for ${district}: ${roundedWeight}kg × Rp${pricePerKg.toLocaleString('id-ID')} = Rp${calculatedCost.toLocaleString('id-ID')}`);
-      setShippingCost(calculatedCost);
-      
-      // Show success message with shipping details
-      console.log(`✅ Ongkos kirim berhasil dihitung untuk kecamatan ${district}: Rp${calculatedCost.toLocaleString('id-ID')}`);
-    } else {
-      console.log('No price_per_kg found in courier rate:', courierRate);
-      
+    const weightForCalc = Math.max(roundedWeight, minW);
+    if (maxW && weightForCalc > maxW) {
       Swal.fire({
         icon: 'warning',
-        title: 'Data Tarif Tidak Lengkap',
-        text: `Data tarif untuk kecamatan ${district} tidak lengkap. Silakan hubungi customer service.`,
+        title: 'Berat Melebihi Batas Layanan',
+        text: `Total berat ${weightForCalc} kg melebihi batas maksimum layanan ini (${maxW} kg). Pilih layanan lain.`,
         confirmButtonColor: '#3b82f6'
       });
-      
       setShippingCost(0);
+      return;
     }
+    if (availability.is_available === false) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Layanan Tidak Tersedia',
+        text: 'Layanan kurir ini sedang tidak tersedia. Pilih layanan lain.',
+        confirmButtonColor: '#3b82f6'
+      });
+      setShippingCost(0);
+      return;
+    }
+    const pricePerKg = pricing.price_per_kg ?? courierRate.price_per_kg ?? 0;
+    const basePrice = pricing.base_price ?? courierRate.base_price ?? 0;
+    const pricingType = pricing.pricing_type || courierRate.pricing_type || 'per_kg';
+    const extraWeight = Math.max(0, weightForCalc - minW);
+    const calculatedCost = pricingType === 'flat' ? basePrice : basePrice + (extraWeight * pricePerKg);
+    setShippingCost(calculatedCost);
+  };
+
+  const selectDefaultRateIndex = (rates) => {
+    if (!rates || rates.length === 0) return null;
+    const tw = calculateTotalWeight();
+    let bestIdx = 0;
+    let bestCost = Infinity;
+    for (let i = 0; i < rates.length; i++) {
+      const r = rates[i];
+      const pricing = r.pricing || {};
+      const availability = r.availability || {};
+      const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
+      const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
+      const w = getRoundedWeight(tw, r);
+      const effW = Math.max(w, minW);
+      if (maxW && effW > maxW) continue;
+      if (availability.is_available === false) continue;
+      const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
+      const bp = pricing.base_price ?? r.base_price ?? 0;
+      const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
+      const cost = pricingType === 'flat' ? bp : bp + (Math.max(0, effW - minW) * ppk);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
   };
 
   // Function to fetch active promotions
@@ -373,6 +427,7 @@ const PaymentMethodCheckout = () => {
         sales_channel_id: 1, // Default sales channel
         items: items,
         shipping_cost: shippingCost, // Use calculated shipping cost
+        courier_id: (typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.courier?.id) ? courierRates[selectedRateIndex].courier.id : null,
         voucher_id: appliedVoucher ? appliedVoucher.id : null, // Add voucher if applied
         notes: 'Order dari marketplace - Payment via Xendit'
       };
@@ -776,12 +831,44 @@ const PaymentMethodCheckout = () => {
                   {/* Show shipping details if available - Compact */}
                   {courierRates.length > 0 && !loadingShipping && (
                     <div className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-100">
-                      <div className="grid grid-cols-2 gap-1 mb-1">
-                        <div>Berat: {Math.ceil(calculateTotalWeight())} kg</div>
-                        <div>Kurir: {courierRates[0]?.courier?.name || 'Standard'}</div>
+                      <div className="grid grid-cols-2 gap-1 mb-2">
+                        <div>Berat: {typeof selectedRateIndex === 'number' ? getRoundedWeight(calculateTotalWeight(), courierRates[selectedRateIndex]) : Math.ceil(calculateTotalWeight())} kg</div>
+                        <div>Kurir: {typeof selectedRateIndex === 'number' ? (courierRates[selectedRateIndex]?.courier?.name || 'Standard') : 'Standard'}</div>
+                      </div>
+                      <div className="mb-2">
+                        <select
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+                          value={typeof selectedRateIndex === 'number' ? selectedRateIndex : ''}
+                          onChange={(e) => {
+                            const idx = parseInt(e.target.value);
+                            setSelectedRateIndex(idx);
+                            calculateShippingCost(courierRates, (checkoutData.customer.addresses?.[0] || checkoutData.customer).district, idx);
+                          }}
+                        >
+                          <option value="" disabled>Pilih kurir & layanan</option>
+                          {courierRates.map((r, i) => {
+                            const w = getRoundedWeight(calculateTotalWeight(), r);
+                            const pricing = r.pricing || {};
+                            const availability = r.availability || {};
+                            const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
+                            const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
+                            const effW = Math.max(w, minW);
+                            const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
+                            const bp = pricing.base_price ?? r.base_price ?? 0;
+                            const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
+                            const cost = pricingType === 'flat' ? bp : bp + (Math.max(0, effW - minW) * ppk);
+                            const eta = r?.delivery?.estimated_days ? `${r.delivery.estimated_days} hari` : '';
+                            const disabled = (maxW && effW > maxW) || availability.is_available === false;
+                            const label = `${r?.courier?.name || '-'} · ${r?.service?.name || '-'} · ${eta ? eta + ' · ' : ''}Rp ${cost.toLocaleString('id-ID')}${disabled ? ' (tidak tersedia)' : ''}`;
+                            return (
+                              <option key={r.id || i} value={i} disabled={disabled}>{label}</option>
+                            );
+                          })}
+                        </select>
                       </div>
                       <div className="text-xs text-gray-400">
-                        Layanan: {courierRates[0]?.service?.name || 'Regular'}
+                        Layanan: {typeof selectedRateIndex === 'number' ? (courierRates[selectedRateIndex]?.service?.name || 'Regular') : 'Regular'}
+                        {typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.delivery?.estimated_days ? ` · ETA ${courierRates[selectedRateIndex].delivery.estimated_days} hari` : ''}
                       </div>
                       {checkoutData?.customer && (
                         <div className="mt-1 pt-1 border-t border-gray-100">

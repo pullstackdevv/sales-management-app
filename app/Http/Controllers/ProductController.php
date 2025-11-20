@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+use App\Jobs\ImportProductsJob;
 
 class ProductController extends Controller
 {
@@ -336,6 +339,123 @@ class ProductController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
+        }
+    }
+
+    public function import(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'file' => 'required|file|mimetypes:application/zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel|max:10240'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $file = $request->file('file');
+            $userId = Auth::id();
+
+            $fileName = 'products_' . time() . '.' . $file->getClientOriginalExtension();
+            $filePath = $file->storeAs('temp', $fileName, 'local');
+
+            $jobId = uniqid('product_import_', true);
+
+            ImportProductsJob::dispatch($filePath, $userId, $jobId);
+
+            cache()->put("product_import_job_{$jobId}", [
+                'id' => $jobId,
+                'status' => 'queued',
+                'message' => 'Import job has been queued for processing',
+                'created_at' => now()->toISOString()
+            ], now()->addHours(24));
+
+            $activeJobIds = cache()->get('active_product_import_jobs', []);
+            $activeJobIds[] = $jobId;
+            cache()->put('active_product_import_jobs', $activeJobIds, now()->addHours(24));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Import job has been queued for processing',
+                'data' => [
+                    'job_id' => $jobId,
+                    'status' => 'queued'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Product import failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Import failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function importStatus(string $jobId): JsonResponse
+    {
+        try {
+            $status = cache()->get("product_import_job_{$jobId}");
+
+            if (!$status) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Job not found or expired'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $status
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to get product import status: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get import status'
+            ], 500);
+        }
+    }
+
+    public function activeImports(Request $request): JsonResponse
+    {
+        try {
+            $activeImports = [];
+            $activeJobIds = cache()->get('active_product_import_jobs', []);
+
+            foreach ($activeJobIds as $jobId) {
+                $status = cache()->get("product_import_job_{$jobId}");
+                if ($status && isset($status['status']) && in_array($status['status'], ['queued', 'processing'])) {
+                    $activeImports[] = $status;
+                } else {
+                    $activeJobIds = array_filter($activeJobIds, function($id) use ($jobId) {
+                        return $id !== $jobId;
+                    });
+                    cache()->put('active_product_import_jobs', array_values($activeJobIds), now()->addHours(24));
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'active_imports' => $activeImports,
+                    'count' => count($activeImports)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to get active product imports: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get active imports',
+                'data' => [
+                    'active_imports' => [],
+                    'count' => 0
+                ]
+            ], 500);
         }
     }
 

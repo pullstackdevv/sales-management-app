@@ -56,12 +56,28 @@ export default function AddCustomer() {
     
     // Handle address changes
     const handleAddressChange = (field, value, index = activeAddressIndex) => {
+        // Sanitize postal code input: numeric only, max 5 digits, optional
+        if (field === 'postal_code') {
+            const numericValue = (value || '').replace(/\D/g, '').slice(0, 5);
+            setAddresses(prev => prev.map((addr, i) =>
+                i === index ? { ...addr, [field]: numericValue } : addr
+            ));
+            // Real-time error only when partially filled (1-4 digits)
+            if (numericValue.length > 0 && numericValue.length < 5) {
+                setErrors(prev => ({ ...prev, [`postal_code_${index}`]: 'Kode pos harus 5 digit angka' }));
+            } else {
+                setErrors(prev => ({ ...prev, [`postal_code_${index}`]: null }));
+            }
+            return;
+        }
+
         setAddresses(prev => prev.map((addr, i) => 
             i === index ? { ...addr, [field]: value } : addr
         ));
-        // Clear error when user starts typing
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: null }));
+        // Clear error when user starts typing (per-address keys)
+        const key = `${field}_${index}`;
+        if (errors[key]) {
+            setErrors(prev => ({ ...prev, [key]: null }));
         }
     };
 
@@ -263,10 +279,11 @@ export default function AddCustomer() {
                 if (!address.city?.trim()) {
                     newErrors[`city_${index}`] = 'Kota/Kecamatan wajib diisi';
                 }
-                if (!address.postal_code?.trim()) {
-                    newErrors[`postal_code_${index}`] = 'Kode pos wajib diisi';
-                } else if (!/^[0-9]{5}$/.test(address.postal_code)) {
-                    newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
+                // Postal code optional: only validate format if provided
+                if (address.postal_code?.trim()) {
+                    if (!/^[0-9]{5}$/.test(address.postal_code)) {
+                        newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
+                    }
                 }
                 if (!address.address_detail?.trim()) {
                     newErrors[`address_detail_${index}`] = 'Alamat lengkap wajib diisi';
@@ -343,7 +360,7 @@ export default function AddCustomer() {
                             province: address.province,
                             city: address.city,
                             district: address.district,
-                            postal_code: address.postal_code,
+                            postal_code: address.postal_code || null,
                             address_detail: address.address_detail,
                             is_default: address.is_default,
                         }))
@@ -655,7 +672,7 @@ export default function AddCustomer() {
                                         <input
                                             type="text"
                                             className={`w-full mt-1 border rounded px-3 py-2 text-sm pr-10 ${
-                                                errors.city ? 'border-red-500' : 'border-gray-300'
+                                                errors[`city_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                             placeholder="Cari Kota/Kecamatan..."
                                             value={cityQuery}
@@ -691,26 +708,27 @@ export default function AddCustomer() {
                                                 ))}
                                             </div>
                                         )}
-                                        {errors.city && (
-                                            <p className="text-red-500 text-xs mt-1">{errors.city}</p>
+                                        {errors[`city_${activeAddressIndex}`] && (
+                                            <p className="text-red-500 text-xs mt-1">{errors[`city_${activeAddressIndex}`]}</p>
                                         )}
                                     </div>
                                     
                                     <div>
                                         <label className="text-sm font-medium">
-                                            Kode Pos <span className="text-red-500">*</span>
+                                            Kode Pos (opsional)
                                         </label>
                                         <input 
                                             type="text"
                                             className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                                errors.postal_code ? 'border-red-500' : 'border-gray-300'
+                                                errors[`postal_code_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                             value={addresses[activeAddressIndex]?.postal_code || ''}
                                             onChange={(e) => handleAddressChange('postal_code', e.target.value)}
-                                            placeholder="Masukkan kode pos"
+                                            placeholder="12345"
+                                            maxLength={5}
                                         />
-                                        {errors.postal_code && (
-                                            <p className="text-red-500 text-xs mt-1">{errors.postal_code}</p>
+                                        {errors[`postal_code_${activeAddressIndex}`] && (
+                                            <p className="text-red-500 text-xs mt-1">{errors[`postal_code_${activeAddressIndex}`]}</p>
                                         )}
                                     </div>
 
@@ -720,14 +738,14 @@ export default function AddCustomer() {
                                         </label>
                                         <textarea 
                                             className={`w-full mt-1 border rounded px-3 py-2 text-sm min-h-[80px] ${
-                                                errors.address_detail ? 'border-red-500' : 'border-gray-300'
+                                                errors[`address_detail_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
                                             }`}
                                             value={addresses[activeAddressIndex]?.address_detail || ''}
                                             onChange={(e) => handleAddressChange('address_detail', e.target.value)}
                                             placeholder="Masukkan alamat lengkap (nama jalan, nomor rumah, RT/RW, dll)"
                                         />
-                                        {errors.address_detail && (
-                                            <p className="text-red-500 text-xs mt-1">{errors.address_detail}</p>
+                                        {errors[`address_detail_${activeAddressIndex}`] && (
+                                            <p className="text-red-500 text-xs mt-1">{errors[`address_detail_${activeAddressIndex}`]}</p>
                                         )}
                                     </div>
                                 </div>

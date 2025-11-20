@@ -496,6 +496,15 @@ const CustomerDataCheckout = () => {
     if (addressFormErrors[field]) {
       setAddressFormErrors(prev => ({ ...prev, [field]: null }));
     }
+
+    if (field === 'postal_code') {
+      const numericValue = value.replace(/\D/g, '').slice(0, 5);
+      setNewAddressData(prev => ({ ...prev, [field]: numericValue }));
+      if (numericValue.length > 0 && numericValue.length < 5) {
+        setAddressFormErrors(prev => ({ ...prev, postal_code: 'Kode pos harus 5 digit' }));
+      }
+      return;
+    }
   };
 
   // Validate address form
@@ -520,10 +529,10 @@ const CustomerDataCheckout = () => {
       errors.city = 'Silakan cari dan pilih kecamatan dari dropdown';
     }
     
-    if (!newAddressData.postal_code.trim()) {
-      errors.postal_code = 'Kode pos wajib diisi';
+    if (newAddressData.postal_code.trim() && newAddressData.postal_code.length !== 5) {
+      errors.postal_code = 'Kode pos harus 5 digit';
     }
-    
+
     setAddressFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -1036,10 +1045,7 @@ const CustomerDataCheckout = () => {
         requiredFields.push('Lokasi (Kecamatan/Kota - wajib pilih dari dropdown pencarian)');
       }
 
-      if (!addressData.postal_code.trim()) {
-        newErrors.postal_code = 'Kode pos wajib diisi';
-        requiredFields.push('Kode Pos');
-      } else if (addressData.postal_code.length !== 5) {
+      if (addressData.postal_code.trim() && addressData.postal_code.length !== 5) {
         newErrors.postal_code = 'Kode pos harus 5 digit';
       }
 
@@ -1102,7 +1108,7 @@ const CustomerDataCheckout = () => {
             city: addressData.city || 'Kota tidak diketahui',
             district: addressData.district || 'Kecamatan tidak diketahui',
             province: addressData.province || 'Provinsi tidak diketahui',
-            postal_code: addressData.postal_code || '00000',
+            postal_code: addressData.postal_code || null,
             recipient_name: addressData.recipient_name || formData.full_name,
             recipient_phone: addressData.recipient_phone || formData.phone,
             is_default: true
@@ -1574,7 +1580,7 @@ const CustomerDataCheckout = () => {
                         {/* Postal Code */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Kode Pos *
+                            Kode Pos (opsional)
                           </label>
                           <input
                             type="text"
@@ -2156,7 +2162,7 @@ const CustomerDataCheckout = () => {
               {/* Postal Code */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Kode Pos *
+                  Kode Pos (opsional)
                 </label>
                 <input
                   type="text"

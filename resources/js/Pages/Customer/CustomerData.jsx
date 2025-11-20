@@ -180,7 +180,7 @@ export default function CustomerData() {
                             (a) => a.is_default
                         );
                         const addressDisplay = defaultAddress
-                            ? `${defaultAddress.address_detail}, ${defaultAddress.district}, ${defaultAddress.city}, ${defaultAddress.province} - ${defaultAddress.postal_code}`
+                            ? `${defaultAddress.address_detail}, ${defaultAddress.district}, ${defaultAddress.city}, ${defaultAddress.province}${defaultAddress.postal_code ? ` - ${defaultAddress.postal_code}` : ''}`
                             : "-";
                         
                         const addressCount = customer.addresses?.length || 0;

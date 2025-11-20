@@ -221,7 +221,7 @@ export default function Categories() {
                                     <p className="text-base sm:text-sm text-gray-500">Coba ubah kata kunci pencarian atau filter</p>
                                 </div>
                             ) : (
-                                <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6" : "space-y-4"}>
+                                <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6" : "space-y-4"}>
                                     {products.map((product) => (
                                         viewMode === 'grid'
                                             ? <ProductCard key={product.id} product={product} />

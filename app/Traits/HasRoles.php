@@ -135,6 +135,13 @@ trait HasRoles
                 }
             }
         }
+        // Check module-level permission (e.g., 'orders' matches 'orders.view', 'orders.create', etc.)
+        // This is for middleware that checks coarse-grained permissions
+        foreach ($permissions as $perm) {
+            if (str_starts_with($perm->name, $permission . '.')) {
+                return true;
+            }
+        }
 
         return false;
     }

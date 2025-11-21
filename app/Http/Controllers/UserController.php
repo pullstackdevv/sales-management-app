@@ -57,9 +57,8 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role_id' => 'required|string',
-            'is_active' => 'boolean',
-
+            'role_id' => 'required|string|exists:roles,name',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         try {
@@ -124,10 +123,9 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
-            'password' => 'sometimes|required|string|min:8|confirmed',
-            'role_id' => 'sometimes|required|string',
-            'is_active' => 'boolean',
-
+            'password' => 'sometimes|nullable|string|min:8|confirmed',
+            'role_id' => 'sometimes|required|string|exists:roles,name',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         try {
@@ -163,10 +161,10 @@ class UserController extends Controller
             if (isset($validated['is_active'])) {
                 $updateData['is_active'] = $validated['is_active'];
             }
-            
-            $updateData['updated_by'] = Auth::id();
 
-            $user->update($updateData);
+            if (!empty($updateData)) {
+                $user->update($updateData);
+            }
 
             DB::commit();
 

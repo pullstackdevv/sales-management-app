@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Role;
+use App\Models\Permission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +30,7 @@ class RoleController extends Controller
             return [
                 'role' => $role->name,
                 'description' => $role->description,
-                'permissions' => $role->permissions ?? [],
+                'permissions' => $role->getPermissionNames(),
                 'is_active' => $role->is_active,
                 'is_system' => $role->is_system,
                 'users_count' => $role->users_count
@@ -55,7 +56,14 @@ class RoleController extends Controller
         try {
             DB::beginTransaction();
 
-            $role = Role::create($validated);
+            $role = Role::create([
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'is_active' => $validated['is_active'] ?? true,
+            ]);
+
+            // Sync permissions
+            $role->syncPermissions($validated['permissions']);
 
             DB::commit();
 
@@ -65,7 +73,7 @@ class RoleController extends Controller
                 'data' => [
                     'role' => $role->name,
                     'description' => $role->description,
-                    'permissions' => $role->permissions ?? [],
+                    'permissions' => $role->getPermissionNames(),
                     'is_active' => $role->is_active,
                     'is_system' => $role->is_system
                 ]
@@ -83,7 +91,7 @@ class RoleController extends Controller
             'data' => [
                 'role' => $role->name,
                 'description' => $role->description,
-                'permissions' => $role->permissions ?? [],
+                'permissions' => $role->getPermissionNames(),
                 'is_active' => $role->is_active,
                 'is_system' => $role->is_system,
                 'users_count' => $role->users()->count()
@@ -104,11 +112,13 @@ class RoleController extends Controller
         try {
             DB::beginTransaction();
 
-            // Hanya update field yang diizinkan
+            // Update role description
             $role->update([
                 'description' => $validated['description'] ?? $role->description,
-                'permissions' => $validated['permissions']
             ]);
+
+            // Sync permissions
+            $role->syncPermissions($validated['permissions']);
 
             DB::commit();
 
@@ -118,7 +128,7 @@ class RoleController extends Controller
                 'data' => [
                     'role' => $role->name,
                     'description' => $role->description,
-                    'permissions' => $role->permissions ?? [],
+                    'permissions' => $role->getPermissionNames(),
                     'is_active' => $role->is_active,
                     'is_system' => $role->is_system
                 ]
@@ -184,7 +194,7 @@ class RoleController extends Controller
                 'data' => [
                     'role' => $role->name,
                     'description' => $role->description,
-                    'permissions' => $role->permissions ?? [],
+                    'permissions' => $role->getPermissionNames(),
                     'is_active' => $role->is_active,
                     'is_system' => $role->is_system
                 ]

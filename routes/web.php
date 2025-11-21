@@ -199,6 +199,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Settings/index', ['activeMenu' => 'role']);
         })->name('settings.role');
 
+        Route::get('/settings/permission', function () {
+            return Inertia::render('Settings/index', ['activeMenu' => 'permission']);
+        })->name('settings.permission');
+
         Route::get('/settings/dashboard', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'dashboard']);
         })->name('settings.dashboard');

@@ -126,6 +126,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('roles/permissions', [RoleController::class, 'getPermissions']);
     Route::put('roles/{roleName}', [RoleController::class, 'update']);
 
+    // Permission routes
+    Route::get('permissions', [RoleController::class, 'getAllPermissions']);
+
     // Stock movement routes
     Route::apiResource('stock-movements', StockMovementController::class);
 

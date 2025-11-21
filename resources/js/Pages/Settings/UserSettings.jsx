@@ -318,7 +318,7 @@ export default function UserSettings() {
       key: "role", 
       label: "Role",
       render: (row) => {
-        const roleName = row.role?.name || 'Unknown';
+        const roleName = row.roles?.[0]?.name || 'Unknown';
         return <span className="capitalize">{roleName}</span>;
       }
     },

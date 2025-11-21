@@ -236,4 +236,14 @@ class RoleController extends Controller
             'data' => Role::getAllPermissions()
         ]);
     }
+
+    public function getAllPermissions(): JsonResponse
+    {
+        $permissions = Permission::orderBy('module')->orderBy('name')->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $permissions
+        ]);
+    }
 }

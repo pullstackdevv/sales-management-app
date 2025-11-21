@@ -48,6 +48,14 @@ class VoucherController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('vouchers.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create vouchers.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'code' => 'required|string|max:50|unique:vouchers,code',
             'name' => 'required|string|max:255',
@@ -104,6 +112,14 @@ class VoucherController extends Controller
 
     public function update(Request $request, Voucher $voucher): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('vouchers.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit vouchers.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'code' => 'sometimes|required|string|max:50|unique:vouchers,code,' . $voucher->id,
             'name' => 'sometimes|required|string|max:255',
@@ -149,6 +165,14 @@ class VoucherController extends Controller
 
     public function destroy(Voucher $voucher): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('vouchers.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete vouchers.'
+            ], 403);
+        }
+
         if ($voucher->orders()->exists()) {
             throw ValidationException::withMessages([
                 'voucher' => ['Cannot delete voucher that has been used in orders.']
@@ -175,6 +199,14 @@ class VoucherController extends Controller
 
     public function toggleStatus(Voucher $voucher): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('vouchers.toggle_status')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to toggle voucher status.'
+            ], 403);
+        }
+
         try {
             DB::beginTransaction();
 

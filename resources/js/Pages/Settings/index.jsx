@@ -6,6 +6,7 @@ import OrderSettings from "./OrderSettings";
 import ProductSettings from "./ProductSettings";
 import UserSettings from "./UserSettings";
 import RoleSettings from "./RoleSettings";
+import PermissionSettings from "./PermissionSettings";
 import OriginSettings from "./OriginSettings";
 import CourierSettings from "./CourierSettings";
 import PaymentSettings from "./PaymentSettings";
@@ -25,14 +26,13 @@ const stockOpnames = [
 ];
 
 const menus = [
-  { key: "general", label: "General", icon: "mdi:cog" },
-  { key: "order", label: "Order", icon: "mdi:clipboard-list-outline" },
-  { key: "product", label: "Product", icon: "mdi:package-variant" },
-  { key: "payment", label: "Payment", icon: "mdi:credit-card-outline" },
-  { key: "courier", label: "Courier", icon: "mdi:truck-outline" },
-  { key: "origin", label: "Asal Pengiriman", icon: "mdi:map-marker-outline" },
-  { key: "user", label: "User", icon: "mdi:account-outline" },
-  { key: "role", label: "Role Settings", icon: "mdi:shield-account-outline" },
+  { key: "general", label: "General", icon: "solar:settings-outline" },
+  { key: "user", label: "Users", icon: "solar:user-outline" },
+  { key: "role", label: "Roles", icon: "solar:shield-user-outline" },
+  { key: "permission", label: "Permissions", icon: "solar:key-outline" },
+  { key: "payment", label: "Payment Banks", icon: "solar:card-outline" },
+  { key: "courier", label: "Couriers", icon: "solar:delivery-outline" },
+  { key: "origin", label: "Sales Channels", icon: "solar:shop-outline" },
 ];
 
 function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
@@ -59,13 +59,16 @@ function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
           ))}
         </div>
         {activeMenu === "general" && <GeneralSettings />}
-        {activeMenu === "order" && <OrderSettings />}
-        {activeMenu === "product" && <ProductSettings />}
+        {activeMenu === "user" && <UserSettings />}
+        {activeMenu === "role" && <RoleSettings />}
+        {activeMenu === "permission" && <PermissionSettings />}
         {activeMenu === "payment" && <PaymentSettings />}
         {activeMenu === "courier" && <CourierSettings />}
         {activeMenu === "origin" && <OriginSettings />}
-        {activeMenu === "user" && <UserSettings />}
-        {activeMenu === "role" && <RoleSettings />}
+        
+        {/* Legacy menus */}
+        {activeMenu === "order" && <OrderSettings />}
+        {activeMenu === "product" && <ProductSettings />}
         {activeMenu === "dashboard" && <DashboardSettings />}
         {activeMenu === "api" && <ApiSettings />}
       </div>

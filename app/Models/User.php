@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,7 +13,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -23,7 +24,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role_id',
         'is_active',
     ];
 
@@ -53,11 +53,6 @@ class User extends Authenticatable
     }
 
     // Relationships
-    public function role()
-    {
-        return $this->belongsTo(Role::class);
-    }
-
     public function products()
     {
         return $this->hasMany(Product::class, 'created_by');
@@ -83,77 +78,28 @@ class User extends Authenticatable
         return $this->hasMany(OrderPayment::class, 'verified_by');
     }
 
-    public function isOwner(): bool
-    {
-        return $this->role && $this->role->name === 'owner';
-    }
+    // Note: isOwner(), isAdmin(), isStaff(), hasPermission(), etc.
+    // are now provided by the HasRoles trait
 
-    public function isAdmin(): bool
-    {
-        return $this->role && $this->role->name === 'admin';
-    }
-
-    public function isStaff(): bool
-    {
-        return $this->role && $this->role->name === 'staff';
-    }
-
-    public function isWarehouse(): bool
-    {
-        return $this->role && $this->role->name === 'warehouse';
-    }
-
-    // Permission methods based on role
-    public function hasPermission(string $permission): bool
-    {
-        if (!$this->is_active) {
-            return false;
-        }
-
-        // Owner has all permissions
-        if ($this->isOwner()) {
-            return true;
-        }
-
-        // Get role-based permissions
-        $rolePermissions = $this->getRolePermissions();
-        
-        // Check if permission matches any role permission pattern
-        foreach ($rolePermissions as $rolePermission) {
-            if ($rolePermission === '*' || $this->matchesPermissionPattern($permission, $rolePermission)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function matchesPermissionPattern(string $permission, string $pattern): bool
-    {
-        // Convert pattern to regex (e.g., 'orders.*' becomes '/^orders\..+$/')
-        if (str_ends_with($pattern, '.*')) {
-            $prefix = str_replace('.*', '', $pattern);
-            return str_starts_with($permission, $prefix . '.');
-        }
-        
-        return $permission === $pattern;
-    }
-
-    public function getRolePermissions(): array
-    {
-        if (!$this->role) {
-            return [];
-        }
-
-        return $this->role->permissions ?? [];
-    }
-
+    /**
+     * Get role description for the user.
+     */
     public function getRoleDescription(): string
     {
-        if (!$this->role) {
+        $roles = $this->roles;
+        
+        if ($roles->isEmpty()) {
             return 'Tidak ada akses';
         }
 
-        return $this->role->description ?? 'Tidak ada deskripsi';
+        return $roles->pluck('description')->implode(', ');
+    }
+
+    /**
+     * Check if user is warehouse staff.
+     */
+    public function isWarehouse(): bool
+    {
+        return $this->hasRole('warehouse');
     }
 }

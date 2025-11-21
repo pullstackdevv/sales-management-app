@@ -100,6 +100,14 @@ class ProductController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('products.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create products.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -195,6 +203,14 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('products.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit products.'
+            ], 403);
+        }
+
         // Custom validation for variants SKU
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -344,6 +360,14 @@ class ProductController extends Controller
 
     public function import(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('products.import')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You do not have permission to import products.'
+            ], 403);
+        }
+
         try {
             $validator = Validator::make($request->all(), [
                 'file' => 'required|file|mimetypes:application/zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel|max:10240'
@@ -461,6 +485,14 @@ class ProductController extends Controller
 
     public function destroy(Product $product): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('products.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete products.'
+            ], 403);
+        }
+
         try {
             if ($product->variants()->whereHas('orderItems')->exists()) {
                 throw ValidationException::withMessages([

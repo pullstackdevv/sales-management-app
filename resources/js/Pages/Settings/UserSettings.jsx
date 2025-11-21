@@ -58,7 +58,7 @@ export default function UserSettings() {
       email: user.email,
       password: '',
       password_confirmation: '',
-      role_id: user.role?.name || user.role_id || '',
+      role_id: user.roles?.[0]?.name || user.role_id || '',
       is_active: user.is_active
     });
     setSelectedUser(user);

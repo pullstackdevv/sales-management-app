@@ -45,6 +45,14 @@ class RoleController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('roles.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create roles.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:roles,name',
             'description' => 'nullable|string|max:255',
@@ -101,6 +109,14 @@ class RoleController extends Controller
 
     public function update(Request $request, string $roleName): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('roles.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit roles.'
+            ], 403);
+        }
+
         $role = Role::where('name', $roleName)->firstOrFail();
 
         $validated = $request->validate([
@@ -142,6 +158,14 @@ class RoleController extends Controller
 
     public function destroy(Role $role): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('roles.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete roles.'
+            ], 403);
+        }
+
         if ($role->is_system) {
             throw ValidationException::withMessages([
                 'role' => ['Cannot delete system role.']

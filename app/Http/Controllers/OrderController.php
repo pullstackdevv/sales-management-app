@@ -110,6 +110,14 @@ class OrderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create orders.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'address_id' => 'required|exists:customer_addresses,id',
@@ -305,6 +313,14 @@ class OrderController extends Controller
 
     public function update(Request $request, Order $order): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit orders.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'address_id' => 'sometimes|required|exists:customer_addresses,id',
             'sales_channel_id' => 'nullable|exists:sales_channels,id',
@@ -489,6 +505,14 @@ class OrderController extends Controller
 
     public function destroy(Order $order): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete orders.'
+            ], 403);
+        }
+
         if ($order->status !== 'pending') {
             throw ValidationException::withMessages([
                 'order' => ['Can only delete pending orders.']
@@ -528,6 +552,14 @@ class OrderController extends Controller
 
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.update_status')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to update order status.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'status' => 'required|in:pending,paid,shipped,delivered,cancelled'
         ]);

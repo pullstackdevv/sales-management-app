@@ -36,11 +36,25 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+        
+        // Load roles with permissions for authenticated user
+        if ($user) {
+            $user->load(['roles' => function ($query) {
+                $query->with('permissions:id,name');
+            }]);
+            
+            // Transform roles to include permission names as array
+            $user->roles->each(function ($role) {
+                $role->permissions = $role->permissions->pluck('name')->toArray();
+            });
+        }
+        
         return [
             ...parent::share($request),
             // Authenticated user data
             'auth' => [
-                'user' => $request->user() ? $request->user()->load('role') : null,
+                'user' => $user,
             ],
 
             // Flash message support

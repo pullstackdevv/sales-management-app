@@ -43,6 +43,14 @@ class UserController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('users.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create users.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -103,6 +111,14 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('users.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit users.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
@@ -165,6 +181,14 @@ class UserController extends Controller
 
     public function destroy(User $user): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('users.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete users.'
+            ], 403);
+        }
+
         if ($user->id === Auth::id()) {
             throw ValidationException::withMessages([
                 'user' => ['Cannot delete your own account.']

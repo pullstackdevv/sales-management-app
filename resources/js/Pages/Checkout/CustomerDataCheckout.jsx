@@ -628,18 +628,20 @@ const CustomerDataCheckout = () => {
     setSavingAddress(true);
 
     try {
-      const addressPayload = {
-        label: newAddressData.label || 'Rumah',
-        recipient_name: newAddressData.recipient_name || selectedCustomer?.name || 'Penerima',
-        recipient_phone: newAddressData.recipient_phone || selectedCustomer?.phone || '08123456789',
-        address_detail: newAddressData.address_detail || 'Alamat tidak diketahui',
-        city: newAddressData.city || 'Kota tidak diketahui',
-        district: newAddressData.district || 'Kecamatan tidak diketahui',
-        province: newAddressData.province || 'Provinsi tidak diketahui',
-        postal_code: newAddressData.postal_code || '00000',
-        is_default: newAddressData.is_default,
-        is_primary: newAddressData.is_default || false
-      };
+    const addressPayload = {
+      label: newAddressData.label || 'Rumah',
+      recipient_name: newAddressData.recipient_name || selectedCustomer?.name || 'Penerima',
+      recipient_phone: newAddressData.recipient_phone || '',
+      recipient_email: newAddressData.recipient_email || '',
+      is_dropship: !!newAddressData.is_dropship,
+      address_detail: newAddressData.address_detail || 'Alamat tidak diketahui',
+      city: newAddressData.city || 'Kota tidak diketahui',
+      district: newAddressData.district || 'Kecamatan tidak diketahui',
+      province: newAddressData.province || 'Provinsi tidak diketahui',
+      postal_code: newAddressData.postal_code || '',
+      is_default: newAddressData.is_default,
+      is_primary: newAddressData.is_default || false
+    };
 
       let successMessage = '';
       if (editingAddress) {
@@ -653,6 +655,12 @@ const CustomerDataCheckout = () => {
           if (normalizedAddr.phone && !normalizedAddr.recipient_phone) {
             normalizedAddr.recipient_phone = normalizedAddr.phone;
             delete normalizedAddr.phone;
+          }
+          if (normalizedAddr.recipient_email === undefined) {
+            normalizedAddr.recipient_email = '';
+          }
+          if (normalizedAddr.is_dropship === undefined) {
+            normalizedAddr.is_dropship = false;
           }
           return normalizedAddr;
         });
@@ -677,6 +685,12 @@ const CustomerDataCheckout = () => {
           if (normalizedAddr.phone && !normalizedAddr.recipient_phone) {
             normalizedAddr.recipient_phone = normalizedAddr.phone;
             delete normalizedAddr.phone;
+          }
+          if (normalizedAddr.recipient_email === undefined) {
+            normalizedAddr.recipient_email = '';
+          }
+          if (normalizedAddr.is_dropship === undefined) {
+            normalizedAddr.is_dropship = false;
           }
           return normalizedAddr;
         });
@@ -716,11 +730,13 @@ const CustomerDataCheckout = () => {
       setNewAddressData({
         label: '',
         recipient_name: '',
+        recipient_phone: '',
+        recipient_email: '',
+        is_dropship: false,
         address_detail: '',
         city: '',
         province: '',
         postal_code: '',
-        recipient_phone: '',
         is_default: false
       });
       setAddressFormErrors({});
@@ -1341,50 +1357,7 @@ const CustomerDataCheckout = () => {
                   </div>
                 </div>
 
-                {/* Dropshipper Toggle */}
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isDropshipper}
-                      onChange={(e) => setIsDropshipper(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded"
-                    />
-                    <span className="ml-3 text-sm font-medium text-gray-700">
-                      Ini adalah pesanan dropshipper (penerima berbeda dengan pemesan)
-                    </span>
-                  </label>
-                </div>
-
-                {/* Recipient Form (jika dropshipper aktif) */}
-                {isDropshipper && (
-                  <div className="mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <h3 className="text-sm font-semibold mb-4 text-amber-900">Data Penerima</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input
-                        type="text"
-                        placeholder="Nama Penerima"
-                        value={recipientData.full_name}
-                        onChange={(e) => setRecipientData({...recipientData, full_name: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="HP Penerima"
-                        value={recipientData.phone}
-                        onChange={(e) => setRecipientData({...recipientData, phone: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="email"
-                        placeholder="Email Penerima (opsional)"
-                        value={recipientData.email}
-                        onChange={(e) => setRecipientData({...recipientData, email: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 md:col-span-2"
-                      />
-                    </div>
-                  </div>
-                )}
+                
 
                 {/* New Customer Form */}
                 {customerType === 'new' && (
@@ -2171,6 +2144,34 @@ const CustomerDataCheckout = () => {
                   <p className="text-red-500 text-sm mt-1">{addressFormErrors.postal_code}</p>
                 )}
               </div>
+
+              {/* Dropship Toggle in Address Modal */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={!!newAddressData.is_dropship}
+                  onChange={(e) => handleAddressFormChange('is_dropship', e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label className="ml-2 block text-sm text-gray-700">
+                  Pesanan dropship (penerima berbeda dengan pemesan)
+                </label>
+              </div>
+
+              {newAddressData.is_dropship && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Penerima (opsional)
+                  </label>
+                  <input
+                    type="email"
+                    value={newAddressData.recipient_email || ''}
+                    onChange={(e) => handleAddressFormChange('recipient_email', e.target.value)}
+                    placeholder="email@example.com"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

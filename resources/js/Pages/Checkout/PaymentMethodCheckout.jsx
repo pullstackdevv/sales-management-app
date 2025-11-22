@@ -15,7 +15,7 @@ const PaymentMethodCheckout = () => {
   const [courierRates, setCourierRates] = useState([]);
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [selectedRateIndex, setSelectedRateIndex] = useState(null);
-  
+
   // Voucher states
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
@@ -30,7 +30,7 @@ const PaymentMethodCheckout = () => {
     // Ambil data checkout dari session
     const data = checkoutSession.get();
     console.log('PaymentMethodCheckout - Raw session data:', data);
-    
+
     if (!data || !data.product || !data.customer) {
       console.log('PaymentMethodCheckout - Missing required data:', {
         hasData: !!data,
@@ -41,7 +41,7 @@ const PaymentMethodCheckout = () => {
       router.visit(route('marketplace.home'));
       return;
     }
-    
+
     console.log('PaymentMethodCheckout - Customer data received:', data.customer);
     setCheckoutData(data);
     setLoading(false);
@@ -65,15 +65,20 @@ const PaymentMethodCheckout = () => {
 
     setLoadingShipping(true);
     try {
-      // Prioritize district (kecamatan) from customer address data
-      const customerAddress = checkoutData.customer.addresses?.[0] || checkoutData.customer;
+      // Use selected address by address_id if available
+      const addressId = checkoutData.customer.address_id;
+      const addresses = checkoutData.customer.addresses || [];
+      const selectedAddress = (addressId && Array.isArray(addresses))
+        ? addresses.find(a => a.id === addressId)
+        : null;
+      const customerAddress = selectedAddress || checkoutData.customer;
       const district = customerAddress.district || checkoutData.customer.district;
       const city = customerAddress.city || checkoutData.customer.city;
       const province = customerAddress.province || checkoutData.customer.province;
-      
+
       console.log('Shipping calculation data:', {
         district,
-        city, 
+        city,
         province,
         customerAddress
       });
@@ -89,7 +94,7 @@ const PaymentMethodCheckout = () => {
         setShippingCost(0);
         return;
       }
-      
+
       const queryParams = new URLSearchParams();
       queryParams.append('page', '1');
       queryParams.append('per_page', '50');
@@ -97,10 +102,12 @@ const PaymentMethodCheckout = () => {
       queryParams.append('sort_order', 'asc');
       if (district) queryParams.append('district', district);
       if (city) queryParams.append('city', city);
+      if (province) queryParams.append('province', province);
+      queryParams.append('courier_name', 'TIKI');
       queryParams.append('origin_city', 'Jakarta');
       const response = await axios.get(`/api/courier-rates?${queryParams.toString()}`);
       console.log('Courier rates API response:', response.data);
-      
+
       if (response.data && response.data.success && response.data.data && response.data.data.rates) {
         const rates = response.data.data.rates;
         console.log(`Found ${rates.length} courier rates for district: ${district}`);
@@ -110,7 +117,7 @@ const PaymentMethodCheckout = () => {
         calculateShippingCost(rates, district, defaultIndex);
       } else {
         console.log(`No courier rates found for district: ${district}`);
-        
+
         // Show user-friendly message if no rates found
         Swal.fire({
           icon: 'info',
@@ -118,20 +125,20 @@ const PaymentMethodCheckout = () => {
           text: `Maaf, ongkos kirim untuk kecamatan ${district} belum tersedia. Silakan hubungi customer service untuk informasi lebih lanjut.`,
           confirmButtonColor: '#3b82f6'
         });
-        
+
         setShippingCost(0);
         setCourierRates([]);
       }
     } catch (error) {
       console.error('Error fetching courier rates:', error);
-      
+
       Swal.fire({
         icon: 'error',
         title: 'Gagal Mengambil Data Ongkir',
         text: 'Terjadi kesalahan saat mengambil data ongkos kirim. Silakan coba lagi.',
         confirmButtonColor: '#3b82f6'
       });
-      
+
       setShippingCost(0);
     } finally {
       setLoadingShipping(false);
@@ -141,12 +148,12 @@ const PaymentMethodCheckout = () => {
   // Function to calculate total weight from products
   const calculateTotalWeight = () => {
     if (!checkoutData || !checkoutData.product) return 0;
-    
+
     // Check if this is from MultiProductCheckout with pre-calculated weight
     if (checkoutData.product.totalWeight) {
       return checkoutData.product.totalWeight;
     }
-    
+
     // Check if this is from MultiProductCheckout with multiProducts array
     if (checkoutData.product.multiProducts && Array.isArray(checkoutData.product.multiProducts)) {
       return checkoutData.product.multiProducts.reduce((totalWeight, product) => {
@@ -155,9 +162,9 @@ const PaymentMethodCheckout = () => {
         return totalWeight + (weight * quantity);
       }, 0);
     }
-    
+
     let totalWeight = 0;
-    
+
     if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
       // Multiple variants selected (single product with multiple variants)
       Object.values(checkoutData.product.selectedVariants).forEach(({ variant, quantity }) => {
@@ -170,7 +177,7 @@ const PaymentMethodCheckout = () => {
       const quantity = checkoutData.product.quantity || 1;
       totalWeight += weight * quantity;
     }
-    
+
     return totalWeight;
   };
 
@@ -299,7 +306,7 @@ const PaymentMethodCheckout = () => {
     try {
       const authToken = localStorage.getItem('auth_token');
       const orderAmount = checkoutData.product.subtotal + shippingCost;
-      
+
       const response = await axios.post('/api/vouchers/validate', {
         code: voucherCode,
         order_amount: orderAmount,
@@ -362,30 +369,19 @@ const PaymentMethodCheckout = () => {
   // Handle lanjut ke step berikutnya - Direct payment with xendit
   const handleContinue = async () => {
     setSubmitting(true);
-    
+
     try {
-      // Get auth token from localStorage
-      const authToken = localStorage.getItem('auth_token');
-      if (!authToken) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Login Diperlukan',
-          text: 'Anda perlu login terlebih dahulu',
-          confirmButtonColor: '#3b82f6'
-        });
-        setSubmitting(false);
-        return;
-      }
+      
 
 
 
       // Calculate total quantity and prepare items
       let items = [];
-      
+
       // Debug: Log the checkout data structure
       console.log('Checkout data structure:', checkoutData);
       console.log('Product data:', checkoutData.product);
-      
+
       // Check if this is from MultiProductCheckout
       if (checkoutData.product.multiProducts && Array.isArray(checkoutData.product.multiProducts)) {
         // Multi-product checkout from MultiProductCheckout
@@ -419,45 +415,78 @@ const PaymentMethodCheckout = () => {
 
       // Debug: Log the final items array
       console.log('Final items array:', items);
-      
-      // Prepare order data with correct customer_id field
-      const orderData = {
-        customer_id: checkoutData.customer.customer_id, // Use customer_id instead of id
-        address_id: checkoutData.customer.address_id || 1,
-        sales_channel_id: 1, // Default sales channel
-        items: items,
-        shipping_cost: shippingCost, // Use calculated shipping cost
-        courier_id: (typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.courier?.id) ? courierRates[selectedRateIndex].courier.id : null,
-        voucher_id: appliedVoucher ? appliedVoucher.id : null, // Add voucher if applied
-        notes: 'Order dari marketplace - Payment via Xendit'
+
+      const addressId = checkoutData.customer.address_id;
+      const addresses = checkoutData.customer.addresses || [];
+      const selectedAddress = (addressId && Array.isArray(addresses))
+        ? addresses.find(a => a.id === addressId)
+        : null;
+
+      const normalizePhone = (x) => (x || '').toString().replace(/[^0-9+]/g, '').trim();
+      const guestEmail = checkoutData.customer.email || '';
+      const guestPhone = normalizePhone(selectedAddress?.recipient_phone || checkoutData.customer.whatsapp || selectedAddress?.phone || checkoutData.customer.phone || '');
+      const guestName = checkoutData.customer.name || selectedAddress?.recipient_name || '';
+
+      if (!guestPhone || guestPhone.trim().length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Nomor HP Diperlukan',
+          text: 'Mohon lengkapi nomor HP pemesan atau penerima sebelum melanjutkan.',
+          confirmButtonColor: '#3b82f6'
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      const selectedRate = typeof selectedRateIndex === 'number' ? courierRates[selectedRateIndex] : null;
+      const webOrderData = {
+        items: items.map(p => ({ product_variant_id: p.product_variant_id, quantity: p.quantity })),
+        shipping_cost: shippingCost,
+        voucher_id: appliedVoucher ? appliedVoucher.id : null,
+        notes: 'Order dari marketplace - Payment via Xendit',
+        guest_email: guestEmail,
+        guest_phone: guestPhone,
+        guest_name: guestName,
+        address_id: addressId || null,
+        courier_id: selectedRate?.courier?.id || null,
+        courier_rate_id: selectedRate?.id || null,
+        service_type: selectedRate?.service?.name || selectedRate?.service_type || null
       };
-      
-      // Debug: Log the final order data
-      console.log('Final order data being sent to API:', orderData);
+
+      if (!addressId) {
+        webOrderData.address_name = (selectedAddress?.recipient_name ?? '').toString();
+        webOrderData.address_phone = normalizePhone(selectedAddress?.recipient_phone || guestPhone);
+        webOrderData.address_label = selectedAddress?.label || 'Alamat Web Order';
+        webOrderData.address_street = selectedAddress?.address_detail || checkoutData.customer.address;
+        webOrderData.address_city = selectedAddress?.city || checkoutData.customer.city;
+        webOrderData.address_province = selectedAddress?.province || checkoutData.customer.province;
+        webOrderData.address_district = selectedAddress?.district || checkoutData.customer.district || '';
+        webOrderData.address_postal_code = selectedAddress?.postal_code || '';
+      }
+
+      if (!webOrderData.address_id && (!webOrderData.address_phone || webOrderData.address_phone.trim().length === 0)) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Nomor HP Penerima Diperlukan',
+          text: 'Mohon lengkapi nomor HP penerima pada alamat pengiriman.',
+          confirmButtonColor: '#3b82f6'
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      console.log('Final order data being sent to API:', webOrderData);
 
 
 
-      // Create order
-      const orderResponse = await axios.post('/api/orders', orderData, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+      const orderResponse = await axios.post('/order/create', webOrderData);
 
       if (orderResponse.data.status === 'success' && orderResponse.data.data.order_number) {
         const orderNumber = orderResponse.data.data.order_number;
-        
+
         // Create payment with xendit
         const paymentResponse = await axios.post(`/api/payment/create/${orderNumber}`, {
           payment_gateway: 'xendit'
-        }, {
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
         });
 
         if (paymentResponse.data.status === 'success') {
@@ -467,7 +496,7 @@ const PaymentMethodCheckout = () => {
             order_number: orderNumber,
             payment_data: paymentResponse.data.data
           });
-          
+
           if (success) {
             // Redirect ke payment_url dari response
             const paymentUrl = paymentResponse.data.data.order?.payment_url || paymentResponse.data.data.invoice_url;
@@ -515,13 +544,13 @@ const PaymentMethodCheckout = () => {
         // Show detailed error information
         const errorData = error.response.data;
         let errorMessage = errorData?.message || `Error ${error.response.status}: ${error.response.statusText}`;
-        
+
         // Show validation errors if available
         if (errorData?.errors && Array.isArray(errorData.errors)) {
           const validationErrors = errorData.errors.map(err => err.message).join(', ');
           errorMessage += ` - ${validationErrors}`;
         }
-        
+
         Swal.fire({
           icon: 'error',
           title: 'Terjadi Kesalahan',
@@ -612,7 +641,7 @@ const PaymentMethodCheckout = () => {
                 </div>
                 <span className="ml-2 text-sm font-medium text-blue-600">Pembayaran</span>
               </div>
-              
+
             </div>
           </div>
 
@@ -621,7 +650,7 @@ const PaymentMethodCheckout = () => {
             <div className="lg:col-span-2">
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-xl font-semibold mb-6">Gateway Pembayaran</h2>
-                
+
                 <div className="border rounded-lg p-6 bg-blue-50 border-blue-200">
                   <div className="flex items-center space-x-4">
                     <div className="p-3 rounded-lg bg-blue-100 text-blue-600">
@@ -639,26 +668,26 @@ const PaymentMethodCheckout = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600">
                     <strong>Catatan:</strong> Setelah mengklik "Lanjutkan ke Pembayaran", Anda akan diarahkan ke halaman pembayaran untuk memilih metode pembayaran yang diinginkan.
                   </p>
                 </div>
               </div>
-            </div>        
+            </div>
             {/* Order Summary */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
                 <h3 className="text-base font-semibold mb-3">Ringkasan Pesanan</h3>
-                
+
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between items-start">
                     <span className="text-sm text-gray-600">Produk</span>
                     <span className="text-sm font-medium text-right flex-1 ml-2 truncate">{checkoutData.product.name}</span>
                   </div>
                   {/* Tampilkan semua varian yang dipilih - Compact */}
-                {checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0 ? (
+                  {checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0 ? (
                     <div className="space-y-1">
                       <span className="text-xs text-gray-500 font-medium">Varian:</span>
                       {Object.values(checkoutData.product.selectedVariants).map(({ variant, quantity }) => (
@@ -688,12 +717,12 @@ const PaymentMethodCheckout = () => {
                     </div>
                   )}
 
-                  
+
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
                     <span className="font-medium">Rp {checkoutData.product.subtotal.toLocaleString('id-ID')}</span>
                   </div>
-                  
+
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Ongkos Kirim</span>
                     <span className="font-medium">
@@ -714,8 +743,8 @@ const PaymentMethodCheckout = () => {
                         </label>
                         <div className="space-y-2 max-h-48 overflow-y-auto">
                           {promotions.map((promo) => (
-                            <div 
-                              key={promo.id} 
+                            <div
+                              key={promo.id}
                               className="p-3 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg"
                             >
                               <div className="flex items-start gap-2">
@@ -730,16 +759,16 @@ const PaymentMethodCheckout = () => {
                                   {(promo.start_date || promo.end_date) && (
                                     <div className="mt-2 text-xs text-orange-700">
                                       <span className="font-medium">Periode: </span>
-                                      {promo.start_date && new Date(promo.start_date).toLocaleDateString('id-ID', { 
-                                        day: 'numeric', 
-                                        month: 'short', 
-                                        year: 'numeric' 
+                                      {promo.start_date && new Date(promo.start_date).toLocaleDateString('id-ID', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric'
                                       })}
                                       {promo.start_date && promo.end_date && ' - '}
-                                      {promo.end_date && new Date(promo.end_date).toLocaleDateString('id-ID', { 
-                                        day: 'numeric', 
-                                        month: 'short', 
-                                        year: 'numeric' 
+                                      {promo.end_date && new Date(promo.end_date).toLocaleDateString('id-ID', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric'
                                       })}
                                     </div>
                                   )}
@@ -827,7 +856,7 @@ const PaymentMethodCheckout = () => {
                       <span className="font-medium">-Rp {voucherDiscount.toLocaleString('id-ID')}</span>
                     </div>
                   )}
-                  
+
                   {/* Show shipping details if available - Compact */}
                   {courierRates.length > 0 && !loadingShipping && (
                     <div className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-100">
@@ -842,7 +871,13 @@ const PaymentMethodCheckout = () => {
                           onChange={(e) => {
                             const idx = parseInt(e.target.value);
                             setSelectedRateIndex(idx);
-                            calculateShippingCost(courierRates, (checkoutData.customer.addresses?.[0] || checkoutData.customer).district, idx);
+                            const addressId = checkoutData.customer.address_id;
+                            const addresses = checkoutData.customer.addresses || [];
+                            const selectedAddress = (addressId && Array.isArray(addresses))
+                              ? addresses.find(a => a.id === addressId)
+                              : null;
+                            const district = (selectedAddress || checkoutData.customer).district;
+                            calculateShippingCost(courierRates, district, idx);
                           }}
                         >
                           <option value="" disabled>Pilih kurir & layanan</option>
@@ -873,13 +908,21 @@ const PaymentMethodCheckout = () => {
                       {checkoutData?.customer && (
                         <div className="mt-1 pt-1 border-t border-gray-100">
                           <div className="text-xs text-gray-400 truncate">
-                            Tujuan: {(checkoutData.customer.addresses?.[0] || checkoutData.customer).district}, {(checkoutData.customer.addresses?.[0] || checkoutData.customer).city}
+                            {(() => {
+                              const addressId = checkoutData.customer.address_id;
+                              const addresses = checkoutData.customer.addresses || [];
+                              const selectedAddress = (addressId && Array.isArray(addresses))
+                                ? addresses.find(a => a.id === addressId)
+                                : null;
+                              const dest = selectedAddress || checkoutData.customer;
+                              return `Tujuan: ${dest.district}, ${dest.city}`;
+                            })()}
                           </div>
                         </div>
                       )}
                     </div>
                   )}
-                  
+
                   {/* Show message when no shipping data available - Compact */}
                   {courierRates.length === 0 && !loadingShipping && shippingCost === 0 && (
                     <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
@@ -887,9 +930,9 @@ const PaymentMethodCheckout = () => {
                       <div className="text-xs">Perlu data kecamatan yang lengkap</div>
                     </div>
                   )}
-                  
+
                   <hr className="my-3" />
-                  
+
                   <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
                     <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
@@ -901,8 +944,9 @@ const PaymentMethodCheckout = () => {
                   <h4 className="text-sm font-medium mb-2 text-gray-700">Data Pemesan</h4>
                   <div className="text-xs text-gray-600 space-y-1">
                     <p className="font-medium">{checkoutData.customer.name}</p>
+                    <p>{checkoutData.customer.email}</p>
                     <p>{checkoutData.customer.whatsapp}</p>
-                    <p className="text-xs text-gray-500 truncate">{checkoutData.customer.address}, {checkoutData.customer.city}</p>
+                    {/* <p className="text-xs text-gray-500 truncate">{checkoutData.customer.address}, {checkoutData.customer.city}</p> */}
                   </div>
                 </div>
 

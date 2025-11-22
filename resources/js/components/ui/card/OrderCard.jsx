@@ -549,7 +549,7 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                             </div>
                             <div>
                                 <div className="font-semibold">
-                                    {localOrder.courier}
+                                    {localOrder.courier} - {localOrder.service_type}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                     Resi : {localOrder.resi || "-"}

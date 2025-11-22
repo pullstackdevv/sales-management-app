@@ -134,6 +134,7 @@ class CourierRateController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'courier_id' => 'nullable|integer|exists:couriers,id',
+                'courier_name' => 'nullable|string|max:100',
                 'province' => 'nullable|string|max:100',
                 'city' => 'nullable|string|max:100'
             ]);
@@ -154,6 +155,12 @@ class CourierRateController extends Controller
 
             if ($request->has('courier_id')) {
                 $query->where('courier_id', $request->courier_id);
+            }
+
+            if ($request->has('courier_name')) {
+                $query->whereHas('courier', function ($q) use ($request) {
+                    $q->where('name', 'like', '%' . $request->courier_name . '%');
+                });
             }
 
             if ($request->has('province')) {
@@ -289,16 +296,17 @@ class CourierRateController extends Controller
             $query->where('origin_city', 'like', '%' . $request->origin_city . '%');
         }
 
-        // Service type filter - restrict to REG and ONS only
         $allowedServiceTypes = ['REG', 'ONS'];
+        $isTiki = false;
+        if ($request->has('courier_name') && stripos($request->courier_name, 'tiki') !== false) {
+            $isTiki = true;
+        }
         if ($request->has('service_type')) {
-            // Only allow REG and ONS service types
-            if (in_array($request->service_type, $allowedServiceTypes)) {
-                $query->where('service_type', $request->service_type);
-            }
+            $query->where('service_type', $request->service_type);
         } else {
-            // If no service_type specified, only show REG and ONS
-            $query->whereIn('service_type', $allowedServiceTypes);
+            if (!$isTiki) {
+                $query->whereIn('service_type', $allowedServiceTypes);
+            }
         }
 
         // Price filters

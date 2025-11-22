@@ -311,7 +311,8 @@ export default function AddOrder() {
                 status: formData.status,
                 payment_status: formData.payment_status,
                 payment_bank_id: formData.payment_bank_id || null,
-                courier_id: formData.courier || null
+                courier_id: formData.courier || null,
+                service_type: formData.service_type || null
             };
             
             console.log('AddOrder - Sending data:', {

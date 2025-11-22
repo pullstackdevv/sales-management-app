@@ -30,7 +30,6 @@ export default function UserSettings() {
   useEffect(() => {
     fetchUsers();
     fetchRoles();
-    fetchRoleDescriptions();
   }, []);
 
   const resetForm = () => {
@@ -58,7 +57,7 @@ export default function UserSettings() {
       email: user.email,
       password: '',
       password_confirmation: '',
-      role_id: user.role?.name || user.role_id || '',
+      role_id: user.roles?.[0]?.name || user.role_id || '',
       is_active: user.is_active
     });
     setSelectedUser(user);
@@ -112,19 +111,37 @@ export default function UserSettings() {
       
       if (err.response?.status === 422) {
         // Validation errors
-        const errors = Object.values(err.response.data.errors).flat();
-        setFormError(errors.join(', '));
+        const errors = err.response.data.errors;
+        const errorMessages = Object.entries(errors).map(([field, messages]) => {
+          return `<strong>${field}:</strong> ${messages.join(', ')}`;
+        }).join('<br>');
+        
+        Swal.fire({
+          icon: 'error',
+          title: 'Validasi Gagal',
+          html: errorMessages,
+          confirmButtonText: 'OK'
+        });
       } else if (err.response?.status === 401) {
-        setFormError('Sesi Anda telah berakhir. Silakan login kembali.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Sesi Berakhir',
+          text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+          timer: 2000,
+          showConfirmButton: false
+        });
         setTimeout(() => window.location.href = '/login', 2000);
       } else if (err.response?.status === 403) {
-        setFormError('Anda tidak memiliki akses untuk membuat user.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Akses Ditolak',
+          text: 'Anda tidak memiliki akses untuk membuat user.'
+        });
       } else {
-        setFormError('Gagal membuat user. Silakan coba lagi.');
         Swal.fire({
           icon: 'error',
           title: 'Gagal!',
-          text: 'Gagal membuat user'
+          text: err.response?.data?.message || 'Gagal membuat user. Silakan coba lagi.'
         });
       }
     } finally {
@@ -162,19 +179,37 @@ export default function UserSettings() {
       
       if (err.response?.status === 422) {
         // Validation errors
-        const errors = Object.values(err.response.data.errors).flat();
-        setFormError(errors.join(', '));
+        const errors = err.response.data.errors;
+        const errorMessages = Object.entries(errors).map(([field, messages]) => {
+          return `<strong>${field}:</strong> ${messages.join(', ')}`;
+        }).join('<br>');
+        
+        Swal.fire({
+          icon: 'error',
+          title: 'Validasi Gagal',
+          html: errorMessages,
+          confirmButtonText: 'OK'
+        });
       } else if (err.response?.status === 401) {
-        setFormError('Sesi Anda telah berakhir. Silakan login kembali.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Sesi Berakhir',
+          text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+          timer: 2000,
+          showConfirmButton: false
+        });
         setTimeout(() => window.location.href = '/login', 2000);
       } else if (err.response?.status === 403) {
-        setFormError('Anda tidak memiliki akses untuk memperbarui user.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Akses Ditolak',
+          text: 'Anda tidak memiliki akses untuk memperbarui user.'
+        });
       } else {
-        setFormError('Gagal memperbarui user. Silakan coba lagi.');
         Swal.fire({
           icon: 'error',
           title: 'Gagal!',
-          text: 'Gagal memperbarui user'
+          text: err.response?.data?.message || 'Gagal memperbarui user. Silakan coba lagi.'
         });
       }
     } finally {
@@ -282,23 +317,24 @@ export default function UserSettings() {
       const response = await api.get("/roles");
       if (response.data.status === 'success') {
         const rolesData = response.data.data.data || response.data.data;
-        setRoles(Array.isArray(rolesData) ? rolesData : []);
+        const rolesArray = Array.isArray(rolesData) ? rolesData : [];
+        setRoles(rolesArray);
+        
+        // Build role descriptions from roles data
+        const descriptions = {};
+        rolesArray.forEach(role => {
+          descriptions[role.name] = {
+            description: role.description,
+            permissions: role.permissions || []
+          };
+        });
+        setRoleDescriptions(descriptions);
       }
     } catch (err) {
       console.error('Error fetching roles:', err);
     }
   };
 
-  const fetchRoleDescriptions = async () => {
-    try {
-      const response = await api.get("/users/role-permissions");
-      if (response.data.status === 'success') {
-        setRoleDescriptions(response.data.data || {});
-      }
-    } catch (err) {
-      console.error('Error fetching role descriptions:', err);
-    }
-  };
 
 
   
@@ -318,7 +354,7 @@ export default function UserSettings() {
       key: "role", 
       label: "Role",
       render: (row) => {
-        const roleName = row.role?.name || 'Unknown';
+        const roleName = row.roles?.[0]?.name || 'Unknown';
         return <span className="capitalize">{roleName}</span>;
       }
     },
@@ -504,22 +540,36 @@ export default function UserSettings() {
                     value={formData.password}
                     onChange={handleInputChange}
                     required={modalType === 'create'}
+                    minLength={8}
                     placeholder="Masukkan password"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    <Icon icon="solar:info-circle-outline" className="inline mr-1" width={14} />
+                    Minimal 8 karakter
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Konfirmasi Password *</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Konfirmasi Password {modalType === 'create' ? '*' : ''}
+                  </label>
                   <input
                     type="password"
                     name="password_confirmation"
                     value={formData.password_confirmation}
                     onChange={handleInputChange}
                     required={modalType === 'create' || formData.password}
+                    minLength={8}
                     placeholder="Konfirmasi password"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  {formData.password && formData.password_confirmation && formData.password !== formData.password_confirmation && (
+                    <p className="text-xs text-red-500 mt-1">
+                      <Icon icon="solar:danger-circle-outline" className="inline mr-1" width={14} />
+                      Password tidak cocok
+                    </p>
+                  )}
                 </div>
 
                 <div>

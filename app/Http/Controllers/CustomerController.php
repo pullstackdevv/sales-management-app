@@ -46,6 +46,14 @@ class CustomerController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('customers.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create customers.'
+            ], 403);
+        }
+
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
@@ -151,6 +159,14 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('customers.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit customers.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|nullable|string|email|max:255|unique:customers,email,' . $customer->id . ',id,deleted_at,NULL',
@@ -215,6 +231,14 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('customers.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete customers.'
+            ], 403);
+        }
+
         if ($customer->orders()->exists()) {
             throw ValidationException::withMessages([
                 'customer' => ['Cannot delete customer that has orders.']
@@ -245,6 +269,14 @@ class CustomerController extends Controller
 
     public function toggleStatus(Customer $customer): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('customers.toggle_status')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to toggle customer status.'
+            ], 403);
+        }
+
         try {
             DB::beginTransaction();
 

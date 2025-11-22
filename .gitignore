@@ -22,3 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Ignore all .md files except README.md
+*.md
+!README.md
+!CORS_RATE_LIMITER.md

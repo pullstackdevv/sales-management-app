@@ -16,7 +16,9 @@ class UserController extends Controller
     public function index(Request $request): JsonResponse
     {
         $users = User::query()
-            ->with('role')
+            ->with(['roles' => function ($query) {
+                $query->select('roles.id', 'roles.name', 'roles.description');
+            }])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -24,7 +26,9 @@ class UserController extends Controller
                 });
             })
             ->when($request->role_id, function ($query, $roleId) {
-                $query->where('role_id', $roleId);
+                $query->whereHas('roles', function ($q) use ($roleId) {
+                    $q->where('roles.id', $roleId);
+                });
             })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
                 $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
@@ -41,19 +45,26 @@ class UserController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('users.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create users.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role_id' => 'required|string',
-            'is_active' => 'boolean',
-
+            'role_id' => 'required|string|exists:roles,name',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         try {
             DB::beginTransaction();
 
-            // Convert role name to role_id
+            // Find role by name
             $role = Role::where('name', $validated['role_id'])->first();
             if (!$role) {
                 return response()->json([
@@ -66,17 +77,18 @@ class UserController extends Controller
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
-                'role_id' => $role->id,
                 'is_active' => $validated['is_active'] ?? true,
-                'created_by' => Auth::id()
             ]);
+
+            // Assign role using pivot table
+            $user->assignRole($role);
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'User created successfully',
-                'data' => $user->load('role')
+                'data' => $user->load('roles')
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -89,7 +101,7 @@ class UserController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $user->load([
-                'role',
+                'roles',
                 'orders' => function ($query) {
                     $query->with(['items', 'payments', 'shipping'])
                         ->latest();
@@ -100,13 +112,20 @@ class UserController extends Controller
 
     public function update(Request $request, User $user): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('users.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit users.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
-            'password' => 'sometimes|required|string|min:8|confirmed',
-            'role_id' => 'sometimes|required|string',
-            'is_active' => 'boolean',
-
+            'password' => 'sometimes|nullable|string|min:8|confirmed',
+            'role_id' => 'sometimes|required|string|exists:roles,name',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         try {
@@ -126,8 +145,8 @@ class UserController extends Controller
                 $updateData['password'] = Hash::make($validated['password']);
             }
             
+            // Handle role update separately using pivot table
             if (isset($validated['role_id'])) {
-                // Convert role name to role_id
                 $role = Role::where('name', $validated['role_id'])->first();
                 if (!$role) {
                     return response()->json([
@@ -135,23 +154,24 @@ class UserController extends Controller
                         'message' => 'Role not found'
                     ], 400);
                 }
-                $updateData['role_id'] = $role->id;
+                // Sync role (replace existing roles)
+                $user->syncRoles([$role]);
             }
             
             if (isset($validated['is_active'])) {
                 $updateData['is_active'] = $validated['is_active'];
             }
-            
-            $updateData['updated_by'] = Auth::id();
 
-            $user->update($updateData);
+            if (!empty($updateData)) {
+                $user->update($updateData);
+            }
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'User updated successfully',
-                'data' => $user->fresh('role')
+                'data' => $user->fresh('roles')
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -161,6 +181,14 @@ class UserController extends Controller
 
     public function destroy(User $user): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('users.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete users.'
+            ], 403);
+        }
+
         if ($user->id === Auth::id()) {
             throw ValidationException::withMessages([
                 'user' => ['Cannot delete your own account.']
@@ -316,7 +344,7 @@ class UserController extends Controller
         foreach ($roles as $role) {
             $rolePermissions[$role->name] = [
                 'description' => $role->description,
-                'permissions' => $role->permissions ?? []
+                'permissions' => $role->getPermissionNames()
             ];
         }
 

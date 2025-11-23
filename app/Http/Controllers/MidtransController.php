@@ -178,7 +178,8 @@ class MidtransController extends Controller
 
             if (!$orderNumber || !$transactionStatus) {
                 Log::error('Invalid Midtrans notification payload', $payload);
-                return response()->json(['status' => 'error', 'message' => 'Invalid payload'], 400);
+
+                return response()->json(['status' => 'error', 'message' => 'Invalid payload'], 200);
             }
 
             Log::info('Midtrans notification received', [
@@ -192,7 +193,8 @@ class MidtransController extends Controller
 
             if (!$order) {
                 Log::error('Order not found for notification: ' . $orderNumber);
-                return response()->json(['status' => 'error', 'message' => 'Order not found'], 404);
+
+                return response()->json(['status' => 'error', 'message' => 'Order not found'], 200);
             }
 
             $paymentStatus = $this->mapTransactionStatus($transactionStatus, $fraudStatus);
@@ -214,11 +216,12 @@ class MidtransController extends Controller
                 'order_status' => $order->status,
             ]);
 
-            return response()->json(['status' => 'success']);
+            return response()->json(['status' => 'success'], 200);
 
         } catch (\Exception $e) {
             Log::error('Midtrans notification handling failed: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 200);
         }
     }
 

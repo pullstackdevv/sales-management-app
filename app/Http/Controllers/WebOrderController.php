@@ -26,14 +26,35 @@ class WebOrderController extends Controller
     public function createOrder(Request $request)
     {
         try {
+            // Normalize types for validation
+            $input = $request->all();
+            if (array_key_exists('address_phone', $input) && $input['address_phone'] !== null) {
+                $input['address_phone'] = (string) $input['address_phone'];
+            }
+            if (array_key_exists('guest_phone', $input) && $input['guest_phone'] !== null) {
+                $input['guest_phone'] = (string) $input['guest_phone'];
+            }
+            if (array_key_exists('address_name', $input) && $input['address_name'] !== null) {
+                $input['address_name'] = (string) $input['address_name'];
+            }
+            if (array_key_exists('address_postal_code', $input)) {
+                $input['address_postal_code'] = $input['address_postal_code'] === null ? null : (string) $input['address_postal_code'];
+            }
+
             // Validate request
-            $validator = Validator::make($request->all(), [
+            $validator = Validator::make($input, [
                 'items' => 'required|array|min:1',
                 'items.*.product_variant_id' => 'required|exists:product_variants,id',
                 'items.*.quantity' => 'required|integer|min:1',
                 'shipping_cost' => 'required|numeric|min:0',
                 'voucher_id' => 'nullable|exists:vouchers,id',
                 'notes' => 'nullable|string|max:1000',
+                'customer_id' => 'nullable|exists:customers,id',
+                'is_dropship' => 'nullable|boolean',
+                // Optional shipping info from checkout
+                'courier_id' => 'nullable|exists:couriers,id',
+                'courier_rate_id' => 'nullable|exists:courier_rates,id',
+                'service_type' => 'nullable|string|max:50',
                 
                 // Guest checkout fields (required if user not logged in)
                 'guest_email' => 'required_without:user_id|email',
@@ -43,7 +64,7 @@ class WebOrderController extends Controller
                 // Address fields
                 'address_id' => 'nullable|exists:customer_addresses,id',
                 'address_name' => 'required_without:address_id|string|max:255',
-                'address_phone' => 'required_without:address_id|string|max:20',
+                'address_phone' => 'required_without:address_id|string|string|max:20',
                 'address_street' => 'required_without:address_id|string',
                 'address_city' => 'required_without:address_id|string|max:100',
                 'address_province' => 'required_without:address_id|string|max:100',
@@ -58,57 +79,101 @@ class WebOrderController extends Controller
                 );
             }
 
+            // Merge normalized input back into request for downstream usage
+            $request->merge($input);
+
             DB::beginTransaction();
 
             $user = Auth::user();
             $isGuest = !$user;
             
             // Handle customer and address
-            $customerId = null;
+            $customerId = $request->customer_id;
             $addressId = null;
             
             if (!$isGuest) {
                 // Logged in user
-                $customerId = $user->customer?->id;
+                $customerId = $customerId ?: ($user->customer?->id);
+
+                // If the logged-in user does not have a linked customer, create one using guest payload
+                if (!$customerId) {
+                    $email = $request->guest_email ?? ($user->email ?? null);
+                    $name = $request->guest_name ?? ($user->name ?? 'Web Customer');
+                    $phone = $request->guest_phone ?? ($user->phone ?? '');
+
+                    // Ensure email is not null to satisfy unique constraint; fallback to synthesized email if needed
+                    if (!$email) {
+                        $email = strtolower(Str::slug($name, '.')) . '@guest.local';
+                    }
+
+                    $customer = Customer::firstOrCreate(
+                        ['email' => $email],
+                        [
+                            'name' => $name,
+                            'phone' => $phone,
+                            'email' => $email,
+                        ]
+                    );
+                    $customerId = $customer->id;
+                }
                 
                 if ($request->address_id) {
+                    // Use provided address_id directly (dropship uses selected address)
                     $addressId = $request->address_id;
                 } else {
-                    // Create new address for logged in user
+                    // Create new address for logged in user (map to CustomerAddress fields)
                     $address = CustomerAddress::create([
                         'customer_id' => $customerId,
-                        'name' => $request->address_name,
+                        'label' => $request->address_label ?? 'Alamat Web Order',
+                        'recipient_name' => $request->address_name,
                         'phone' => $request->address_phone,
-                        'street' => $request->address_street,
+                        'address_detail' => $request->address_street,
                         'city' => $request->address_city,
                         'province' => $request->address_province,
+                        'district' => $request->address_district ?? '',
                         'postal_code' => $request->address_postal_code,
+                        'is_default' => false,
                     ]);
                     $addressId = $address->id;
                 }
             } else {
-                // Guest checkout - create customer if not exists
-                $customer = Customer::firstOrCreate(
-                    ['email' => $request->guest_email],
-                    [
-                        'name' => $request->guest_name,
-                        'phone' => $request->guest_phone,
-                        'email' => $request->guest_email,
-                    ]
-                );
-                $customerId = $customer->id;
-                
-                // Create address for guest
-                $address = CustomerAddress::create([
-                    'customer_id' => $customerId,
-                    'name' => $request->guest_name,
-                    'phone' => $request->guest_phone,
-                    'street' => $request->address_street,
-                    'city' => $request->address_city,
-                    'province' => $request->address_province,
-                    'postal_code' => $request->address_postal_code,
-                ]);
-                $addressId = $address->id;
+                // Guest checkout - create or reuse customer
+                if ($customerId) {
+                    $customer = Customer::find($customerId);
+                    if (!$customer) {
+                        return ResponseFormatter::error('Customer tidak ditemukan', [], 422);
+                    }
+                } else {
+                    $customer = Customer::firstOrCreate(
+                        ['email' => $request->guest_email],
+                        [
+                            'name' => $request->guest_name,
+                            'phone' => $request->guest_phone,
+                            'email' => $request->guest_email,
+                        ]
+                    );
+                    $customerId = $customer->id;
+                }
+
+                if ($request->address_id) {
+                    // Use provided address_id directly (avoid creating duplicate address)
+                    $addressId = $request->address_id;
+                } else {
+                    // Create address for guest (map to CustomerAddress fields)
+                    $address = CustomerAddress::create([
+                        'customer_id' => $customerId,
+                        'label' => $request->address_label ?? 'Alamat Web Order',
+                        'recipient_name' => $request->address_name,
+                        'phone' => $request->address_phone,
+                        'address_detail' => $request->address_street,
+                        'city' => $request->address_city,
+                        'province' => $request->address_province,
+                        'district' => $request->address_district ?? '',
+                        'postal_code' => $request->address_postal_code,
+                        'is_default' => false,
+                    ]);
+                    $addressId = $address->id;
+                }
             }
 
             // Calculate total price
@@ -139,8 +204,8 @@ class WebOrderController extends Controller
                     'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
                     'price' => $price,
-                    'base_price' => $variant->product->base_price,
-                    'total_price' => $subtotal,
+                    'base_price' => $variant->base_price,
+                    'subtotal' => $subtotal,
                 ];
             }
             
@@ -189,6 +254,21 @@ class WebOrderController extends Controller
                 'notes' => $request->notes,
                 'payment_status' => PaymentStatus::PENDING,
             ]);
+
+            // If courier info provided, create shipping record in pending state
+            if ($request->courier_id) {
+                $order->shipping()->create([
+                    'courier_id' => $request->courier_id,
+                    'courier_rate_id' => $request->courier_rate_id,
+                    'service_type' => $request->service_type,
+                    'status' => 'pending',
+                    'tracking_number' => '',
+                    'weight' => $order->items->sum(function($i){ return ($i->productVariant->weight ?? 0) * $i->quantity; }),
+                    'notes' => 'Marketplace checkout',
+                    'created_by' => $isGuest ? null : $user->id,
+                    'shipped_at' => now()
+                ]);
+            }
 
             // Create order items and update stock
             foreach ($orderItems as $item) {

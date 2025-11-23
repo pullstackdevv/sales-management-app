@@ -149,8 +149,10 @@ class OrderController extends Controller
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'required|numeric|min:0',
             'notes' => 'nullable|string|max:255',
-            'status' => 'nullable|in:pending,paid,shipped,cancelled',
+            'status' => 'nullable|in:pending,processing,paid,shipped,delivered,cancelled',
             'courier_id' => 'nullable|exists:couriers,id',
+            'courier_rate_id' => 'nullable|exists:courier_rates,id',
+            'service_type' => 'nullable|string|max:100',
             'payment_bank_id' => 'nullable|exists:payment_banks,id',
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
@@ -302,6 +304,10 @@ class OrderController extends Controller
             if (isset($validated['courier_id'])) {
                 $order->shipping()->create([
                     'courier_id' => $validated['courier_id'],
+                    'courier_rate_id' => $validated['courier_rate_id'] ?? null,
+                    'service_type' => $validated['service_type'] ?? null,
+                    'status' => 'pending',
+                    'weight' => $order->items->sum(function($i){ return ($i->productVariant->weight ?? 0) * $i->quantity; }),
                     'tracking_number' => '', // Will be filled when shipped
                     'shipped_at' => now()
                 ]);
@@ -327,7 +333,7 @@ class OrderController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $order->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
+            'data' => $order->load(['customer', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel', 'voucher'])
         ]);
     }
 
@@ -349,8 +355,10 @@ class OrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'sometimes|required|numeric|min:0',
-            'status' => 'sometimes|required|in:pending,paid,shipped,cancelled',
+            'status' => 'sometimes|required|in:pending,processing,paid,shipped,delivered,cancelled',
             'courier_id' => 'nullable|exists:couriers,id',
+            'courier_rate_id' => 'nullable|exists:courier_rates,id',
+            'service_type' => 'nullable|string|max:100',
             'payment_bank_id' => 'nullable|exists:payment_banks,id',
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
@@ -496,6 +504,10 @@ class OrderController extends Controller
                     ['order_id' => $order->id],
                     [
                         'courier_id' => $validated['courier_id'],
+                        'courier_rate_id' => $validated['courier_rate_id'] ?? $order->shipping->courier_rate_id ?? null,
+                        'service_type' => $validated['service_type'] ?? $order->shipping->service_type ?? null,
+                        'status' => $order->shipping->status ?? 'pending',
+                        'weight' => $order->items->sum(function($i){ return ($i->productVariant->weight ?? 0) * $i->quantity; }),
                         'tracking_number' => $order->shipping->tracking_number ?? '',
                         'shipped_at' => $order->shipping->shipped_at ?? now()
                     ]
@@ -515,7 +527,7 @@ class OrderController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order updated successfully',
-                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
+                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -581,7 +593,7 @@ class OrderController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:pending,paid,shipped,delivered,cancelled'
+            'status' => 'required|in:pending,processing,paid,shipped,delivered,cancelled'
         ]);
 
         if ($order->status === $validated['status']) {

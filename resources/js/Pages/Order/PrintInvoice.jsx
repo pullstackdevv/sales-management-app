@@ -30,6 +30,16 @@ const PrintInvoice = () => {
     });
 
     useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('popup') !== '1') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('popup', '1');
+            window.open(url.toString(), '_blank', 'noopener');
+            window.history.back();
+        }
+    }, []);
+
+    useEffect(() => {
         fetchInvoiceData();
     }, [orderId]);
 
@@ -58,8 +68,16 @@ const PrintInvoice = () => {
                 tax_amount: orderData.tax_amount || 0,
                 tax_rate: orderData.tax_rate || 0,
                 discount_amount: orderData.discount_amount || 0,
+                voucher_id: orderData.voucher_id || null,
+                voucher: orderData.voucher ? {
+                    code: orderData.voucher.code,
+                    type: orderData.voucher.type,
+                    value: orderData.voucher.value
+                } : null,
                 total_amount: orderData.total_price,
                 total_weight: totalWeight,
+                courier_name: orderData.shipping?.courier?.name || null,
+                service_type: orderData.shipping?.courier_rate?.service_type || orderData.shipping?.service_type || null,
                 payment_info: orderData.payments?.[0] ? {
                     status: orderData.payments[0].status,
                     method: orderData.payments[0].payment_method,
@@ -74,6 +92,17 @@ const PrintInvoice = () => {
                     email: 'info@saleparfum.com'
                 }
             };
+            // Fallback fetch courier if missing
+            if (!transformedData.courier_name && orderData.shipping?.id) {
+                try {
+                    const shipResp = await api.get(`/orders/${orderId}/shipping/${orderData.shipping.id}`);
+                    const shipData = shipResp.data.data;
+                    transformedData.courier_name = shipData.courier?.name || transformedData.courier_name;
+                    transformedData.service_type = shipData.courier_rate?.service_type || shipData.service_type || transformedData.service_type;
+                } catch (e) {
+                    console.warn('Failed to fetch shipping detail:', e);
+                }
+            }
             setInvoiceData(transformedData);
         } catch (error) {
             console.error('Error fetching invoice data:', error);
@@ -101,27 +130,17 @@ const PrintInvoice = () => {
 
     const handlePrint = async () => {
         try {
-            // Log print action
             console.log('🖨️ Print Invoice Triggered', {
                 orderId,
                 orderNumber: invoiceData?.invoice_number,
                 timestamp: new Date().toISOString()
             });
 
-            // Update order printed_at timestamp
-            const response = await api.patch(`/orders/${orderId}`, {
-                printed_at: new Date().toISOString()
-            });
+            // Hanya update printed_at; tidak mengubah status
+            await api.patch(`/orders/${orderId}`, { printed_at: new Date().toISOString() });
             
-            console.log('✅ Invoice Print Status Updated', {
-                orderId,
-                printed_at: response.data.data.printed_at
-            });
-            
-            // Trigger print dialog
             window.print();
             
-            // Success notification with Swal
             await Swal.fire({
                 title: 'Berhasil!',
                 text: `Invoice ${invoiceData?.invoice_number} berhasil diprint`,
@@ -131,26 +150,44 @@ const PrintInvoice = () => {
                 timer: 3000,
                 timerProgressBar: true
             });
-            
-            // Log successful print
-            console.log('✅ Print Dialog Triggered Successfully', {
-                orderId,
-                orderNumber: invoiceData?.invoice_number
-            });
         } catch (error) {
-            console.error('❌ Error updating print status:', error);
-            
-            // Error alert with Swal
+            console.error('❌ Error updating printed_at:', error);
             await Swal.fire({
                 title: 'Error!',
-                text: 'Gagal memperbarui status print',
+                text: 'Gagal memperbarui printed_at',
                 icon: 'error',
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#d33'
             });
-            
-            // Still print even if update fails
             window.print();
+        }
+    };
+
+    const handlePrintAndProcess = async () => {
+        try {
+            await api.post(`/orders/${orderId}/update-status`, { status: 'processing' });
+            await api.patch(`/orders/${orderId}`, { printed_at: new Date().toISOString() });
+
+            window.print();
+
+            await Swal.fire({
+                title: 'Berhasil!',
+                text: `Order diproses dan invoice ${invoiceData?.invoice_number} diprint`,
+                icon: 'success',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#3085d6',
+                timer: 2500,
+                timerProgressBar: true
+            });
+        } catch (error) {
+            console.error('❌ Error update status processing:', error);
+            await Swal.fire({
+                title: 'Error!',
+                text: 'Gagal memperbarui status order ke processing',
+                icon: 'error',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
         }
     };
 
@@ -218,6 +255,13 @@ const PrintInvoice = () => {
                             <Icon icon="solar:printer-outline" className="w-5 h-5" />
                             Cetak Invoice
                         </button>
+                        {/* <button
+                            onClick={handlePrintAndProcess}
+                            className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[180px] justify-center"
+                        >
+                            <Icon icon="solar:printer-minimalistic-2-line-duotone" className="w-5 h-5" />
+                            Cetak & Proses
+                        </button> */}
                         <button
                             onClick={() => setShowSettings(!showSettings)}
                             className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
@@ -225,13 +269,13 @@ const PrintInvoice = () => {
                             <Icon icon="solar:settings-outline" className="w-5 h-5" />
                             Pengaturan Cetak
                         </button>
-                        <button
+                        {/* <button
                             onClick={() => window.history.back()}
                             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
                         >
                             <Icon icon="solar:arrow-left-outline" className="w-5 h-5" />
                             Kembali
-                        </button>
+                        </button> */}
                     </div>
 
                     {/* Panel Pengaturan Cetak */}
@@ -381,10 +425,10 @@ const PrintInvoice = () => {
                         {/* Header Row */}
                         <div className="grid grid-cols-3 border-b-2 border-black">
                             <div className="border-r-2 border-black p-4 font-bold text-lg">
-                                {printSettings.showCompanyInfo ? (invoiceData?.company?.name || 'SALEPARFUM') : 'SALEPARFUM'}
+                                {invoiceData?.courier_name || 'KURIR'}
                             </div>
                             <div className="border-r-2 border-black p-4 font-bold text-lg text-center">
-                                INSTANT
+                                {(invoiceData?.service_type || 'SERVICE').toString().toUpperCase()}
                             </div>
                             <div className="p-4 font-bold text-lg text-center">
                                 {invoiceData?.total_weight ? `${invoiceData.total_weight}kg` : '0.5kg'}
@@ -457,11 +501,23 @@ const PrintInvoice = () => {
                             </div>
                         )}
 
+                        {/* Voucher Note Row */}
+                        {(invoiceData?.voucher || (invoiceData?.discount_amount || 0) > 0) && (
+                            <div className="border-b-2 border-black p-4">
+                                <div className="font-bold mb-2">Catatan Voucher:</div>
+                                <div className="text-sm">
+                                    {invoiceData?.voucher
+                                        ? `Voucher ${invoiceData.voucher.code} • ${invoiceData.voucher.type.toUpperCase()} • Nilai: ${Number(invoiceData.voucher.value).toLocaleString('id-ID')}`
+                                        : `Diskon: Rp ${Number(Math.round(invoiceData.discount_amount || 0)).toLocaleString('id-ID')}`}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Total Row */}
                         {printSettings.showTotal && (
                             <div className="p-4">
                                 <div className="font-bold text-lg">
-                                     Total: Rp{invoiceData?.total_amount?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '2.199.000'}
+                                     Total: Rp{Number(Math.round(invoiceData?.total_amount || 0)).toLocaleString('id-ID')}
                                  </div>
                             </div>
                         )}

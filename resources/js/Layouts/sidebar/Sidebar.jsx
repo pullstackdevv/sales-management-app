@@ -60,10 +60,11 @@ const SidebarLayout = ({ isOpen, onClose, onOpen }) => {
                                                     openDropdowns[item.id] ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                                                 }`}>
                                                     {item.children.map((child) => (
-                                                        <NavItems
-                                                            item={child}
-                                                            key={child.id}
-                                                        />
+                                                        <PermissionGuard key={child.id} permission={child.permission}>
+                                                            <NavItems
+                                                                item={child}
+                                                            />
+                                                        </PermissionGuard>
                                                     ))}
                                                 </div>
                                             </div>

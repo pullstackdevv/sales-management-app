@@ -62,6 +62,66 @@ class ReportController extends Controller
             return ResponseFormatter::error('Failed to retrieve sales data: ' . $e->getMessage(), [], 500);
         }
     }
+
+    public function profit(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            
+            // Check if user has permission to view sales report
+            if (!$user->hasPermission('reports.sales')) {
+                return ResponseFormatter::error('Unauthorized access to profit report', [], 403);
+            }
+
+            $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
+            $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
+            
+            $profitData = $this->getProfitChart($startDate, $endDate);
+            return ResponseFormatter::success('Profit data retrieved successfully', $profitData);
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Failed to retrieve profit data: ' . $e->getMessage(), [], 500);
+        }
+    }
+
+    public function bankTransactions(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            
+            // Check if user has permission to view sales report
+            if (!$user->hasPermission('reports.sales')) {
+                return ResponseFormatter::error('Unauthorized access to bank transactions report', [], 403);
+            }
+
+            $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
+            $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
+            
+            $bankData = $this->getBankTransactions($startDate, $endDate);
+            return ResponseFormatter::success('Bank transactions data retrieved successfully', $bankData);
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Failed to retrieve bank transactions data: ' . $e->getMessage(), [], 500);
+        }
+    }
+
+    public function courierData(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            
+            // Check if user has permission to view sales report
+            if (!$user->hasPermission('reports.sales')) {
+                return ResponseFormatter::error('Unauthorized access to courier data report', [], 403);
+            }
+
+            $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
+            $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
+            
+            $courierData = $this->getCourierData($startDate, $endDate);
+            return ResponseFormatter::success('Courier data retrieved successfully', $courierData);
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Failed to retrieve courier data: ' . $e->getMessage(), [], 500);
+        }
+    }
     
     private function getSalesChart($startDate, $endDate)
     {

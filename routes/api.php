@@ -79,6 +79,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);
         Route::get('sales', [ReportController::class, 'sales']);
+        Route::get('profit', [ReportController::class, 'profit']);
+        Route::get('bank-transactions', [ReportController::class, 'bankTransactions']);
+        Route::get('courier-data', [ReportController::class, 'courierData']);
         Route::get('stock', [ReportController::class, 'stock']);
         Route::get('user-performance', [ReportController::class, 'userPerformance']);
         Route::get('payments', [ReportController::class, 'payments']);

@@ -99,8 +99,9 @@ class RoleSeeder extends Seeder
                         // Reports - Full access
                         'reports.view',
                         'reports.sales',
-                        'reports.products',
-                        'reports.customers',
+                        'reports.profit',
+                        'reports.bank',
+                        'reports.courier',
                         'reports.stock',
                         'reports.export',
                         
@@ -144,11 +145,10 @@ class RoleSeeder extends Seeder
                         'customers.create',
                         'customers.view_orders',
                         
-                        // Reports - View only
+                        // Reports - View only (limited access)
                         'reports.view',
                         'reports.sales',
-                        'reports.products',
-                        'reports.customers',
+                        'reports.profit',
                     ],
                     'is_active' => true,
                     'is_system' => true

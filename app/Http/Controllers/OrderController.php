@@ -59,6 +59,26 @@ class OrderController extends Controller
             })
             ->paginate($request->per_page ?? 10);
 
+        // Add formatted WIB date field for frontend display
+        $orders->getCollection()->transform(function ($order) {
+            // Prefer ordered_at if available, fallback to created_at
+            $timestamp = $order->ordered_at ?? $order->created_at;
+
+            if ($timestamp) {
+                // Use Indonesian locale and Asia/Jakarta timezone
+                $formatted = $timestamp
+                    ->timezone('Asia/Jakarta')
+                    ->locale('id')
+                    ->translatedFormat('l, d M Y, H.i');
+
+                $order->date = $formatted . ' WIB';
+            } else {
+                $order->date = null;
+            }
+
+            return $order;
+        });
+
         return response()->json([
             'status' => 'success',
             'data' => $orders

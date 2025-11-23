@@ -3,8 +3,10 @@ import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useState, useEffect } from 'react';
 import api from '@/api/axios';
 import { Link } from '@inertiajs/react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Order() {
+  const { hasPermission } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('Semua Order');
@@ -111,7 +113,7 @@ export default function Order() {
           id: order.id,
           number: order.order_number,
           channel: order.sales_channel?.name || 'Website Resmi',
-          date: formatDate(order.ordered_at),
+          date: order.date, // Use pre-formatted WIB date from backend
           ordered_at: order.ordered_at, // Add raw date for PaymentHistoryModal
           customer: order.customer?.name || 'N/A',
           admin: 'Admin', // Default admin name
@@ -301,14 +303,17 @@ export default function Order() {
             />
           </div>
           <div className="flex gap-2">
-            <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Filter</button>
-            <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
-            <Link
-              href={route('cms.orders.create')}
-              className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Tambah Order
-            </Link>
+            {hasPermission('orders.export') && (
+              <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
+            )}
+            {hasPermission('orders.create') && (
+              <Link
+                href={route('cms.orders.create')}
+                className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Tambah Order
+              </Link>
+            )}
           </div>
         </div>
 

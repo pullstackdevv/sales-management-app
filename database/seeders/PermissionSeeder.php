@@ -116,9 +116,10 @@ class PermissionSeeder extends Seeder
 
             // Reports
             ['name' => 'reports.view', 'display_name' => 'View Reports', 'description' => 'Can view reports', 'module' => 'reports'],
-            ['name' => 'reports.sales', 'display_name' => 'View Sales Report', 'description' => 'Can view sales report', 'module' => 'reports'],
-            ['name' => 'reports.products', 'display_name' => 'View Product Report', 'description' => 'Can view product report', 'module' => 'reports'],
-            ['name' => 'reports.customers', 'display_name' => 'View Customer Report', 'description' => 'Can view customer report', 'module' => 'reports'],
+            ['name' => 'reports.sales', 'display_name' => 'View Sales Chart', 'description' => 'Can view sales chart report', 'module' => 'reports'],
+            ['name' => 'reports.profit', 'display_name' => 'View Profit Chart', 'description' => 'Can view profit chart report', 'module' => 'reports'],
+            ['name' => 'reports.bank', 'display_name' => 'View Bank Transactions', 'description' => 'Can view bank transactions report', 'module' => 'reports'],
+            ['name' => 'reports.courier', 'display_name' => 'View Courier Data', 'description' => 'Can view courier data report', 'module' => 'reports'],
             ['name' => 'reports.stock', 'display_name' => 'View Stock Report', 'description' => 'Can view stock report', 'module' => 'reports'],
             ['name' => 'reports.export', 'display_name' => 'Export Reports', 'description' => 'Can export report data', 'module' => 'reports'],
 

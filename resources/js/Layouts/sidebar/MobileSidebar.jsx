@@ -56,7 +56,9 @@ const MobileSidebar = ({ isOpen, onClose }) => {
                         {/* Render submenu */}
                         <div className="ml-6 space-y-1">
                           {item.children.map((child) => (
-                            <NavItems item={child} key={child.id} onClick={onClose} />
+                            <PermissionGuard key={child.id} permission={child.permission}>
+                              <NavItems item={child} onClick={onClose} />
+                            </PermissionGuard>
                           ))}
                         </div>
                       </div>

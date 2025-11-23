@@ -5,8 +5,10 @@ import { Button } from "flowbite-react";
 import api from "@/api/axios";
 import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function UserSettings() {
+  const { hasPermission } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -364,20 +366,24 @@ export default function UserSettings() {
       label: "Aksi",
       render: (row) => (
         <div className="flex gap-2">
-          <button
-            onClick={() => openEditModal(row)}
-            className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Edit User"
-          >
-            <Icon icon="mdi:pencil" className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => deleteUser(row)}
-            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-            title="Hapus User"
-          >
-            <Icon icon="mdi:trash-can-outline" className="w-4 h-4" />
-          </button>
+          {hasPermission('users.edit') && (
+            <button
+              onClick={() => openEditModal(row)}
+              className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Edit User"
+            >
+              <Icon icon="mdi:pencil" className="w-4 h-4" />
+            </button>
+          )}
+          {hasPermission('users.delete') && (
+            <button
+              onClick={() => deleteUser(row)}
+              className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+              title="Hapus User"
+            >
+              <Icon icon="mdi:trash-can-outline" className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -391,13 +397,15 @@ export default function UserSettings() {
           <h2 className="text-2xl font-bold text-gray-900">Pengaturan User</h2>
           <p className="text-gray-600 mt-1">Kelola data pengguna dan permission</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
-          Tambah User
-        </button>
+        {hasPermission('users.create') && (
+          <button
+            onClick={openCreateModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
+            Tambah User
+          </button>
+        )}
       </div>
 
       {loading ? (

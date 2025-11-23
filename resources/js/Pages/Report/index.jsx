@@ -4,8 +4,11 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
 import api from '@/api/axios';
+import PermissionGuard from "../../components/PermissionGuard";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function Report() {
+    const { hasPermission } = useAuth();
     const [reportData, setReportData] = useState({
         salesChart: {
             categories: [],
@@ -124,58 +127,74 @@ export default function Report() {
             {/* Charts */}
             {!loading && !error && (
                 <div className="grid md:grid-cols-2 gap-6">
-                    <div className="bg-white rounded shadow p-4">
-                        <h2 className="font-semibold mb-3">Grafik Penjualan</h2>
-                        <HighchartsReact
-                            highcharts={Highcharts}
-                            options={salesChartOptions}
-                        />
-                    </div>
+                    <PermissionGuard permission="reports.sales">
+                        <div className="bg-white rounded shadow p-4">
+                            <h2 className="font-semibold mb-3">Grafik Penjualan</h2>
+                            <HighchartsReact
+                                highcharts={Highcharts}
+                                options={salesChartOptions}
+                            />
+                        </div>
+                    </PermissionGuard>
 
-                    <div className="bg-white rounded shadow p-4">
-                        <h2 className="font-semibold mb-3">Grafik Keuntungan</h2>
-                        <HighchartsReact
-                            highcharts={Highcharts}
-                            options={profitChartOptions}
-                        />
-                    </div>
+                    <PermissionGuard permission="reports.sales">
+                        <div className="bg-white rounded shadow p-4">
+                            <h2 className="font-semibold mb-3">Grafik Keuntungan</h2>
+                            <HighchartsReact
+                                highcharts={Highcharts}
+                                options={profitChartOptions}
+                            />
+                        </div>
+                    </PermissionGuard>
                 </div>
             )}
 
             {/* Data Tables */}
             {!loading && !error && (
                 <div className="grid md:grid-cols-2 gap-6 mt-6">
-                    <div className="bg-white rounded shadow p-4">
-                        <h2 className="font-semibold mb-3">Data Transaksi Bank</h2>
-                        <ul className="text-sm text-gray-700 space-y-1">
-                            {reportData.bankTransactions.map((transaction, i) => (
-                                <li
-                                    key={i}
-                                    className="flex justify-between border-b py-1"
-                                >
-                                    <span>{transaction.bank_name}</span>
-                                    <span>Rp {transaction.total_amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                    <PermissionGuard permission="reports.sales">
+                        <div className="bg-white rounded shadow p-4">
+                            <h2 className="font-semibold mb-3">Data Transaksi Bank</h2>
+                            <ul className="text-sm text-gray-700 space-y-1">
+                                {reportData.bankTransactions.map((transaction, i) => (
+                                    <li
+                                        key={i}
+                                        className="flex justify-between border-b py-1"
+                                    >
+                                        <span>{transaction.bank_name}</span>
+                                        <span>Rp {transaction.total_amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </PermissionGuard>
 
-                    <div className="bg-white rounded shadow p-4">
-                        <h2 className="font-semibold mb-3">Ekspedisi</h2>
-                        <ul className="text-sm text-gray-700 space-y-1">
-                            {reportData.courierData.map((courier, i) => (
-                                <li
-                                    key={i}
-                                    className="flex justify-between border-b py-1"
-                                >
-                                    <span>{courier.courier_name}</span>
-                                    <span>
-                                        {courier.percentage}% - Rp {courier.total_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                    <PermissionGuard permission="reports.sales">
+                        <div className="bg-white rounded shadow p-4">
+                            <h2 className="font-semibold mb-3">Ekspedisi</h2>
+                            <ul className="text-sm text-gray-700 space-y-1">
+                                {reportData.courierData.map((courier, i) => (
+                                    <li
+                                        key={i}
+                                        className="flex justify-between border-b py-1"
+                                    >
+                                        <span>{courier.courier_name}</span>
+                                        <span>
+                                            {courier.percentage}% - Rp {courier.total_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </PermissionGuard>
+                </div>
+            )}
+
+            {/* No Permission Message */}
+            {!loading && !error && !hasPermission('reports.sales') && (
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+                    <p className="font-semibold">Akses Terbatas</p>
+                    <p className="text-sm">Anda tidak memiliki izin untuk melihat laporan ini. Silakan hubungi administrator untuk mendapatkan akses.</p>
                 </div>
             )}
         </DashboardLayout>

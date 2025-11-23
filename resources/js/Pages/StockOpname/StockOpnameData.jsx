@@ -4,8 +4,10 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Link, router } from "@inertiajs/react";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function StockOpnamePage() {
+    const { hasPermission } = useAuth();
     const [stockOpnames, setStockOpnames] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -230,15 +232,17 @@ export default function StockOpnamePage() {
                             />
                             Filter
                         </button>
-                        <Link href="/cms/stock-opname/add">
-                            <button className="text-sm bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-1">
-                                <Icon
-                                    icon="material-symbols:add"
-                                    className="text-lg"
-                                />
-                                Buat Baru
-                            </button>
-                        </Link>
+                        {hasPermission('stock.create') && (
+                            <Link href="/cms/stock-opname/add">
+                                <button className="text-sm bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-1">
+                                    <Icon
+                                        icon="material-symbols:add"
+                                        className="text-lg"
+                                    />
+                                    Buat Baru
+                                </button>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -334,41 +338,49 @@ export default function StockOpnamePage() {
                                 </div>
                                 <div className="col-span-1">
                                     <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => fetchStockOpnameDetail(item.id)}
-                                            disabled={detailLoading}
-                                            className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                            title="Lihat Detail"
-                                        >
-                                            <Icon icon="material-symbols:visibility" className="text-lg" />
-                                        </button>
+                                        {hasPermission('stock.view') && (
+                                            <button
+                                                onClick={() => fetchStockOpnameDetail(item.id)}
+                                                disabled={detailLoading}
+                                                className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                                title="Lihat Detail"
+                                            >
+                                                <Icon icon="material-symbols:visibility" className="text-lg" />
+                                            </button>
+                                        )}
                                         
                                         {item.status === 'draft' && (
                                             <>
-                                                <button
-                                                    onClick={() => handleFinalize(item.id)}
-                                                    className="text-green-600 hover:text-green-800"
-                                                    title="Finalisasi Stock Opname"
-                                                >
-                                                    <Icon icon="material-symbols:check-circle" className="text-lg" />
-                                                </button>
-                                                
-                                                <Link href={`/cms/stock-opname/edit/${item.id}`}>
+                                                {hasPermission('stock.approve') && (
                                                     <button
-                                                        className="text-yellow-600 hover:text-yellow-800"
-                                                        title="Edit Stock Opname"
+                                                        onClick={() => handleFinalize(item.id)}
+                                                        className="text-green-600 hover:text-green-800"
+                                                        title="Finalisasi Stock Opname"
                                                     >
-                                                        <Icon icon="material-symbols:edit" className="text-lg" />
+                                                        <Icon icon="material-symbols:check-circle" className="text-lg" />
                                                     </button>
-                                                </Link>
+                                                )}
                                                 
-                                                <button
-                                                    onClick={() => handleDelete(item.id)}
-                                                    className="text-red-600 hover:text-red-800"
-                                                    title="Hapus Stock Opname"
-                                                >
-                                                    <Icon icon="material-symbols:delete" className="text-lg" />
-                                                </button>
+                                                {hasPermission('stock.edit') && (
+                                                    <Link href={`/cms/stock-opname/edit/${item.id}`}>
+                                                        <button
+                                                            className="text-yellow-600 hover:text-yellow-800"
+                                                            title="Edit Stock Opname"
+                                                        >
+                                                            <Icon icon="material-symbols:edit" className="text-lg" />
+                                                        </button>
+                                                    </Link>
+                                                )}
+                                                
+                                                {hasPermission('stock.delete') && (
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="text-red-600 hover:text-red-800"
+                                                        title="Hapus Stock Opname"
+                                                    >
+                                                        <Icon icon="material-symbols:delete" className="text-lg" />
+                                                    </button>
+                                                )}
                                             </>
                                         )}
                                     </div>

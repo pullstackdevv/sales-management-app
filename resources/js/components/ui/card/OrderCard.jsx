@@ -7,6 +7,7 @@ import { Timeline, TimelineItem, TimelinePoint } from "flowbite-react";
 import PaymentHistoryModal from "../modal/PaymentHistoryModal";
 import ShippingUpdateModal from "../modal/ShippingUpdateModal";
 import OrderHistoryModal from "../modal/OrderHistoryModal";
+import { useAuth } from "../../../contexts/AuthContext";
 
 // Helper function for route generation
 const route = (name, params = null) => {
@@ -23,6 +24,7 @@ const route = (name, params = null) => {
 };
 
 export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, isSelected = false, onSelect }) {
+    const { hasPermission } = useAuth();
     const [localOrder, setLocalOrder] = useState(order);
 
 
@@ -423,17 +425,19 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                             <div className="relative" ref={dropdownRef}>
                                 <button
                                     onClick={() =>
-                                        setShowStatusDropdown(
+                                        hasPermission('orders.update_status') && setShowStatusDropdown(
                                             !showStatusDropdown
                                         )
                                     }
                                     disabled={
+                                        !hasPermission('orders.update_status') ||
                                         isUpdatingStatus ||
                                         validTransitions.length === 0
                                     }
                                     className={`${statusBadge.bgColor} ${statusBadge.textColor
                                         } text-xs font-semibold px-2 py-1 rounded-md flex items-center gap-1 ${validTransitions.length > 0 &&
-                                            !isUpdatingStatus
+                                            !isUpdatingStatus &&
+                                            hasPermission('orders.update_status')
                                             ? "hover:opacity-80 cursor-pointer"
                                             : "cursor-default"
                                         } ${isUpdatingStatus ? "opacity-50" : ""}`}
@@ -579,29 +583,33 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
 
             <div className="flex justify-between border-t mt-4">
                 <div className="flex items-center gap-2 mt-4">
-                    <Link 
-                        href={`/cms/order/print-invoice/${localOrder.id}`}
-                        className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
-                    >
-                        <Icon icon="mdi:printer" width="16" />
-                        Print
-                    </Link>
+                    {hasPermission('orders.print') && (
+                        <Link 
+                            href={`/cms/order/print-invoice/${localOrder.id}`}
+                            className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
+                        >
+                            <Icon icon="mdi:printer" width="16" />
+                            Print
+                        </Link>
+                    )}
                     {localOrder.printed_at && (
                         <span className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
                             <Icon icon="mdi:check-circle" width="14" />
                             Sudah Diprint
                         </span>
                     )}
-                    <button
-                        onClick={() => setShowOrderHistory(true)}
-                        className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
-                    >
-                        <Icon icon="mdi:history" width="16" />
-                        Lihat Riwayat
-                    </button>
+                    {hasPermission('orders.view') && (
+                        <button
+                            onClick={() => setShowOrderHistory(true)}
+                            className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
+                        >
+                            <Icon icon="mdi:history" width="16" />
+                            Lihat Riwayat
+                        </button>
+                    )}
                 </div>
                 <div className="≈mt-6 pt-4 flex flex-wrap justify-end gap-2">
-                    {(() => {
+                    {hasPermission('orders.update_status') && (() => {
                         const shouldShowShipping = localOrder.status === 'Paid' || localOrder.status === 'paid' || localOrder.status === 'shipped' || localOrder.status === 'Dikirim';
 
                         return shouldShowShipping;
@@ -614,7 +622,7 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                                 Update Shipping
                             </button>
                         )}
-                    {(() => {
+                    {hasPermission('orders.update_status') && (() => {
                         const shouldShow = localOrder.status !== 'delivered' && localOrder.status !== 'Diterima';
 
                         return shouldShow;
@@ -626,13 +634,15 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                                 Tandai diterima
                             </button>
                         )}
-                    <Link
-                        href={route('cms.orders.edit', localOrder.id)}
-                        className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md hover:bg-blue-50 flex items-center gap-2"
-                    >
-                        <Icon icon="mdi:pencil" width="16" />
-                        Edit Order
-                    </Link>
+                    {hasPermission('orders.edit') && (
+                        <Link
+                            href={route('cms.orders.edit', localOrder.id)}
+                            className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md hover:bg-blue-50 flex items-center gap-2"
+                        >
+                            <Icon icon="mdi:pencil" width="16" />
+                            Edit Order
+                        </Link>
+                    )}
                 </div>
             </div>
 

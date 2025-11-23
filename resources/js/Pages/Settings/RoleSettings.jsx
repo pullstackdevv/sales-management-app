@@ -5,8 +5,10 @@ import TableComponent from "../../components/ui/table/TableComponent";
 import api from "@/api/axios";
 import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function RoleSettings() {
+  const { hasPermission } = useAuth();
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -231,13 +233,15 @@ export default function RoleSettings() {
       label: "Aksi",
       render: (row) => (
         <div className="flex gap-2">
-          <button
-            onClick={() => openEditModal(row)}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
-          >
-            <Icon icon="mdi:pencil" width={16} height={16} />
-            Edit
-          </button>
+          {hasPermission('roles.edit') && (
+            <button
+              onClick={() => openEditModal(row)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+            >
+              <Icon icon="mdi:pencil" width={16} height={16} />
+              Edit
+            </button>
+          )}
         </div>
       ),
     },

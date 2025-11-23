@@ -4,8 +4,10 @@ import { Icon } from "@iconify/react";
 import Swal from "sweetalert2";
 import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
+import { useAuth } from "../../contexts/AuthContext";
 
 const PromotionData = () => {
+    const { hasPermission } = useAuth();
     const [promotions, setPromotions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -181,15 +183,17 @@ const PromotionData = () => {
                                 <option value="no">Tidak Tampil</option>
                             </select>
                         </div>
-                        <div>
-                            <button
-                                onClick={handleAddPromotion}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                            >
-                                <Icon icon="solar:add-circle-outline" className="text-xl" />
-                                Tambah Promosi
-                            </button>
-                        </div>
+                        {hasPermission('promotions.create') && (
+                            <div>
+                                <button
+                                    onClick={handleAddPromotion}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <Icon icon="solar:add-circle-outline" className="text-xl" />
+                                    Tambah Promosi
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -245,45 +249,69 @@ const PromotionData = () => {
                                                 <div>{formatDate(promotion.end_date)}</div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <button
-                                                    onClick={() => toggleStatus(promotion.id)}
-                                                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                {hasPermission('promotions.toggle_status') ? (
+                                                    <button
+                                                        onClick={() => toggleStatus(promotion.id)}
+                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                            promotion.is_active
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : 'bg-gray-100 text-gray-800'
+                                                        }`}
+                                                    >
+                                                        {promotion.is_active ? 'Aktif' : 'Tidak Aktif'}
+                                                    </button>
+                                                ) : (
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                                         promotion.is_active
                                                             ? 'bg-green-100 text-green-800'
                                                             : 'bg-gray-100 text-gray-800'
-                                                    }`}
-                                                >
-                                                    {promotion.is_active ? 'Aktif' : 'Tidak Aktif'}
-                                                </button>
+                                                    }`}>
+                                                        {promotion.is_active ? 'Aktif' : 'Tidak Aktif'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <button
-                                                    onClick={() => toggleStorefront(promotion.id)}
-                                                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                {hasPermission('promotions.toggle_storefront') ? (
+                                                    <button
+                                                        onClick={() => toggleStorefront(promotion.id)}
+                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                            promotion.is_storefront
+                                                                ? 'bg-blue-100 text-blue-800'
+                                                                : 'bg-gray-100 text-gray-800'
+                                                        }`}
+                                                    >
+                                                        {promotion.is_storefront ? 'Ya' : 'Tidak'}
+                                                    </button>
+                                                ) : (
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                                         promotion.is_storefront
                                                             ? 'bg-blue-100 text-blue-800'
                                                             : 'bg-gray-100 text-gray-800'
-                                                    }`}
-                                                >
-                                                    {promotion.is_storefront ? 'Ya' : 'Tidak'}
-                                                </button>
+                                                    }`}>
+                                                        {promotion.is_storefront ? 'Ya' : 'Tidak'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEditPromotion(promotion.id)}
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="Edit"
-                                                    >
-                                                        <Icon icon="solar:pen-outline" className="text-xl" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => deletePromotion(promotion.id)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Hapus"
-                                                    >
-                                                        <Icon icon="solar:trash-bin-outline" className="text-xl" />
-                                                    </button>
+                                                    {hasPermission('promotions.edit') && (
+                                                        <button
+                                                            onClick={() => handleEditPromotion(promotion.id)}
+                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            title="Edit"
+                                                        >
+                                                            <Icon icon="solar:pen-outline" className="text-xl" />
+                                                        </button>
+                                                    )}
+                                                    {hasPermission('promotions.delete') && (
+                                                        <button
+                                                            onClick={() => deletePromotion(promotion.id)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Hapus"
+                                                        >
+                                                            <Icon icon="solar:trash-bin-outline" className="text-xl" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

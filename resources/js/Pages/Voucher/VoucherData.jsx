@@ -6,8 +6,10 @@ import VoucherCard from "../../components/ui/card/VoucherCard";
 import Swal from "sweetalert2";
 import { router } from "@inertiajs/react";
 import { debugComponent, debugApi } from "../../utils/devtools";
+import { useAuth } from "../../contexts/AuthContext";
 
 const VoucherData = () => {
+    const { hasPermission } = useAuth();
     const [vouchers, setVouchers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -160,13 +162,15 @@ const VoucherData = () => {
                         Kelola voucher dan promosi untuk pelanggan
                     </p>
                 </div>
-                <button 
-                    onClick={handleAddVoucher}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                    <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
-                    Tambah Voucher
-                </button>
+                {hasPermission('vouchers.create') && (
+                    <button 
+                        onClick={handleAddVoucher}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                        <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
+                        Tambah Voucher
+                    </button>
+                )}
             </div>
 
             {loading ? (

@@ -5,8 +5,10 @@ import api from '@/api/axios';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import DashboardLayout from '../../Layouts/DashboardLayout';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProductCategoryData() {
+    const { hasPermission } = useAuth();
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -106,13 +108,15 @@ export default function ProductCategoryData() {
                             <h1 className="text-3xl font-bold text-gray-900">Kategori Produk</h1>
                             <p className="text-gray-600 mt-1">Kelola kategori produk Anda</p>
                         </div>
-                        <Link
-                            href="/cms/product/category/add"
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
-                        >
-                            <Icon icon="solar:add-circle-outline" width="20" />
-                            Tambah Kategori
-                        </Link>
+                        {hasPermission('product_categories.create') && (
+                            <Link
+                                href="/cms/product/category/add"
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
+                            >
+                                <Icon icon="solar:add-circle-outline" width="20" />
+                                Tambah Kategori
+                            </Link>
+                        )}
                     </div>
 
                     {/* Filters */}
@@ -205,20 +209,34 @@ export default function ProductCategoryData() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <button
-                                                            onClick={() => handleToggleActive(category.id, category.is_active)}
-                                                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                                                        {hasPermission('product_categories.edit') ? (
+                                                            <button
+                                                                onClick={() => handleToggleActive(category.id, category.is_active)}
+                                                                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+                                                                    category.is_active
+                                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                                }`}
+                                                            >
+                                                                <Icon
+                                                                    icon={category.is_active ? 'solar:check-circle-outline' : 'solar:close-circle-outline'}
+                                                                    width="14"
+                                                                />
+                                                                {category.is_active ? 'Aktif' : 'Tidak Aktif'}
+                                                            </button>
+                                                        ) : (
+                                                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
                                                                 category.is_active
-                                                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                            }`}
-                                                        >
-                                                            <Icon
-                                                                icon={category.is_active ? 'solar:check-circle-outline' : 'solar:close-circle-outline'}
-                                                                width="14"
-                                                            />
-                                                            {category.is_active ? 'Aktif' : 'Tidak Aktif'}
-                                                        </button>
+                                                                    ? 'bg-green-100 text-green-700'
+                                                                    : 'bg-gray-100 text-gray-700'
+                                                            }`}>
+                                                                <Icon
+                                                                    icon={category.is_active ? 'solar:check-circle-outline' : 'solar:close-circle-outline'}
+                                                                    width="14"
+                                                                />
+                                                                {category.is_active ? 'Aktif' : 'Tidak Aktif'}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="text-sm text-gray-600">
@@ -227,20 +245,24 @@ export default function ProductCategoryData() {
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right">
                                                         <div className="flex justify-end gap-2">
-                                                            <Link
-                                                                href={`/cms/product/category/edit/${category.id}`}
-                                                                className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded transition-colors"
-                                                                title="Edit"
-                                                            >
-                                                                <Icon icon="solar:pen-outline" width="18" />
-                                                            </Link>
-                                                            <button
-                                                                onClick={() => handleDelete(category.id, category.name)}
-                                                                className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded transition-colors"
-                                                                title="Hapus"
-                                                            >
-                                                                <Icon icon="solar:trash-bin-outline" width="18" />
-                                                            </button>
+                                                            {hasPermission('product_categories.edit') && (
+                                                                <Link
+                                                                    href={`/cms/product/category/edit/${category.id}`}
+                                                                    className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded transition-colors"
+                                                                    title="Edit"
+                                                                >
+                                                                    <Icon icon="solar:pen-outline" width="18" />
+                                                                </Link>
+                                                            )}
+                                                            {hasPermission('product_categories.delete') && (
+                                                                <button
+                                                                    onClick={() => handleDelete(category.id, category.name)}
+                                                                    className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded transition-colors"
+                                                                    title="Hapus"
+                                                                >
+                                                                    <Icon icon="solar:trash-bin-outline" width="18" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>

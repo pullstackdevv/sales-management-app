@@ -113,7 +113,7 @@ export default function Order() {
           id: order.id,
           number: order.order_number,
           channel: order.sales_channel?.name || 'Website Resmi',
-          date: formatDate(order.ordered_at),
+          date: order.date, // Use pre-formatted WIB date from backend
           ordered_at: order.ordered_at, // Add raw date for PaymentHistoryModal
           customer: order.customer?.name || 'N/A',
           admin: 'Admin', // Default admin name

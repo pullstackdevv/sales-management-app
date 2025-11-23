@@ -68,8 +68,8 @@ class ReportController extends Controller
         try {
             $user = auth()->user();
             
-            // Check if user has permission to view sales report
-            if (!$user->hasPermission('reports.sales')) {
+            // Check if user has permission to view profit report
+            if (!$user->hasPermission('reports.profit')) {
                 return ResponseFormatter::error('Unauthorized access to profit report', [], 403);
             }
 
@@ -88,8 +88,8 @@ class ReportController extends Controller
         try {
             $user = auth()->user();
             
-            // Check if user has permission to view sales report
-            if (!$user->hasPermission('reports.sales')) {
+            // Check if user has permission to view bank transactions report
+            if (!$user->hasPermission('reports.bank')) {
                 return ResponseFormatter::error('Unauthorized access to bank transactions report', [], 403);
             }
 
@@ -108,8 +108,8 @@ class ReportController extends Controller
         try {
             $user = auth()->user();
             
-            // Check if user has permission to view sales report
-            if (!$user->hasPermission('reports.sales')) {
+            // Check if user has permission to view courier data report
+            if (!$user->hasPermission('reports.courier')) {
                 return ResponseFormatter::error('Unauthorized access to courier data report', [], 403);
             }
 

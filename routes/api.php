@@ -91,12 +91,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Product routes
 Route::get('products/storefront', [ProductController::class, 'storefront']);
-// product
-Route::apiResource('products', ProductController::class);
-Route::apiResource('products.variants', ProductVariantController::class);
+// Specific product utility routes (declare before resource to avoid conflicts)
+Route::get('products/import-template', [ProductController::class, 'importTemplate']);
 Route::post('products/import', [ProductController::class, 'import']);
 Route::get('products/import-status/{jobId}', [ProductController::class, 'importStatus']);
 Route::get('products/active-imports', [ProductController::class, 'activeImports']);
+// product
+Route::apiResource('products', ProductController::class);
+Route::apiResource('products.variants', ProductVariantController::class);
 // Product Category routes
 Route::apiResource('product-categories', ProductCategoryController::class);
 // Customer routes
@@ -175,11 +177,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('orders.payments', OrderPaymentController::class);
     Route::apiResource('orders.items', OrderItemController::class);
 
-    // Voucher routes
+    // Voucher routes (admin-only)
     Route::apiResource('vouchers', VoucherController::class);
     Route::post('vouchers/{voucher}/toggle-status', [VoucherController::class, 'toggleStatus']);
-    Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
-    Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
 
     // Promotion routes
     Route::apiResource('promotions', PromotionController::class);
@@ -203,6 +203,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
     });
 });
+
+// Public voucher routes (for checkout)
+Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
+Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
 
 // Payment Gateway Routes (public access for webhooks and order payment)
 Route::prefix('payment')->name('payment.')->group(function () {

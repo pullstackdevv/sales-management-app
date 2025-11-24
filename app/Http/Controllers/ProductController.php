@@ -483,6 +483,27 @@ class ProductController extends Controller
         }
     }
 
+    public function importTemplate()
+    {
+        try {
+            $path = base_path('resources/import_templates/product_import_template.xlsx');
+            if (!file_exists($path)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Template file not found'
+                ], 404);
+            }
+
+            return response()->download($path, 'product_import_template.xlsx');
+        } catch (\Exception $e) {
+            Log::error('Failed to download product import template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to download template'
+            ], 500);
+        }
+    }
+
     public function destroy(Product $product): JsonResponse
     {
         // Check permission

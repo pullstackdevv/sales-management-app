@@ -14,6 +14,14 @@ class PromotionController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        // Check permission
+        if (!auth()->user()->hasPermission('promotions.view')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         $promotions = Promotion::with(['creator'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -60,6 +68,14 @@ class PromotionController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!auth()->user()->hasPermission('promotions.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -92,6 +108,14 @@ class PromotionController extends Controller
 
     public function show(Promotion $promotion): JsonResponse
     {
+        // Check permission
+        if (!auth()->user()->hasPermission('promotions.view')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         return response()->json([
             'status' => 'success',
             'data' => $promotion->load(['creator'])
@@ -107,6 +131,14 @@ class PromotionController extends Controller
 
     public function update(Request $request, Promotion $promotion): JsonResponse
     {
+        // Check permission
+        if (!auth()->user()->hasPermission('promotions.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
@@ -139,6 +171,14 @@ class PromotionController extends Controller
 
     public function destroy(Promotion $promotion): JsonResponse
     {
+        // Check permission
+        if (!auth()->user()->hasPermission('promotions.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -159,6 +199,14 @@ class PromotionController extends Controller
 
     public function toggleStatus(Promotion $promotion): JsonResponse
     {
+        // Check permission
+        if (!auth()->user()->hasPermission('promotions.toggle_status')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         try {
             DB::beginTransaction();
 
@@ -182,6 +230,14 @@ class PromotionController extends Controller
 
     public function toggleStorefront(Promotion $promotion): JsonResponse
     {
+        // Check permission
+        if (!auth()->user()->hasPermission('promotions.toggle_storefront')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
         try {
             DB::beginTransaction();
 

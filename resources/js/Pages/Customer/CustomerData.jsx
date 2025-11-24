@@ -4,8 +4,10 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import api from "@/api/axios";
 import { showSuccess, showError, showConfirm } from '@/utils/sweetalert';
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function CustomerData() {
+    const { hasPermission } = useAuth();
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -138,21 +140,17 @@ export default function CustomerData() {
                     </div>
 
                     <div className="flex gap-2">
-                        <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
-                            Download Excel
-                        </button>
-                        <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
-                            Filter
-                        </button>
-                        <Link href={"/cms/customer/add"}>
-                            <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
-                                <Icon
-                                    icon="material-symbols:add"
-                                    className="text-lg"
-                                />
-                                Tambah Customer
-                            </button>
-                        </Link>
+                        {hasPermission('customers.create') && (
+                            <Link href="/cms/customer/add">
+                                <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
+                                    <Icon
+                                        icon="material-symbols:add"
+                                        className="text-lg"
+                                    />
+                                    Tambah Customer
+                                </button>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -235,7 +233,7 @@ export default function CustomerData() {
                                 </div>
 
                                 <div className="col-span-2 flex gap-2 justify-end text-lg text-gray-500">
-                                    {addressCount > 0 && (
+                                    {hasPermission('customers.view') && addressCount > 0 && (
                                         <button 
                                             className="hover:text-green-600"
                                             onClick={() => handleViewAddresses(customer)}
@@ -244,20 +242,24 @@ export default function CustomerData() {
                                             <Icon icon="mdi:map-marker-multiple" />
                                         </button>
                                     )}
-                                    <button 
-                                        className="hover:text-blue-600"
-                                        onClick={() => handleEdit(customer.id)}
-                                        title="Edit Customer"
-                                    >
-                                        <Icon icon="mdi:pencil-outline" />
-                                    </button>
-                                    <button 
-                                        className="hover:text-red-600"
-                                        onClick={() => handleDelete(customer)}
-                                        title="Hapus Customer"
-                                    >
-                                        <Icon icon="mdi:trash-outline" />
-                                    </button>
+                                    {hasPermission('customers.edit') && (
+                                        <button 
+                                            className="hover:text-blue-600"
+                                            onClick={() => handleEdit(customer.id)}
+                                            title="Edit Customer"
+                                        >
+                                            <Icon icon="mdi:pencil-outline" />
+                                        </button>
+                                    )}
+                                    {hasPermission('customers.delete') && (
+                                        <button 
+                                            className="hover:text-red-600"
+                                            onClick={() => handleDelete(customer)}
+                                            title="Hapus Customer"
+                                        >
+                                            <Icon icon="mdi:trash-outline" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );

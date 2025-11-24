@@ -7,8 +7,10 @@ import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
 import StockHistoryModal from "@/components/StockHistoryModal";
 import StockAdjustmentModal from "@/components/StockAdjustmentModal";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function ProductData() {
+  const { hasPermission } = useAuth();
   const [products, setProducts] = useState([]);
   const [expandedProduct, setExpandedProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -215,21 +217,24 @@ export default function ProductData() {
           <h1 className="text-2xl font-semibold">Produk</h1>
 
           <div className="flex gap-2">
-            <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100" onClick={handleImportClick} disabled={importing}>
-              {importing ? "Mengimpor..." : "Impor Produk"}
-            </button>
-            <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
-              Filter
-            </button>
-            <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
-              Download
-            </button>
-            <Link href="/cms/product/add">
-              <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
-                <Icon icon="material-symbols:add" className="text-lg" />
-                Tambah Produk
+            {hasPermission('products.import') && (
+              <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100" onClick={handleImportClick} disabled={importing}>
+                {importing ? "Mengimpor..." : "Impor Produk"}
               </button>
-            </Link>
+            )}
+            {hasPermission('products.export') && (
+              <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
+                Download
+              </button>
+            )}
+            {hasPermission('products.create') && (
+              <Link href="/cms/product/add">
+                <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
+                  <Icon icon="material-symbols:add" className="text-lg" />
+                  Tambah Produk
+                </button>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -366,29 +371,35 @@ export default function ProductData() {
                       </span>
                     </div>
                     <div className="col-span-2 flex justify-end gap-2 text-lg text-gray-500">
-                      <button
-                        className="hover:text-blue-600 transition-colors"
-                        onClick={() =>
-                          setExpandedProduct(
-                            expandedProduct === product.id ? null : product.id
-                          )
-                        }
-                        title="Lihat detail"
-                      >
-                        <Icon icon="mdi:eye-outline" />
-                      </button>
-                      <Link href={`/cms/product/edit/${product.id}`}>
-                        <button className="hover:text-blue-600 transition-colors" title="Edit produk">
-                          <Icon icon="mdi:pencil-outline" />
+                      {hasPermission('products.view') && (
+                        <button
+                          className="hover:text-blue-600 transition-colors"
+                          onClick={() =>
+                            setExpandedProduct(
+                              expandedProduct === product.id ? null : product.id
+                            )
+                          }
+                          title="Lihat detail"
+                        >
+                          <Icon icon="mdi:eye-outline" />
                         </button>
-                      </Link>
-                      <button 
-                        className="hover:text-red-600 transition-colors"
-                        onClick={() => deleteProduct(product.id)}
-                        title="Hapus produk"
-                      >
-                        <Icon icon="mdi:trash-outline" />
-                      </button>
+                      )}
+                      {hasPermission('products.edit') && (
+                        <Link href={`/cms/product/edit/${product.id}`}>
+                          <button className="hover:text-blue-600 transition-colors" title="Edit produk">
+                            <Icon icon="mdi:pencil-outline" />
+                          </button>
+                        </Link>
+                      )}
+                      {hasPermission('products.delete') && (
+                        <button 
+                          className="hover:text-red-600 transition-colors"
+                          onClick={() => deleteProduct(product.id)}
+                          title="Hapus produk"
+                        >
+                          <Icon icon="mdi:trash-outline" />
+                        </button>
+                      )}
                     </div>
                   </div>
 

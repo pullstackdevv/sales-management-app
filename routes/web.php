@@ -242,10 +242,26 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
         Route::get('/promotion/create', [\App\Http\Controllers\PromotionController::class, 'create'])->name('promotions.create');
         Route::get('/promotion/edit/{promotion}', [\App\Http\Controllers\PromotionController::class, 'edit'])->name('promotions.edit');
 
-        // analizer
+        // Reports
         Route::get('/report', function () {
             return Inertia::render('Report/index');
         })->name('reports.index');
+
+        Route::get('/report/sales', function () {
+            return Inertia::render('Report/SalesReport');
+        })->name('reports.sales');
+
+        Route::get('/report/profit', function () {
+            return Inertia::render('Report/ProfitReport');
+        })->name('reports.profit');
+
+        Route::get('/report/bank', function () {
+            return Inertia::render('Report/BankReport');
+        })->name('reports.bank');
+
+        Route::get('/report/courier', function () {
+            return Inertia::render('Report/CourierReport');
+        })->name('reports.courier');
 
         Route::get('/analyzer', function () {
             return Inertia::render('Report/Analyzer');

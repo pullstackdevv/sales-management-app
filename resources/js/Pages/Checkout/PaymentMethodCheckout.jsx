@@ -112,6 +112,7 @@ const PaymentMethodCheckout = () => {
         const rates = response.data.data.rates;
         console.log(`Found ${rates.length} courier rates for district: ${district}`);
         setCourierRates(rates);
+        console.log(rates)
         const defaultIndex = selectDefaultRateIndex(rates);
         setSelectedRateIndex(defaultIndex);
         calculateShippingCost(rates, district, defaultIndex);
@@ -439,6 +440,7 @@ const PaymentMethodCheckout = () => {
       }
 
       const selectedRate = typeof selectedRateIndex === 'number' ? courierRates[selectedRateIndex] : null;
+      const isDropship = !!(selectedAddress?.is_dropship);
       const webOrderData = {
         items: items.map(p => ({ product_variant_id: p.product_variant_id, quantity: p.quantity })),
         shipping_cost: shippingCost,
@@ -448,6 +450,7 @@ const PaymentMethodCheckout = () => {
         guest_phone: guestPhone,
         guest_name: guestName,
         address_id: addressId || null,
+        is_dropship: isDropship,
         courier_id: selectedRate?.courier?.id || null,
         courier_rate_id: selectedRate?.id || null,
         service_type: selectedRate?.service?.name || selectedRate?.service_type || null

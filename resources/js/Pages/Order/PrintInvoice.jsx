@@ -462,7 +462,7 @@ console.log(invoiceData)
                         {printSettings.showCustomerInfo && (
                             <div className="border-b-2 border-black p-4">
                                 <div className="font-bold">
-                                    Kepada: {invoiceData?.customer?.name || 'MILA'} ({invoiceData?.customer?.phone || '6285693468592'})
+                                    Kepada: {invoiceData?.shipping_address?.recipient_name || 'Customer'} ({invoiceData?.shipping_address?.phone || '-'})
                                 </div>
                             </div>
                         )}

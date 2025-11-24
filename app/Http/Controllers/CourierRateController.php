@@ -266,11 +266,21 @@ class CourierRateController extends Controller
 
         // Location filters
         if ($request->has('province')) {
-            $query->where('destination_province', 'like', '%' . $request->province . '%');
+            $provinceVariants = $this->normalizeProvinceVariants($request->province);
+            $query->where(function ($q) use ($provinceVariants) {
+                foreach ($provinceVariants as $pv) {
+                    $q->orWhere('destination_province', 'like', '%' . $pv . '%');
+                }
+            });
         }
 
         if ($request->has('city')) {
-            $query->where('destination_city', 'like', '%' . $request->city . '%');
+            $cityVariants = $this->normalizeCityVariants($request->city);
+            $query->where(function ($q) use ($cityVariants) {
+                foreach ($cityVariants as $cv) {
+                    $q->orWhere('destination_city', 'like', '%' . $cv . '%');
+                }
+            });
         }
 
         if ($request->has('district')) {
@@ -431,6 +441,46 @@ class CourierRateController extends Controller
         }
 
         return $cleanDistrict;
+    }
+
+    private function normalizeProvinceVariants(string $province): array
+    {
+        $name = trim($province);
+        $variants = [$name];
+        $noPrefix = preg_replace('/^(Provinsi)\s+/i', '', $name);
+        if ($noPrefix && $noPrefix !== $name) {
+            $variants[] = trim($noPrefix);
+        }
+        $lower = mb_strtolower($name);
+        if (strpos($lower, 'daerah istimewa yogyakarta') !== false || strpos($lower, 'di yogyakarta') !== false || $lower === 'yogyakarta') {
+            $variants[] = 'DI Yogyakarta';
+            $variants[] = 'Yogyakarta';
+        }
+        if (strpos($lower, 'daerah khusus ibukota jakarta') !== false || strpos($lower, 'dki jakarta') !== false || strpos($lower, 'jakarta') !== false) {
+            $variants[] = 'DKI Jakarta';
+            $variants[] = 'Jakarta';
+        }
+        $variants = array_values(array_unique(array_map(function ($x) { return trim($x); }, $variants)));
+        return $variants;
+    }
+
+    private function normalizeCityVariants(string $city): array
+    {
+        $name = trim($city);
+        $variants = [$name];
+        $noPrefix = preg_replace('/^(Kabupaten|Kab\.|Kota|Kota Administrasi|Kota Adm\.)\s+/i', '', $name);
+        if ($noPrefix && $noPrefix !== $name) {
+            $variants[] = trim($noPrefix);
+        }
+        $lower = mb_strtolower($name);
+        if (strpos($lower, 'kota administrasi jakarta') !== false || strpos($lower, 'kota adm. jakarta') !== false || strpos($lower, 'jakarta') !== false) {
+            if (preg_match('/jakarta\s+([a-zA-Z\s]+)/i', $name, $m)) {
+                $variants[] = 'Jakarta ' . trim($m[1]);
+            }
+            $variants[] = 'Jakarta';
+        }
+        $variants = array_values(array_unique(array_map(function ($x) { return trim($x); }, $variants)));
+        return $variants;
     }
 
     /**

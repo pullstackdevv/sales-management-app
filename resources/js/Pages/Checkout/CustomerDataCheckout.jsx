@@ -62,7 +62,9 @@ const CustomerDataCheckout = () => {
     district: '',
     province: '',
     postal_code: '',
-    is_default: false
+    is_default: false,
+    is_dropship: false,
+    recipient_email: ''
   });
   const [addressFormErrors, setAddressFormErrors] = useState({});
   const [savingAddress, setSavingAddress] = useState(false);
@@ -180,7 +182,10 @@ const CustomerDataCheckout = () => {
       const response = await api.get(`/customers/${customerId}/addresses`);
       
       if (response.data.status === 'success') {
-        const addresses = response.data.data || [];
+        const addresses = (response.data.data || []).map(addr => ({
+          ...addr,
+          recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
+        }));
         setCustomerAddresses(addresses);
         
         // Check if there's a selected address in session
@@ -207,7 +212,10 @@ const CustomerDataCheckout = () => {
       setAddressesLoading(true);
       const response = await api.get(`/customers/${customerId}/addresses`);
       if (response.data.status === 'success') {
-        const addresses = response.data.data || [];
+        const addresses = (response.data.data || []).map(addr => ({
+          ...addr,
+          recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
+        }));
         setCustomerAddresses(addresses);
         
         // Auto-select default address or first address
@@ -458,7 +466,9 @@ const CustomerDataCheckout = () => {
       district: '',
       province: '',
       postal_code: '',
-      is_default: false
+      is_default: false,
+      is_dropship: false,
+      recipient_email: ''
     });
     setModalLocationQuery('');
     setModalLocationResults([]);
@@ -473,13 +483,15 @@ const CustomerDataCheckout = () => {
     setNewAddressData({
       label: address.label || 'Rumah',
       recipient_name: address.recipient_name || '',
-      recipient_phone: address.recipient_phone || '',
+      recipient_phone: address.recipient_phone || address.phone || '',
       address_detail: address.address_detail || '',
       city: address.city || '',
       district: address.district || '',
       province: address.province || '',
       postal_code: address.postal_code || '',
-      is_default: address.is_default || false
+      is_default: address.is_default || false,
+      is_dropship: !!address.is_dropship,
+      recipient_email: address.recipient_email || ''
     });
     // Set the location query for edit mode
     const locationName = address.district || address.city || '';
@@ -1212,12 +1224,12 @@ const CustomerDataCheckout = () => {
           addresses: createdCustomer.addresses
         };
       } else {
-        // Format data for existing customer
         const selectedAddress = customerAddresses.find(addr => addr.id == selectedAddressId);
         customerData = {
           customer_id: getCustomerId(selectedCustomer),
           name: selectedCustomer.name,
           email: selectedCustomer.email,
+          phone: selectedCustomer.phone,
           whatsapp: selectedCustomer.phone,
           address_id: selectedAddressId,
           address: selectedAddress?.address_detail || '',
@@ -1225,8 +1237,8 @@ const CustomerDataCheckout = () => {
           district: selectedAddress?.district || '',
           province: selectedAddress?.province || '',
           postal_code: selectedAddress?.postal_code || '',
-          recipient_name: selectedAddress?.recipient_name || '',
-          recipient_phone: selectedAddress?.recipient_phone || '',
+          recipient_name: selectedAddress?.recipient_name || selectedCustomer.name || '',
+          recipient_phone: selectedAddress?.recipient_phone || selectedAddress?.phone || selectedCustomer.phone || '',
           addresses: customerAddresses
         };
       }
@@ -1707,6 +1719,11 @@ const CustomerDataCheckout = () => {
                                           Default
                                         </span>
                                       )}
+                                      {address.is_dropship && (
+                                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                          Dropship
+                                        </span>
+                                      )}
                                       <button
                                         type="button"
                                         onClick={() => handleEditAddress(address)}
@@ -1728,7 +1745,7 @@ const CustomerDataCheckout = () => {
                                       </button>
                                     </div>
                                     <p className="text-sm text-gray-600 mt-1">
-                                      {address.recipient_name} - {address.recipient_phone}
+                                      {address.recipient_name} - {(address.recipient_phone || address.phone)}
                                     </p>
                                     <p className="text-sm text-gray-600">
                                       {address.address_detail}, {address.district}, {address.city}, {address.province} {address.postal_code}

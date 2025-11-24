@@ -26,6 +26,8 @@ export default function AddCustomer() {
             label: "Rumah",
             recipient_name: "",
             recipient_phone: "",
+            recipient_email: "",
+            is_dropship: false,
             province: "",
             city: "",
             district: "",
@@ -51,6 +53,21 @@ export default function AddCustomer() {
         // Clear error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }));
+        }
+        // Auto-fill recipient fields in address when top-level fields change
+        if (field === 'full_name') {
+            setAddresses(prev => prev.map((addr, i) => (
+                i === activeAddressIndex || !addr.recipient_name
+                    ? { ...addr, recipient_name: value }
+                    : addr
+            )));
+        }
+        if (field === 'phone') {
+            setAddresses(prev => prev.map((addr, i) => (
+                i === activeAddressIndex || !addr.recipient_phone
+                    ? { ...addr, recipient_phone: value }
+                    : addr
+            )));
         }
     };
     
@@ -88,6 +105,8 @@ export default function AddCustomer() {
             label: "Alamat " + (addresses.length + 1),
             recipient_name: formData.full_name,
             recipient_phone: formData.phone,
+            recipient_email: "",
+            is_dropship: false,
             province: "",
             city: "",
             district: "",
@@ -160,43 +179,18 @@ export default function AddCustomer() {
             setShowCityDropdown(false);
             return;
         }
-        
         setSearchingCity(true);
-        
-        // Cancel previous request if exists
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        
-        // Create new abort controller
-        abortControllerRef.current = new AbortController();
-        
         try {
-            const response = await api.get('/wilayah/search-regencies', {
-                params: { q: query },
-                signal: abortControllerRef.current.signal
-            });
-            
+            const response = await api.get('/wilayah/search-regencies', { params: { q: query } });
             if (response.data.status === 'success') {
-                const enrichedResults = response.data.data.map(regency => ({
-                    name: regency.name,
-                    type: 'Kabupaten/Kota',
-                    regency_name: regency.name,
-                    province_name: regency.province_name,
-                    code: regency.code
-                }));
-                
-                setCityResults(enrichedResults);
+                setCityResults(response.data.data);
                 setShowCityDropdown(true);
             } else {
-                console.error('Error searching cities:', response.data.message);
                 setCityResults([]);
             }
         } catch (error) {
-            if (error.name !== 'AbortError') {
-                console.error('Error searching cities:', error);
-                setCityResults([]);
-            }
+            console.error('Error searching cities:', error);
+            setCityResults([]);
         } finally {
             setSearchingCity(false);
         }
@@ -206,6 +200,18 @@ export default function AddCustomer() {
     const handleCitySearch = (e) => {
         const query = e.target.value;
         setCityQuery(query);
+
+        setAddresses(prev => prev.map((addr, i) => (
+            i === activeAddressIndex
+                ? { ...addr, district: "", city: "", province: "" }
+                : addr
+        )));
+        setErrors(prev => ({
+            ...prev,
+            [`city_${activeAddressIndex}`]: null,
+            [`district_${activeAddressIndex}`]: null,
+            [`province_${activeAddressIndex}`]: null
+        }));
         
         // Clear previous timeout
         if (searchTimeoutRef.current) {
@@ -220,17 +226,20 @@ export default function AddCustomer() {
     
     // Select city from dropdown
     const selectCity = (city) => {
-        setCityQuery(`${city.name}, ${city.regency_name}`);
-        handleAddressChange('city', city.name);
-        handleAddressChange('district', city.name);
+        setCityQuery(city.name);
+        handleAddressChange('district', city.district_name || '');
+        handleAddressChange('city', city.regency_name);
         handleAddressChange('province', city.province_name);
         setShowCityDropdown(false);
         setCityResults([]);
-        
+
         // Clear city error
-        if (errors.city) {
-            setErrors(prev => ({ ...prev, city: null }));
-        }
+        setErrors(prev => ({
+            ...prev,
+            [`city_${activeAddressIndex}`]: null,
+            [`district_${activeAddressIndex}`]: null,
+            [`province_${activeAddressIndex}`]: null
+        }));
     };
     
     // Close dropdown when clicking outside
@@ -276,8 +285,10 @@ export default function AddCustomer() {
         const addressesToValidate = addresses.filter(hasAnyAddressData);
         if (addressesToValidate.length > 0) {
             addressesToValidate.forEach((address, index) => {
-                if (!address.city?.trim()) {
-                    newErrors[`city_${index}`] = 'Kota/Kecamatan wajib diisi';
+                if (!address.district?.trim() || !address.city?.trim() || !address.province?.trim()) {
+                    newErrors[`district_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
+                    newErrors[`city_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
+                    newErrors[`province_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
                 }
                 // Postal code optional: only validate format if provided
                 if (address.postal_code?.trim()) {
@@ -321,6 +332,8 @@ export default function AddCustomer() {
             };
             const addressLabel = (key) => {
                 if (key.startsWith('city_')) return 'Alamat: Kota/Kecamatan';
+                if (key.startsWith('district_')) return 'Alamat: Kota/Kecamatan';
+                if (key.startsWith('province_')) return 'Alamat: Kota/Kecamatan';
                 if (key.startsWith('postal_code_')) return 'Alamat: Kode Pos';
                 if (key.startsWith('address_detail_')) return 'Alamat: Alamat Lengkap';
                 return key;
@@ -353,19 +366,21 @@ export default function AddCustomer() {
                 category: formData.category,
                 ...(addressesToSend.length > 0
                     ? {
-                        addresses: addressesToSend.map(address => ({
-                            label: address.label,
-                            recipient_name: address.recipient_name || formData.full_name,
-                            recipient_phone: address.recipient_phone || formData.phone,
-                            province: address.province,
-                            city: address.city,
-                            district: address.district,
-                            postal_code: address.postal_code || null,
-                            address_detail: address.address_detail,
-                            is_default: address.is_default,
-                        }))
-                      }
-                    : {})
+                addresses: addressesToSend.map(address => ({
+                    label: address.label,
+                    recipient_name: address.recipient_name || formData.full_name,
+                    recipient_phone: address.recipient_phone || formData.phone,
+                    recipient_email: address.recipient_email || '',
+                    is_dropship: !!address.is_dropship,
+                    province: address.province,
+                    city: address.city,
+                    district: address.district,
+                    postal_code: address.postal_code || null,
+                    address_detail: address.address_detail,
+                    is_default: address.is_default,
+                }))
+              }
+                : {})
             };
             console.log(customerData);
             const response = await api.post('/customers', customerData);
@@ -664,6 +679,28 @@ export default function AddCustomer() {
                                     </div>
                                 </div>
 
+                                <div className="flex items-center gap-2 mb-4">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={!!addresses[activeAddressIndex]?.is_dropship}
+                                        onChange={(e) => handleAddressChange('is_dropship', e.target.checked)}
+                                    />
+                                    <span className="text-sm">Alamat Pesanan dropship</span>
+                                </div>
+                                {addresses[activeAddressIndex]?.is_dropship && (
+                                    <div className="mb-4">
+                                        <label className="text-sm font-medium">Email Penerima (opsional)</label>
+                                        <input
+                                            type="email"
+                                            className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
+                                            value={addresses[activeAddressIndex]?.recipient_email || ''}
+                                            onChange={(e) => handleAddressChange('recipient_email', e.target.value)}
+                                            placeholder="email@example.com"
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="relative city-search-container">
                                         <label className="text-sm font-medium">
@@ -702,7 +739,7 @@ export default function AddCustomer() {
                                                     >
                                                         <div className="font-medium">{city.name}</div>
                                                         <div className="text-gray-500 text-xs">
-                                                            {city.type}, {city.regency_name}, {city.province_name}
+                                                            {city.regency_name}, {city.province_name}
                                                         </div>
                                                     </div>
                                                 ))}

@@ -253,6 +253,7 @@ class WebOrderController extends Controller
                 'guest_phone' => $isGuest ? $request->guest_phone : null,
                 'notes' => $request->notes,
                 'payment_status' => PaymentStatus::PENDING,
+                'is_dropship' => (bool) ($request->is_dropship ?? false),
             ]);
 
             // If courier info provided, create shipping record in pending state

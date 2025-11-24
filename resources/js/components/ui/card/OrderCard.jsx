@@ -26,6 +26,7 @@ const route = (name, params = null) => {
 export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, isSelected = false, onSelect }) {
     const { hasPermission } = useAuth();
     const [localOrder, setLocalOrder] = useState(order);
+    console.log(order)
 
 
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -399,13 +400,19 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
 
             <div className="flex flex-col md:flex-row justify-between gap-6">
                 <div className="flex-1 grid gap-2">
+                    {localOrder.is_dropship && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200 mt-1 w-fit">
+                            <Icon icon="mdi:package-variant-closed" width={12} />
+                            Dropship
+                        </span>
+                    )}
                     <div>
                         <div className="text-gray-500">Pemesan</div>
                         <div className="font-bold">{localOrder.customer}</div>
                     </div>
                     <div>
                         <div className="text-gray-500">Dikirim kepada</div>
-                        <div className="font-bold">{localOrder.customer}</div>
+                        <div className="font-bold">{localOrder.recipient_name || localOrder.customer}</div>
                     </div>
                     <div>
                         <div className="text-gray-500">Admin</div>
@@ -521,9 +528,9 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                                     </span>
                                     {localOrder.payment_status && (
                                         <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 ${localOrder.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
-                                                localOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                    localOrder.payment_status === 'expired' ? 'bg-red-100 text-red-700' :
-                                                        'bg-gray-100 text-gray-700'
+                                            localOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                localOrder.payment_status === 'expired' ? 'bg-red-100 text-red-700' :
+                                                    'bg-gray-100 text-gray-700'
                                             }`}>
                                             <Icon icon={
                                                 localOrder.payment_status === 'paid' ? 'mdi:check-circle' :
@@ -584,7 +591,7 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
             <div className="flex justify-between border-t mt-4">
                 <div className="flex items-center gap-2 mt-4">
                     {hasPermission('orders.print') && (
-                        <Link 
+                        <Link
                             href={`/cms/order/print-invoice/${localOrder.id}`}
                             className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
                         >

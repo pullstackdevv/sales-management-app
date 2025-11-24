@@ -70,7 +70,8 @@ class CustomerController extends Controller
                 'addresses.*.district' => 'required|string|max:255',
                 'addresses.*.postal_code' => 'nullable|string|regex:/^\d{5}$/',
                 'addresses.*.address_detail' => 'required|string',
-                'addresses.*.is_default' => 'boolean'
+                'addresses.*.is_default' => 'boolean',
+                'addresses.*.is_dropship' => 'boolean'
             ], [
                 'addresses.required' => 'Alamat pengiriman wajib diisi',
                 'addresses.*.label.required' => 'Label alamat wajib diisi',
@@ -111,7 +112,8 @@ class CustomerController extends Controller
                         'district' => $addressData['district'],
                         'postal_code' => $addressData['postal_code'] ?? null,
                         'address_detail' => $addressData['address_detail'],
-                        'is_default' => $addressData['is_default'] ?? ($index === 0) // First address is default if not specified
+                        'is_default' => $addressData['is_default'] ?? ($index === 0),
+                        'is_dropship' => $addressData['is_dropship'] ?? false
                     ]);
                 }
             }
@@ -188,7 +190,8 @@ class CustomerController extends Controller
             'addresses.*.district' => 'required_with:addresses|string|max:255',
             'addresses.*.postal_code' => 'nullable|string|regex:/^\d{5}$/',
             'addresses.*.address_detail' => 'required_with:addresses|string',
-            'addresses.*.is_default' => 'boolean'
+            'addresses.*.is_default' => 'boolean',
+            'addresses.*.is_dropship' => 'boolean'
         ]);
 
         try {
@@ -215,7 +218,8 @@ class CustomerController extends Controller
                         'district' => $addressData['district'],
                         'postal_code' => $addressData['postal_code'] ?? null,
                         'address_detail' => $addressData['address_detail'],
-                        'is_default' => $addressData['is_default'] ?? ($index === 0) // First address is default if not specified
+                        'is_default' => $addressData['is_default'] ?? ($index === 0),
+                        'is_dropship' => $addressData['is_dropship'] ?? false
                     ]);
                 }
             }

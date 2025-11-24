@@ -24,7 +24,9 @@ export default function EditCustomer({ customerId }) {
     const [addresses, setAddresses] = useState([{
         label: "Rumah",
         recipient_name: "",
-        phone: "",
+        recipient_phone: "",
+        recipient_email: "",
+        is_dropship: false,
         province: "",
         city: "",
         district: "",
@@ -68,6 +70,8 @@ export default function EditCustomer({ customerId }) {
                             label: address.label || "Rumah",
                             recipient_name: address.recipient_name || customerData.name,
                             recipient_phone: address.phone || customerData.phone,
+                            recipient_email: '',
+                            is_dropship: !!address.is_dropship,
                             province: address.province || "",
                             city: address.city || "",
                             district: address.district || "",
@@ -107,6 +111,21 @@ export default function EditCustomer({ customerId }) {
         // Clear error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }));
+        }
+        // Auto-fill recipient fields when editing top-level name/phone
+        if (field === 'full_name') {
+            setAddresses(prev => prev.map((addr, i) => (
+                i === activeAddressIndex || !addr.recipient_name
+                    ? { ...addr, recipient_name: value }
+                    : addr
+            )));
+        }
+        if (field === 'phone') {
+            setAddresses(prev => prev.map((addr, i) => (
+                i === activeAddressIndex || !addr.recipient_phone
+                    ? { ...addr, recipient_phone: value }
+                    : addr
+            )));
         }
     };
     
@@ -206,43 +225,18 @@ export default function EditCustomer({ customerId }) {
             setShowCityDropdown(false);
             return;
         }
-        
         setSearchingCity(true);
-        
-        // Cancel previous request if exists
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        
-        // Create new abort controller
-        abortControllerRef.current = new AbortController();
-        
         try {
-            const response = await api.get('/wilayah/search-regencies', {
-                params: { q: query },
-                signal: abortControllerRef.current.signal
-            });
-            
+            const response = await api.get('/wilayah/search-regencies', { params: { q: query } });
             if (response.data.status === 'success') {
-                const enrichedResults = response.data.data.map(regency => ({
-                    name: regency.name,
-                    type: 'Kabupaten/Kota',
-                    regency_name: regency.name,
-                    province_name: regency.province_name,
-                    code: regency.code
-                }));
-                
-                setCityResults(enrichedResults);
+                setCityResults(response.data.data);
                 setShowCityDropdown(true);
             } else {
-                console.error('Error searching cities:', response.data.message);
                 setCityResults([]);
             }
         } catch (error) {
-            if (error.name !== 'AbortError') {
-                console.error('Error searching cities:', error);
-                setCityResults([]);
-            }
+            console.error('Error searching cities:', error);
+            setCityResults([]);
         } finally {
             setSearchingCity(false);
         }
@@ -252,6 +246,18 @@ export default function EditCustomer({ customerId }) {
     const handleCitySearch = (e) => {
         const query = e.target.value;
         setCityQuery(query);
+
+        setAddresses(prev => prev.map((addr, i) => (
+            i === activeAddressIndex
+                ? { ...addr, district: "", city: "", province: "" }
+                : addr
+        )));
+        setErrors(prev => ({
+            ...prev,
+            [`city_${activeAddressIndex}`]: null,
+            [`district_${activeAddressIndex}`]: null,
+            [`province_${activeAddressIndex}`]: null
+        }));
         
         // Clear previous timeout
         if (searchTimeoutRef.current) {
@@ -266,13 +272,13 @@ export default function EditCustomer({ customerId }) {
     
     // Select city from dropdown
     const selectCity = (city) => {
-        setCityQuery(`${city.name}, ${city.regency_name}`);
+        setCityQuery(city.name);
         setAddresses(prev => {
             const newAddresses = [...prev];
             newAddresses[activeAddressIndex] = {
                 ...newAddresses[activeAddressIndex],
-                city: city.name,
-                district: city.name,
+                district: city.district_name || '',
+                city: city.regency_name,
                 province: city.province_name
             };
             return newAddresses;
@@ -280,10 +286,12 @@ export default function EditCustomer({ customerId }) {
         setShowCityDropdown(false);
         setCityResults([]);
         
-        // Clear city error
-        if (errors.city) {
-            setErrors(prev => ({ ...prev, city: null }));
-        }
+        setErrors(prev => ({
+            ...prev,
+            [`city_${activeAddressIndex}`]: null,
+            [`district_${activeAddressIndex}`]: null,
+            [`province_${activeAddressIndex}`]: null
+        }));
     };
     
     // Close dropdown when clicking outside
@@ -316,17 +324,15 @@ export default function EditCustomer({ customerId }) {
         // Validate all addresses
         let hasAddressErrors = false;
         addresses.forEach((address, index) => {
-            if (!address.city.trim()) {
-                newErrors[`city_${index}`] = 'Kota/Kecamatan wajib diisi';
-                if (index === activeAddressIndex) newErrors.city = 'Kota/Kecamatan wajib diisi';
+            if (!address.district.trim() || !address.city.trim() || !address.province.trim()) {
+                newErrors[`district_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
+                newErrors[`city_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
+                newErrors[`province_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
+                if (index === activeAddressIndex) newErrors.city = 'Silakan cari dan pilih kecamatan dari dropdown';
                 hasAddressErrors = true;
             }
             
-            if (!address.postal_code.trim()) {
-                newErrors[`postal_code_${index}`] = 'Kode pos wajib diisi';
-                if (index === activeAddressIndex) newErrors.postal_code = 'Kode pos wajib diisi';
-                hasAddressErrors = true;
-            } else if (!/^[0-9]{5}$/.test(address.postal_code)) {
+            if (address.postal_code.trim() && !/^[0-9]{5}$/.test(address.postal_code)) {
                 newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
                 if (index === activeAddressIndex) newErrors.postal_code = 'Kode pos harus 5 digit angka';
                 hasAddressErrors = true;
@@ -383,6 +389,8 @@ export default function EditCustomer({ customerId }) {
                      label: addr.label,
                      recipient_name: addr.recipient_name || formData.full_name,
                      recipient_phone: addr.recipient_phone || formData.phone,
+                     recipient_email: addr.recipient_email || '',
+                     is_dropship: !!addr.is_dropship,
                      province: addr.province,
                      city: addr.city,
                      district: addr.district,
@@ -697,11 +705,33 @@ export default function EditCustomer({ customerId }) {
                                             type="text"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             value={addresses[activeAddressIndex]?.recipient_phone || ''}
-                                            onChange={(e) => handleAddressChange('recipient_phone', e.target.value)}
+                                        onChange={(e) => handleAddressChange('recipient_phone', e.target.value)}
                                             placeholder="08xxxxxxxxxx"
                                         />
                                     </div>
                                 </div>
+
+                                <div className="flex items-center gap-2 mb-4">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={!!addresses[activeAddressIndex]?.is_dropship}
+                                        onChange={(e) => handleAddressChange('is_dropship', e.target.checked)}
+                                    />
+                                    <span className="text-sm">Pesanan dropship</span>
+                                </div>
+                                {addresses[activeAddressIndex]?.is_dropship && (
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Email Penerima (opsional)</label>
+                                        <input
+                                            type="email"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            value={addresses[activeAddressIndex]?.recipient_email || ''}
+                                            onChange={(e) => handleAddressChange('recipient_email', e.target.value)}
+                                            placeholder="email@example.com"
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -742,7 +772,7 @@ export default function EditCustomer({ customerId }) {
                                                     >
                                                         <div className="font-medium">{city.name}</div>
                                                         <div className="text-gray-500 text-xs">
-                                                            {city.type}, {city.regency_name}, {city.province_name}
+                                                            {city.regency_name}, {city.province_name}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -755,7 +785,7 @@ export default function EditCustomer({ customerId }) {
                                     
                                     <div>
                                         <label className="text-sm font-medium">
-                                            Kode Pos <span className="text-red-500">*</span>
+                                            Kode Pos (opsional)
                                         </label>
                                         <input 
                                             type="text"

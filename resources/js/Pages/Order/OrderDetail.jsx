@@ -8,6 +8,10 @@ import PaymentHistoryModal from '../../components/ui/modal/PaymentHistoryModal';
 import OrderHistoryModal from '../../components/ui/modal/OrderHistoryModal';
 
 export default function OrderDetail({ auth, order }) {
+    const formatRupiah = (value) => {
+        const num = typeof value === 'number' ? value : parseFloat(value || 0);
+        return num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    };
     const [orderData, setOrderData] = useState(order || null);
     const [loading, setLoading] = useState(!order);
     const [checkingPayment, setCheckingPayment] = useState(false);
@@ -51,7 +55,7 @@ export default function OrderDetail({ auth, order }) {
 
     const handleCopyOrderDetails = () => {
         if (!orderData) return;
-        
+
         const orderDetails = `
 Order #${orderData.order_number || orderData.id}
 Tanggal: ${new Date(orderData.created_at).toLocaleDateString('id-ID')}
@@ -60,18 +64,18 @@ Alamat: ${orderData.shipping_address || '-'}
 Telp: ${orderData.customer?.phone || '-'}
 
 Produk:
-${orderData.items?.map(item => 
-    `- ${item.product_name_snapshot || item.product_variant?.product?.name} ${item.variant_label ? `(${item.variant_label})` : ''}
-  ${item.quantity} x Rp${item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })} = Rp${item.subtotal?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
-).join('\n') || 'Tidak ada produk'}
-Ongkir: Rp${orderData.shipping_cost?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}
-Total: Rp${orderData.total_price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}
+${orderData.items?.map(item =>
+            `- ${item.product_name_snapshot || item.product_variant?.product?.name} ${item.variant_label ? `(${item.variant_label})` : ''}
+  ${item.quantity} x Rp${formatRupiah(item.price)} = Rp${formatRupiah(item.subtotal)}`
+        ).join('\n') || 'Tidak ada produk'}
+Ongkir: Rp${formatRupiah(orderData.shipping_cost)}
+Total: Rp${formatRupiah(orderData.total_price)}
 
 Status: ${getStatusLabel(orderData.payment_status)}
 Kurir: ${orderData.shipping?.courier?.name || 'Kurir'} - ${orderData.shipping?.service_type || 'Reguler'}
 Resi: ${orderData.shipping?.tracking_number || '-'}
         `;
-        
+
         navigator.clipboard.writeText(orderDetails).then(() => {
             toast.success('Detail order berhasil disalin!');
         }).catch(() => {
@@ -87,7 +91,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
 
     const handleCheckPaymentStatus = async () => {
         if (!orderData?.payment_url) return;
-        
+
         setCheckingPayment(true);
         try {
             const response = await api.post(`/orders/${orderData.id}/check-payment`);
@@ -178,7 +182,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
     return (
         <DashboardLayout user={auth.user}>
             <Head title={`Order #${orderData.order_number || orderData.id}`} />
-            
+
             <div className="py-6">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Header */}
@@ -191,7 +195,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                     </Link>
                                     <h1 className="text-2xl font-bold text-gray-900">Order</h1>
                                 </div>
-                                
+
                                 <div className="flex space-x-3">
                                     <button
                                         onClick={() => setShowOrderHistory(true)}
@@ -200,7 +204,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <RefreshCw className="w-4 h-4" />
                                         <span>Riwayat Order</span>
                                     </button>
-                                    
+
                                     <button
                                         onClick={handleManageOrder}
                                         className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -222,14 +226,14 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                 <div className="space-y-4">
                                     <div>
                                         <h3 className="text-lg font-semibold mb-4">Order ID #{orderData.order_number || orderData.id}</h3>
-                                        <p className="text-sm text-gray-600">{new Date(orderData.created_at).toLocaleDateString('id-ID', { 
-                                            weekday: 'long', 
-                                            year: 'numeric', 
-                                            month: 'long', 
-                                            day: 'numeric' 
+                                        <p className="text-sm text-gray-600">{new Date(orderData.created_at).toLocaleDateString('id-ID', {
+                                            weekday: 'long',
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
                                         })}</p>
                                     </div>
-                                    
+
                                     <div>
                                         <p className="text-sm text-gray-600 mb-2">Status bayar & Total Bayar</p>
                                         <div className="flex items-center justify-between">
@@ -253,7 +257,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                             <div className="flex items-center space-x-2">
                                                 {isWebOrder() && (
                                                     <>
-                                                        <button 
+                                                        <button
                                                             onClick={handleCheckPaymentStatus}
                                                             disabled={checkingPayment}
                                                             className="flex items-center space-x-1 text-green-600 hover:text-green-800 text-sm disabled:opacity-50"
@@ -261,9 +265,9 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                                             <RefreshCw className={`w-4 h-4 ${checkingPayment ? 'animate-spin' : ''}`} />
                                                             <span>{checkingPayment ? 'Mengecek...' : 'Cek Status'}</span>
                                                         </button>
-                                                        <a 
-                                                            href={orderData.payment_url} 
-                                                            target="_blank" 
+                                                        <a
+                                                            href={orderData.payment_url}
+                                                            target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 text-sm"
                                                         >
@@ -298,7 +302,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <p className="text-sm text-gray-600">Resi: {orderData.shipping?.tracking_number || '-'}</p>
                                     </div>
                                     <div className="ml-auto">
-                                        <p className="font-bold">Rp{orderData.shipping_cost?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
+                                        <p className="font-bold">Rp{formatRupiah(orderData.shipping_cost)}</p>
                                     </div>
                                 </div>
                             </div>
@@ -331,14 +335,14 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                 <h3 className="text-lg font-semibold">Produk</h3>
                                 <p className="text-sm text-gray-600">Total Produk: {orderData.items?.length || 0}</p>
                             </div>
-                            
+
                             <div className="space-y-4">
                                 {orderData.items?.map((item, index) => (
                                     <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
                                         <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
                                             {item.product_variant?.product?.image ? (
-                                                <img 
-                                                    src={`/storage/${item.product_variant.product.image}`} 
+                                                <img
+                                                    src={`/storage/${item.product_variant.product.image}`}
                                                     alt={item.product_variant.product.name}
                                                     className="w-full h-full object-cover"
                                                 />
@@ -356,22 +360,22 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         </div>
                                     </div>
                                 )) || (
-                                    <div className="text-center py-8 text-gray-500">
-                                        Tidak ada produk
-                                    </div>
-                                )}
+                                        <div className="text-center py-8 text-gray-500">
+                                            Tidak ada produk
+                                        </div>
+                                    )}
                             </div>
-                            
+
                             {/* Total Section */}
                             <div className="mt-6 pt-4 border-t">
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
                                         <span>{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</span>
-                                        <span>Rp{orderData.shipping_cost?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</span>
+                                        <span>Rp{formatRupiah(orderData.shipping_cost)}</span>
                                     </div>
                                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                         <span>TOTAL</span>
-                                        <span>Rp{orderData.total_price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</span>
+                                        <span>Rp{formatRupiah(orderData.total_price)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -406,6 +410,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                     orderId={orderData.id}
                 />
             )}
+
         </DashboardLayout>
     );
 }

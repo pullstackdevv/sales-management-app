@@ -510,6 +510,7 @@ class WebOrderController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'search_query' => 'required|string|min:3',
+                'status' => 'nullable|in:pending,paid,processing,shipped,delivered,cancelled',
             ]);
 
             if ($validator->fails()) {
@@ -520,17 +521,25 @@ class WebOrderController extends Controller
                 );
             }
 
-            $query = $request->search_query;
+            $queryTerm = $request->search_query;
 
-            // Search by order number, email, or phone
-            $orders = Order::with(['items.productVariant.product'])
-                ->where(function($q) use ($query) {
-                    $q->where('order_number', 'like', "%{$query}%")
-                      ->orWhere('customer_email', 'like', "%{$query}%")
-                      ->orWhere('customer_phone', 'like', "%{$query}%");
-                })
-                ->orderBy('created_at', 'desc')
-                ->paginate(10);
+            // Search by order number, email (guest or customer), or phone (guest or customer)
+            $ordersQuery = Order::with(['items.productVariant.product'])
+                ->where(function($q) use ($queryTerm) {
+                    $q->where('order_number', 'like', "%{$queryTerm}%")
+                      ->orWhere('guest_email', 'like', "%{$queryTerm}%")
+                      ->orWhere('guest_phone', 'like', "%{$queryTerm}%")
+                      ->orWhereHas('customer', function($cq) use ($queryTerm) {
+                          $cq->where('email', 'like', "%{$queryTerm}%")
+                             ->orWhere('phone', 'like', "%{$queryTerm}%");
+                      });
+                });
+
+            if ($request->filled('status')) {
+                $ordersQuery->where('status', $request->status);
+            }
+
+            $orders = $ordersQuery->orderBy('created_at', 'desc')->paginate(10);
 
             return ResponseFormatter::success(
                 'Orders found',

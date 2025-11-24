@@ -46,8 +46,7 @@ class CustomerController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('customers.create')) {
+        if (Auth::check() && !Auth::user()->hasPermission('customers.create')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Unauthorized. You do not have permission to create customers.'
@@ -159,7 +158,12 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer): JsonResponse
     {
-        // Check permission
+        if (!Auth::check()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized'
+            ], 401);
+        }
         if (!Auth::user()->hasPermission('customers.edit')) {
             return response()->json([
                 'status' => 'error',
@@ -231,7 +235,12 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer): JsonResponse
     {
-        // Check permission
+        if (!Auth::check()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized'
+            ], 401);
+        }
         if (!Auth::user()->hasPermission('customers.delete')) {
             return response()->json([
                 'status' => 'error',
@@ -269,7 +278,12 @@ class CustomerController extends Controller
 
     public function toggleStatus(Customer $customer): JsonResponse
     {
-        // Check permission
+        if (!Auth::check()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized'
+            ], 401);
+        }
         if (!Auth::user()->hasPermission('customers.toggle_status')) {
             return response()->json([
                 'status' => 'error',

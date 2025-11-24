@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/helpers';
 import checkoutSession from '@/utils/checkoutSession';
 import Swal from 'sweetalert2';
 import api from '@/api/axios';
+import axios from 'axios';
 
 const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +44,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         }
     }, []);
 
-    // Fetch orders based on customer_id from checkout session
+    // Fetch orders for external user via public track-orders search
     useEffect(() => {
         const fetchOrders = async () => {
             try {
@@ -51,22 +52,23 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
 
                 const sessionData = checkoutSession.get();
                 const customer = sessionData?.customer || {};
-                const customerId = customer.customer_id ?? sessionData?.customer_id ?? null;
+                const searchBase = (searchQuery && searchQuery.trim().length >= 3)
+                    ? searchQuery.trim()
+                    : (customer.phone || customer.email || '');
 
-                if (!customerId) {
+                if (!searchBase || searchBase.trim().length < 3) {
                     setOrders([]);
                     setPagination({ current_page: 1, last_page: 1, total: 0 });
                     return;
                 }
 
-                const response = await api.get('/order-histories', {
-                    params: {
-                        customer_id: customerId,
+                const response = await axios.post(`/track-orders/search?page=${currentPage}`,
+                    {
+                        search_query: searchBase,
                         status: statusFilter !== 'all' ? statusFilter : undefined,
-                        search: searchQuery || undefined,
-                        page: currentPage,
                     },
-                });
+                    { headers: { 'Accept': 'application/json' } }
+                );
 
                 if (response.data.status === 'success') {
                     const data = response.data.data;

@@ -172,11 +172,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('orders.payments', OrderPaymentController::class);
     Route::apiResource('orders.items', OrderItemController::class);
 
-    // Voucher routes
+    // Voucher routes (admin-only)
     Route::apiResource('vouchers', VoucherController::class);
     Route::post('vouchers/{voucher}/toggle-status', [VoucherController::class, 'toggleStatus']);
-    Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
-    Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
 
     // Promotion routes
     Route::apiResource('promotions', PromotionController::class);
@@ -200,6 +198,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
     });
 });
+
+// Public voucher routes (for checkout)
+Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
+Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
 
 // Payment Gateway Routes (public access for webhooks and order payment)
 Route::prefix('payment')->name('payment.')->group(function () {

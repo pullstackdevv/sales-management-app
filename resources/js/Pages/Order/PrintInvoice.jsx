@@ -57,6 +57,7 @@ const PrintInvoice = () => {
             const transformedData = {
                 invoice_number: orderData.order_number,
                 created_at: orderData.created_at,
+                status:orderData.status,
                 customer: orderData.customer,
                 items: orderData.items?.map(item => ({
                     product_name: item.product_name_snapshot || item.product_variant?.product?.name || 'Product',
@@ -165,7 +166,11 @@ const PrintInvoice = () => {
 
     const handlePrintAndProcess = async () => {
         try {
-            await api.post(`/orders/${orderId}/update-status`, { status: 'processing' });
+            // Skip status update if already processing
+            console.log(invoiceData.status)
+            if (invoiceData?.status !== 'processing') {
+                await api.post(`/orders/${orderId}/update-status`, { status: 'processing' });
+            }
             await api.patch(`/orders/${orderId}`, { printed_at: new Date().toISOString() });
 
             window.print();
@@ -249,14 +254,14 @@ const PrintInvoice = () => {
                 <div className="no-print mb-6">
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
                         <button
-                            onClick={handlePrint}
+                            onClick={handlePrintAndProcess}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
                         >
                             <Icon icon="solar:printer-outline" className="w-5 h-5" />
                             Cetak Invoice
                         </button>
                         {/* <button
-                            onClick={handlePrintAndProcess}
+                            onClick={}
                             className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[180px] justify-center"
                         >
                             <Icon icon="solar:printer-minimalistic-2-line-duotone" className="w-5 h-5" />

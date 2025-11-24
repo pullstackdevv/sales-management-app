@@ -86,6 +86,15 @@ const PrintInvoice = () => {
                 } : null,
                 notes: orderData.notes,
                 shipping: orderData.shipping,
+                shipping_address: orderData.address ? {
+                    recipient_name: orderData.address.recipient_name,
+                    phone: orderData.address.phone,
+                    address_detail: orderData.address.address_detail,
+                    city: orderData.address.city,
+                    province: orderData.address.province,
+                    district: orderData.address.district,
+                    postal_code: orderData.address.postal_code,
+                } : null,
                 company: {
                     name: 'SALEPARFUM',
                     address: 'Jl. Contoh No. 123, Jakarta',
@@ -231,7 +240,7 @@ const PrintInvoice = () => {
             </div>
         );
     }
-
+console.log(invoiceData)
     return (
         <>
             <Head title={`Invoice - Order #${orderId}`} />
@@ -463,27 +472,16 @@ const PrintInvoice = () => {
                             <div className="border-b-2 border-black p-4">
                                 <div className="font-bold mb-2">Alamat:</div>
                                 <div className="text-sm leading-relaxed">
-                                     {invoiceData?.shipping?.address ? (
+                                     {invoiceData?.shipping_address ? (
                                          <>
-                                             {invoiceData.shipping.address.street}<br/>
-                                             {invoiceData.shipping.address.city}, {invoiceData.shipping.address.state} {invoiceData.shipping.address.postal_code}<br/>
-                                             {invoiceData.shipping.address.country}<br/>
-                                             {invoiceData.shipping.phone && `+${invoiceData.shipping.phone}`}
-                                         </>
-                                     ) : invoiceData?.customer?.address ? (
-                                         <>
-                                             {invoiceData.customer.address.street}<br/>
-                                             {invoiceData.customer.address.city}, {invoiceData.customer.address.state} {invoiceData.customer.address.postal_code}<br/>
-                                             {invoiceData.customer.address.country}
+                                             {invoiceData.shipping_address.address_detail}<br/>
+                                             {invoiceData.shipping_address.city}, {invoiceData.shipping_address.province} {invoiceData.shipping_address.postal_code}<br/>
+                                             {invoiceData.shipping_address.district && `${invoiceData.shipping_address.district}`}<br/>
+                                             {invoiceData.shipping_address.phone && `${invoiceData.shipping_address.phone}`}
                                          </>
                                      ) : (
                                          <>
-                                             Kahfi Signature, Jl. Moh. Kahfi I Blok 10M,<br/>
-                                             Ciganjur, Kec.Jagakarsa Kota Jakarta Selatan,<br/>
-                                             Daerah Khusus Ibukota Jakarta<br/>
-                                             12630<br/>
-                                             +62/856-9346-8592, KotaJakarta Selatan,<br/>
-                                             DKI Jakarta, 12630 12630
+                                             Alamat tidak tersedia
                                          </>
                                      )}
                                  </div>

@@ -333,7 +333,7 @@ class OrderController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $order->load(['customer', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel', 'voucher'])
+            'data' => $order->load(['customer', 'address', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel', 'voucher'])
         ]);
     }
 

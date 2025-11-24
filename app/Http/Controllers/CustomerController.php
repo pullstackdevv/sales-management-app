@@ -158,13 +158,13 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer): JsonResponse
     {
-        if (!Auth::check()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized'
-            ], 401);
-        }
-        if (!Auth::user()->hasPermission('customers.edit')) {
+        // if (!Auth::check()) {
+        //     return response()->json([
+        //         'status' => 'error',
+        //         'message' => 'Unauthorized'
+        //     ], 401);
+        // }
+        if (Auth::check() && !Auth::user()->hasPermission('customers.create')) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Unauthorized. You do not have permission to edit customers.'

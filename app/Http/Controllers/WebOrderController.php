@@ -524,7 +524,14 @@ class WebOrderController extends Controller
             $queryTerm = $request->search_query;
 
             // Search by order number, email (guest or customer), or phone (guest or customer)
-            $ordersQuery = Order::with(['items.productVariant.product'])
+            $ordersQuery = Order::with([
+                    'items.productVariant.product',
+                    'address',
+                    'shipping.courier',
+                    'payments.paymentBank',
+                    'voucher',
+                    'createdBy'
+                ])
                 ->where(function($q) use ($queryTerm) {
                     $q->where('order_number', 'like', "%{$queryTerm}%")
                       ->orWhere('guest_email', 'like', "%{$queryTerm}%")

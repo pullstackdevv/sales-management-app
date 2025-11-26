@@ -26,7 +26,7 @@ const route = (name, params = null) => {
 export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, isSelected = false, onSelect }) {
     const { hasPermission } = useAuth();
     const [localOrder, setLocalOrder] = useState(order);
-    console.log(order)
+    // console.log(order)
 
 
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -333,7 +333,7 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
     };
 
     const validTransitions = getValidStatusTransitions(localOrder.raw_status || localOrder.status);
-
+    console.log('ini order card', localOrder)
     return (
         <div className={`border rounded-xl p-4 mb-4 bg-white shadow-sm text-sm ${orderSource.borderColor} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
             <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center text-xs text-gray-600 border-b pb-4 mb-4">

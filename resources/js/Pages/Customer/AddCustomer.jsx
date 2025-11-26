@@ -26,7 +26,6 @@ export default function AddCustomer() {
             label: "Rumah",
             recipient_name: "",
             recipient_phone: "",
-            recipient_email: "",
             is_dropship: false,
             province: "",
             city: "",
@@ -105,7 +104,6 @@ export default function AddCustomer() {
             label: "Alamat " + (addresses.length + 1),
             recipient_name: formData.full_name,
             recipient_phone: formData.phone,
-            recipient_email: "",
             is_dropship: false,
             province: "",
             city: "",
@@ -370,7 +368,6 @@ export default function AddCustomer() {
                     label: address.label,
                     recipient_name: address.recipient_name || formData.full_name,
                     recipient_phone: address.recipient_phone || formData.phone,
-                    recipient_email: address.recipient_email || '',
                     is_dropship: !!address.is_dropship,
                     province: address.province,
                     city: address.city,
@@ -688,18 +685,7 @@ export default function AddCustomer() {
                                     />
                                     <span className="text-sm">Alamat Pesanan dropship</span>
                                 </div>
-                                {addresses[activeAddressIndex]?.is_dropship && (
-                                    <div className="mb-4">
-                                        <label className="text-sm font-medium">Email Penerima (opsional)</label>
-                                        <input
-                                            type="email"
-                                            className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
-                                            value={addresses[activeAddressIndex]?.recipient_email || ''}
-                                            onChange={(e) => handleAddressChange('recipient_email', e.target.value)}
-                                            placeholder="email@example.com"
-                                        />
-                                    </div>
-                                )}
+                                
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="relative city-search-container">

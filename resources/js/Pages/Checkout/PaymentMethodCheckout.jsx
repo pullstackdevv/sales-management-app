@@ -111,11 +111,15 @@ const PaymentMethodCheckout = () => {
       if (response.data && response.data.success && response.data.data && response.data.data.rates) {
         const rates = response.data.data.rates;
         console.log(`Found ${rates.length} courier rates for district: ${district}`);
-        setCourierRates(rates);
-        console.log(rates)
-        const defaultIndex = selectDefaultRateIndex(rates);
+        const allowed = ['ECO','REG','ONS'];
+        const filtered = (rates || []).filter(r => {
+          const code = r?.service?.type || r?.service_type;
+          return allowed.includes((code || '').toString().toUpperCase());
+        });
+        setCourierRates(filtered);
+        const defaultIndex = selectDefaultRateIndex(filtered);
         setSelectedRateIndex(defaultIndex);
-        calculateShippingCost(rates, district, defaultIndex);
+        calculateShippingCost(filtered, district, defaultIndex);
       } else {
         console.log(`No courier rates found for district: ${district}`);
 

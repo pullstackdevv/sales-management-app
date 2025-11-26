@@ -896,7 +896,7 @@ class OrderController extends Controller
                         'name' => $shipping->courier->name
                     ],
                     'tracking_number' => $shipping->tracking_number,
-                    'shipped_at' => $shipping->shipped_at->toISOString()
+                    'shipped_at' => $shipping->shipped_at->setTimezone(config('app.timezone'))->toIso8601String()
                 ],
                 'order' => [
                     'id' => $order->id,

@@ -25,7 +25,6 @@ export default function EditCustomer({ customerId }) {
         label: "Rumah",
         recipient_name: "",
         recipient_phone: "",
-        recipient_email: "",
         is_dropship: false,
         province: "",
         city: "",
@@ -70,7 +69,6 @@ export default function EditCustomer({ customerId }) {
                             label: address.label || "Rumah",
                             recipient_name: address.recipient_name || customerData.name,
                             recipient_phone: address.phone || customerData.phone,
-                            recipient_email: '',
                             is_dropship: !!address.is_dropship,
                             province: address.province || "",
                             city: address.city || "",
@@ -389,8 +387,7 @@ export default function EditCustomer({ customerId }) {
                      label: addr.label,
                      recipient_name: addr.recipient_name || formData.full_name,
                      recipient_phone: addr.recipient_phone || formData.phone,
-                     recipient_email: addr.recipient_email || '',
-                     is_dropship: !!addr.is_dropship,
+                    is_dropship: !!addr.is_dropship,
                      province: addr.province,
                      city: addr.city,
                      district: addr.district,
@@ -720,18 +717,7 @@ export default function EditCustomer({ customerId }) {
                                     />
                                     <span className="text-sm">Pesanan dropship</span>
                                 </div>
-                                {addresses[activeAddressIndex]?.is_dropship && (
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Email Penerima (opsional)</label>
-                                        <input
-                                            type="email"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            value={addresses[activeAddressIndex]?.recipient_email || ''}
-                                            onChange={(e) => handleAddressChange('recipient_email', e.target.value)}
-                                            placeholder="email@example.com"
-                                        />
-                                    </div>
-                                )}
+                                
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 

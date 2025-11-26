@@ -384,11 +384,7 @@ export default function CustomerData() {
                                         <div>
                                             <strong>Telepon Penerima:</strong> {address.recipient_phone || address.phone}
                                         </div>
-                                        {address.recipient_email && (
-                                            <div>
-                                                <strong>Email Penerima:</strong> {address.recipient_email}
-                                            </div>
-                                        )}
+                                        
                                         <div>
                                             <strong>Alamat:</strong> {address.address_detail}
                                         </div>

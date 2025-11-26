@@ -31,7 +31,7 @@ class CourierRateController extends Controller
                 'province' => 'nullable|string|max:100',
                 'city' => 'nullable|string|max:100',
                 'district' => 'nullable|string|max:100',
-                'service_type' => 'nullable|string|in:REG,ONS',
+                'service_type' => 'nullable|string|in:ECO,REG,ONS',
                 'origin_city' => 'nullable|string|max:100',
                 'min_price' => 'nullable|numeric|min:0',
                 'max_price' => 'nullable|numeric|min:0',
@@ -207,7 +207,7 @@ class CourierRateController extends Controller
     {
         try {
             // Only show REG and ONS service types
-            $allowedServiceTypes = ['REG', 'ONS'];
+            $allowedServiceTypes = ['REG', 'ONS', 'ECO'];
             
             $serviceTypes = CourierRate::select('service_type')
                 ->distinct()
@@ -218,7 +218,8 @@ class CourierRateController extends Controller
 
             $serviceDescriptions = [
                 'REG' => 'Regular Service',
-                'ONS' => 'One Night Service'
+                'ONS' => 'One Night Service',
+                'ECO' => 'Economy Service'
             ];
 
             $services = collect($serviceTypes)->map(function ($type) use ($serviceDescriptions) {
@@ -306,7 +307,7 @@ class CourierRateController extends Controller
             $query->where('origin_city', 'like', '%' . $request->origin_city . '%');
         }
 
-        $allowedServiceTypes = ['REG', 'ONS'];
+        $allowedServiceTypes = ['ECO', 'REG', 'ONS'];
         $isTiki = false;
         if ($request->has('courier_name') && stripos($request->courier_name, 'tiki') !== false) {
             $isTiki = true;

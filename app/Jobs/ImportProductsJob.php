@@ -91,6 +91,7 @@ class ImportProductsJob implements ShouldQueue
                             $productBasePrice = $mapped['base_price'] ?? 0;
                             $categoryId = $mapped['category_id'] ?? null;
                             $categoryName = isset($mapped['category']) ? trim((string) $mapped['category']) : null;
+                            $categoryIds = [];
                             if ($categoryId) {
                                 $existingCategory = ProductCategory::where('id', $categoryId)->where('is_active', 1)->first();
                                 if (!$existingCategory) {
@@ -102,38 +103,48 @@ class ImportProductsJob implements ShouldQueue
                                     $categoryName = $existingCategory->name;
                                 }
                             } elseif ($categoryName) {
-                                $normalizedName = trim((string) $categoryName);
-                                if ($normalizedName === '') {
+                                $normalized = trim((string) $categoryName);
+                                if ($normalized === '') {
                                     $skipped++;
                                     $lastSkipReason = 'missing_category';
                                     continue;
                                 }
-
-                                $foundCategory = ProductCategory::whereRaw('LOWER(name) = ?', [strtolower($normalizedName)])->first();
-                                if (!$foundCategory) {
-                                    $slug = Str::slug($normalizedName);
-                                    $foundCategory = ProductCategory::where('slug', $slug)->first();
+                                $names = collect(preg_split('/[,;|]/', $normalized))
+                                    ->map(function($n){ return trim($n); })
+                                    ->filter(function($n){ return $n !== ''; })
+                                    ->values();
+                                if ($names->isEmpty()) {
+                                    $skipped++;
+                                    $lastSkipReason = 'missing_category';
+                                    continue;
                                 }
-
-                                if ($foundCategory) {
-                                    if ($foundCategory->is_active === false) {
-                                        $foundCategory->update(['is_active' => 1, 'updated_by' => $this->userId]);
+                                foreach ($names as $i => $name) {
+                                    $foundCategory = ProductCategory::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                                    if (!$foundCategory) {
+                                        $slug = Str::slug($name);
+                                        $foundCategory = ProductCategory::where('slug', $slug)->first();
                                     }
-                                    $categoryId = $foundCategory->id;
-                                    $categoryName = $foundCategory->name;
-                                } else {
-                                    $newCategory = ProductCategory::firstOrCreate(
-                                        ['name' => $normalizedName],
-                                        [
-                                            'slug' => Str::slug($normalizedName),
-                                            'description' => '',
-                                            'is_active' => 1,
-                                            'created_by' => $this->userId,
-                                            'updated_by' => null
-                                        ]
-                                    );
-                                    $categoryId = $newCategory->id;
-                                    $categoryName = $newCategory->name;
+                                    if ($foundCategory) {
+                                        if ($foundCategory->is_active === false) {
+                                            $foundCategory->update(['is_active' => 1, 'updated_by' => $this->userId]);
+                                        }
+                                    } else {
+                                        $foundCategory = ProductCategory::firstOrCreate(
+                                            ['name' => $name],
+                                            [
+                                                'slug' => Str::slug($name),
+                                                'description' => '',
+                                                'is_active' => 1,
+                                                'created_by' => $this->userId,
+                                                'updated_by' => null
+                                            ]
+                                        );
+                                    }
+                                    $categoryIds[] = $foundCategory->id;
+                                    if ($i === 0) {
+                                        $categoryId = $foundCategory->id;
+                                        $categoryName = $foundCategory->name;
+                                    }
                                 }
                             } else {
                                 $skipped++;
@@ -154,6 +165,12 @@ class ImportProductsJob implements ShouldQueue
                                     'created_by' => $this->userId
                                 ]
                             );
+
+                            if (!empty($categoryIds)) {
+                                $product->categories()->sync($categoryIds);
+                            } elseif (!empty($categoryId)) {
+                                $product->categories()->sync([$categoryId]);
+                            }
 
                             $variantData = [
                                 'product_id' => $product->id,

@@ -48,6 +48,11 @@ class Product extends Model
         return $this->belongsTo(ProductCategory::class, 'category_id');
     }
 
+    public function categories()
+    {
+        return $this->belongsToMany(ProductCategory::class, 'product_product_category');
+    }
+
     // Helper method to get the minimum selling price from variants
     public function getMinPriceAttribute()
     {

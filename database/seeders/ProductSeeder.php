@@ -81,6 +81,10 @@ class ProductSeeder extends Seeder
 
         foreach ($products as $productData) {
             $product = Product::create($productData);
+
+            if (!empty($productData['category_id'])) {
+                $product->categories()->sync([$productData['category_id']]);
+            }
             
             // Generate base SKU from product name
             $baseSku = strtoupper(substr(str_replace(' ', '', $product->name), 0, 6));

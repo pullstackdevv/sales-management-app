@@ -351,9 +351,19 @@ export default function ProductData() {
                       </span>
                     </div>
                     <div className="col-span-2">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        {product.category || 'Tanpa kategori'}
-                      </span>
+                      {Array.isArray(product.categories) && product.categories.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {product.categories.map((c) => (
+                            <span key={c.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                              {c.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {product.category || 'Tanpa kategori'}
+                        </span>
+                      )}
                     </div>
                     <div className="col-span-1">
                       <span className="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">

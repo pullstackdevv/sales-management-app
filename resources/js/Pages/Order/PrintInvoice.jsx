@@ -58,6 +58,7 @@ const PrintInvoice = () => {
                 invoice_number: orderData.order_number,
                 created_at: orderData.created_at,
                 status:orderData.status,
+                is_dropship: !!orderData.is_dropship,
                 customer: orderData.customer,
                 items: orderData.items?.map(item => ({
                     product_name: item.product_name_snapshot || item.product_variant?.product?.name || 'Product',
@@ -94,6 +95,7 @@ const PrintInvoice = () => {
                     province: orderData.address.province,
                     district: orderData.address.district,
                     postal_code: orderData.address.postal_code,
+                    is_dropship: orderData.address.is_dropship
                 } : null,
                 company: {
                     name: 'SALEPARFUM',
@@ -453,7 +455,9 @@ console.log(invoiceData)
                         {printSettings.showCompanyInfo && (
                             <div className="border-b-2 border-black p-4">
                                 <div className="font-bold">
-                                    Pengirim: {invoiceData?.company?.name || 'SALEPARFUM'} - {invoiceData?.company?.phone || '083867000077'}
+                                    Pengirim: {invoiceData?.shipping_address?.is_dropship
+                                        ? `${invoiceData?.customer?.name || 'Customer'} - ${invoiceData?.customer?.phone || '083867000077'}`
+                                        : `${invoiceData?.company?.name || 'SALEPARFUM'} - ${invoiceData?.company?.phone || '083867000077'}`}
                                 </div>
                             </div>
                         )}

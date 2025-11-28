@@ -5,7 +5,7 @@ import { imageAsset } from '@/utils/asset';
 const FullLogo = () => {
   return (
     <Link href="/">
-      <img src={imageAsset('logos/mystock.png')} alt="logo" className="block w-40" />
+      <img src={imageAsset('logos/logo.png')} alt="logo" className="block w-40" />
     </Link>
   );
 };

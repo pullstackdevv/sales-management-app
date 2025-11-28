@@ -9,6 +9,7 @@ import {
     Package
 } from "lucide-react";
 import { AuthProvider } from "../contexts/AuthContext";
+import { imageAsset } from "@/utils/asset";
 import { useCart } from "../hooks/useCart";
 
 export default function MarketplaceLayout({ children }) {
@@ -25,7 +26,7 @@ export default function MarketplaceLayout({ children }) {
                         {/* Logo */}
                         <div className="flex items-center">
                             <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-                                <img src="/assets/images/logos/mystock.png" alt="MyStock Logo" className="h-7 sm:h-8 w-auto" />
+                                <img src={imageAsset('logos/mystock.png')} alt="MyStock Logo" className="h-7 sm:h-8 w-auto" />
                             </Link>
                         </div>
 

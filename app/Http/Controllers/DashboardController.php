@@ -28,7 +28,7 @@ class DashboardController extends Controller
             $activeProducts = Product::where('is_active', true)->count();
             
             $todaySales = Order::whereDate('created_at', $today)
-                ->where('payment_status', 'paid')
+                ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                 ->sum('total_price');
             
             $weeklyRevenueData = [];
@@ -37,13 +37,13 @@ class DashboardController extends Controller
             for ($i = 6; $i >= 0; $i--) {
                 $date = Carbon::now()->subDays($i);
                 $revenue = Order::whereDate('created_at', $date)
-                    ->where('payment_status', 'paid')
+                    ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                     ->sum('total_price');
                 $weeklyRevenueData[] = (float) $revenue;
-                $ordersPaidCount = Order::whereDate('created_at', $date)
-                    ->where('payment_status', 'paid')
+                $ordersCountForDay = Order::whereDate('created_at', $date)
+                    ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                     ->count();
-                $weeklyOrderCounts[] = (int) $ordersPaidCount;
+                $weeklyOrderCounts[] = (int) $ordersCountForDay;
                 $labels[] = $date->format('d M');
             }
             
@@ -107,7 +107,7 @@ class DashboardController extends Controller
             $todayOrdersSummary = [
                 'total' => $todayOrdersList->count(),
                 'total_revenue' => (float) Order::whereDate('created_at', $today)
-                    ->where('payment_status', 'paid')
+                    ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                     ->sum('total_price'),
                 'by_status' => [
                     'pending' => (int) ($statusCounts['pending'] ?? 0),

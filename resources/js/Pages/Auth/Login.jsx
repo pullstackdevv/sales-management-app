@@ -8,7 +8,7 @@ import { imageAsset } from '@/utils/asset';
 
 // Logo Component
 const Logo = () => (
-  <img src={imageAsset('logos/mystock.png')} alt="logo" className="block w-60 mx-auto mb-6" />
+  <img src={imageAsset('logos/logo.png')} alt="logo" className="block w-60 mx-auto mb-6" />
 );
 
 export default function LoginForm() {

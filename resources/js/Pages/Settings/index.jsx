@@ -32,7 +32,8 @@ const menus = [
   { key: "permission", label: "Permissions", icon: "solar:key-outline" },
   { key: "payment", label: "Payment Banks", icon: "solar:card-outline" },
   { key: "courier", label: "Couriers", icon: "solar:delivery-outline" },
-  { key: "origin", label: "Sales Channels", icon: "solar:shop-outline" },
+  { key: "order", label: "Sales Channels", icon: "solar:shop-outline" },
+  { key: "origin", label: "Origin Settings", icon: "solar:shop-outline" },
 ];
 
 function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {

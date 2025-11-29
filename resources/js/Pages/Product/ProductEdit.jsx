@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { router } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
-import * as AuthAPI from "@/api/auth";
+import { useAuth } from "../../contexts/AuthContext";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
 import TiptapEditor from "@/components/TiptapEditor";
@@ -10,6 +10,7 @@ import StockHistoryModal from "@/components/StockHistoryModal";
 import StockAdjustmentModal from "@/components/StockAdjustmentModal";
 
 export default function ProductEdit() {
+  const { isOwner } = useAuth();
   const [product, setProduct] = useState({
     name: "",
     category_ids: [],
@@ -26,6 +27,8 @@ export default function ProductEdit() {
   const [productImagePreview, setProductImagePreview] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+
+  const canViewBasePrice = isOwner;
 
   // Format number to ribuan without decimal
   const formatRibuan = (num) => {
@@ -255,8 +258,7 @@ export default function ProductEdit() {
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price || 0);
         formData.append(`variants[${index}][discount_price]`, variant.discount_price || '');
-        const weightKg = variant.weight ? Number(variant.weight) / 1000 : 0;
-        formData.append(`variants[${index}][weight]`, weightKg);
+        formData.append(`variants[${index}][weight]`, variant.weight || 0);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
         formData.append(`variants[${index}][is_storefront]`, variant.is_storefront ? '1' : '0');
@@ -609,7 +611,7 @@ export default function ProductEdit() {
                                 errors[`variants.${index}.weight`] ? 'border-red-500' : 'border-gray-300'
                               }`}
                               placeholder="Masukkan berat"
-                              value={formatRibuan(variant.weight)}
+                              value={variant.weight}
                               onChange={(e) => updateVariant(index, 'weight', parseRibuan(e.target.value))}
                               onFocus={() => { if (variant.weight === 0) updateVariant(index, 'weight', ''); }}
                             />
@@ -630,7 +632,7 @@ export default function ProductEdit() {
                                 value={formatRibuan(variant.stock)}
                                 onChange={(e) => updateVariant(index, 'stock', parseRibuan(e.target.value))}
                                 onFocus={() => { if (variant.stock === 0) updateVariant(index, 'stock', ''); }}
-                                required
+                                // required
                               />
                               <button
                                 type="button"
@@ -781,5 +783,3 @@ export default function ProductEdit() {
     </DashboardLayout>
   );
 }
-  const currentUser = AuthAPI.getUser();
-  const canViewBasePrice = currentUser?.role_id === 1;

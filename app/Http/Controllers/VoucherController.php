@@ -173,12 +173,6 @@ class VoucherController extends Controller
             ], 403);
         }
 
-        if ($voucher->orders()->exists()) {
-            throw ValidationException::withMessages([
-                'voucher' => ['Cannot delete voucher that has been used in orders.']
-            ]);
-        }
-
         try {
             DB::beginTransaction();
 

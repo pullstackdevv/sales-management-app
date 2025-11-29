@@ -3,14 +3,14 @@ import { Link } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import api from "@/api/axios";
-import * as AuthAPI from "@/api/auth";
+import { useAuth } from "../../contexts/AuthContext";
 import Swal from "sweetalert2";
 import StockHistoryModal from "@/components/StockHistoryModal";
 import StockAdjustmentModal from "@/components/StockAdjustmentModal";
-import { useAuth } from "../../contexts/AuthContext";
 
 export default function ProductData() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, isOwner } = useAuth();
+  const canViewBasePrice = isOwner;
   const [products, setProducts] = useState([]);
   const [expandedProduct, setExpandedProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -421,8 +421,8 @@ export default function ProductData() {
                               <th className="px-3 py-2">Gambar</th>
                               <th className="px-3 py-2">Nama Varian</th>
                               <th className="px-3 py-2">SKU</th>
-                              <th className="px-3 py-2">Harga Jual</th>
                               {canViewBasePrice && (<th className="px-3 py-2">Harga Modal</th>)}
+                              <th className="px-3 py-2">Harga Jual</th>
                               {canViewBasePrice && (<th className="px-3 py-2">Margin</th>)}
                               <th className="px-3 py-2">Stok</th>
                               <th className="px-3 py-2">Status</th>
@@ -457,12 +457,12 @@ export default function ProductData() {
                                   </td>
                                   <td className="px-3 py-2">{variant.name || variant.variant_label}</td>
                                   <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
-                                  <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2 text-gray-600">
                                       {variant.base_price > 0 ? formatCurrency(variant.base_price) : '-'}
                                     </td>
                                   )}
+                                  <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2">
                                       {variant.base_price > 0 ? (
@@ -594,5 +594,3 @@ export default function ProductData() {
     </DashboardLayout>
   );
 }
-const currentUser = AuthAPI.getUser();
-const canViewBasePrice = currentUser?.role_id === 1;

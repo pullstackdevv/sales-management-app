@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import axios from "axios";
+import api from "../../api/axios";
 import Swal from "sweetalert2";
 
 export default function AddOrder() {
@@ -59,6 +60,31 @@ export default function AddOrder() {
     
     // Error states
     const [errors, setErrors] = useState({});
+    const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
+    const [newCustomer, setNewCustomer] = useState({
+        full_name: "",
+        email: "",
+        phone: "",
+        line_id: "",
+        other_contact: "",
+        category: "Pelanggan"
+    });
+    const [newAddress, setNewAddress] = useState({
+        label: "Rumah",
+        recipient_name: "",
+        recipient_phone: "",
+        is_dropship: false,
+        province: "",
+        city: "",
+        district: "",
+        postal_code: "",
+        address_detail: "",
+        is_default: true
+    });
+    const [newCustErrors, setNewCustErrors] = useState({});
+    const [cityQuery, setCityQuery] = useState("");
+    const [cityResults, setCityResults] = useState([]);
+    const [searchingCity, setSearchingCity] = useState(false);
 
     // Fetch customers dari API
     const fetchCustomers = async (search = '') => {
@@ -73,6 +99,90 @@ export default function AddOrder() {
             console.error('Error fetching customers:', error);
         } finally {
             setLoading(prev => ({ ...prev, customers: false }));
+        }
+    };
+
+    const validateNewCustomer = () => {
+        const e = {};
+        if (!newCustomer.full_name.trim()) e.full_name = 'Nama lengkap wajib diisi';
+        if (!newCustomer.phone.trim()) e.phone = 'Nomor telepon wajib diisi';
+        else if (!/^08[0-9]{8,11}$/.test(newCustomer.phone)) e.phone = 'Format nomor telepon tidak valid';
+        if (!newAddress.district.trim() || !newAddress.city.trim() || !newAddress.province.trim()) {
+            e.city = 'Pilih kecamatan dari hasil pencarian';
+        }
+        if (!newAddress.address_detail.trim()) e.address_detail = 'Alamat lengkap wajib diisi';
+        if (newAddress.postal_code && !/^[0-9]{5}$/.test(newAddress.postal_code)) e.postal_code = 'Kode pos harus 5 digit angka';
+        setNewCustErrors(e);
+        return Object.keys(e).length === 0;
+    };
+
+    const submitNewCustomer = async () => {
+        if (!validateNewCustomer()) return;
+        const payload = {
+            name: newCustomer.full_name,
+            email: newCustomer.email || null,
+            phone: newCustomer.phone,
+            line_id: newCustomer.line_id || null,
+            other_contact: newCustomer.other_contact || null,
+            category: newCustomer.category,
+            addresses: [{
+                label: newAddress.label,
+                recipient_name: newAddress.recipient_name || newCustomer.full_name,
+                recipient_phone: newAddress.recipient_phone || newCustomer.phone,
+                is_dropship: !!newAddress.is_dropship,
+                province: newAddress.province,
+                city: newAddress.city,
+                district: newAddress.district,
+                postal_code: newAddress.postal_code || null,
+                address_detail: newAddress.address_detail,
+                is_default: true
+            }]
+        };
+        try {
+            const res = await api.post('/customers', payload);
+            if (res.data.status === 'success') {
+                const cust = res.data.data;
+                setCustomers(prev => [cust, ...prev]);
+                setSelectedCustomer(cust);
+                setFormData(prev => ({ ...prev, customer_id: cust.id }));
+                const addrs = cust.addresses || [];
+                setCustomerAddresses(addrs);
+                const def = addrs.find(a => a.is_default) || addrs[0];
+                if (def) setFormData(prev => ({ ...prev, address_id: def.id }));
+                setSearchTerms(prev => ({ ...prev, customer: cust.name }));
+                setAddCustomerModalOpen(false);
+                setNewCustomer({ full_name: "", email: "", phone: "", line_id: "", other_contact: "", category: "Pelanggan" });
+                setNewAddress({ label: "Rumah", recipient_name: "", recipient_phone: "", is_dropship: false, province: "", city: "", district: "", postal_code: "", address_detail: "", is_default: true });
+                setNewCustErrors({});
+                Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Customer baru ditambahkan', timer: 1500, showConfirmButton: false });
+            }
+        } catch (error) {
+            let msg = 'Gagal menambahkan customer';
+            if (error.response?.data?.errors) {
+                setNewCustErrors(error.response.data.errors);
+                msg = 'Mohon periksa data yang dimasukkan';
+            } else if (error.response?.data?.message) {
+                msg = error.response.data.message;
+            }
+            Swal.fire({ icon: 'error', title: 'Error', text: msg });
+        }
+    };
+
+    const handleCitySearch = async (q) => {
+        setCityQuery(q);
+        if ((q || '').length < 2) { setCityResults([]); setSearchingCity(false); return; }
+        try {
+            setSearchingCity(true);
+            const r = await api.get('/wilayah/search-regencies', { params: { q } });
+            if (r.data.status === 'success') {
+                setCityResults(r.data.data);
+            } else {
+                setCityResults([]);
+            }
+        } catch (e) {
+            setCityResults([]);
+        } finally {
+            setSearchingCity(false);
         }
     };
 
@@ -462,6 +572,20 @@ export default function AddOrder() {
                                                 <div className="text-xs text-gray-400">{customer.phone}</div>
                                             </div>
                                         ))}
+                                    </div>
+                                )}
+                                {searchTerms.customer && customers.length === 0 && !selectedCustomer && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                                        <div className="p-3 text-sm text-gray-600">Tidak ada hasil</div>
+                                        <div className="p-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setAddCustomerModalOpen(true)}
+                                                className="w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                                            >
+                                                Tambah Customer Baru
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -926,6 +1050,71 @@ export default function AddOrder() {
                     </div>
                 </div>
             </div>
+            {addCustomerModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold">Tambah Customer</h3>
+                            <button onClick={() => setAddCustomerModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                                <Icon icon="material-symbols:close" className="text-xl" />
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm font-medium">Kategori</label>
+                                <select className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.category ? 'border-red-500' : 'border-gray-300'}`} value={newCustomer.category} onChange={(e) => setNewCustomer({ ...newCustomer, category: e.target.value })}>
+                                    <option value="Pelanggan">Pelanggan</option>
+                                    <option value="Reseller">Reseller</option>
+                                    <option value="Dropshipper">Dropshipper</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Nama Lengkap</label>
+                                <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.full_name ? 'border-red-500' : 'border-gray-300'}`} value={newCustomer.full_name} onChange={(e) => { setNewCustomer({ ...newCustomer, full_name: e.target.value }); setNewAddress({ ...newAddress, recipient_name: e.target.value }); }} placeholder="Masukkan nama lengkap" />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">No. HP</label>
+                                <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.phone ? 'border-red-500' : 'border-gray-300'}`} value={newCustomer.phone} onChange={(e) => { setNewCustomer({ ...newCustomer, phone: e.target.value }); setNewAddress({ ...newAddress, recipient_phone: e.target.value }); }} placeholder="081234567890" />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Email</label>
+                                <input type="email" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.email ? 'border-red-500' : 'border-gray-300'}`} value={newCustomer.email} onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })} placeholder="opsional" />
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <label className="text-sm font-medium">Cari Kecamatan/Kota</label>
+                            <div className="relative city-search-container">
+                                <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.city ? 'border-red-500' : 'border-gray-300'}`} value={cityQuery} onChange={(e) => handleCitySearch(e.target.value)} placeholder="Ketik minimal 2 huruf" />
+                                {searchingCity && <div className="absolute right-3 top-2.5"><Icon icon="eos-icons:loading" className="w-4 h-4 animate-spin" /></div>}
+                                {cityResults.length > 0 && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        {cityResults.map((c) => (
+                                            <div key={`${c.regency_code}-${c.district_code}`} onClick={() => { setCityQuery(c.name); setNewAddress({ ...newAddress, district: c.district_name || '', city: c.regency_name, province: c.province_name }); setCityResults([]); }} className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                <div className="font-medium text-sm">{c.name}</div>
+                                                <div className="text-xs text-gray-500">{c.regency_name}, {c.province_name}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm font-medium">Alamat Lengkap</label>
+                                <textarea rows="3" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.address_detail ? 'border-red-500' : 'border-gray-300'}`} value={newAddress.address_detail} onChange={(e) => setNewAddress({ ...newAddress, address_detail: e.target.value })} placeholder="Nama jalan, RT/RW, patokan" />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Kode Pos</label>
+                                <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.postal_code ? 'border-red-500' : 'border-gray-300'}`} value={newAddress.postal_code} onChange={(e) => setNewAddress({ ...newAddress, postal_code: (e.target.value || '').replace(/\D/g, '').slice(0,5) })} placeholder="opsional" />
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-4">
+                            <button type="button" onClick={() => setAddCustomerModalOpen(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">Batal</button>
+                            <button type="button" onClick={submitNewCustomer} className="flex-1 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Simpan Customer</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

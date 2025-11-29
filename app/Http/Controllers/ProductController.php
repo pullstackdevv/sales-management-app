@@ -331,6 +331,7 @@ class ProductController extends Controller
             }
 
             if (isset($validated['variants'])) {
+                $isOwner = Auth::user()->roles()->where('name', 'owner')->exists();
                 // Delete variants that are not in the request
                 $variantIds = collect($validated['variants'])->pluck('id')->filter();
                 $product->variants()->whereNotIn('id', $variantIds)->delete();
@@ -360,7 +361,7 @@ class ProductController extends Controller
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
                             'price' => $variant['price'],
-                            'base_price' => $variant['base_price'],
+                            'base_price' => $isOwner ? $variant['base_price'] : $variantModel->base_price,
                             'discount_price' => $variant['discount_price'] ?? null,
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
@@ -387,7 +388,7 @@ class ProductController extends Controller
                             'variant_label' => $variant['variant_label'],
                             'sku' => $variant['sku'],
                             'price' => $variant['price'],
-                            'base_price' => $variant['base_price'],
+                            'base_price' => $isOwner ? $variant['base_price'] : 0,
                             'discount_price' => $variant['discount_price'] ?? null,
                             'weight' => $variant['weight'] ?? null,
                             'is_active' => $variant['is_active'] ?? true,

@@ -484,7 +484,7 @@ export default function ProductAdd() {
                             value={formatRibuan(variant.stock)}
                             onChange={(e) => updateVariant(index, 'stock', parseRibuan(e.target.value))}
                             onFocus={() => { if (variant.stock === 0) updateVariant(index, 'stock', ''); }}
-                            required
+                            
                           />
                           {errors[`variants.${index}.stock`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.stock`][0]}</p>

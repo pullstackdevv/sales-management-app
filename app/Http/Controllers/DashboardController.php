@@ -9,6 +9,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
@@ -18,6 +19,12 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         try {
+            if (!Auth::user()->hasPermission('dashboard.view')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized. You do not have permission to view dashboard.'
+                ], 403);
+            }
             // Get today's date
             $today = Carbon::today();
             

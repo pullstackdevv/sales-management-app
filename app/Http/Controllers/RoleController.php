@@ -14,6 +14,7 @@ class RoleController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        
         $roles = Role::withCount('users')
             ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%");

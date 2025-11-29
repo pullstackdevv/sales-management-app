@@ -6,13 +6,13 @@ const SidebarContent = [
         icon: "solar:widget-add-line-duotone",
         id: uniqueId(),
         url: "/cms/dashboard",
-        permission: "dashboard",
+        permission: "dashboard.view",
     },
     {
         name: "Order",
         icon: "solar:cart-outline",
         id: uniqueId(),
-        permission: "orders",
+        permission: "orders.view",
         children: [
             {
                 name: "Semua order",
@@ -44,7 +44,7 @@ const SidebarContent = [
         name: "Produk",
         icon: "solar:box-outline",
         id: uniqueId(),
-        permission: "products",
+        permission: "products.view",
         children: [
             {
                 name: "Daftar Produk",
@@ -65,13 +65,13 @@ const SidebarContent = [
         icon: "solar:clipboard-check-outline",
         id: uniqueId(),
         url: "/cms/stock-opname/data",
-        permission: "stock",
+        permission: "stock.view",
     },
     {
         name: "Voucher",
         icon: "solar:ticket-outline",
         id: uniqueId(),
-        permission: "vouchers",
+        permission: "vouchers.view",
         children: [
             {
                 name: "Daftar Voucher",
@@ -91,7 +91,7 @@ const SidebarContent = [
         name: "Promosi",
         icon: "solar:tag-price-outline",
         id: uniqueId(),
-        permission: "promotions",
+        permission: "promotions.view",
         children: [
             {
                 name: "Daftar Promosi",
@@ -112,20 +112,20 @@ const SidebarContent = [
         icon: "flowbite:users-group-outline",
         id: uniqueId(),
         url: "/cms/customer/data",
-        permission: "customers",
+        permission: "customers.view",
     },
     {
         name: "Expense",
         icon: "solar:money-bag-outline",
         id: uniqueId(),
         url: "/cms/expense",
-        permission: "expenses",
+        permission: "expenses.view",
     },
     {
         name: "Report",
         icon: "solar:chart-outline",
         id: uniqueId(),
-        permission: "reports",
+        permission: "reports.view",
         children: [
             {
                 name: "Grafik Penjualan",
@@ -162,14 +162,14 @@ const SidebarContent = [
         icon: "solar:cpu-outline",
         id: uniqueId(),
         url: "/cms/analyzer",
-        permission: "reports",
+        permission: "reports.analyzer",
     },
     {
         name: "Setting",
         icon: "solar:settings-outline",
         id: uniqueId(),
         url: "/cms/settings",
-        permission: "settings",
+        permission: "settings.view",
     },
 ];
 

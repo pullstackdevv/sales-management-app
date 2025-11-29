@@ -20,6 +20,12 @@ class ProductController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        if (!Auth::user()->hasPermission('products.view')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to view products.'
+            ], 403);
+        }
         $products = Product::with(['variants', 'categories'])
             ->when($request->search, function($query, $search) {
                 $query->where('name', 'like', "%{$search}%")

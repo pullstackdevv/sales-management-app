@@ -27,6 +27,12 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        if (!Auth::user()->hasPermission('orders.view')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to view orders.'
+            ], 403);
+        }
         $orders = Order::with(['customer', 'address', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {

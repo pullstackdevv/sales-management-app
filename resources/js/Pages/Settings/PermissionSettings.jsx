@@ -30,8 +30,24 @@ export default function PermissionSettings() {
     }
   };
 
-  // Get unique modules
-  const modules = [...new Set(permissions.map((p) => p.module))].sort();
+  // Define desired module order
+  const moduleOrder = [
+    "dashboard",
+    "orders",
+    "products",
+    "stock",
+    "vouchers",
+    "promotions",
+    "customers",
+    "expenses",
+    "reports",
+    "settings",
+  ];
+
+  // Get unique modules from permissions and sort by custom order
+  const modules = moduleOrder.filter((module) =>
+    permissions.some((p) => p.module === module)
+  );
 
   // Filter permissions
   const filteredPermissions = permissions.filter((permission) => {
@@ -215,7 +231,11 @@ export default function PermissionSettings() {
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(groupedPermissions).map(([module, perms]) => (
+          {modules
+            .filter((module) => groupedPermissions[module] && groupedPermissions[module].length > 0)
+            .map((module) => {
+              const perms = groupedPermissions[module];
+              return (
             <div
               key={module}
               className="bg-white border border-gray-200 rounded-lg overflow-hidden"
@@ -276,7 +296,8 @@ export default function PermissionSettings() {
                 </div>
               </div>
             </div>
-          ))}
+              );
+            })}
         </div>
       )}
     </div>

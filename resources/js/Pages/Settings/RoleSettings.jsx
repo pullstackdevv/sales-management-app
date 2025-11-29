@@ -42,6 +42,20 @@ export default function RoleSettings() {
     }
   };
 
+  // Desired module order for permissions grouping
+  const moduleOrder = [
+    'dashboard',
+    'orders',
+    'products',
+    'stock',
+    'vouchers',
+    'promotions',
+    'customers',
+    'expenses',
+    'reports',
+    'settings',
+  ];
+
   const resetForm = () => {
     setFormData({
       role: '',
@@ -333,35 +347,35 @@ export default function RoleSettings() {
                   Permissions ({formData.permissions.length} selected)
                 </label>
                 <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
-                  {/* Group by module */}
-                  {Object.entries(
-                    availablePermissions.reduce((acc, perm) => {
-                      if (!acc[perm.module]) acc[perm.module] = [];
-                      acc[perm.module].push(perm);
-                      return acc;
-                    }, {})
-                  ).map(([module, perms]) => (
-                    <div key={module} className="border-b border-gray-200 last:border-b-0">
-                      <div className="bg-gray-50 px-4 py-2 font-medium text-sm text-gray-700 capitalize">
-                        {module} ({perms.length})
+                  {/* Group by module with custom order */}
+                  {moduleOrder
+                    .map((module) => ({
+                      module,
+                      perms: availablePermissions.filter((perm) => perm.module === module),
+                    }))
+                    .filter(({ perms }) => perms.length > 0)
+                    .map(({ module, perms }) => (
+                      <div key={module} className="border-b border-gray-200 last:border-b-0">
+                        <div className="bg-gray-50 px-4 py-2 font-medium text-sm text-gray-700 capitalize">
+                          {module} ({perms.length})
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 p-4">
+                          {perms.map((permission) => (
+                            <label key={permission.name} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={formData.permissions.includes(permission.name)}
+                                onChange={() => handlePermissionChange(permission.name)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">
+                                {permission.display_name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 p-4">
-                        {perms.map((permission) => (
-                          <label key={permission.name} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                            <input
-                              type="checkbox"
-                              checked={formData.permissions.includes(permission.name)}
-                              onChange={() => handlePermissionChange(permission.name)}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-700">
-                              {permission.display_name}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
             </div>

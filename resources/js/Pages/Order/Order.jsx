@@ -82,6 +82,7 @@ export default function Order() {
       const response = await api.get(url);
       const responseData = response.data.data;
       const ordersData = responseData.data || [];
+      console.log(ordersData)
       
       // Set pagination data
       setPagination({
@@ -116,6 +117,7 @@ export default function Order() {
           date: order.date, // Use pre-formatted WIB date from backend
           ordered_at: order.ordered_at, // Add raw date for PaymentHistoryModal
           customer: order.customer?.name || 'N/A',
+          recipient_name: order.address?.recipient_name || order.customer?.name || 'N/A',
           admin: 'Admin', // Default admin name
           status: getStatusLabel(order.status),
           raw_status: order.status, // Add raw status for timeline logic
@@ -133,6 +135,7 @@ export default function Order() {
           sales_channel: order.sales_channel?.code || 'WEBSITE',
           // Add shipping object with ID for update operations
           shipping: order.shipping,
+          is_dropship: order.address?.is_dropship,
           // Add payment bank details for detailed display
           payment_bank: paymentBank,
           // Add printed_at for print status tracking

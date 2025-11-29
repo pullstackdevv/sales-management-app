@@ -23,7 +23,7 @@ export default function ProductData() {
   const fileInputRef = useRef(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
-  
+
   // Modal states
   const [stockHistoryModal, setStockHistoryModal] = useState({ isOpen: false, variant: null });
   const [stockAdjustmentModal, setStockAdjustmentModal] = useState({ isOpen: false, variant: null });
@@ -38,7 +38,7 @@ export default function ProductData() {
         ...(searchTerm && { search: searchTerm }),
         ...(categoryFilter && { category: categoryFilter })
       };
-      
+
       const response = await api.get("/products", { params });
       setProducts(response.data.data.data);
       setPagination(response.data.data);
@@ -275,16 +275,16 @@ export default function ProductData() {
                 (sum, v) => sum + v.stock,
                 0
               );
-              const minPrice = product.variants?.length > 0 
+              const minPrice = product.variants?.length > 0
                 ? Math.min(...product.variants.map(v => v.price))
                 : 0;
-              const maxPrice = product.variants?.length > 0 
+              const maxPrice = product.variants?.length > 0
                 ? Math.max(...product.variants.map(v => v.price))
                 : 0;
-              const minBasePrice = product.variants?.length > 0 
+              const minBasePrice = product.variants?.length > 0
                 ? Math.min(...product.variants.map(v => v.base_price || 0))
                 : 0;
-              const maxBasePrice = product.variants?.length > 0 
+              const maxBasePrice = product.variants?.length > 0
                 ? Math.max(...product.variants.map(v => v.base_price || 0))
                 : 0;
 
@@ -293,8 +293,8 @@ export default function ProductData() {
                   <div className="grid grid-cols-12 items-center px-4 py-3 text-sm hover:bg-gray-50">
                     <div className="col-span-1">
                       {product.image ? (
-                        <img 
-                          src={`/storage/${product.image}`} 
+                        <img
+                          src={`/storage/${product.image}`}
                           alt={product.name}
                           className="w-12 h-12 object-cover rounded-md"
                           onError={(e) => {
@@ -303,7 +303,7 @@ export default function ProductData() {
                           }}
                         />
                       ) : null}
-                      <div 
+                      <div
                         className={`w-12 h-12 bg-gray-200 rounded-md flex items-center justify-center ${product.image ? 'hidden' : 'flex'}`}
                       >
                         <Icon icon="mdi:image-outline" className="text-gray-400" />
@@ -314,14 +314,14 @@ export default function ProductData() {
                       <div className="space-y-1">
                         <p className="text-gray-800 font-medium">
                           {product.variants?.length > 0 ? (
-                            minPrice === maxPrice 
+                            minPrice === maxPrice
                               ? formatCurrency(minPrice)
                               : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`
                           ) : 'Belum ada harga'}
                         </p>
                         {canViewBasePrice && minBasePrice > 0 && (
                           <p className="text-gray-500 text-xs">
-                            Modal: {minBasePrice === maxBasePrice 
+                            Modal: {minBasePrice === maxBasePrice
                               ? formatCurrency(minBasePrice)
                               : `${formatCurrency(minBasePrice)} - ${formatCurrency(maxBasePrice)}`
                             }
@@ -329,7 +329,7 @@ export default function ProductData() {
                         )}
                       </div>
                       {product.description && (
-                        <div 
+                        <div
                           className="text-xs text-gray-500 mt-1 line-clamp-2 prose prose-sm max-w-none"
                           dangerouslySetInnerHTML={{ __html: product.description }}
                         />
@@ -337,9 +337,8 @@ export default function ProductData() {
                     </div>
                     <div className="col-span-1">
                       <span
-                        className={`text-xs font-semibold ${
-                          totalStock === 0 ? "text-red-500" : "text-green-600"
-                        }`}
+                        className={`text-xs font-semibold ${totalStock === 0 ? "text-red-500" : "text-green-600"
+                          }`}
                       >
                         {totalStock === 0
                           ? "Stok habis"
@@ -352,9 +351,19 @@ export default function ProductData() {
                       </span>
                     </div>
                     <div className="col-span-2">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        {product.category || 'Tanpa kategori'}
-                      </span>
+                      {Array.isArray(product.categories) && product.categories.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {product.categories.map((c) => (
+                            <span key={c.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                              {c.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {product.category || 'Tanpa kategori'}
+                        </span>
+                      )}
                     </div>
                     <div className="col-span-1">
                       <span className="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">
@@ -362,11 +371,10 @@ export default function ProductData() {
                       </span>
                     </div>
                     <div className="col-span-1">
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        product.is_storefront 
-                          ? 'bg-green-100 text-green-600' 
+                      <span className={`text-xs px-2 py-1 rounded ${product.is_storefront
+                          ? 'bg-green-100 text-green-600'
                           : 'bg-gray-100 text-gray-600'
-                      }`}>
+                        }`}>
                         {product.is_storefront ? 'Ya' : 'Tidak'}
                       </span>
                     </div>
@@ -392,7 +400,7 @@ export default function ProductData() {
                         </Link>
                       )}
                       {hasPermission('products.delete') && (
-                        <button 
+                        <button
                           className="hover:text-red-600 transition-colors"
                           onClick={() => deleteProduct(product.id)}
                           title="Hapus produk"
@@ -423,16 +431,16 @@ export default function ProductData() {
                           </thead>
                           <tbody>
                             {product.variants.map((variant) => {
-                              const profitMargin = variant.base_price > 0 
+                              const profitMargin = variant.base_price > 0
                                 ? (((variant.price - variant.base_price) / variant.base_price) * 100).toFixed(1)
                                 : 0;
-                              
+
                               return (
                                 <tr key={variant.id} className="border-b">
                                   <td className="px-3 py-2">
                                     {variant.image ? (
-                                      <img 
-                                        src={`/storage/${variant.image}`} 
+                                      <img
+                                        src={`/storage/${variant.image}`}
                                         alt={variant.variant_label}
                                         className="w-10 h-10 object-cover rounded border"
                                         onError={(e) => {
@@ -441,7 +449,7 @@ export default function ProductData() {
                                         }}
                                       />
                                     ) : null}
-                                    <div 
+                                    <div
                                       className={`w-10 h-10 bg-gray-200 rounded border flex items-center justify-center ${variant.image ? 'hidden' : 'flex'}`}
                                     >
                                       <Icon icon="mdi:image-outline" className="text-gray-400 text-sm" />
@@ -458,11 +466,10 @@ export default function ProductData() {
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2">
                                       {variant.base_price > 0 ? (
-                                        <span className={`text-xs px-2 py-1 rounded ${
-                                          profitMargin >= 30 ? 'bg-green-100 text-green-800' :
-                                          profitMargin >= 15 ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-red-100 text-red-800'
-                                        }`}>
+                                        <span className={`text-xs px-2 py-1 rounded ${profitMargin >= 30 ? 'bg-green-100 text-green-800' :
+                                            profitMargin >= 15 ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-red-100 text-red-800'
+                                          }`}>
                                           +{profitMargin}%
                                         </span>
                                       ) : (
@@ -473,9 +480,8 @@ export default function ProductData() {
                                   <td className="px-3 py-2">
                                     <button
                                       onClick={() => openStockHistoryModal({ ...variant, product })}
-                                      className={`font-semibold hover:underline cursor-pointer ${
-                                        variant.stock === 0 ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'
-                                      }`}
+                                      className={`font-semibold hover:underline cursor-pointer ${variant.stock === 0 ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'
+                                        }`}
                                       title="Klik untuk melihat riwayat stok"
                                     >
                                       {variant.stock}
@@ -528,6 +534,29 @@ export default function ProductData() {
                 <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setImportFile(e.target.files?.[0] || null)} className="w-full" />
                 <p className="text-xs text-gray-500 mt-1">Format yang didukung: Excel (.xlsx, .xls) atau CSV (.csv)</p>
               </div>
+              <div className="flex items-center justify-between bg-gray-50 border rounded-lg p-3">
+                <p className="text-sm text-gray-700">Unduh template impor produk (Excel)</p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.get('/products/import-template', { responseType: 'blob' });
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = 'product_import_template.xlsx';
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                      Swal.fire({ icon: 'error', title: 'Gagal', text: 'Tidak dapat mengunduh template' });
+                    }
+                  }}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Download Template
+                </button>
+              </div>
               <div className="border rounded-lg p-4 bg-blue-50">
                 <p className="font-medium text-sm mb-2">Format File yang Diharapkan:</p>
                 <ul className="text-xs text-gray-700 space-y-1">
@@ -547,14 +576,14 @@ export default function ProductData() {
           </div>
         </div>
       )}
-      
+
       {/* Stock History Modal */}
       <StockHistoryModal
         isOpen={stockHistoryModal.isOpen}
         onClose={closeStockHistoryModal}
         variant={stockHistoryModal.variant}
       />
-      
+
       {/* Stock Adjustment Modal */}
       <StockAdjustmentModal
         isOpen={stockAdjustmentModal.isOpen}
@@ -565,5 +594,5 @@ export default function ProductData() {
     </DashboardLayout>
   );
 }
-  const currentUser = AuthAPI.getUser();
-  const canViewBasePrice = currentUser?.role_id === 1;
+const currentUser = AuthAPI.getUser();
+const canViewBasePrice = currentUser?.role_id === 1;

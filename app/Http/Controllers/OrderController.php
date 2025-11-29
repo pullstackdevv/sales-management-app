@@ -33,7 +33,7 @@ class OrderController extends Controller
                 'message' => 'Unauthorized. You do not have permission to view orders.'
             ], 403);
         }
-        $orders = Order::with(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
+        $orders = Order::with(['customer', 'address', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('order_number', 'like', "%{$search}%")
@@ -162,7 +162,8 @@ class OrderController extends Controller
             'payment_bank_id' => 'nullable|exists:payment_banks,id',
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
-            'proof_image' => 'nullable|string'
+            'proof_image' => 'nullable|string',
+            'is_dropship' => 'nullable|boolean'
         ]);
 
         try {
@@ -239,7 +240,8 @@ class OrderController extends Controller
                 'shipping_cost' => $validated['shipping_cost'],
                 'status' => $validated['status'] ?? 'pending',
                 'payment_status' => $validated['payment_status'] ?? 'pending',
-                'ordered_at' => now()
+                'ordered_at' => now(),
+                'is_dropship' => (bool)($validated['is_dropship'] ?? false)
             ]);
 
             // Create order items and update stock
@@ -339,7 +341,7 @@ class OrderController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $order->load(['customer', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel', 'voucher'])
+            'data' => $order->load(['customer', 'address', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel', 'voucher'])
         ]);
     }
 
@@ -369,7 +371,8 @@ class OrderController extends Controller
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
             'proof_image' => 'nullable|string',
-            'printed_at' => 'nullable|date'
+            'printed_at' => 'nullable|date',
+            'is_dropship' => 'nullable|boolean'
         ]);
 
         // Batasi edit order berdasarkan status dan payment gateway
@@ -401,6 +404,11 @@ class OrderController extends Controller
             // Update sales channel if provided
             if (isset($validated['sales_channel_id'])) {
                 $order->update(['sales_channel_id' => $validated['sales_channel_id']]);
+            }
+
+            // Update is_dropship if provided
+            if (array_key_exists('is_dropship', $validated)) {
+                $order->update(['is_dropship' => (bool)$validated['is_dropship']]);
             }
 
             // Update items if provided
@@ -894,7 +902,7 @@ class OrderController extends Controller
                         'name' => $shipping->courier->name
                     ],
                     'tracking_number' => $shipping->tracking_number,
-                    'shipped_at' => $shipping->shipped_at->toISOString()
+                    'shipped_at' => $shipping->shipped_at->setTimezone(config('app.timezone'))->toIso8601String()
                 ],
                 'order' => [
                     'id' => $order->id,

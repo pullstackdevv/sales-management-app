@@ -26,6 +26,7 @@ export default function AddCustomer() {
             label: "Rumah",
             recipient_name: "",
             recipient_phone: "",
+            is_dropship: false,
             province: "",
             city: "",
             district: "",
@@ -51,6 +52,21 @@ export default function AddCustomer() {
         // Clear error when user starts typing
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }));
+        }
+        // Auto-fill recipient fields in address when top-level fields change
+        if (field === 'full_name') {
+            setAddresses(prev => prev.map((addr, i) => (
+                i === activeAddressIndex || !addr.recipient_name
+                    ? { ...addr, recipient_name: value }
+                    : addr
+            )));
+        }
+        if (field === 'phone') {
+            setAddresses(prev => prev.map((addr, i) => (
+                i === activeAddressIndex || !addr.recipient_phone
+                    ? { ...addr, recipient_phone: value }
+                    : addr
+            )));
         }
     };
     
@@ -88,6 +104,7 @@ export default function AddCustomer() {
             label: "Alamat " + (addresses.length + 1),
             recipient_name: formData.full_name,
             recipient_phone: formData.phone,
+            is_dropship: false,
             province: "",
             city: "",
             district: "",
@@ -160,43 +177,18 @@ export default function AddCustomer() {
             setShowCityDropdown(false);
             return;
         }
-        
         setSearchingCity(true);
-        
-        // Cancel previous request if exists
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        
-        // Create new abort controller
-        abortControllerRef.current = new AbortController();
-        
         try {
-            const response = await api.get('/wilayah/search-regencies', {
-                params: { q: query },
-                signal: abortControllerRef.current.signal
-            });
-            
+            const response = await api.get('/wilayah/search-regencies', { params: { q: query } });
             if (response.data.status === 'success') {
-                const enrichedResults = response.data.data.map(regency => ({
-                    name: regency.name,
-                    type: 'Kabupaten/Kota',
-                    regency_name: regency.name,
-                    province_name: regency.province_name,
-                    code: regency.code
-                }));
-                
-                setCityResults(enrichedResults);
+                setCityResults(response.data.data);
                 setShowCityDropdown(true);
             } else {
-                console.error('Error searching cities:', response.data.message);
                 setCityResults([]);
             }
         } catch (error) {
-            if (error.name !== 'AbortError') {
-                console.error('Error searching cities:', error);
-                setCityResults([]);
-            }
+            console.error('Error searching cities:', error);
+            setCityResults([]);
         } finally {
             setSearchingCity(false);
         }
@@ -206,6 +198,18 @@ export default function AddCustomer() {
     const handleCitySearch = (e) => {
         const query = e.target.value;
         setCityQuery(query);
+
+        setAddresses(prev => prev.map((addr, i) => (
+            i === activeAddressIndex
+                ? { ...addr, district: "", city: "", province: "" }
+                : addr
+        )));
+        setErrors(prev => ({
+            ...prev,
+            [`city_${activeAddressIndex}`]: null,
+            [`district_${activeAddressIndex}`]: null,
+            [`province_${activeAddressIndex}`]: null
+        }));
         
         // Clear previous timeout
         if (searchTimeoutRef.current) {
@@ -220,17 +224,20 @@ export default function AddCustomer() {
     
     // Select city from dropdown
     const selectCity = (city) => {
-        setCityQuery(`${city.name}, ${city.regency_name}`);
-        handleAddressChange('city', city.name);
-        handleAddressChange('district', city.name);
+        setCityQuery(city.name);
+        handleAddressChange('district', city.district_name || '');
+        handleAddressChange('city', city.regency_name);
         handleAddressChange('province', city.province_name);
         setShowCityDropdown(false);
         setCityResults([]);
-        
+
         // Clear city error
-        if (errors.city) {
-            setErrors(prev => ({ ...prev, city: null }));
-        }
+        setErrors(prev => ({
+            ...prev,
+            [`city_${activeAddressIndex}`]: null,
+            [`district_${activeAddressIndex}`]: null,
+            [`province_${activeAddressIndex}`]: null
+        }));
     };
     
     // Close dropdown when clicking outside
@@ -276,8 +283,10 @@ export default function AddCustomer() {
         const addressesToValidate = addresses.filter(hasAnyAddressData);
         if (addressesToValidate.length > 0) {
             addressesToValidate.forEach((address, index) => {
-                if (!address.city?.trim()) {
-                    newErrors[`city_${index}`] = 'Kota/Kecamatan wajib diisi';
+                if (!address.district?.trim() || !address.city?.trim() || !address.province?.trim()) {
+                    newErrors[`district_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
+                    newErrors[`city_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
+                    newErrors[`province_${index}`] = 'Silakan cari dan pilih kecamatan dari dropdown';
                 }
                 // Postal code optional: only validate format if provided
                 if (address.postal_code?.trim()) {
@@ -321,6 +330,8 @@ export default function AddCustomer() {
             };
             const addressLabel = (key) => {
                 if (key.startsWith('city_')) return 'Alamat: Kota/Kecamatan';
+                if (key.startsWith('district_')) return 'Alamat: Kota/Kecamatan';
+                if (key.startsWith('province_')) return 'Alamat: Kota/Kecamatan';
                 if (key.startsWith('postal_code_')) return 'Alamat: Kode Pos';
                 if (key.startsWith('address_detail_')) return 'Alamat: Alamat Lengkap';
                 return key;
@@ -353,19 +364,20 @@ export default function AddCustomer() {
                 category: formData.category,
                 ...(addressesToSend.length > 0
                     ? {
-                        addresses: addressesToSend.map(address => ({
-                            label: address.label,
-                            recipient_name: address.recipient_name || formData.full_name,
-                            recipient_phone: address.recipient_phone || formData.phone,
-                            province: address.province,
-                            city: address.city,
-                            district: address.district,
-                            postal_code: address.postal_code || null,
-                            address_detail: address.address_detail,
-                            is_default: address.is_default,
-                        }))
-                      }
-                    : {})
+                addresses: addressesToSend.map(address => ({
+                    label: address.label,
+                    recipient_name: address.recipient_name || formData.full_name,
+                    recipient_phone: address.recipient_phone || formData.phone,
+                    is_dropship: !!address.is_dropship,
+                    province: address.province,
+                    city: address.city,
+                    district: address.district,
+                    postal_code: address.postal_code || null,
+                    address_detail: address.address_detail,
+                    is_default: address.is_default,
+                }))
+              }
+                : {})
             };
             console.log(customerData);
             const response = await api.post('/customers', customerData);
@@ -664,50 +676,100 @@ export default function AddCustomer() {
                                     </div>
                                 </div>
 
+                                <div className="flex items-center gap-2 mb-4">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={!!addresses[activeAddressIndex]?.is_dropship}
+                                        onChange={(e) => handleAddressChange('is_dropship', e.target.checked)}
+                                    />
+                                    <span className="text-sm">Alamat Pesanan dropship</span>
+                                </div>
+                                
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="relative city-search-container">
-                                        <label className="text-sm font-medium">
-                                            Kota/Kecamatan <span className="text-red-500">*</span>
+                                        <label className="text-sm font-medium text-gray-700 mb-2">
+                                            Cari Kecamatan/Kota <span className="text-red-500">*</span>
+                                            <span className="text-xs text-gray-500 ml-2">(Wajib pilih dari hasil pencarian)</span>
                                         </label>
-                                        <input
-                                            type="text"
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm pr-10 ${
-                                                errors[`city_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
-                                            }`}
-                                            placeholder="Cari Kota/Kecamatan..."
-                                            value={cityQuery}
-                                            onChange={handleCitySearch}
-                                            onFocus={() => setShowCityDropdown(true)}
-                                        />
-                                        {searchingCity ? (
-                                            <Icon
-                                                icon="mdi:loading"
-                                                className="absolute right-3 top-9 text-gray-400 animate-spin"
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                    errors[`city_${activeAddressIndex}`]
+                                                        ? 'border-red-500'
+                                                        : (addresses[activeAddressIndex]?.district && addresses[activeAddressIndex]?.city)
+                                                            ? 'border-green-500 bg-green-50'
+                                                            : 'border-gray-300'
+                                                }`}
+                                                placeholder="Ketik nama kecamatan atau kota..."
+                                                value={cityQuery}
+                                                onChange={handleCitySearch}
+                                                onFocus={() => setShowCityDropdown(true)}
+                                                autoComplete="off"
                                             />
-                                        ) : (
-                                            <Icon
-                                                icon="mdi:magnify"
-                                                className="absolute right-3 top-9 text-gray-400"
-                                            />
-                                        )}
-                                        
-                                        {/* City dropdown */}
+                                            {(addresses[activeAddressIndex]?.district && addresses[activeAddressIndex]?.city) && (
+                                                <div className="absolute right-3 top-2.5 text-green-600">
+                                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            {searchingCity && !(addresses[activeAddressIndex]?.district && addresses[activeAddressIndex]?.city) && (
+                                                <div className="absolute right-3 top-2.5 text-gray-400">
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         {showCityDropdown && cityResults.length > 0 && (
-                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                                                 {cityResults.map((city, index) => (
-                                                    <div
+                                                    <button
                                                         key={index}
-                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                                        type="button"
                                                         onClick={() => selectCity(city)}
+                                                        className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
                                                     >
-                                                        <div className="font-medium">{city.name}</div>
-                                                        <div className="text-gray-500 text-xs">
-                                                            {city.type}, {city.regency_name}, {city.province_name}
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`px-2 py-1 text-xs rounded ${city.district_name ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                                                {city.district_name ? 'Kecamatan' : 'Kota/Kabupaten'}
+                                                            </span>
+                                                            <span className="font-medium">{city.name}</span>
                                                         </div>
-                                                    </div>
+                                                        <div className="text-sm text-gray-500 mt-1">
+                                                            {city.district_name ? `${city.regency_name}, ${city.province_name}` : city.province_name}
+                                                        </div>
+                                                    </button>
                                                 ))}
                                             </div>
                                         )}
+
+                                        {(addresses[activeAddressIndex]?.district || addresses[activeAddressIndex]?.city) && (
+                                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
+                                                <div className="flex items-start gap-2">
+                                                    <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                    </svg>
+                                                    <div className="flex-1">
+                                                        <h4 className="text-sm font-medium text-green-900 mb-2">✓ Lokasi Berhasil Dipilih:</h4>
+                                                        <div className="text-sm text-green-800 space-y-1">
+                                                            {addresses[activeAddressIndex]?.district && (
+                                                                <div><strong>Kecamatan:</strong> {addresses[activeAddressIndex]?.district}</div>
+                                                            )}
+                                                            {addresses[activeAddressIndex]?.city && (
+                                                                <div><strong>Kota/Kabupaten:</strong> {addresses[activeAddressIndex]?.city}</div>
+                                                            )}
+                                                            {addresses[activeAddressIndex]?.province && (
+                                                                <div><strong>Provinsi:</strong> {addresses[activeAddressIndex]?.province}</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {errors[`city_${activeAddressIndex}`] && (
                                             <p className="text-red-500 text-xs mt-1">{errors[`city_${activeAddressIndex}`]}</p>
                                         )}

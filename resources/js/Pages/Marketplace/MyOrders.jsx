@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/helpers';
 import checkoutSession from '@/utils/checkoutSession';
 import Swal from 'sweetalert2';
 import api from '@/api/axios';
+import axios from 'axios';
 
 const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +44,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         }
     }, []);
 
-    // Fetch orders based on customer_id from checkout session
+    // Fetch orders for external user via public track-orders search
     useEffect(() => {
         const fetchOrders = async () => {
             try {
@@ -51,22 +52,23 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
 
                 const sessionData = checkoutSession.get();
                 const customer = sessionData?.customer || {};
-                const customerId = customer.customer_id ?? sessionData?.customer_id ?? null;
+                const searchBase = (searchQuery && searchQuery.trim().length >= 3)
+                    ? searchQuery.trim()
+                    : (customer.phone || customer.email || '');
 
-                if (!customerId) {
+                if (!searchBase || searchBase.trim().length < 3) {
                     setOrders([]);
                     setPagination({ current_page: 1, last_page: 1, total: 0 });
                     return;
                 }
 
-                const response = await api.get('/order-histories', {
-                    params: {
-                        customer_id: customerId,
+                const response = await axios.post(`/track-orders/search?page=${currentPage}`,
+                    {
+                        search_query: searchBase,
                         status: statusFilter !== 'all' ? statusFilter : undefined,
-                        search: searchQuery || undefined,
-                        page: currentPage,
                     },
-                });
+                    { headers: { 'Accept': 'application/json' } }
+                );
 
                 if (response.data.status === 'success') {
                     const data = response.data.data;
@@ -90,6 +92,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         if (!showCustomerForm) {
             fetchOrders();
         }
+        
     }, [searchQuery, statusFilter, currentPage, showCustomerForm]);
 
     const getStatusBadge = (status) => {
@@ -157,6 +160,19 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
 
     const isWebOrder = (order) => {
         return order?.payment_url && order.payment_url.trim() !== '';
+    };
+
+    const getPaymentMethodName = (order) => {
+        if (order?.payments && order.payments.length > 0) {
+            return order.payments[0]?.payment_bank?.name || 'Manual Transfer';
+        }
+        if (isWebOrder(order)) {
+            const url = order.payment_url.toLowerCase();
+            if (url.includes('midtrans')) return 'Midtrans';
+            if (url.includes('xendit')) return 'Xendit';
+            return 'Online Payment';
+        }
+        return 'Manual Transfer';
     };
 
     const handleCheckPaymentStatus = async (order) => {
@@ -277,7 +293,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         setVerificationError('');
         setPendingCustomer(null);
     };
-
+console.log(orders)
     // Show customer data form if needed
     if (showCustomerForm) {
         return (
@@ -649,7 +665,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                         <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Kurir</p>
                                                         <p className="flex justify-between mb-1">
                                                             <span className="text-gray-700">
-                                                                {order.shipping?.courier?.name || 'Kurir - Reguler'}
+                                                                {order.shipping?.courier?.name || 'Kurir - Reguler'} - {order.shipping.courier_rate?.service_type || 'Reguler'}
                                                             </span>
                                                             <span className="font-medium">
                                                                 {formatCurrency(order.shipping_cost || 0)}
@@ -663,11 +679,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                         )}
                                                         <p className="mt-3 text-xs font-semibold text-gray-500 uppercase mb-1">Metode Bayar</p>
                                                         <p className="flex justify-between">
-                                                            <span className="text-gray-700">
-                                                                {order.payments && order.payments.length > 0
-                                                                    ? (order.payments[0].payment_bank?.name || 'Manual Transfer')
-                                                                    : 'Tidak diketahui'}
-                                                            </span>
+                                                            <span className="text-gray-700">{getPaymentMethodName(order)}</span>
                                                         </p>
                                                         {isWebOrder(order) && (
                                                             <div className="mt-2 flex flex-wrap gap-3">
@@ -704,15 +716,15 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                         <p className="text-xs text-gray-600 mt-1 whitespace-pre-line">
                                                             {order.address ? (
                                                                 [
-                                                                    order.address.address_line_1,
-                                                                    order.address.address_line_2,
-                                                                    `${order.address.city || ''}${order.address.city && order.address.state ? ', ' : ''}${order.address.state || ''}`,
+                                                                    order.address.address_detail,
+                                                                    order.address.district,
+                                                                    `${order.address.city || ''}${order.address.city && order.address.province ? ', ' : ''}${order.address.province || ''}`,
                                                                     order.address.postal_code
                                                                 ].filter(Boolean).join('\n')
                                                             ) : '-'}
                                                         </p>
                                                         <p className="text-xs text-gray-600 mt-1">
-                                                            Telp: {order.customer?.phone || '-'}
+                                                            Telp: {order.address?.phone || order.customer?.phone || '-'}
                                                         </p>
                                                     </div>
 

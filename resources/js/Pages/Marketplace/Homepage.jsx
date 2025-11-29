@@ -30,27 +30,32 @@ const Homepage = () => {
     // Derive categories from loaded products (fallback to string/slug if available)
     const categories = useMemo(() => {
         const map = new Map();
-        // Always include "all"
-        map.set('all', { id: 'all', name: 'Semua' });
-
+        map.set('', { id: '', name: 'Semua' });
         products.forEach((p) => {
-            // Support various possible shapes from API
-            // e.g. p.category is string | { name, slug } | { name }
-            const catObj = p.category || p.product_category || null;
-            let id = null;
-            let name = null;
-            if (catObj && typeof catObj === 'object') {
-                id = catObj.slug || catObj.name || null;
-                name = catObj.name || catObj.slug || null;
-            } else if (typeof catObj === 'string') {
-                id = catObj;
-                name = catObj;
-            }
-            if (id && name && !map.has(id)) {
-                map.set(id, { id, name });
+            if (Array.isArray(p.categories)) {
+                p.categories.forEach((c) => {
+                    const id = c.id;
+                    const name = c.name;
+                    if (id != null && name && !map.has(id)) {
+                        map.set(id, { id, name });
+                    }
+                });
+            } else {
+                const catObj = p.category || p.product_category || null;
+                let id = null;
+                let name = null;
+                if (catObj && typeof catObj === 'object') {
+                    id = catObj.id || catObj.slug || catObj.name || null;
+                    name = catObj.name || catObj.slug || null;
+                } else if (typeof catObj === 'string') {
+                    id = catObj;
+                    name = catObj;
+                }
+                if (id && name && !map.has(id)) {
+                    map.set(id, { id, name });
+                }
             }
         });
-
         return Array.from(map.values());
     }, [products]);
 
@@ -61,7 +66,7 @@ const Homepage = () => {
                 page,
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
-                category: selectedCategory || undefined,
+                ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
                 sort: sortBy,
             };
             
@@ -90,7 +95,7 @@ const Homepage = () => {
                 page: 1,
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
-                category: selectedCategory || undefined,
+                ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
                 sort: sortBy,
             };
             
@@ -142,7 +147,7 @@ const Homepage = () => {
             page: 1,
             per_page: pagination.per_page,
             search: searchQuery || undefined,
-            category: selectedCategory || undefined,
+            ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
             sort: sortBy,
         };
         
@@ -179,7 +184,7 @@ const Homepage = () => {
             page: pagination.current_page,
             per_page: pagination.per_page,
             search: searchQuery || undefined,
-            category: selectedCategory || undefined,
+            ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
             sort: sortBy,
         };
         
@@ -437,6 +442,16 @@ const Homepage = () => {
                     <div className="p-2.5 sm:p-3 flex flex-col flex-grow">
                         {/* Product Name */}
                         <h3 className="text-xs sm:text-xs font-medium text-gray-900 mb-1.5 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors flex-grow">{product.name}</h3>
+                        {/* Categories */}
+                        {Array.isArray(product.categories) && product.categories.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-1">
+                                {product.categories.map((c) => (
+                                    <span key={c.id} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                        {c.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                         
                         {/* Price */}
                         <div className="flex flex-col gap-0.5">
@@ -486,6 +501,15 @@ const Homepage = () => {
                             <h3 className="text-base sm:text-sm font-medium text-gray-900 mb-2 sm:mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
                                 {product.name}
                             </h3>
+                            {Array.isArray(product.categories) && product.categories.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-1">
+                                    {product.categories.map((c) => (
+                                        <span key={c.id} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                            {c.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                             <div className="flex items-center gap-2">
                                 {variantInfo?.hasDiscount ? (
                                     <>

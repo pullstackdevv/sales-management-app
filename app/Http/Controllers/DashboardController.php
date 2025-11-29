@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -33,21 +34,24 @@ class DashboardController extends Controller
             $totalCustomers = Customer::count();
             $activeProducts = Product::where('is_active', true)->count();
             
-            // Calculate today's sales
             $todaySales = Order::whereDate('created_at', $today)
-                ->whereIn('status', ['paid', 'shipped'])
+                ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                 ->sum('total_price');
             
-            // Weekly sales chart data (last 7 days)
-            $weeklyData = [];
-            $days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-            
+            $weeklyRevenueData = [];
+            $weeklyOrderCounts = [];
+            $labels = [];
             for ($i = 6; $i >= 0; $i--) {
                 $date = Carbon::now()->subDays($i);
-                $salesCount = Order::whereDate('created_at', $date)
-                    ->whereIn('status', ['paid', 'shipped'])
+                $revenue = Order::whereDate('created_at', $date)
+                    ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
+                    ->sum('total_price');
+                $weeklyRevenueData[] = (float) $revenue;
+                $ordersCountForDay = Order::whereDate('created_at', $date)
+                    ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                     ->count();
-                $weeklyData[] = $salesCount;
+                $weeklyOrderCounts[] = (int) $ordersCountForDay;
+                $labels[] = $date->format('d M');
             }
             
             $summaryCards = [
@@ -78,16 +82,94 @@ class DashboardController extends Controller
             ];
             
             $salesChart = [
-                'categories' => $days,
-                'data' => $weeklyData,
-                'title' => 'Grafik Penjualan Mingguan'
+                'categories' => $labels,
+                'data' => $weeklyRevenueData,
+                'ordersCount' => $weeklyOrderCounts,
+                'title' => 'Pendapatan 7 Hari Terakhir'
+            ];
+
+            $todayOrdersList = Order::with(['customer', 'salesChannel'])
+                ->whereDate('created_at', $today)
+                ->latest()
+                ->take(10)
+                ->get()
+                ->map(function ($o) {
+                    return [
+                        'id' => $o->id,
+                        'order_number' => $o->order_number,
+                        'customer_name' => optional($o->customer)->name,
+                        'status' => $o->status,
+                        'payment_status' => $o->payment_status,
+                        'total_price' => (float) $o->total_price,
+                        'created_at' => $o->created_at->toDateTimeString(),
+                        'sales_channel' => optional($o->salesChannel)->name,
+                    ];
+                });
+
+            $statusCounts = Order::select('status', DB::raw('COUNT(*) as count'))
+                ->whereDate('created_at', $today)
+                ->groupBy('status')
+                ->pluck('count', 'status');
+
+            $todayOrdersSummary = [
+                'total' => $todayOrdersList->count(),
+                'total_revenue' => (float) Order::whereDate('created_at', $today)
+                    ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
+                    ->sum('total_price'),
+                'by_status' => [
+                    'pending' => (int) ($statusCounts['pending'] ?? 0),
+                    'paid' => (int) ($statusCounts['paid'] ?? 0),
+                    'processing' => (int) ($statusCounts['processing'] ?? 0),
+                    'shipped' => (int) ($statusCounts['shipped'] ?? 0),
+                    'delivered' => (int) ($statusCounts['delivered'] ?? 0),
+                    'cancelled' => (int) ($statusCounts['cancelled'] ?? 0),
+                ],
+            ];
+
+            $todayStockInList = StockMovement::with(['productVariant.product', 'createdBy'])
+                ->whereDate('created_at', $today)
+                ->where('type', 'in')
+                ->latest()
+                ->take(10)
+                ->get()
+                ->map(function ($m) {
+                    $pv = $m->productVariant;
+                    return [
+                        'id' => $m->id,
+                        'product' => optional($pv->product)->name,
+                        'variant' => $pv->variant_label ?? 'Default',
+                        'sku' => $pv->sku,
+                        'quantity' => (int) $m->quantity,
+                        'note' => $m->note,
+                        'created_by' => optional($m->createdBy)->name,
+                        'created_at' => $m->created_at->toDateTimeString(),
+                    ];
+                });
+
+            $todayStockInSummary = [
+                'total_added' => (int) StockMovement::whereDate('created_at', $today)
+                    ->where('type', 'in')
+                    ->sum('quantity'),
+                'records' => (int) StockMovement::whereDate('created_at', $today)
+                    ->where('type', 'in')
+                    ->count(),
             ];
             
             return response()->json([
                 'success' => true,
                 'data' => [
                     'summaryCards' => $summaryCards,
-                    'salesChart' => $salesChart
+                    'salesChart' => $salesChart,
+                    'activity' => [
+                        'todayOrders' => [
+                            'list' => $todayOrdersList,
+                            'summary' => $todayOrdersSummary,
+                        ],
+                        'todayStockIn' => [
+                            'list' => $todayStockInList,
+                            'summary' => $todayStockInSummary,
+                        ],
+                    ],
                 ]
             ]);
             

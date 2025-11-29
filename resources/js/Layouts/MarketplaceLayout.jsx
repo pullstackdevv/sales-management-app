@@ -25,7 +25,7 @@ export default function MarketplaceLayout({ children }) {
                         {/* Logo */}
                         <div className="flex items-center">
                             <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity duration-200">
-                                <img src="/assets/images/logos/mystock.png" alt="MyStock Logo" className="h-7 sm:h-8 w-auto" />
+                                <img src="/assets/images/logos/logo.png" alt="MyStock Logo" className="h-7 sm:h-8 w-auto" />
                             </Link>
                         </div>
 
@@ -116,14 +116,14 @@ export default function MarketplaceLayout({ children }) {
             {/* Footer */}
             <footer className="bg-gray-100 text-gray-500">
                 <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-16">
                         <div>
                             <h3 className="text-lg font-semibold mb-4 text-gray-500">Tentang Kami</h3>
                             <p className="text-gray-400 text-sm">
                                 Marketplace terpercaya dengan ribuan produk berkualitas dan pelayanan terbaik.
                             </p>
                         </div>
-                        <div>
+                        {/* <div>
                             <h3 className="text-lg font-semibold mb-4 text-gray-500">Layanan</h3>
                             <ul className="space-y-2 text-sm text-gray-400">
                                 <li><Link href="/help" className="hover:text-gray-200">Bantuan</Link></li>
@@ -131,14 +131,12 @@ export default function MarketplaceLayout({ children }) {
                                 <li><Link href="/returns" className="hover:text-gray-200">Retur</Link></li>
                                 <li><Link href="/contact" className="hover:text-gray-200">Kontak</Link></li>
                             </ul>
-                        </div>
-                        <div>
+                        </div> */}
+                        <div className="justify-content-end">
                             <h3 className="text-lg font-semibold mb-4 text-gray-500">Akun</h3>
                             <ul className="space-y-2 text-sm text-gray-400">
-                                <li><Link href="/profile" className="hover:text-gray-200">Profil Saya</Link></li>
-                                <li><Link href="/orders" className="hover:text-gray-200">Pesanan</Link></li>
-                                <li><Link href="/wishlist" className="hover:text-gray-200">Wishlist</Link></li>
-                                <li><Link href="/settings" className="hover:text-gray-200">Pengaturan</Link></li>
+                                <li><Link href="/orders" className="hover:text-gray-200">Pesanan Saya</Link></li>
+                                <li><Link href="/cart" className="hover:text-gray-200">Keranjang</Link></li>
                             </ul>
                         </div>
                         <div>

@@ -111,10 +111,15 @@ const PaymentMethodCheckout = () => {
       if (response.data && response.data.success && response.data.data && response.data.data.rates) {
         const rates = response.data.data.rates;
         console.log(`Found ${rates.length} courier rates for district: ${district}`);
-        setCourierRates(rates);
-        const defaultIndex = selectDefaultRateIndex(rates);
+        const allowed = ['ECO','REG','ONS'];
+        const filtered = (rates || []).filter(r => {
+          const code = r?.service?.type || r?.service_type;
+          return allowed.includes((code || '').toString().toUpperCase());
+        });
+        setCourierRates(filtered);
+        const defaultIndex = selectDefaultRateIndex(filtered);
         setSelectedRateIndex(defaultIndex);
-        calculateShippingCost(rates, district, defaultIndex);
+        calculateShippingCost(filtered, district, defaultIndex);
       } else {
         console.log(`No courier rates found for district: ${district}`);
 
@@ -439,6 +444,7 @@ const PaymentMethodCheckout = () => {
       }
 
       const selectedRate = typeof selectedRateIndex === 'number' ? courierRates[selectedRateIndex] : null;
+      const isDropship = !!(selectedAddress?.is_dropship);
       const webOrderData = {
         items: items.map(p => ({ product_variant_id: p.product_variant_id, quantity: p.quantity })),
         shipping_cost: shippingCost,
@@ -448,6 +454,7 @@ const PaymentMethodCheckout = () => {
         guest_phone: guestPhone,
         guest_name: guestName,
         address_id: addressId || null,
+        is_dropship: isDropship,
         courier_id: selectedRate?.courier?.id || null,
         courier_rate_id: selectedRate?.id || null,
         service_type: selectedRate?.service?.name || selectedRate?.service_type || null

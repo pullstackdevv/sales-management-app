@@ -31,6 +31,7 @@ class Order extends Model
         'payment_token',
         'payment_url',
         'payment_status',
+        'is_dropship',
     ];
 
     protected $casts = [
@@ -40,6 +41,7 @@ class Order extends Model
         'ordered_at' => 'datetime',
         'printed_at' => 'datetime',
         'payment_status' => PaymentStatus::class,
+        'is_dropship' => 'boolean',
     ];
 
     // Relationships

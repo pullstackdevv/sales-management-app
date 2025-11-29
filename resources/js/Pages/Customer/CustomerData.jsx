@@ -369,6 +369,11 @@ export default function CustomerData() {
                                                     Default
                                                 </span>
                                             )}
+                                            {address.is_dropship && (
+                                                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                                                    Dropship
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -377,8 +382,9 @@ export default function CustomerData() {
                                             <strong>Penerima:</strong> {address.recipient_name}
                                         </div>
                                         <div>
-                                            <strong>Telepon:</strong> {address.phone}
+                                            <strong>Telepon Penerima:</strong> {address.recipient_phone || address.phone}
                                         </div>
+                                        
                                         <div>
                                             <strong>Alamat:</strong> {address.address_detail}
                                         </div>

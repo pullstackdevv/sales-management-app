@@ -26,9 +26,9 @@ class ProductCategory extends Model
     /**
      * Get the products for this category
      */
-    public function products(): HasMany
+    public function products()
     {
-        return $this->hasMany(Product::class, 'category_id');
+        return $this->belongsToMany(Product::class, 'product_product_category');
     }
 
     /**

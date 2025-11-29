@@ -24,6 +24,7 @@ const useDebounce = (value, delay) => {
 };
 
 export default function CourierRates() {
+  const DEBOUNCE_DELAY_MS = 1000;
   const [rates, setRates] = useState([]);
   const [couriers, setCouriers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,11 +33,15 @@ export default function CourierRates() {
   const [selectedCourier, setSelectedCourier] = useState("");
   const [selectedProvince, setSelectedProvince] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedServiceType, setSelectedServiceType] = useState("");
+  const [serviceTypes, setServiceTypes] = useState([]);
   
   // Debounced values for API calls
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
-  const debouncedSelectedProvince = useDebounce(selectedProvince, 500);
-  const debouncedSelectedCity = useDebounce(selectedCity, 500);
+  const debouncedSearchTerm = useDebounce(searchTerm, DEBOUNCE_DELAY_MS);
+  const debouncedSelectedProvince = useDebounce(selectedProvince, DEBOUNCE_DELAY_MS);
+  const debouncedSelectedCity = useDebounce(selectedCity, DEBOUNCE_DELAY_MS);
+  const debouncedSelectedDistrict = useDebounce(selectedDistrict, DEBOUNCE_DELAY_MS);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
@@ -112,6 +117,12 @@ export default function CourierRates() {
       if (debouncedSelectedCity) {
         params.append('city', debouncedSelectedCity);
       }
+      if (debouncedSelectedDistrict) {
+        params.append('district', debouncedSelectedDistrict);
+      }
+      if (selectedServiceType) {
+        params.append('service_type', selectedServiceType);
+      }
       if (debouncedSearchTerm) {
         params.append('search', debouncedSearchTerm);
       }
@@ -143,6 +154,16 @@ export default function CourierRates() {
       setCouriers(Array.isArray(couriersData) ? couriersData : []);
     } catch (err) {
       console.error("Error fetching couriers:", err);
+    }
+  };
+
+  const fetchServiceTypes = async () => {
+    try {
+      const response = await api.get(API_ROUTES.courierRates.serviceTypes);
+      const data = response.data.data || [];
+      setServiceTypes(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching service types:', err);
     }
   };
 
@@ -270,19 +291,20 @@ export default function CourierRates() {
 
   useEffect(() => {
     fetchCouriers();
+    fetchServiceTypes();
     checkActiveImports(); // Check for active imports on page load
   }, []);
 
   useEffect(() => {
     fetchRates();
-  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSearchTerm, currentPage]);
+  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSelectedDistrict, selectedServiceType, debouncedSearchTerm, currentPage]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (currentPage !== 1) {
       setCurrentPage(1);
     }
-  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSearchTerm]);
+  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSelectedDistrict, selectedServiceType, debouncedSearchTerm]);
 
   // Set initial courier filter from URL or default to TIKI
   useEffect(() => {
@@ -516,7 +538,7 @@ export default function CourierRates() {
         <>
           {/* Filters */}
           <div className="bg-white p-4 rounded-lg shadow-sm border space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Courier
@@ -560,6 +582,35 @@ export default function CourierRates() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Filter kota"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kecamatan
+                </label>
+                <input
+                  type="text"
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Filter kecamatan"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Layanan
+                </label>
+                <select
+                  value={selectedServiceType}
+                  onChange={(e) => setSelectedServiceType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Semua Layanan</option>
+                  {serviceTypes.map((s) => (
+                    <option key={s.code} value={s.code}>{s.name}</option>
+                  ))}
+                </select>
               </div>
               
               <div>
@@ -633,6 +684,9 @@ export default function CourierRates() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
+                          {rate.destination?.district || '-'}
+                        </div>
+                        <div className="text-sm text-gray-900">
                           {rate.destination?.city || '-'}
                         </div>
                         <div className="text-sm text-gray-500">
@@ -687,7 +741,7 @@ export default function CourierRates() {
                   Tidak ada tarif ditemukan
                 </h3>
                 <p className="text-gray-500">
-                  {searchTerm || selectedCourier || selectedProvince || selectedCity
+                  {searchTerm || selectedCourier || selectedProvince || selectedCity || selectedDistrict || selectedServiceType
                     ? "Coba ubah filter pencarian"
                     : "Belum ada data tarif courier"}
                 </p>

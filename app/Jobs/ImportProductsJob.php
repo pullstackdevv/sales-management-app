@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -89,7 +90,8 @@ class ImportProductsJob implements ShouldQueue
 
                             $productBasePrice = $mapped['base_price'] ?? 0;
                             $categoryId = $mapped['category_id'] ?? null;
-                            $categoryName = $mapped['category'] ?? null;
+                            $categoryName = isset($mapped['category']) ? trim((string) $mapped['category']) : null;
+                            $categoryIds = [];
                             if ($categoryId) {
                                 $existingCategory = ProductCategory::where('id', $categoryId)->where('is_active', 1)->first();
                                 if (!$existingCategory) {
@@ -97,14 +99,52 @@ class ImportProductsJob implements ShouldQueue
                                     $lastSkipReason = 'invalid_category_id';
                                     continue;
                                 }
+                                if (!$categoryName) {
+                                    $categoryName = $existingCategory->name;
+                                }
                             } elseif ($categoryName) {
-                                $foundCategory = ProductCategory::where('name', $categoryName)->where('is_active', 1)->first();
-                                if ($foundCategory) {
-                                    $categoryId = $foundCategory->id;
-                                } else {
+                                $normalized = trim((string) $categoryName);
+                                if ($normalized === '') {
                                     $skipped++;
-                                    $lastSkipReason = 'category_not_found: ' . $categoryName;
+                                    $lastSkipReason = 'missing_category';
                                     continue;
+                                }
+                                $names = collect(preg_split('/[,;|]/', $normalized))
+                                    ->map(function($n){ return trim($n); })
+                                    ->filter(function($n){ return $n !== ''; })
+                                    ->values();
+                                if ($names->isEmpty()) {
+                                    $skipped++;
+                                    $lastSkipReason = 'missing_category';
+                                    continue;
+                                }
+                                foreach ($names as $i => $name) {
+                                    $foundCategory = ProductCategory::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                                    if (!$foundCategory) {
+                                        $slug = Str::slug($name);
+                                        $foundCategory = ProductCategory::where('slug', $slug)->first();
+                                    }
+                                    if ($foundCategory) {
+                                        if ($foundCategory->is_active === false) {
+                                            $foundCategory->update(['is_active' => 1, 'updated_by' => $this->userId]);
+                                        }
+                                    } else {
+                                        $foundCategory = ProductCategory::firstOrCreate(
+                                            ['name' => $name],
+                                            [
+                                                'slug' => Str::slug($name),
+                                                'description' => '',
+                                                'is_active' => 1,
+                                                'created_by' => $this->userId,
+                                                'updated_by' => null
+                                            ]
+                                        );
+                                    }
+                                    $categoryIds[] = $foundCategory->id;
+                                    if ($i === 0) {
+                                        $categoryId = $foundCategory->id;
+                                        $categoryName = $foundCategory->name;
+                                    }
                                 }
                             } else {
                                 $skipped++;
@@ -112,18 +152,25 @@ class ImportProductsJob implements ShouldQueue
                                 continue;
                             }
 
-                            $product = Product::firstOrCreate([
-                                'name' => $mapped['name']
-                            ], [
-                                'category' => $categoryName ?? '',
-                                'category_id' => $categoryId,
-                                'description' => $mapped['description'],
-                                'base_price' => $productBasePrice,
-                                'image' => $mapped['image'],
-                                'is_active' => $mapped['is_active'],
-                                'is_storefront' => $mapped['is_storefront'],
-                                'created_by' => $this->userId
-                            ]);
+                            $product = Product::updateOrCreate(
+                                ['name' => $mapped['name']],
+                                [
+                                    'category' => $categoryName ?? '',
+                                    'category_id' => $categoryId,
+                                    'description' => $mapped['description'],
+                                    'base_price' => $productBasePrice,
+                                    'image' => $mapped['image'],
+                                    'is_active' => $mapped['is_active'],
+                                    'is_storefront' => $mapped['is_storefront'],
+                                    'created_by' => $this->userId
+                                ]
+                            );
+
+                            if (!empty($categoryIds)) {
+                                $product->categories()->sync($categoryIds);
+                            } elseif (!empty($categoryId)) {
+                                $product->categories()->sync([$categoryId]);
+                            }
 
                             $variantData = [
                                 'product_id' => $product->id,

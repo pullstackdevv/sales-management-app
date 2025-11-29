@@ -12,8 +12,7 @@ import StockAdjustmentModal from "@/components/StockAdjustmentModal";
 export default function ProductEdit() {
   const [product, setProduct] = useState({
     name: "",
-    category_id: "",
-    category: "",
+    category_ids: [],
     description: "",
     image: "",
     is_active: true,
@@ -92,8 +91,7 @@ export default function ProductEdit() {
       
       setProduct({
         name: productData?.name || "",
-        category_id: productData?.category_id || "",
-        category: productData?.category || "",
+        category_ids: Array.isArray(productData?.categories) ? productData.categories.map(c => c.id) : [],
         description: productData?.description || "",
         // keep existing image path so it can be previewed
         image: productData?.image || "",
@@ -234,8 +232,11 @@ export default function ProductEdit() {
       // Append basic product data
       formData.append('name', product.name);
       formData.append('description', product.description);
-      formData.append('category_id', product.category_id);
-      formData.append('category', product.category);
+      if (Array.isArray(product.category_ids)) {
+        product.category_ids.forEach((cid, idx) => {
+          formData.append(`category_ids[${idx}]`, cid);
+        });
+      }
       formData.append('is_active', product.is_active ? '1' : '0');
       formData.append('is_storefront', product.is_storefront ? '1' : '0');
       
@@ -355,35 +356,31 @@ export default function ProductEdit() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">Kategori*</label>
-                    <select
-                      className={`w-full border px-3 py-2 rounded-md ${
-                        errors.category_id ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      value={product.category_id}
-                      onChange={(e) => {
-                        const selectedCategory = categories.find(cat => cat.id === parseInt(e.target.value));
-                        setProduct({ 
-                          ...product, 
-                          category_id: e.target.value,
-                          category: selectedCategory?.name || ''
-                        });
-                      }}
-                      required
-                      disabled={loadingCategories}
-                    >
-                      <option value="">-- Pilih Kategori --</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.category_id && (
-                      <p className="text-red-500 text-xs mt-1">{errors.category_id[0]}</p>
-                    )}
-                    {errors.category && (
-                      <p className="text-red-500 text-xs mt-1">{errors.category[0]}</p>
+                    <label className="block text-sm font-medium mb-1">Kategori</label>
+                    <div className={`border rounded-md p-3 ${errors.category_ids ? 'border-red-500' : 'border-gray-300'}`}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {categories.map((cat) => (
+                          <label key={cat.id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              value={cat.id}
+                              checked={Array.isArray(product.category_ids) && product.category_ids.includes(cat.id)}
+                              onChange={(e) => {
+                                const id = parseInt(e.target.value);
+                                const checked = e.target.checked;
+                                const current = Array.isArray(product.category_ids) ? product.category_ids : [];
+                                const next = checked ? [...current, id] : current.filter((x) => x !== id);
+                                setProduct({ ...product, category_ids: next });
+                              }}
+                              disabled={loadingCategories}
+                            />
+                            <span>{cat.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {errors.category_ids && (
+                      <p className="text-red-500 text-xs mt-1">{errors.category_ids[0]}</p>
                     )}
                   </div>
 

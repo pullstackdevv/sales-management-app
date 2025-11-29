@@ -14,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use App\Jobs\ImportProductsJob;
+use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
@@ -25,10 +26,16 @@ class ProductController extends Controller
                 'message' => 'Unauthorized. You do not have permission to view products.'
             ], 403);
         }
-        $products = Product::with(['variants'])
+        $products = Product::with(['variants', 'categories'])
             ->when($request->search, function($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
+            })
+            ->when($request->category_ids, function($query, $ids) {
+                $ids = is_array($ids) ? $ids : [$ids];
+                $query->whereHas('categories', function($q) use ($ids) {
+                    $q->whereIn('product_categories.id', $ids);
+                });
             })
             ->when($request->category, function($query, $category) {
                 $query->where('category', $category);
@@ -51,12 +58,18 @@ class ProductController extends Controller
         $products = Product::with(['variants' => function($query) {
                 $query->where('is_active', true)
                       ->where('is_storefront', true);
-            }])
+            }, 'categories'])
             ->where('is_storefront', true)
             ->where('is_active', true)
             ->when($request->search, function($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
+            })
+            ->when($request->category_ids, function($query, $ids) {
+                $ids = is_array($ids) ? $ids : [$ids];
+                $query->whereHas('categories', function($q) use ($ids) {
+                    $q->whereIn('product_categories.id', $ids);
+                });
             })
             ->when($request->category, function($query, $category) {
                 $query->where('category', $category);
@@ -117,14 +130,16 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category' => 'required|string|max:255',
+            'category' => 'nullable|string|max:255',
             'category_id' => 'nullable|exists:product_categories,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'exists:product_categories,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
             'is_storefront' => 'boolean',
             'variants' => 'required|array|min:1',
             'variants.*.variant_label' => 'required|string|max:255',
-            'variants.*.sku' => 'required|string|max:255|unique:product_variants,sku',
+            'variants.*.sku' => 'nullable|string|max:255',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.discount_price' => 'nullable|numeric|min:0',
@@ -147,13 +162,27 @@ class ProductController extends Controller
             $product = Product::create([
                 'name' => $validated['name'],
                 'description' => $validated['description'],
-                'category' => $validated['category'],
-                'category_id' => $validated['category_id'] ?? null,
+                'category' => $validated['category'] ?? (function() use ($validated) {
+                    if (!empty($validated['category_ids'])) {
+                        $first = \App\Models\ProductCategory::find($validated['category_ids'][0]);
+                        return $first ? $first->name : '';
+                    }
+                    return '';
+                })(),
+                'category_id' => $validated['category_id'] ?? (function() use ($validated) {
+                    return !empty($validated['category_ids']) ? $validated['category_ids'][0] : null;
+                })(),
                 'image' => $imagePath,
                 'is_active' => $validated['is_active'] ?? true,
                 'is_storefront' => $validated['is_storefront'] ?? true,
                 'created_by' => Auth::id()
             ]);
+
+            if (!empty($validated['category_ids'])) {
+                $product->categories()->sync($validated['category_ids']);
+            } elseif (!empty($validated['category_id'])) {
+                $product->categories()->sync([$validated['category_id']]);
+            }
 
             foreach ($validated['variants'] as $index => $variant) {
                 // Handle variant image upload (if provided)
@@ -171,9 +200,18 @@ class ProductController extends Controller
                     }
                 }
 
+                $prefix = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $product->name), 0, 6));
+                $baseSku = $variant['sku'] ?? ($prefix . '-' . str_pad($index + 1, 3, '0', STR_PAD_LEFT));
+                $skuCandidate = $baseSku;
+                $suffix = 1;
+                while (ProductVariant::where('sku', $skuCandidate)->exists()) {
+                    $skuCandidate = $baseSku . '-' . str_pad($suffix, 2, '0', STR_PAD_LEFT);
+                    $suffix++;
+                }
+
                 $product->variants()->create([
                     'variant_label' => $variant['variant_label'],
-                    'sku' => $variant['sku'],
+                    'sku' => $skuCandidate,
                     'price' => $variant['price'],
                     'base_price' => $variant['base_price'],
                     'discount_price' => $variant['discount_price'] ?? null,
@@ -191,7 +229,7 @@ class ProductController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Product created successfully',
-                'data' => new ProductResource($product->load(['variants', 'createdBy']))
+                'data' => new ProductResource($product->load(['variants', 'createdBy', 'categories']))
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -203,7 +241,7 @@ class ProductController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => new ProductResource($product->load(['variants', 'createdBy']))
+            'data' => new ProductResource($product->load(['variants', 'createdBy', 'categories']))
         ]);
     }
 
@@ -221,8 +259,10 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
-            'category' => 'sometimes|required|string|max:255',
+            'category' => 'nullable|string|max:255',
             'category_id' => 'nullable|exists:product_categories,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'exists:product_categories,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
             'is_storefront' => 'boolean',
@@ -274,13 +314,27 @@ class ProductController extends Controller
             $product->update([
                 'name' => $validated['name'] ?? $product->name,
                 'description' => $validated['description'] ?? $product->description,
-                'category' => $validated['category'] ?? $product->category,
-                'category_id' => $validated['category_id'] ?? $product->category_id,
+                'category' => $validated['category'] ?? (function() use ($validated, $product) {
+                    if (!empty($validated['category_ids'])) {
+                        $first = \App\Models\ProductCategory::find($validated['category_ids'][0]);
+                        return $first ? $first->name : $product->category;
+                    }
+                    return $product->category;
+                })(),
+                'category_id' => $validated['category_id'] ?? (function() use ($validated, $product) {
+                    return !empty($validated['category_ids']) ? $validated['category_ids'][0] : $product->category_id;
+                })(),
                 'image' => $imagePath,
                 'is_active' => $validated['is_active'] ?? $product->is_active,
                 'is_storefront' => $validated['is_storefront'] ?? $product->is_storefront,
                 'updated_by' => Auth::id()
             ]);
+
+            if (!empty($validated['category_ids'])) {
+                $product->categories()->sync($validated['category_ids']);
+            } elseif (!empty($validated['category_id'])) {
+                $product->categories()->sync([$validated['category_id']]);
+            }
 
             if (isset($validated['variants'])) {
                 // Delete variants that are not in the request
@@ -356,7 +410,7 @@ class ProductController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Product updated successfully',
-                'data' => new ProductResource($product->load(['variants', 'createdBy']))
+                'data' => new ProductResource($product->load(['variants', 'createdBy', 'categories']))
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -485,6 +539,27 @@ class ProductController extends Controller
                     'active_imports' => [],
                     'count' => 0
                 ]
+            ], 500);
+        }
+    }
+
+    public function importTemplate()
+    {
+        try {
+            $path = base_path('resources/import_templates/product_import_template.xlsx');
+            if (!file_exists($path)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Template file not found'
+                ], 404);
+            }
+
+            return response()->download($path, 'product_import_template.xlsx');
+        } catch (\Exception $e) {
+            Log::error('Failed to download product import template: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to download template'
             ], 500);
         }
     }

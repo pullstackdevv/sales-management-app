@@ -20,6 +20,15 @@ class ProductResource extends JsonResource
             'sku' => $this->sku,
             'category' => $this->category,
             'category_id' => $this->category_id,
+            'categories' => $this->whenLoaded('categories', function() {
+                return $this->categories->map(function($c) {
+                    return [
+                        'id' => $c->id,
+                        'name' => $c->name,
+                        'slug' => $c->slug,
+                    ];
+                });
+            }),
             'description' => $this->description,
             'image' => $this->image,
             'is_active' => $this->is_active,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Link } from '@inertiajs/react';
-import { 
+import {
     Search,
     Filter,
     Grid,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { productsAPI } from '@/api/products';
+import axios from 'axios';
 // Removed cart functionality from homepage cards
 
 const Homepage = () => {
@@ -25,6 +26,7 @@ const Homepage = () => {
         per_page: 1000, // Set high value to fetch all products
         total: 0,
     });
+    const [bannerUrls, setBannerUrls] = useState([]);
     // Removed: addToCart integration on homepage cards
 
     // Derive categories from loaded products (fallback to string/slug if available)
@@ -69,7 +71,7 @@ const Homepage = () => {
                 ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
                 sort: sortBy,
             };
-            
+
             const response = await productsAPI.getProducts(params);
             const payload = response?.data || {};
             setProducts(payload.data || []);
@@ -98,14 +100,14 @@ const Homepage = () => {
                 ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
                 sort: sortBy,
             };
-            
+
             const fetchData = async () => {
                 try {
                     setSearchLoading(true);
                     const response = await productsAPI.getProducts(params);
                     const payload = response?.data || {};
                     const productsData = payload.data || [];
-                    
+
                     // Debug log for price issues
                     console.log('Search fetch - Products received:', productsData.length);
                     if (productsData.length > 0) {
@@ -118,7 +120,7 @@ const Homepage = () => {
                             selling_price: productsData[0].selling_price
                         });
                     }
-                    
+
                     setProducts(productsData);
                     setPagination(prev => ({
                         ...prev,
@@ -134,7 +136,7 @@ const Homepage = () => {
                     setSearchLoading(false);
                 }
             };
-            
+
             fetchData();
         }, 500); // 500ms delay
 
@@ -150,7 +152,7 @@ const Homepage = () => {
             ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
             sort: sortBy,
         };
-        
+
         const fetchData = async () => {
             try {
                 setLoading(true);
@@ -171,7 +173,7 @@ const Homepage = () => {
                 setLoading(false);
             }
         };
-        
+
         fetchData();
     }, [selectedCategory, sortBy]);
 
@@ -179,7 +181,7 @@ const Homepage = () => {
     useEffect(() => {
         // Skip pagination effect when per_page is set to show all products
         if (pagination.per_page >= 1000) return;
-        
+
         const params = {
             page: pagination.current_page,
             per_page: pagination.per_page,
@@ -187,7 +189,7 @@ const Homepage = () => {
             ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
             sort: sortBy,
         };
-        
+
         const fetchData = async () => {
             try {
                 setLoading(true);
@@ -208,7 +210,7 @@ const Homepage = () => {
                 setLoading(false);
             }
         };
-        
+
         if (pagination.current_page > 1) {
             fetchData();
         }
@@ -223,14 +225,14 @@ const Homepage = () => {
             category: selectedCategory || undefined,
             sort: sortBy,
         };
-        
+
         const fetchData = async () => {
             try {
                 setLoading(true);
                 const response = await productsAPI.getProducts(params);
                 const payload = response?.data || {};
                 const productsData = payload.data || [];
-                
+
                 // Debug log for initial load
                 console.log('Initial load - Products received:', productsData.length);
                 if (productsData.length > 0) {
@@ -243,7 +245,7 @@ const Homepage = () => {
                         selling_price: productsData[0].selling_price
                     });
                 }
-                
+
                 setProducts(productsData);
                 setPagination(prev => ({
                     ...prev,
@@ -259,8 +261,17 @@ const Homepage = () => {
                 setLoading(false);
             }
         };
-        
+
         fetchData();
+        const loadSettings = async () => {
+            try {
+                const res = await axios.get('/api/general-settings/public');
+                if (res.data?.success) setBannerUrls(res.data.data?.marketplace_banners || []);
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        loadSettings();
     }, []);
 
 
@@ -274,7 +285,7 @@ const Homepage = () => {
         // Try different price fields in order of preference
         const priceFields = [
             product.price,
-            product.base_price, 
+            product.base_price,
             product.min_price,
             product.selling_price,
             product.regular_price
@@ -284,7 +295,7 @@ const Homepage = () => {
             if (priceField !== null && priceField !== undefined && priceField !== '') {
                 // Convert to number if it's a string
                 const numPrice = typeof priceField === 'string' ? parseFloat(priceField) : priceField;
-                
+
                 // Validate that it's a positive number
                 if (!isNaN(numPrice) && numPrice > 0) {
                     return numPrice;
@@ -302,7 +313,7 @@ const Homepage = () => {
             selling_price: product.selling_price,
             regular_price: product.regular_price
         });
-        
+
         return 0;
     }, []);
 
@@ -315,15 +326,15 @@ const Homepage = () => {
     const formatPrice = useCallback((price) => {
         // Ensure price is a valid number
         const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-        
+
         if (isNaN(numPrice) || numPrice < 0) {
             return 'Harga tidak tersedia';
         }
-        
+
         if (numPrice === 0) {
             return 'Hubungi untuk harga';
         }
-        
+
         return currencyFormatter.format(numPrice);
     }, [currencyFormatter]);
 
@@ -345,9 +356,9 @@ const Homepage = () => {
     // Client-side sorting as fallback
     const sortedProducts = useMemo(() => {
         if (!products || products.length === 0) return [];
-        
+
         const sorted = [...products];
-        
+
         switch (sortBy) {
             case 'name':
                 return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -391,7 +402,7 @@ const Homepage = () => {
         product.variants.forEach(variant => {
             const price = variant.discount_price || variant.price;
             const originalPrice = variant.price;
-            
+
             if (price < minPrice) {
                 minPrice = price;
             }
@@ -416,17 +427,17 @@ const Homepage = () => {
     const ProductCard = memo(({ product }) => {
         const variantInfo = getVariantPriceInfo(product);
         const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
-        
+
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-lg border border-gray-100 hover:border-blue-200 transition-all duration-300 overflow-hidden h-full flex flex-col">
                     {/* Image Container - Square ratio */}
                     <div
                         className="relative overflow-hidden bg-gray-100"
-                        style={{ aspectRatio: '1 / 1'  , maxWidth: 800, maxHeight: 800}}
+                        style={{ aspectRatio: '1 / 1', maxWidth: 800, maxHeight: 800 }}
                     >
-                        <img 
-                            src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
+                        <img
+                            src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'}
                             alt={product.name}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                         />
@@ -437,7 +448,7 @@ const Homepage = () => {
                             </div>
                         )}
                     </div>
-                    
+
                     {/* Content Container */}
                     <div className="p-2.5 sm:p-3 flex flex-col flex-grow">
                         {/* Product Name */}
@@ -452,7 +463,7 @@ const Homepage = () => {
                                 ))}
                             </div>
                         )}
-                        
+
                         {/* Price */}
                         <div className="flex flex-col gap-0.5">
                             {variantInfo?.hasDiscount ? (
@@ -479,7 +490,7 @@ const Homepage = () => {
     const ProductListItem = memo(({ product }) => {
         const variantInfo = getVariantPriceInfo(product);
         const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
-        
+
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden">
@@ -549,7 +560,7 @@ const Homepage = () => {
                 <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                     <div className="text-center">
                         <p className="text-red-500 text-lg mb-4">{error}</p>
-                        <button 
+                        <button
                             onClick={fetchProducts}
                             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                         >
@@ -563,19 +574,92 @@ const Homepage = () => {
 
     return (
         <MarketplaceLayout>
-            {/* Hero Section */}
-            <div className="bg-gray-50 border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
-                    <div className="text-center">
-                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-900 mb-3 sm:mb-4">
-                            Koleksi Produk Terbaik
-                        </h1>
-                        <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
-                            Temukan produk berkualitas dengan harga terbaik
-                        </p>
+            {bannerUrls?.length > 0 ? (
+                <div className="bg-white">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
+                        <div className="relative group">
+                            {/* Navigation Buttons */}
+                            <button
+                                onClick={() => {
+                                    const container = document.getElementById('banner-scroll');
+                                    container.scrollBy({ left: -820, behavior: 'smooth' });
+                                }}
+                                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -ml-4"
+                            >
+                                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    const container = document.getElementById('banner-scroll');
+                                    container.scrollBy({ left: 820, behavior: 'smooth' });
+                                }}
+                                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -mr-4"
+                            >
+                                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+
+                            {/* Banner Container */}
+                            <div
+                                id="banner-scroll"
+                                className="overflow-x-auto scrollbar-hide scroll-smooth"
+                                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                            >
+                                <div className="flex gap-6 snap-x snap-mandatory pb-2">
+                                    {bannerUrls.map((url, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="snap-center flex-shrink-0 transform transition-all duration-300 hover:scale-[1.02]"
+                                        >
+                                            <div className="relative overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300">
+                                                <img
+                                                    src={url}
+                                                    alt={`Banner ${idx + 1}`}
+                                                    className="w-[800px] h-[200px] object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Dots Indicator */}
+                            {bannerUrls.length > 1 && (
+                                <div className="flex justify-center gap-2 mt-6">
+                                    {bannerUrls.map((_, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                const container = document.getElementById('banner-scroll');
+                                                container.scrollTo({ left: idx * 820, behavior: 'smooth' });
+                                            }}
+                                            className="w-2 h-2 rounded-full bg-gray-300 hover:bg-gray-500 transition-all duration-300"
+                                        ></button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            ) : (
+                <div className="bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
+                        <div className="text-center">
+                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-900 mb-3 sm:mb-4">
+                                Koleksi Produk Terbaik
+                            </h1>
+                            <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
+                                Temukan produk berkualitas dengan harga terbaik
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Search and Filters */}
             <div className="bg-white border-b border-gray-100">
@@ -606,11 +690,10 @@ const Homepage = () => {
                             <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
                                 <button
                                     onClick={() => handleCategoryChange('')}
-                                    className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${
-                                        selectedCategory === ''
+                                    className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
                                             ? 'bg-gray-900 text-white border-gray-900'
                                             : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
-                                    }`}
+                                        }`}
                                 >
                                     Semua
                                 </button>
@@ -618,11 +701,10 @@ const Homepage = () => {
                                     <button
                                         key={cat.id}
                                         onClick={() => handleCategoryChange(cat.id)}
-                                        className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${
-                                            selectedCategory === cat.id
+                                        className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
                                                 ? 'bg-gray-900 text-white border-gray-900'
                                                 : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
-                                        }`}
+                                            }`}
                                     >
                                         {cat.name}
                                     </button>
@@ -653,21 +735,19 @@ const Homepage = () => {
                             <div className="flex border border-gray-300 rounded-md overflow-hidden">
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-3 sm:p-2 ${
-                                        viewMode === 'grid'
+                                    className={`p-3 sm:p-2 ${viewMode === 'grid'
                                             ? 'bg-gray-900 text-white'
                                             : 'bg-white text-gray-600 hover:bg-gray-50'
-                                    }`}
+                                        }`}
                                 >
                                     <Grid className="h-5 w-5 sm:h-4 sm:w-4" />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('list')}
-                                    className={`p-3 sm:p-2 ${
-                                        viewMode === 'list'
+                                    className={`p-3 sm:p-2 ${viewMode === 'list'
                                             ? 'bg-gray-900 text-white'
                                             : 'bg-white text-gray-600 hover:bg-gray-50'
-                                    }`}
+                                        }`}
                                 >
                                     <List className="h-5 w-5 sm:h-4 sm:w-4" />
                                 </button>

@@ -52,7 +52,7 @@ const ViewVoucher = ({ voucherId }) => {
 
     const getVoucherValue = (voucher) => {
         if (voucher.type === 'percentage') {
-            return `${voucher.value}%`;
+            return `${Math.floor(voucher.value)}%`;
         }
         if (voucher.type === 'fixed') {
             return formatRupiah(voucher.value);

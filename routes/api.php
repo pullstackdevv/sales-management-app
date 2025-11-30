@@ -34,6 +34,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\WilayahController;
 use App\Http\Controllers\ProductSettingController;
 use App\Http\Controllers\OriginSettingController;
+use App\Http\Controllers\GeneralSettingController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -71,6 +72,9 @@ Route::prefix('courier-rates')->group(function () {
     Route::get('/active-imports', [CourierRateController::class, 'activeImports']);
     Route::get('/{id}', [CourierRateController::class, 'show']);
 });
+
+// Public general settings
+Route::get('general-settings/public', [GeneralSettingController::class, 'public']);
 
 // Dashboard, Analyzer, and Reports routes (using token authentication)
 Route::middleware('auth:sanctum')->group(function () {
@@ -195,6 +199,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Settings routes
     Route::apiResource('product-settings', ProductSettingController::class);
     Route::apiResource('origin-settings', OriginSettingController::class);
+    Route::get('general-settings', [GeneralSettingController::class, 'index']);
+    Route::post('general-settings/upsert', [GeneralSettingController::class, 'upsert']);
+    Route::delete('general-settings/{settingName}', [GeneralSettingController::class, 'destroy']);
 
     // Other authenticated routes remain here
 

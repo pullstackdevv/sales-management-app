@@ -37,8 +37,16 @@ const AddVoucher = () => {
         try {
             const payload = {
                 ...data,
-                is_active: data.is_active || true
+                is_active: data.is_active ?? true
             };
+            payload.minimum_amount = data.minimum_amount ?? data.min_purchase ?? 0;
+            if (payload.type === 'percentage') {
+                payload.maximum_discount = (data.maximum_discount ?? null);
+            } else {
+                delete payload.maximum_discount;
+            }
+            delete payload.min_purchase;
+            delete payload.max_discount;
             if (payload.type === 'free_sample') {
                 payload.value = payload.value ? Number(payload.value) : 1;
             }
@@ -345,12 +353,12 @@ const AddVoucher = () => {
                                         </label>
                                         <input
                                             type="text"
-                                            value={formatRibuan(watch('max_discount'))}
-                                            {...register('max_discount', {
+                                            value={formatRibuan(watch('maximum_discount'))}
+                                            {...register('maximum_discount', {
                                                 min: { value: 0, message: "Nilai tidak boleh negatif" },
                                                 setValueAs: (v) => parseRibuan(v)
                                             })}
-                                            onChange={(e) => setValue('max_discount', parseRibuan(e.target.value), { shouldValidate: true })}
+                                            onChange={(e) => setValue('maximum_discount', parseRibuan(e.target.value), { shouldValidate: true })}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             placeholder="50000"
                                         />
@@ -358,9 +366,9 @@ const AddVoucher = () => {
                                             Kosongkan jika tidak ada batas
                                             maksimal
                                         </p>
-                                        {errors.max_discount && (
+                                        {errors.maximum_discount && (
                                             <p className="text-red-500 text-sm mt-1">
-                                                {errors.max_discount.message}
+                                                {errors.maximum_discount.message}
                                             </p>
                                         )}
                                     </div>

@@ -120,7 +120,7 @@ export default function AddOrder() {
         if (!validateNewCustomer()) return;
         const payload = {
             name: newCustomer.full_name,
-            email: newCustomer.email || null,
+            email: newCustomer.email || 'guest@example.com',
             phone: newCustomer.phone,
             line_id: newCustomer.line_id || null,
             other_contact: newCustomer.other_contact || null,
@@ -164,6 +164,16 @@ export default function AddOrder() {
             } else if (error.response?.data?.message) {
                 msg = error.response.data.message;
             }
+
+            // Handle email already exists error
+            if (error.response?.status === 422 && error.response?.data?.errors?.email) {
+                const emailErrors = error.response.data.errors.email;
+                if (emailErrors.includes('email sudah terdaftar') || emailErrors.includes('The email has already been taken.')) {
+                    msg = 'Email sudah terdaftar, silakan gunakan email lain';
+                    setNewCustErrors(prev => ({ ...prev, email: msg }));
+                }
+            }
+
             Swal.fire({ icon: 'error', title: 'Error', text: msg });
         }
     };
@@ -535,59 +545,69 @@ export default function AddOrder() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Nama Pemesan
                             </label>
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Cari customer"
-                                    value={searchTerms.customer}
-                                    onChange={(e) => {
-                                        setSearchTerms(prev => ({ ...prev, customer: e.target.value }));
-                                        if (!e.target.value) {
-                                            setSelectedCustomer(null);
-                                            setFormData(prev => ({ ...prev, customer_id: '', address_id: '' }));
-                                            setCustomerAddresses([]);
-                                        }
-                                    }}
-                                    className={`w-full px-3 py-2 border rounded-lg ${
-                                        errors.customer_id ? 'border-red-500' : 'border-gray-300'
-                                    }`}
-                                />
-                                {loading.customers && (
-                                    <div className="absolute right-3 top-3">
-                                        <Icon icon="eos-icons:loading" className="w-4 h-4 animate-spin" />
-                                    </div>
-                                )}
-                                
-                                {/* Customer dropdown */}
-                                {searchTerms.customer && customers.length > 0 && !selectedCustomer && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                        {customers.map((customer) => (
-                                            <div
-                                                key={customer.id}
-                                                onClick={() => handleCustomerSelect(customer)}
-                                                className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                                            >
-                                                <div className="font-medium">{customer.name}</div>
-                                                <div className="text-sm text-gray-500">{customer.email}</div>
-                                                <div className="text-xs text-gray-400">{customer.phone}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {searchTerms.customer && customers.length === 0 && !selectedCustomer && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
-                                        <div className="p-3 text-sm text-gray-600">Tidak ada hasil</div>
-                                        <div className="p-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => setAddCustomerModalOpen(true)}
-                                                className="w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                                            >
-                                                Tambah Customer Baru
-                                            </button>
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Cari customer"
+                                        value={searchTerms.customer}
+                                        onChange={(e) => {
+                                            setSearchTerms(prev => ({ ...prev, customer: e.target.value }));
+                                            if (!e.target.value) {
+                                                setSelectedCustomer(null);
+                                                setFormData(prev => ({ ...prev, customer_id: '', address_id: '' }));
+                                                setCustomerAddresses([]);
+                                            }
+                                        }}
+                                        className={`w-full px-3 py-2 border rounded-lg ${
+                                            errors.customer_id ? 'border-red-500' : 'border-gray-300'
+                                        }`}
+                                    />
+                                    {loading.customers && (
+                                        <div className="absolute right-3 top-3">
+                                            <Icon icon="eos-icons:loading" className="w-4 h-4 animate-spin" />
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+
+                                    {/* Customer dropdown */}
+                                    {searchTerms.customer && customers.length > 0 && !selectedCustomer && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                            {customers.map((customer) => (
+                                                <div
+                                                    key={customer.id}
+                                                    onClick={() => handleCustomerSelect(customer)}
+                                                    className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                                                >
+                                                    <div className="font-medium">{customer.name}</div>
+                                                    <div className="text-sm text-gray-500">{customer.email}</div>
+                                                    <div className="text-xs text-gray-400">{customer.phone}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {searchTerms.customer && customers.length === 0 && !selectedCustomer && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                                            <div className="p-3 text-sm text-gray-600">Tidak ada hasil</div>
+                                            <div className="p-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setAddCustomerModalOpen(true)}
+                                                    className="w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                                                >
+                                                    Tambah Customer Baru
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setAddCustomerModalOpen(true)}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                                >
+                                    <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
+                                    <span className="hidden sm:inline">Tambah</span>
+                                </button>
                             </div>
                             {errors.customer_id && (
                                 <p className="text-red-500 text-xs mt-1">{errors.customer_id}</p>

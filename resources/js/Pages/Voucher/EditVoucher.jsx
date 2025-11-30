@@ -13,6 +13,7 @@ const EditVoucher = ({ voucherId }) => {
         handleSubmit,
         watch,
         setValue,
+        setError,
         formState: { errors },
         reset,
     } = useForm();
@@ -112,15 +113,42 @@ const EditVoucher = ({ voucherId }) => {
             }
         } catch (error) {
             console.error('Error updating voucher:', error);
-            
-            let errorMessage = 'Gagal memperbarui voucher';
-            if (error.response?.data?.errors) {
-                const errors = error.response.data.errors;
-                errorMessage = Object.values(errors).flat().join(', ');
-            } else if (error.response?.data?.message) {
-                errorMessage = error.response.data.message;
+
+            const data = error?.response?.data;
+            let errorMessage = 'Gagal memperbarui voucher. Silakan cek kembali informasi yang dimasukkan.';
+
+            if (Array.isArray(data?.errors)) {
+                const messages = data.errors.map((e) => (typeof e === 'string' ? e : e?.message)).filter(Boolean);
+                if (messages.length > 0) {
+                    errorMessage = messages.join(', ');
+                }
+                data.errors.forEach((e) => {
+                    const field = e?.field || (typeof e?.message === 'string' && e.message.toLowerCase().includes('usage limit') ? 'usage_limit' : null);
+                    const msg = typeof e?.message === 'string' ? e.message : (e?.tag || 'Error');
+                    if (field) {
+                        setError(field, { type: 'server', message: msg });
+                    }
+                });
+            } else if (data?.errors && typeof data.errors === 'object') {
+                const apiErrors = data.errors;
+                const joined = Object.values(apiErrors).flat().map((x) => (typeof x === 'string' ? x : String(x))).filter(Boolean).join(', ');
+                if (joined) errorMessage = joined;
+                Object.entries(apiErrors).forEach(([field, msgs]) => {
+                    const msg = Array.isArray(msgs) ? String(msgs[0]) : String(msgs);
+                    setError(field, { type: 'server', message: msg });
+                });
+            } else if (typeof data?.message === 'string') {
+                errorMessage = data.message;
+            } else if (Array.isArray(data?.message)) {
+                errorMessage = data.message.map(String).join(', ');
+            } else if (data?.message && typeof data.message === 'object') {
+                errorMessage = Object.values(data.message).flat().map(String).join(', ');
+            } else if (typeof data === 'string') {
+                errorMessage = data;
+            } else if (error?.message) {
+                errorMessage = error.message;
             }
-            
+
             await Swal.fire({
                 title: 'Error!',
                 text: errorMessage,
@@ -299,13 +327,9 @@ const EditVoucher = ({ voucherId }) => {
                                             )}
                                             {voucherType === 'percentage' ? (
                                                 <input
-                                                    type="number"
-                                                    step="1"
-                                                    {...register("value", {
-                                                        required: "Nilai diskon harus diisi",
-                                                        min: { value: 1, message: "Nilai harus lebih dari 0" },
-                                                        max: { value: 100, message: "Persentase maksimal 100%" }
-                                                    })}
+                                                    type="text"
+                                                    value={formatRibuan(watch('value'))}
+                                                    onChange={(e) => setValue('value', parseRibuan(e.target.value), { shouldValidate: true })}
                                                     className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8`}
                                                     placeholder="10"
                                                 />
@@ -391,10 +415,10 @@ const EditVoucher = ({ voucherId }) => {
                                         <input
                                             type="text"
                                             value={formatRibuan(watch('maximum_discount'))}
-                                            {...register('maximum_discount', {
-                                                min: { value: 0, message: "Maksimal diskon tidak boleh negatif" },
-                                                setValueAs: (v) => parseRibuan(v)
-                                            })}
+                                            // {...register('maximum_discount', {
+                                            //     min: { value: 0, message: "Maksimal diskon tidak boleh negatif" },
+                                            //     setValueAs: (v) => parseRibuan(v)
+                                            // })}
                                             onChange={(e) => setValue('maximum_discount', parseRibuan(e.target.value), { shouldValidate: true })}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             placeholder="500000"

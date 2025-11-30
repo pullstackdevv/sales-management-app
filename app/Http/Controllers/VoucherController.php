@@ -135,10 +135,16 @@ class VoucherController extends Controller
             'free_product_name' => 'nullable|string|max:255'
         ]);
 
+        if (array_key_exists('usage_limit', $validated) && $validated['usage_limit'] !== null && $validated['usage_limit'] < $voucher->used_count) {
+            throw ValidationException::withMessages([
+                'usage_limit' => ['Batas Penggunaan tidak boleh kurang dari pemakaian saat ini.']
+            ]);
+        }
+
         // Validate percentage value
         if (isset($validated['type']) && $validated['type'] === 'percentage' && isset($validated['value']) && $validated['value'] > 100) {
             throw ValidationException::withMessages([
-                'value' => ['Percentage value cannot be greater than 100.']
+                'value' => ['Nilai Persentase tidak boleh lebih dari 100.']
             ]);
         }
 

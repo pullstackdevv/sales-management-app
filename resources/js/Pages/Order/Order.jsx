@@ -306,9 +306,9 @@ export default function Order() {
             />
           </div>
           <div className="flex gap-2">
-            {hasPermission('orders.export') && (
+            {/* {hasPermission('orders.export') && (
               <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
-            )}
+            )} */}
             {hasPermission('orders.create') && (
               <Link
                 href={route('cms.orders.create')}

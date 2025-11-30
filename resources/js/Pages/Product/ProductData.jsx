@@ -218,15 +218,15 @@ export default function ProductData() {
 
           <div className="flex gap-2">
             {hasPermission('products.import') && (
-              <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100" onClick={handleImportClick} disabled={importing}>
+              <button className="text-sm border-2 px-3 py-1 rounded-md hover:bg-gray-100" onClick={handleImportClick} disabled={importing}>
                 {importing ? "Mengimpor..." : "Impor Produk"}
               </button>
             )}
-            {hasPermission('products.export') && (
+            {/* {hasPermission('products.export') && (
               <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
                 Download
               </button>
-            )}
+            )} */}
             {hasPermission('products.create') && (
               <Link href="/cms/product/add">
                 <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">

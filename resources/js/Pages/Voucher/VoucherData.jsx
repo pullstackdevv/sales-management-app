@@ -414,7 +414,7 @@ const VoucherData = () => {
                                                     </span>
                                                     <div className="text-sm font-semibold text-gray-900">
                                                         {voucher.type === "percentage"
-                                                            ? `${voucher.value}%`
+                                                            ? `${Math.floor(voucher.value)}%`
                                                             : voucher.type === "fixed" || voucher.type === "shipping"
                                                             ? formatRupiah(voucher.value)
                                                             : voucher.free_product_name || "Produk Gratis"}

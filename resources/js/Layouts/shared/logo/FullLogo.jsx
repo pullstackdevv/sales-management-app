@@ -23,7 +23,7 @@ const FullLogo = () => {
       <img
         src={logoUrl}
         alt="logo"
-        className="block w-40"
+        className="block max-h-16"
       />
     </Link>
   );

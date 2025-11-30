@@ -265,8 +265,8 @@ const Homepage = () => {
         fetchData();
         const loadSettings = async () => {
             try {
-                const res = await axios.get('/api/general-settings/public');
-                if (res.data?.success) setBannerUrls(res.data.data?.marketplace_banners || []);
+                const res = await axios.get('/api/banners');
+                if (res.data?.success) setBannerUrls((res.data.data || []).map(b => b.image_url));
             } catch (e) {
                 console.error(e);
             }
@@ -465,7 +465,7 @@ const Homepage = () => {
                         )}
 
                         {/* Price */}
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col gap-0.5 ">
                             {variantInfo?.hasDiscount ? (
                                 <>
                                     <span className="text-xs text-gray-400 line-through">
@@ -576,74 +576,8 @@ const Homepage = () => {
         <MarketplaceLayout>
             {bannerUrls?.length > 0 ? (
                 <div className="bg-white">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
-                        <div className="relative group">
-                            {/* Navigation Buttons */}
-                            <button
-                                onClick={() => {
-                                    const container = document.getElementById('banner-scroll');
-                                    container.scrollBy({ left: -820, behavior: 'smooth' });
-                                }}
-                                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -ml-4"
-                            >
-                                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                </svg>
-                            </button>
-
-                            <button
-                                onClick={() => {
-                                    const container = document.getElementById('banner-scroll');
-                                    container.scrollBy({ left: 820, behavior: 'smooth' });
-                                }}
-                                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -mr-4"
-                            >
-                                <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-
-                            {/* Banner Container */}
-                            <div
-                                id="banner-scroll"
-                                className="overflow-x-auto scrollbar-hide scroll-smooth"
-                                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                            >
-                                <div className="flex gap-6 snap-x snap-mandatory pb-2">
-                                    {bannerUrls.map((url, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="snap-center flex-shrink-0 transform transition-all duration-300 hover:scale-[1.02]"
-                                        >
-                                            <div className="relative overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300">
-                                                <img
-                                                    src={url}
-                                                    alt={`Banner ${idx + 1}`}
-                                                    className="w-[800px] h-[200px] object-cover"
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Dots Indicator */}
-                            {bannerUrls.length > 1 && (
-                                <div className="flex justify-center gap-2 mt-6">
-                                    {bannerUrls.map((_, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => {
-                                                const container = document.getElementById('banner-scroll');
-                                                container.scrollTo({ left: idx * 820, behavior: 'smooth' });
-                                            }}
-                                            className="w-2 h-2 rounded-full bg-gray-300 hover:bg-gray-500 transition-all duration-300"
-                                        ></button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 ">
+                        <BannerRotator bannerUrls={bannerUrls} />
                     </div>
                 </div>
             ) : (
@@ -831,6 +765,93 @@ const Homepage = () => {
                 </div>
             </div>
         </MarketplaceLayout>
+    );
+};
+
+const BannerRotator = ({ bannerUrls }) => {
+    const [index, setIndex] = useState(0);
+    const [nextIndex, setNextIndex] = useState(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
+    useEffect(() => {
+        setIndex(0);
+    }, [bannerUrls]);
+
+    useEffect(() => {
+        if (!bannerUrls || bannerUrls.length <= 1) return;
+        const t = setTimeout(() => {
+            startTransition((index + 1) % bannerUrls.length);
+        }, 10000);
+        return () => clearTimeout(t);
+    }, [index, bannerUrls]);
+
+    const startTransition = (target) => {
+        if (target === index) return;
+        setNextIndex(target);
+        setIsTransitioning(true);
+        setTimeout(() => {
+            setIndex(target);
+            setIsTransitioning(false);
+            setNextIndex(null);
+        }, 700);
+    };
+
+    const prev = () => startTransition((index - 1 + bannerUrls.length) % bannerUrls.length);
+    const next = () => startTransition((index + 1) % bannerUrls.length);
+
+    if (!bannerUrls || bannerUrls.length === 0) return null;
+
+    return (
+        <div className="relative group">
+            <div className="relative overflow-hidden rounded-xl shadow-lg h-[120px] lg:h-[250px]">
+                <img
+                    key={`current-${index}`}
+                    src={bannerUrls[index]}
+                    alt={`Banner ${index + 1}`}
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+                />
+                {isTransitioning && nextIndex !== null && (
+                    <img
+                        key={`next-${nextIndex}`}
+                        src={bannerUrls[nextIndex]}
+                        alt={`Banner ${nextIndex + 1}`}
+                        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 opacity-100"
+                    />
+                )}
+            </div>
+            {bannerUrls.length > 1 && (
+                <>
+                    <button
+                        onClick={prev}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-2 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        aria-label="Previous banner"
+                    >
+                        <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={next}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-2 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        aria-label="Next banner"
+                    >
+                        <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <div className="flex justify-center gap-2 mt-3">
+                        {bannerUrls.map((_, i) => (
+                            <button
+                                key={i}
+                                onClick={() => startTransition(i)}
+                                className={`w-2 h-2 rounded-full ${i === index ? 'bg-gray-800' : 'bg-gray-300'}`}
+                                aria-label={`Go to banner ${i + 1}`}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
     );
 };
 

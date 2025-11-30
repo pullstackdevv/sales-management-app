@@ -213,7 +213,13 @@ export default function Cart() {
     }, [updateQuantity]);
 
     const handleRemoveItem = useCallback((id) => {
-        removeFromCart(id);
+        const updated = removeFromCart(id);
+        // Auto reload untuk memastikan tampilan konsisten dengan session
+        try {
+            if (!updated || updated.length === 0) {
+                setTimeout(() => window.location.reload(), 50);
+            }
+        } catch {}
     }, [removeFromCart]);
 
     const toggleSelect = useCallback((id) => {

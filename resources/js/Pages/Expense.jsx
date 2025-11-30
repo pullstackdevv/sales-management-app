@@ -335,13 +335,13 @@ export default function ExpensePage() {
                     </div>
 
                     <div className="flex gap-2">
-                        <Button className="text-sm border border-blue-600 text-blue-600">
+                        {/* <Button className="text-sm border border-blue-600 text-blue-600">
                             <Icon
                                 icon="mdi:download"
                                 className="text-lg mr-1"
                             />
                             Unduh Excel
-                        </Button>
+                        </Button> */}
                         <Button
                             onClick={() => setIsModalOpen(true)}
                             className="bg-blue-600 text-white"

@@ -19,13 +19,11 @@ class GeneralSettingController extends Controller
         ]);
     }
 
-    public function public(): JsonResponse
+    public function publicSettings(): JsonResponse
     {
         $keys = [
             'site_logo_path',
             'site_icon_path',
-            'marketplace_banner_path',
-            'marketplace_banners',
             'social_facebook_url',
             'social_instagram_url',
             'social_twitter_url',
@@ -41,21 +39,9 @@ class GeneralSettingController extends Controller
             return $path ? asset('storage/' . $path) : null;
         };
 
-        $banners = [];
-        if (!empty($settings['marketplace_banners'])) {
-            $decoded = json_decode($settings['marketplace_banners'], true);
-            if (is_array($decoded)) {
-                foreach ($decoded as $p) {
-                    $banners[] = $fileUrl($p);
-                }
-            }
-        }
-
         $result = [
             'site_logo_url' => $fileUrl($settings['site_logo_path'] ?? null),
             'site_icon_url' => $fileUrl($settings['site_icon_path'] ?? null),
-            'marketplace_banner_url' => $fileUrl($settings['marketplace_banner_path'] ?? null) ?? ($banners[0] ?? null),
-            'marketplace_banners' => $banners,
             'social_facebook_url' => $settings['social_facebook_url'] ?? null,
             'social_instagram_url' => $settings['social_instagram_url'] ?? null,
             'social_twitter_url' => $settings['social_twitter_url'] ?? null,
@@ -75,9 +61,6 @@ class GeneralSettingController extends Controller
         $request->validate([
             'site_logo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'site_icon' => 'nullable|file|mimes:jpg,jpeg,png,webp,ico,svg|max:1024',
-            'marketplace_banner' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:4096|dimensions:width=800,height=200',
-            'marketplace_banners' => 'nullable|array',
-            'marketplace_banners.*' => 'file|mimes:jpg,jpeg,png,webp|max:4096|dimensions:width=800,height=200',
             'social_facebook_url' => 'nullable|url',
             'social_instagram_url' => 'nullable|url',
             'social_twitter_url' => 'nullable|url',
@@ -88,7 +71,6 @@ class GeneralSettingController extends Controller
         $fileFields = [
             'site_logo' => 'site_logo_path',
             'site_icon' => 'site_icon_path',
-            'marketplace_banner' => 'marketplace_banner_path',
         ];
 
         foreach ($fileFields as $input => $settingName) {
@@ -110,28 +92,7 @@ class GeneralSettingController extends Controller
             }
         }
 
-        if ($request->hasFile('marketplace_banners')) {
-            $existing = GeneralSetting::where('setting_name', 'marketplace_banners')->first();
-            $paths = [];
-            if ($existing && $existing->setting_value) {
-                $decoded = json_decode($existing->setting_value, true);
-                if (is_array($decoded)) {
-                    $paths = $decoded;
-                }
-            }
-
-            foreach ($request->file('marketplace_banners') as $file) {
-                $ext = $file->getClientOriginalExtension();
-                $filename = 'marketplace_banner_' . Str::random(8) . '.' . $ext;
-                $path = $file->storeAs('settings', $filename, 'public');
-                $paths[] = $path;
-            }
-
-            GeneralSetting::updateOrCreate(
-                ['setting_name' => 'marketplace_banners'],
-                ['setting_value' => json_encode($paths), 'is_active' => true]
-            );
-        }
+        // remove banner handling
 
         $textFields = [
             'social_facebook_url',
@@ -168,7 +129,7 @@ class GeneralSettingController extends Controller
             ], 404);
         }
 
-        $fileFields = ['site_logo_path', 'site_icon_path', 'marketplace_banner_path'];
+        $fileFields = ['site_logo_path', 'site_icon_path'];
         if (in_array($settingName, $fileFields) && $setting->setting_value) {
             Storage::disk('public')->delete($setting->setting_value);
         }

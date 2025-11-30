@@ -35,7 +35,7 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
       <header className={`sticky top-0 z-50 shadow-sm ${isSticky ? "bg-white" : "bg-white"}`}>
         <Navbar fluid className="py-3 px-4 lg:px-6">
           {/* Left - Logo & Hamburger */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 max-h-10">
             {/* Hamburger Menu Button */}
             <button 
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors" 
@@ -63,8 +63,6 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
 
           {/* Right - Actions */}
           <div className="flex items-center gap-4 ml-auto">
-
-
 
             {/* Avatar & Dropdown */}
             <div className="relative">

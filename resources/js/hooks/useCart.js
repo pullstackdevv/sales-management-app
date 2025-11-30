@@ -119,10 +119,42 @@ export const useCart = () => {
     const removeFromCart = useCallback((itemId) => {
         const currentItems = loadCart();
         const updatedItems = currentItems.filter(item => item.id !== itemId);
-        
-        setCartItems(updatedItems);
-        saveCart(updatedItems);
-        
+
+        // Bersihkan legacy checkout_data jika perlu
+        try {
+            const rawLegacy = sessionStorage.getItem('checkout_data');
+            if (rawLegacy) {
+                let data = null;
+                try { data = JSON.parse(rawLegacy); } catch {}
+
+                if (Array.isArray(data)) {
+                    const next = data.filter(it => (it.variant_id ?? it.id) !== itemId);
+                    if (next.length > 0) sessionStorage.setItem('checkout_data', JSON.stringify(next));
+                    else sessionStorage.removeItem('checkout_data');
+                } else if (Array.isArray(data?.items)) {
+                    const nextItems = data.items.filter(it => (it.variant_id ?? it.id) !== itemId);
+                    if (nextItems.length > 0) sessionStorage.setItem('checkout_data', JSON.stringify({ ...data, items: nextItems }));
+                    else sessionStorage.removeItem('checkout_data');
+                } else if (data?.product) {
+                    const vid = data.product?.variant_id ?? data.product?.id;
+                    if (vid === itemId) sessionStorage.removeItem('checkout_data');
+                }
+            }
+        } catch {}
+
+        // Jika kosong, hapus semua sesi terkait keranjang
+        if (updatedItems.length === 0) {
+            setCartItems([]);
+            setCartCount(0);
+            sessionStorage.removeItem('cart');
+            // 'checkout_data' dibersihkan di atas, jaga-jaga hapus lagi
+            sessionStorage.removeItem('checkout_data');
+            window.dispatchEvent(new CustomEvent('cartUpdated', { detail: { items: [], count: 0 } }));
+        } else {
+            setCartItems(updatedItems);
+            saveCart(updatedItems);
+        }
+
         return updatedItems;
     }, [loadCart, saveCart]);
 

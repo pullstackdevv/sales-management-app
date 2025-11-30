@@ -36,6 +36,7 @@ use App\Http\Controllers\ProductSettingController;
 use App\Http\Controllers\OriginSettingController;
 use App\Http\Controllers\GeneralSettingController;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\BannerController;
 
 
 
@@ -74,7 +75,10 @@ Route::prefix('courier-rates')->group(function () {
 });
 
 // Public general settings
-Route::get('general-settings/public', [GeneralSettingController::class, 'public']);
+Route::get('general-settings/public', [GeneralSettingController::class, 'publicSettings']);
+
+// Public banners
+Route::get('banners', [BannerController::class, 'index']);
 
 // Dashboard, Analyzer, and Reports routes (using token authentication)
 Route::middleware('auth:sanctum')->group(function () {
@@ -202,6 +206,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('general-settings', [GeneralSettingController::class, 'index']);
     Route::post('general-settings/upsert', [GeneralSettingController::class, 'upsert']);
     Route::delete('general-settings/{settingName}', [GeneralSettingController::class, 'destroy']);
+
+    // Banner routes (admin)
+    Route::apiResource('banners', BannerController::class)->except(['index', 'show']);
+    Route::post('banners/reorder', [BannerController::class, 'reorder']);
 
     // Other authenticated routes remain here
 

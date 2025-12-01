@@ -120,7 +120,7 @@ export default function AddOrder() {
         if (!validateNewCustomer()) return;
         const payload = {
             name: newCustomer.full_name,
-            email: newCustomer.email || 'guest@example.com',
+            email: newCustomer.email || null,
             phone: newCustomer.phone,
             line_id: newCustomer.line_id || null,
             other_contact: newCustomer.other_contact || null,

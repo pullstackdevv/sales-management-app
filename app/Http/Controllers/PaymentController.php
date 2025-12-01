@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PaymentStatus;
+use App\Enums\StockMovementType;
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
+use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class PaymentController extends Controller
 {
@@ -530,6 +533,7 @@ class PaymentController extends Controller
             $paymentStatus = $this->mapXenditStatus($status);
 
             if ($order->payment_status !== $paymentStatus) {
+                // Update payment status
                 $order->update([
                     'payment_status' => $paymentStatus,
                     'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
@@ -537,6 +541,32 @@ class PaymentController extends Controller
 
                 if ($paymentStatus === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                }
+
+                // Handle cancellation or expiry: restore stock with note
+                if (in_array($paymentStatus, [PaymentStatus::EXPIRED, PaymentStatus::FAILED, PaymentStatus::CANCELLED])) {
+                    $alreadyRestocked = StockMovement::where('order_id', $order->id)
+                        ->where('type', StockMovementType::IN)
+                        ->where('note', 'like', "Cancel Order #{$order->order_number}%")
+                        ->exists();
+                    if (!$alreadyRestocked) {
+                        if ($order->status !== 'cancelled') {
+                            $order->update(['status' => 'cancelled']);
+                        }
+                        foreach ($order->items as $item) {
+                            $variant = $item->productVariant;
+                            $variant->increment('stock', $item->quantity);
+                            $actorId = Auth::id() ?? $order->user_id ?? $variant->created_by;
+                            StockMovement::create([
+                                'product_variant_id' => $item->product_variant_id,
+                                'order_id' => $order->id,
+                                'type' => StockMovementType::IN,
+                                'quantity' => $item->quantity,
+                                'note' => "Cancel Order #{$order->order_number} - Payment {$paymentStatus->value}",
+                                'created_by' => $actorId
+                            ]);
+                        }
+                    }
                 }
             }
 
@@ -591,6 +621,33 @@ class PaymentController extends Controller
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
                 }
+
+                // Handle cancellation/expiry/failed: restore stock with note
+                if (in_array($paymentStatusFromGateway, [PaymentStatus::EXPIRED, PaymentStatus::FAILED, PaymentStatus::CANCELLED])) {
+                    $alreadyRestocked = StockMovement::where('order_id', $order->id)
+                        ->where('type', StockMovementType::IN)
+                        ->where('note', 'like', "Cancel Order #{$order->order_number}%")
+                        ->exists();
+                    if (!$alreadyRestocked) {
+                        if ($order->status !== 'cancelled') {
+                            $order->update(['status' => 'cancelled']);
+                        }
+                        foreach ($order->items as $item) {
+                            $variant = $item->productVariant;
+                            $variant->increment('stock', $item->quantity);
+                            $actorId = Auth::id() ?? $order->user_id ?? $variant->created_by;
+                            StockMovement::create([
+                                'product_variant_id' => $item->product_variant_id,
+                                'order_id' => $order->id,
+                                'type' => StockMovementType::IN,
+                                'quantity' => $item->quantity,
+                                'note' => "Cancel Order #{$order->order_number} - Payment {$paymentStatusFromGateway->value}",
+                                'created_by' => $actorId
+                            ]);
+                        }
+                    }
+                }
+
                 $currentOrder = $order->fresh();
             }
 

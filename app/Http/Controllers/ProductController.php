@@ -576,18 +576,6 @@ class ProductController extends Controller
         }
 
         try {
-            if ($product->variants()->whereHas('orderItems')->exists()) {
-                throw ValidationException::withMessages([
-                    'product' => ['Cannot delete product that has been ordered.']
-                ]);
-            }
-
-            if ($product->variants()->whereHas('stockMovements')->exists()) {
-                throw ValidationException::withMessages([
-                    'product' => ['Cannot delete product that has stock movements.']
-                ]);
-            }
-
             DB::beginTransaction();
 
             // Delete product image if exists

@@ -17,8 +17,10 @@ export default function AddOrder() {
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
         status: 'pending',
+        payment_status: 'pending',
         payment_bank_id: '',
-        courier: ''
+        courier: '',
+        service_type: ''
     });
 
     const [orderItems, setOrderItems] = useState([]);
@@ -27,6 +29,9 @@ export default function AddOrder() {
     const [salesChannels, setSalesChannels] = useState([]);
     const [paymentBanks, setPaymentBanks] = useState([]);
     const [couriers, setCouriers] = useState([]);
+    const [courierRates, setCourierRates] = useState([]);
+    const [selectedRateIndex, setSelectedRateIndex] = useState(null);
+    const [loadingShipping, setLoadingShipping] = useState(false);
     const [origins, setOrigins] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
@@ -309,17 +314,17 @@ export default function AddOrder() {
     };
 
     // Handle courier selection and auto-fill shipping cost
-    const handleCourierSelect = (courierId) => {
+    const handleCourierSelect = async (courierId) => {
         const selectedCourier = couriers.find(courier => courier.id == courierId);
-        
-        setFormData(prev => ({ 
-            ...prev, 
-            courier: courierId,
-            // Auto-fill shipping cost only if not manually edited and courier has cost
-            shipping_cost: !isShippingCostManuallyEdited && selectedCourier?.cost 
-                ? parseFloat(selectedCourier.cost) 
-                : prev.shipping_cost
-        }));
+        setFormData(prev => ({ ...prev, courier: courierId }));
+        const courierName = (selectedCourier?.name || '').toLowerCase();
+        if (courierName.includes('tiki')) {
+            await fetchCourierRatesForManual();
+        } else {
+            setCourierRates([]);
+            setSelectedRateIndex(null);
+            setFormData(prev => ({ ...prev, service_type: '' }));
+        }
     };
 
     // Handle manual shipping cost change
@@ -335,6 +340,139 @@ export default function AddOrder() {
             setFormData(prev => ({ ...prev, shipping_cost: parseFloat(selectedCourier.cost) }));
             setIsShippingCostManuallyEdited(false);
         }
+    };
+
+    const calculateTotalWeight = () => {
+        if (!orderItems || orderItems.length === 0) return 0;
+        return orderItems.reduce((sum, item) => {
+            const w = item.variant_weight ?? item.weight ?? 1;
+            const q = item.quantity || 1;
+            return sum + ((typeof w === 'number' ? w : parseFloat(w) || 1) * q);
+        }, 0);
+    };
+
+    const getRoundedWeight = (totalWeight, rate) => {
+        const name = rate?.courier?.name?.toLowerCase() || rate?.courier_name?.toLowerCase() || '';
+        if (name.includes('tiki')) {
+            if (totalWeight <= 1.5) return 1;
+            return Math.ceil(totalWeight);
+        }
+        return Math.ceil(totalWeight);
+    };
+
+    const selectDefaultRateIndex = (rates) => {
+        if (!rates || rates.length === 0) return null;
+        const tw = calculateTotalWeight();
+        let bestIdx = 0;
+        let bestCost = Infinity;
+        for (let i = 0; i < rates.length; i++) {
+            const r = rates[i];
+            const pricing = r.pricing || {};
+            const availability = r.availability || {};
+            const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
+            const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
+            const w = getRoundedWeight(tw, r);
+            const effW = Math.max(w, minW);
+            if (maxW && effW > maxW) continue;
+            if (availability.is_available === false) continue;
+            const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
+            const bp = pricing.base_price ?? r.base_price ?? 0;
+            const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
+            const cost = pricingType === 'flat' ? bp : bp + (Math.max(0, effW - minW) * ppk);
+            if (cost < bestCost) {
+                bestCost = cost;
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
+    };
+
+    const calculateShippingCostFromRate = (rates, district, indexOverride = null) => {
+        if (!rates || rates.length === 0) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        const tw = calculateTotalWeight();
+        const idx = typeof indexOverride === 'number' ? indexOverride : (typeof selectedRateIndex === 'number' ? selectedRateIndex : 0);
+        const r = rates[idx];
+        if (!r) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        const pricing = r.pricing || {};
+        const availability = r.availability || {};
+        const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
+        const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
+        const rounded = getRoundedWeight(tw, r);
+        const effW = Math.max(rounded, minW);
+        if (maxW && effW > maxW) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        if (availability.is_available === false) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
+        const bp = pricing.base_price ?? r.base_price ?? 0;
+        const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
+        const extra = Math.max(0, effW - minW);
+        const cost = pricingType === 'flat' ? bp : bp + (extra * ppk);
+        setFormData(prev => ({ ...prev, shipping_cost: cost }));
+    };
+
+    const fetchCourierRatesForManual = async () => {
+        if (!selectedCustomer) return;
+        const addressId = parseInt(formData.address_id);
+        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
+        const dest = selectedAddress || selectedCustomer;
+        const district = dest?.district || '';
+        const city = dest?.city || '';
+        const province = dest?.province || '';
+        setLoadingShipping(true);
+        try {
+            const params = new URLSearchParams();
+            params.append('page', '1');
+            params.append('per_page', '50');
+            params.append('sort_by', 'base_price');
+            params.append('sort_order', 'asc');
+            if (district) params.append('district', district);
+            if (city) params.append('city', city);
+            if (province) params.append('province', province);
+            params.append('courier_name', 'TIKI');
+            const res = await axios.get(`/api/courier-rates?${params.toString()}`);
+            const rates = res.data?.data?.rates || [];
+            const allowed = ['ECO','REG','ONS'];
+            const filtered = (rates || []).filter(r => {
+                const code = r?.service?.type || r?.service_type;
+                return allowed.includes((code || '').toString().toUpperCase());
+            });
+            setCourierRates(filtered);
+            const defIdx = selectDefaultRateIndex(filtered);
+            setSelectedRateIndex(defIdx);
+            const svc = filtered[defIdx];
+            setFormData(prev => ({ ...prev, service_type: (svc?.service?.name || svc?.service_type || '') }));
+            calculateShippingCostFromRate(filtered, district, defIdx);
+            setIsShippingCostManuallyEdited(false);
+        } catch (e) {
+            setCourierRates([]);
+            setSelectedRateIndex(null);
+        } finally {
+            setLoadingShipping(false);
+        }
+    };
+
+    const handleServiceSelect = (index) => {
+        const idx = parseInt(index);
+        setSelectedRateIndex(idx);
+        const svc = courierRates[idx];
+        setFormData(prev => ({ ...prev, service_type: (svc?.service?.name || svc?.service_type || '') }));
+        const addressId = parseInt(formData.address_id);
+        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
+        const dest = selectedAddress || selectedCustomer;
+        const district = dest?.district || '';
+        calculateShippingCostFromRate(courierRates, district, idx);
+        setIsShippingCostManuallyEdited(false);
     };
 
     // Handle product selection and add to cart
@@ -429,9 +567,10 @@ export default function AddOrder() {
                 shipping_cost: formData.shipping_cost,
                 notes: formData.notes,
                 status: formData.status,
-                payment_status: formData.payment_status,
+                payment_status: formData.payment_status || (formData.status === 'paid' ? 'paid' : 'pending'),
                 payment_bank_id: formData.payment_bank_id || null,
                 courier_id: formData.courier || null,
+                courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,
                 service_type: formData.service_type || null
             };
             
@@ -729,43 +868,82 @@ export default function AddOrder() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Ongkos Kirim
-                                </label>
-                                <div className="flex gap-2">
-                                    <input
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Ongkos Kirim</label>
+                                {formData.courier && (couriers.find(c => c.id == formData.courier)?.name || '').toLowerCase().includes('tiki') ? (
+                                  <div className="space-y-2">
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Service</label>
+                                      <select
+                                        value={typeof selectedRateIndex === 'number' ? selectedRateIndex : ''}
+                                        onChange={(e) => handleServiceSelect(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                      >
+                                        <option value="">Pilih layanan</option>
+                                        {courierRates.map((rate, idx) => (
+                                          <option key={rate.id || idx} value={idx}>
+                                            {(rate?.service?.name || rate?.service_type || 'Layanan')} - Rp {(function(){
+                                              const p = rate.pricing || {};
+                                              const minW = typeof p.min_weight === 'number' && p.min_weight > 0 ? p.min_weight : 1;
+                                              const totalW = calculateTotalWeight();
+                                              const effW = Math.max(getRoundedWeight(totalW, rate), minW);
+                                              const pricePerKg = p.price_per_kg ?? rate.price_per_kg ?? 0;
+                                              const basePrice = p.base_price ?? rate.base_price ?? 0;
+                                              const pricingType = p.pricing_type || rate.pricing_type || 'per_kg';
+                                              const extra = Math.max(0, effW - minW);
+                                              const cost = pricingType === 'flat' ? basePrice : basePrice + (extra * pricePerKg);
+                                              return Number(cost).toLocaleString('id-ID');
+                                            })()}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={formatRibuan(formData.shipping_cost)}
+                                        disabled
+                                        className="flex-1 px-3 py-2 border rounded-lg border-gray-300 bg-gray-100"
+                                      />
+                                    </div>
+                                    {typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.delivery?.estimated_days && (
+                                      <p className="text-xs text-gray-500">ETA {courierRates[selectedRateIndex].delivery.estimated_days} hari</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex gap-2">
+                                      <input
                                         type="text"
                                         placeholder="0"
                                         value={formatRibuan(formData.shipping_cost)}
                                         onChange={(e) => handleShippingCostChange(e.target.value)}
                                         className={`flex-1 px-3 py-2 border rounded-lg ${
-                                            isShippingCostManuallyEdited ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                                          isShippingCostManuallyEdited ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
                                         }`}
-                                    />
-                                    {formData.courier && couriers.find(c => c.id == formData.courier)?.cost && (
+                                      />
+                                      {formData.courier && couriers.find(c => c.id == formData.courier)?.cost && (
                                         <button
-                                            type="button"
-                                            onClick={resetShippingCost}
-                                            className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                                            title="Reset ke biaya kurir default"
+                                          type="button"
+                                          onClick={resetShippingCost}
+                                          className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                          title="Reset ke biaya kurir default"
                                         >
-                                            <Icon icon="solar:restart-outline" className="w-4 h-4" />
+                                          <Icon icon="solar:restart-outline" className="w-4 h-4" />
                                         </button>
-                                    )}
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                    <p className="text-gray-500 text-xs">
-                                        {isShippingCostManuallyEdited 
-                                            ? 'Diedit manual' 
-                                            : 'Otomatis dari kurir yang dipilih'
-                                        }
-                                    </p>
-                                    {formData.courier && couriers.find(c => c.id == formData.courier)?.cost && (
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between mt-1">
+                                      <p className="text-gray-500 text-xs">
+                                        {isShippingCostManuallyEdited ? 'Diedit manual' : 'Otomatis dari kurir yang dipilih'}
+                                      </p>
+                                      {formData.courier && couriers.find(c => c.id == formData.courier)?.cost && (
                                         <p className="text-xs text-gray-400">
-                                            Default: Rp {Number(couriers.find(c => c.id == formData.courier).cost).toLocaleString('id-ID')}
+                                          Default: Rp {Number(couriers.find(c => c.id == formData.courier).cost).toLocaleString('id-ID')}
                                         </p>
-                                    )}
-                                </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                             </div>
 
 

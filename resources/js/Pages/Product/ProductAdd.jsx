@@ -163,7 +163,10 @@ export default function ProductAdd() {
         formData.append(`variants[${index}][base_price]`, variant.base_price);
         const weightKg = variant.weight ? Number(variant.weight) / 1000 : 0;
         formData.append(`variants[${index}][weight]`, weightKg);
-        formData.append(`variants[${index}][stock]`, variant.stock);
+        const normalizedStock = (variant.stock === '' || variant.stock === null || variant.stock === undefined)
+          ? 0
+          : Number(variant.stock);
+        formData.append(`variants[${index}][stock]`, Number.isNaN(normalizedStock) ? 0 : normalizedStock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
         formData.append(`variants[${index}][is_storefront]`, variant.is_storefront ? '1' : '0');
         if (variant.image && typeof variant.image !== 'string') {
@@ -484,7 +487,6 @@ export default function ProductAdd() {
                             value={formatRibuan(variant.stock)}
                             onChange={(e) => updateVariant(index, 'stock', parseRibuan(e.target.value))}
                             onFocus={() => { if (variant.stock === 0) updateVariant(index, 'stock', ''); }}
-                            
                           />
                           {errors[`variants.${index}.stock`] && (
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.stock`][0]}</p>

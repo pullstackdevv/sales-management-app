@@ -32,6 +32,8 @@ export default function StockHistoryModal({
         page,
         per_page: pagination.per_page,
         product_variant_id: variant.id,
+        sort_by: 'created_at',
+        sort_direction: 'asc',
         ...(filters.type && { type: filters.type }),
         ...(filters.search && { search: filters.search })
       };
@@ -120,9 +122,79 @@ export default function StockHistoryModal({
         onClick={() => handleOrderClick(movement.order_id)}
         className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
       >
-        {movement.note || 'Lihat Order'}
+        {movement.note || `Order #${movement.order?.order_number}`}
       </button>
     );
+  };
+
+  const getDescription = (movement) => {
+    const isIn = movement.type === 'in';
+    const isOut = movement.type === 'out';
+    const isAdj = movement.type === 'adjustment';
+
+    if (isIn) {
+      if (movement.order) {
+        const noteText = (movement.note || '').toLowerCase();
+        if (noteText.includes('cancel')) {
+          return `Cancel Order #${movement.order.order_number}`;
+        }
+        return `Retur Order #${movement.order.order_number}`;
+      }
+      return movement.note || 'Barang Masuk/Tambah Stok';
+    }
+
+    if (isOut) {
+      if (movement.order) {
+        return `Order #${movement.order.order_number}`;
+      }
+      return movement.note || 'Pengurangan Stok';
+    }
+
+    if (isAdj) {
+      const noteText = (movement.note || '').toLowerCase();
+      if (noteText.includes('increase')) {
+        return 'Penyesuaian (Tambah)';
+      }
+      if (noteText.includes('decrease')) {
+        return 'Penyesuaian (Kurang)';
+      }
+      return 'Penyesuaian Stok';
+    }
+
+    return movement.note || '-';
+  };
+
+  const computeRowsWithRunning = (list) => {
+    let running = 0;
+    return list.map((m) => {
+      const isAdj = m.type === 'adjustment';
+      let stockIn = 0;
+      let stockOut = 0;
+      if (isAdj) {
+        const noteText = (m.note || '').toLowerCase();
+        if (noteText.includes('increase')) {
+          stockIn = m.quantity;
+          running += m.quantity;
+        } else if (noteText.includes('decrease')) {
+          stockOut = m.quantity;
+          running -= m.quantity;
+        } else {
+          running = m.quantity;
+        }
+      } else if (m.type === 'in') {
+        stockIn = m.quantity;
+        running += m.quantity;
+      } else if (m.type === 'out') {
+        stockOut = m.quantity;
+        running -= m.quantity;
+      }
+      return {
+        ...m,
+        stockIn,
+        stockOut,
+        running,
+      };
+    });
   };
 
   if (!isOpen) return null;
@@ -193,43 +265,29 @@ export default function StockHistoryModal({
               <p className="text-gray-500">Belum ada riwayat pergerakan stok</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {movements.map((movement) => (
-                <div key={movement.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-full ${getTypeColor(movement.type)}`}>
-                        <Icon icon={getTypeIcon(movement.type)} className="text-lg" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(movement.type)}`}>
-                            {getTypeLabel(movement.type)}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {formatDate(movement.created_at)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-900 mb-1">
-                          {renderNote(movement)}
-                        </p>
-                        {movement.created_by && (
-                          <p className="text-xs text-gray-500">
-                            Oleh: {movement.created_by.name}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-lg font-semibold ${
-                        movement.type === 'in' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {movement.type === 'in' ? '+' : '-'}{movement.quantity}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b">
+                    <th className="px-3 py-2">Tanggal</th>
+                    <th className="px-3 py-2">Deskripsi</th>
+                    <th className="px-3 py-2">Stock In</th>
+                    <th className="px-3 py-2">Stock Out</th>
+                    <th className="px-3 py-2">Running Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {computeRowsWithRunning(movements).map((m) => (
+                    <tr key={m.id} className="border-b hover:bg-gray-50">
+                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(m.created_at)}</td>
+                      <td className="px-3 py-2">{getDescription(m)}</td>
+                      <td className="px-3 py-2 text-green-600 font-semibold">{m.stockIn || ''}</td>
+                      <td className="px-3 py-2 text-red-600 font-semibold">{m.stockOut || ''}</td>
+                      <td className="px-3 py-2 font-semibold">{m.running}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

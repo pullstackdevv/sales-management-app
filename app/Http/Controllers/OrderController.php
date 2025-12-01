@@ -281,31 +281,23 @@ class OrderController extends Controller
                 );
             }
 
-            // Create payment record if payment data is provided
-            if (isset($validated['payment_bank_id']) && ($validated['payment_status'] ?? 'pending') === 'paid') {
+            // Create payment record if payment bank is provided (manual payment)
+            if (!empty($validated['payment_bank_id'])) {
                 $order->payments()->create([
                     'payment_bank_id' => $validated['payment_bank_id'],
                     'amount_paid' => $validated['amount_paid'] ?? $totalPrice,
                     'paid_at' => now(),
                     'proof_image' => $validated['proof_image'] ?? '',
-                    'verified_by' => null, // Will be set when admin verifies
+                    'verified_by' => null,
                     'verified_at' => null
                 ]);
-                
-                // Update order status and payment status when payment is made
-                $order->update([
-                    'status' => 'paid',
-                    'payment_status' => 'paid'
-                ]);
-            } else {
-                // Remove payment record if payment_bank_id is not provided or payment_status is not paid
-                $order->payments()->delete();
-                
-                // Update order status back to pending if no payment
-                $order->update([
-                    'status' => 'pending',
-                    'payment_status' => 'pending'
-                ]);
+                // Only set order as paid if request indicates paid
+                if (($validated['payment_status'] ?? 'pending') === 'paid') {
+                    $order->update([
+                        'status' => 'paid',
+                        'payment_status' => 'paid'
+                    ]);
+                }
             }
 
             // Create shipping record if courier is provided
@@ -413,60 +405,95 @@ class OrderController extends Controller
 
             // Update items if provided
             if (isset($validated['items'])) {
-                // Delete existing items and restore stock
-                foreach ($order->items as $item) {
-                    $variant = $item->productVariant;
-                    $variant->increment('stock', $item->quantity);
-                    
-                    // Record stock movement for item removal
-                    $this->recordStockMovement(
-                        $item->product_variant_id,
-                        StockMovementType::IN,
-                        $item->quantity,
-                        "Order #{$order->id} items updated - Stock returned"
-                    );
-                    
-                    $item->delete();
-                }
+                $existingItems = $order->items()->get()->keyBy('product_variant_id');
+                $incomingItems = collect($validated['items'])->keyBy('product_variant_id');
 
-                // Calculate new subtotal
-                $subtotal = collect($validated['items'])->sum(function ($item) {
-                    return $item['quantity'] * $item['price'];
-                });
-
-                // Create new items and update stock
-                foreach ($validated['items'] as $item) {
-                    $variant = ProductVariant::findOrFail($item['product_variant_id']);
-
-                    if ($variant->stock < $item['quantity']) {
-                        throw ValidationException::withMessages([
-                            'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, diminta: {$item['quantity']}"]
-                        ]);
+                // Handle removals and decreases
+                foreach ($existingItems as $pvId => $oldItem) {
+                    $variant = $oldItem->productVariant;
+                    if (!$incomingItems->has($pvId)) {
+                        // Item removed: return full quantity
+                        $variant->increment('stock', $oldItem->quantity);
+                        $this->recordStockMovement(
+                            $pvId,
+                            StockMovementType::IN,
+                            $oldItem->quantity,
+                            "Order #{$order->order_number} item removed - Stock returned",
+                            $order->id
+                        );
+                        $oldItem->delete();
+                        continue;
                     }
 
-                    $order->items()->create([
-                        'product_variant_id' => $item['product_variant_id'],
-                        'product_name_snapshot' => $variant->product->name,
-                        'variant_label' => $variant->variant_label,
-                        'quantity' => $item['quantity'],
-                        'price' => $item['price'],
-                        'base_price' => $variant->product->base_price,
-                        'subtotal' => $item['quantity'] * $item['price']
+                    $newItem = $incomingItems->get($pvId);
+                    $delta = (int)$newItem['quantity'] - (int)$oldItem->quantity;
+                    // Update price/subtotal regardless of delta
+                    $oldItem->update([
+                        'price' => $newItem['price'],
+                        'subtotal' => (int)$newItem['quantity'] * (float)$newItem['price']
                     ]);
 
-                    // Update stock
-                    $variant->decrement('stock', $item['quantity']);
-                    
-                    // Record stock movement
+                    if ($delta > 0) {
+                        // Quantity increased: decrease stock by delta and record OUT
+                        if ($variant->stock < $delta) {
+                            throw ValidationException::withMessages([
+                                'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, tambahan diminta: {$delta}"]
+                            ]);
+                        }
+                        $variant->decrement('stock', $delta);
+                        $this->recordStockMovement(
+                            $pvId,
+                            StockMovementType::OUT,
+                            $delta,
+                            "Order #{$order->order_number} qty increased",
+                            $order->id
+                        );
+                        $oldItem->update(['quantity' => (int)$newItem['quantity']]);
+                    } elseif ($delta < 0) {
+                        // Quantity decreased: return stock by -delta and record IN
+                        $variant->increment('stock', -$delta);
+                        $this->recordStockMovement(
+                            $pvId,
+                            StockMovementType::IN,
+                            -$delta,
+                            "Order #{$order->order_number} qty decreased - Stock returned",
+                            $order->id
+                        );
+                        $oldItem->update(['quantity' => (int)$newItem['quantity']]);
+                    }
+                    // If delta == 0: no stock movement
+                }
+
+                // Handle additions
+                foreach ($incomingItems as $pvId => $newItem) {
+                    if ($existingItems->has($pvId)) continue;
+                    $variant = ProductVariant::findOrFail($pvId);
+                    if ($variant->stock < (int)$newItem['quantity']) {
+                        throw ValidationException::withMessages([
+                            'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, diminta: {$newItem['quantity']}"]
+                        ]);
+                    }
+                    $order->items()->create([
+                        'product_variant_id' => $pvId,
+                        'product_name_snapshot' => $variant->product->name,
+                        'variant_label' => $variant->variant_label,
+                        'quantity' => (int)$newItem['quantity'],
+                        'price' => (float)$newItem['price'],
+                        'base_price' => $variant->product->base_price,
+                        'subtotal' => (int)$newItem['quantity'] * (float)$newItem['price']
+                    ]);
+                    $variant->decrement('stock', (int)$newItem['quantity']);
                     $this->recordStockMovement(
-                        $item['product_variant_id'],
+                        $pvId,
                         StockMovementType::OUT,
-                        $item['quantity'],
-                        "Order #{$order->id} updated - {$order->customer->name}"
+                        (int)$newItem['quantity'],
+                        "Order #{$order->order_number} item added",
+                        $order->id
                     );
                 }
 
-                // Store subtotal for later total calculation (as variable, not database field)
+                // Recalculate subtotal from current items after updates
+                $subtotal = $order->items()->sum(DB::raw('quantity * price'));
                 $calculatedSubtotal = $subtotal;
             }
 
@@ -491,8 +518,8 @@ class OrderController extends Controller
                 $order->update(['status' => $validated['status']]);
             }
 
-            // Update or create payment record if payment data is provided
-            if (isset($validated['payment_bank_id']) && ($validated['payment_status'] ?? 'pending') === 'paid') {
+            // Update or create payment record if payment bank is provided (manual payment)
+            if (!empty($validated['payment_bank_id'])) {
                 $order->payments()->updateOrCreate(
                     ['order_id' => $order->id],
                     [
@@ -504,12 +531,12 @@ class OrderController extends Controller
                         'verified_at' => null
                     ]
                 );
-                
-                // Update order status and payment status when payment is made
-                $order->update([
-                    'status' => 'paid',
-                    'payment_status' => 'paid'
-                ]);
+                if (($validated['payment_status'] ?? 'pending') === 'paid') {
+                    $order->update([
+                        'status' => 'paid',
+                        'payment_status' => 'paid'
+                    ]);
+                }
             }
 
             // Update or create shipping record if courier is provided

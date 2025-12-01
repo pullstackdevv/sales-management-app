@@ -102,6 +102,8 @@ export default function ProductEdit() {
         is_storefront: productData?.is_storefront ?? true,
         variants: (productData.variants || []).map(variant => ({
           ...variant,
+          // normalize weight from kg (stored) to grams (UI), remove decimals
+          weight: variant.weight != null ? Math.round(Number(variant.weight) * 1000) : 0,
           is_active: variant.is_active ?? true,
           is_storefront: variant.is_storefront ?? true
         }))
@@ -258,7 +260,10 @@ export default function ProductEdit() {
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price || 0);
         formData.append(`variants[${index}][discount_price]`, variant.discount_price || '');
-        formData.append(`variants[${index}][weight]`, variant.weight || 0);
+        const weightKg = (variant.weight === '' || variant.weight === null || variant.weight === undefined)
+          ? 0
+          : Number(variant.weight) / 1000;
+        formData.append(`variants[${index}][weight]`, Number.isNaN(weightKg) ? 0 : weightKg);
         formData.append(`variants[${index}][stock]`, variant.stock);
         formData.append(`variants[${index}][is_active]`, variant.is_active ? '1' : '0');
         formData.append(`variants[${index}][is_storefront]`, variant.is_storefront ? '1' : '0');
@@ -632,6 +637,7 @@ export default function ProductEdit() {
                                 value={formatRibuan(variant.stock)}
                                 onChange={(e) => updateVariant(index, 'stock', parseRibuan(e.target.value))}
                                 onFocus={() => { if (variant.stock === 0) updateVariant(index, 'stock', ''); }}
+                                readOnly
                                 // required
                               />
                               <button

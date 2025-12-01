@@ -28,7 +28,7 @@ class StockMovement extends Model
     // Relationships
     public function productVariant()
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(ProductVariant::class)->withTrashed();
     }
 
     public function order()

@@ -8,6 +8,8 @@ use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\StockMovement;
+use App\Enums\StockMovementType;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Voucher;
@@ -278,6 +280,16 @@ class WebOrderController extends Controller
                 // Update stock
                 $variant = ProductVariant::findOrFail($item['product_variant_id']);
                 $variant->decrement('stock', $item['quantity']);
+
+                // Record stock movement (OUT) for marketplace/web order
+                StockMovement::create([
+                    'product_variant_id' => $item['product_variant_id'],
+                    'order_id' => $order->id,
+                    'type' => StockMovementType::OUT,
+                    'quantity' => $item['quantity'],
+                    'note' => "Order #{$order->order_number} - Web Order",
+                    'created_by' => $variant->created_by
+                ]);
             }
 
             // Note: Voucher used_count will be updated when payment is confirmed

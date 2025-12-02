@@ -58,6 +58,40 @@ class OrderController extends Controller
                     $query->whereNotNull('payment_url');
                 }
             })
+            ->when($request->start_date || $request->end_date, function ($query) use ($request) {
+                try {
+                    $start = $request->start_date ? \Carbon\Carbon::parse($request->start_date)->startOfDay() : null;
+                    $end = $request->end_date ? \Carbon\Carbon::parse($request->end_date)->endOfDay() : null;
+
+                    if ($start && $end) {
+                        $query->where(function ($q) use ($start, $end) {
+                            $q->whereBetween('ordered_at', [$start, $end])
+                              ->orWhere(function ($qq) use ($start, $end) {
+                                  $qq->whereNull('ordered_at')
+                                     ->whereBetween('created_at', [$start, $end]);
+                              });
+                        });
+                    } elseif ($start) {
+                        $query->where(function ($q) use ($start) {
+                            $q->where('ordered_at', '>=', $start)
+                              ->orWhere(function ($qq) use ($start) {
+                                  $qq->whereNull('ordered_at')
+                                     ->where('created_at', '>=', $start);
+                              });
+                        });
+                    } elseif ($end) {
+                        $query->where(function ($q) use ($end) {
+                            $q->where('ordered_at', '<=', $end)
+                              ->orWhere(function ($qq) use ($end) {
+                                  $qq->whereNull('ordered_at')
+                                     ->where('created_at', '<=', $end);
+                              });
+                        });
+                    }
+                } catch (\Exception $e) {
+                    // Ignore invalid date formats and skip filtering
+                }
+            })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
                 $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
             }, function ($query) {
@@ -367,19 +401,16 @@ class OrderController extends Controller
             'is_dropship' => 'nullable|boolean'
         ]);
 
-        // Batasi edit order berdasarkan status dan payment gateway
-        if ($order->payments()->exists()) {
-            // Jika order memiliki payment gateway, hanya izinkan update status ke shipped/delivered
-            if (in_array($order->status, ['paid', 'pending', 'cancelled'])) {
-                $allowedStatusUpdates = ['shipped', 'delivered'];
-                if (isset($validated['status']) && !in_array($validated['status'], $allowedStatusUpdates)) {
-                    throw ValidationException::withMessages([
-                        'status' => ['Orders with payment gateway can only be updated to shipped or delivered status.']
-                    ]);
-                }
-                // Hanya izinkan update status, tidak boleh edit field lain
-                $validated = array_intersect_key($validated, array_flip(['status']));
+        // Batasi edit order khusus untuk order dengan payment gateway (memiliki payment_url)
+        if (!is_null($order->payment_url)) {
+            $allowedStatusUpdates = ['shipped', 'delivered'];
+            if (isset($validated['status']) && !in_array($validated['status'], $allowedStatusUpdates)) {
+                throw ValidationException::withMessages([
+                    'status' => ['Orders with payment gateway can only be updated to shipped or delivered status.']
+                ]);
             }
+            // Untuk gateway: hanya izinkan perubahan status, field lain diabaikan
+            $validated = array_intersect_key($validated, array_flip(['status']));
         }
 
         try {
@@ -405,6 +436,35 @@ class OrderController extends Controller
 
             // Update items if provided
             if (isset($validated['items'])) {
+                // Short-circuit: if items are identical (same variants, qty, price), skip stock operations
+                $existingItemsSnapshot = $order->items()->get(['product_variant_id','quantity','price'])->map(function($i){
+                    return [
+                        'product_variant_id' => (int)$i->product_variant_id,
+                        'quantity' => (int)$i->quantity,
+                        'price' => (float)$i->price,
+                    ];
+                })->sortBy('product_variant_id')->values()->toArray();
+                $incomingItemsSnapshot = collect($validated['items'])->map(function($i){
+                    return [
+                        'product_variant_id' => (int)$i['product_variant_id'],
+                        'quantity' => (int)$i['quantity'],
+                        'price' => (float)$i['price'],
+                    ];
+                })->sortBy('product_variant_id')->values()->toArray();
+
+                if ($existingItemsSnapshot === $incomingItemsSnapshot) {
+                    // Still update subtotals in case of rounding changes, but do not touch stock
+                    foreach ($order->items as $item) {
+                        $match = collect($validated['items'])->firstWhere('product_variant_id', $item->product_variant_id);
+                        if ($match) {
+                            $item->update([
+                                'price' => (float)$match['price'],
+                                'subtotal' => (int)$match['quantity'] * (float)$match['price'],
+                            ]);
+                        }
+                    }
+                    $calculatedSubtotal = $order->items()->sum(DB::raw('quantity * price'));
+                } else {
                 $existingItems = $order->items()->get()->keyBy('product_variant_id');
                 $incomingItems = collect($validated['items'])->keyBy('product_variant_id');
 
@@ -495,6 +555,7 @@ class OrderController extends Controller
                 // Recalculate subtotal from current items after updates
                 $subtotal = $order->items()->sum(DB::raw('quantity * price'));
                 $calculatedSubtotal = $subtotal;
+                }
             }
 
             // Update shipping cost if provided

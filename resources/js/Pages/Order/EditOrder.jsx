@@ -20,7 +20,8 @@ export default function EditOrder() {
         order_date: new Date().toISOString().split('T')[0],
         status: 'pending',
         payment_bank_id: '',
-        courier: ''
+        courier: '',
+        service_type: ''
     });
 
     const [orderItems, setOrderItems] = useState([]);
@@ -30,9 +31,13 @@ export default function EditOrder() {
     const [paymentBanks, setPaymentBanks] = useState([]);
     const [couriers, setCouriers] = useState([]);
     const [origins, setOrigins] = useState([]);
+    const [courierRates, setCourierRates] = useState([]);
+    const [selectedRateIndex, setSelectedRateIndex] = useState(null);
+    const [loadingShipping, setLoadingShipping] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     const [originalOrder, setOriginalOrder] = useState(null);
+    const [isShippingCostManuallyEdited, setIsShippingCostManuallyEdited] = useState(false);
     
     // Loading states
     const [loading, setLoading] = useState({
@@ -54,6 +59,16 @@ export default function EditOrder() {
     
     // Error states
     const [errors, setErrors] = useState({});
+
+    const formatRupiah = (num) => {
+        if (!num || num === 0) return '';
+        return Math.floor(num).toLocaleString('id-ID');
+    };
+
+    const parseRupiah = (str) => {
+        if (!str) return 0;
+        return parseInt(str.toString().replace(/\./g, '')) || 0;
+    };
 
     // Fetch existing order data
     const fetchOrder = async () => {
@@ -78,7 +93,9 @@ export default function EditOrder() {
                 order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
                 status: order.status || 'pending',
                 payment_bank_id: paymentBankId,
-                courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : ''
+                courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : '',
+                service_type: (order.shipping && order.shipping.service_type) ? order.shipping.service_type : '',
+                origin_setting_id: order.origin_setting_id ? String(order.origin_setting_id) : ''
             });
             
             // Set order items with complete variant details
@@ -313,6 +330,153 @@ export default function EditOrder() {
         return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0);
     };
 
+    const calculateTotalWeight = () => {
+        if (!orderItems || orderItems.length === 0) return 0;
+        return orderItems.reduce((sum, item) => {
+            const w = item.variant_weight ?? item.weight ?? 1;
+            const q = item.quantity || 1;
+            return sum + ((typeof w === 'number' ? w : parseFloat(w) || 1) * q);
+        }, 0);
+    };
+
+    const getRoundedWeight = (totalWeight, rate) => {
+        const name = rate?.courier?.name?.toLowerCase() || rate?.courier_name?.toLowerCase() || '';
+        if (name.includes('tiki')) {
+            if (totalWeight <= 1.5) return 1;
+            return Math.ceil(totalWeight);
+        }
+        return Math.ceil(totalWeight);
+    };
+
+    const selectDefaultRateIndex = (rates, preferService = null) => {
+        if (!rates || rates.length === 0) return null;
+        const tw = calculateTotalWeight();
+        if (preferService) {
+            const idxPrefer = rates.findIndex(r => {
+                const code = r?.service?.type || r?.service_type || '';
+                const name = r?.service?.name || '';
+                const target = (preferService || '').toString().toUpperCase();
+                return code.toString().toUpperCase() === target || name.toString().toUpperCase() === target;
+            });
+            if (idxPrefer >= 0) return idxPrefer;
+        }
+        let bestIdx = 0;
+        let bestCost = Infinity;
+        for (let i = 0; i < rates.length; i++) {
+            const r = rates[i];
+            const pricing = r.pricing || {};
+            const availability = r.availability || {};
+            const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
+            const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
+            const w = getRoundedWeight(tw, r);
+            const effW = Math.max(w, minW);
+            if (maxW && effW > maxW) continue;
+            if (availability.is_available === false) continue;
+            const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
+            const bp = pricing.base_price ?? r.base_price ?? 0;
+            const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
+            const cost = pricingType === 'flat' ? bp : bp + (Math.max(0, effW - minW) * ppk);
+            if (cost < bestCost) {
+                bestCost = cost;
+                bestIdx = i;
+            }
+        }
+        return bestIdx;
+    };
+
+    const calculateShippingCostFromRate = (rates, district, indexOverride = null) => {
+        if (!rates || rates.length === 0) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        const tw = calculateTotalWeight();
+        const idx = typeof indexOverride === 'number' ? indexOverride : (typeof selectedRateIndex === 'number' ? selectedRateIndex : 0);
+        const r = rates[idx];
+        if (!r) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        const pricing = r.pricing || {};
+        const availability = r.availability || {};
+        const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
+        const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
+        const rounded = getRoundedWeight(tw, r);
+        const effW = Math.max(rounded, minW);
+        if (maxW && effW > maxW) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        if (availability.is_available === false) {
+            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
+            return;
+        }
+        const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
+        const bp = pricing.base_price ?? r.base_price ?? 0;
+        const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
+        const extra = Math.max(0, effW - minW);
+        const cost = pricingType === 'flat' ? bp : bp + (extra * ppk);
+        setFormData(prev => ({ ...prev, shipping_cost: cost }));
+    };
+
+    const fetchCourierRatesForManual = async () => {
+        if (!selectedCustomer && !originalOrder?.customer && !originalOrder?.address) return;
+        const addressId = parseInt(formData.address_id);
+        const baseCustomer = selectedCustomer || originalOrder?.customer || null;
+        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
+        const dest = selectedAddress || originalOrder?.address || baseCustomer;
+        const district = dest?.district || '';
+        const city = dest?.city || '';
+        const province = dest?.province || '';
+        setLoadingShipping(true);
+        try {
+            const params = new URLSearchParams();
+            params.append('page', '1');
+            params.append('per_page', '50');
+            params.append('sort_by', 'base_price');
+            params.append('sort_order', 'asc');
+            if (district) params.append('district', district);
+            if (city) params.append('city', city);
+            if (province) params.append('province', province);
+            params.append('courier_name', 'TIKI');
+            const res = await axios.get(`/api/courier-rates?${params.toString()}`);
+            const rates = res.data?.data?.rates || [];
+            const allowed = ['ECO','REG','ONS'];
+            const filtered = (rates || []).filter(r => {
+                const code = r?.service?.type || r?.service_type || r?.service?.name || '';
+                const normalized = code.toString().toUpperCase();
+                return allowed.some(k => normalized.includes(k));
+            });
+            setCourierRates(filtered);
+            const prefer = originalOrder?.shipping?.service_type || null;
+            let defIdx = selectDefaultRateIndex(filtered, prefer);
+            if (defIdx === null && filtered.length > 0) defIdx = 0;
+            setSelectedRateIndex(defIdx);
+            const svc = typeof defIdx === 'number' ? filtered[defIdx] : null;
+            const svcName = svc?.service?.name || svc?.service_type || '';
+            setFormData(prev => ({ ...prev, service_type: svcName }));
+            calculateShippingCostFromRate(filtered, district, defIdx);
+            setIsShippingCostManuallyEdited(false);
+        } catch (e) {
+            setCourierRates([]);
+            setSelectedRateIndex(null);
+        } finally {
+            setLoadingShipping(false);
+        }
+    };
+
+    const handleServiceSelect = (index) => {
+        const idx = parseInt(index);
+        setSelectedRateIndex(idx);
+        const svc = courierRates[idx];
+        setFormData(prev => ({ ...prev, service_type: (svc?.service?.name || svc?.service_type || '') }));
+        const addressId = parseInt(formData.address_id);
+        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
+        const dest = selectedAddress || selectedCustomer || originalOrder?.customer || null;
+        const district = dest?.district || '';
+        calculateShippingCostFromRate(courierRates, district, idx);
+        setIsShippingCostManuallyEdited(false);
+    };
+
     // Handle form submission
     const handleSubmit = async () => {
         setLoading(prev => ({ ...prev, submitting: true }));
@@ -354,7 +518,9 @@ export default function EditOrder() {
                 notes: formData.notes,
                 status: formData.status,
                 payment_bank_id: formData.payment_bank_id || null,
-                courier_id: formData.courier || null
+                courier_id: formData.courier || null,
+                courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,
+                service_type: formData.service_type || null
             };
             
             console.log('EditOrder - Sending data:', {
@@ -444,6 +610,33 @@ export default function EditOrder() {
         return () => clearTimeout(timer);
     }, [searchTerms.product]);
 
+    useEffect(() => {
+        if (!formData.courier) return;
+        const c = couriers.find(x => String(x.id) === String(formData.courier));
+        const name = c?.name?.toLowerCase() || '';
+        if (name.includes('tiki')) {
+            fetchCourierRatesForManual();
+        } else {
+            setCourierRates([]);
+            setSelectedRateIndex(null);
+            setFormData(prev => ({ ...prev, service_type: '' }));
+        }
+    }, [formData.courier, formData.address_id, formData.origin_setting_id, orderItems, couriers]);
+
+    useEffect(() => {
+        if (origins && origins.length > 0 && !formData.origin_setting_id) {
+            const defaultOrigin = origins[0];
+            setFormData(prev => ({ ...prev, origin_setting_id: String(defaultOrigin.id) }));
+        }
+    }, [origins]);
+
+    useEffect(() => {
+        const name = originalOrder?.shipping?.courier?.name?.toLowerCase() || '';
+        if (name.includes('tiki')) {
+            fetchCourierRatesForManual();
+        }
+    }, [originalOrder]);
+
     if (loading.order) {
         return (
             <DashboardLayout>
@@ -456,7 +649,7 @@ export default function EditOrder() {
             </DashboardLayout>
         );
     }
-
+console.log(formData)
     return (
         <DashboardLayout>
             <div className="space-y-6">
@@ -653,19 +846,64 @@ export default function EditOrder() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Ongkos Kirim
-                                </label>
-                                <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={formData.shipping_cost}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
-                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
-                                />
-                                {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' && (
-                                    <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Ongkos Kirim</label>
+                                {formData.courier && (couriers.find(c => String(c.id) === String(formData.courier))?.name || '').toLowerCase().includes('tiki') ? (
+                                  <div className="space-y-2">
+                                    <div>
+                                      <label className="block text-xs text-gray-600 mb-1">Service</label>
+                                      <select
+                                        value={typeof selectedRateIndex === 'number' ? selectedRateIndex : ''}
+                                        onChange={(e) => handleServiceSelect(e.target.value)}
+                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
+                                        disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
+                                      >
+                                        <option value="">Pilih layanan</option>
+                                        {courierRates.map((rate, idx) => (
+                                          <option key={rate.id || idx} value={idx}>
+                                            {(rate?.service?.name || rate?.service_type || 'Layanan')} - Rp {(function(){
+                                              const p = rate.pricing || {};
+                                              const minW = typeof p.min_weight === 'number' && p.min_weight > 0 ? p.min_weight : 1;
+                                              const totalW = calculateTotalWeight();
+                                              const effW = Math.max(getRoundedWeight(totalW, rate), minW);
+                                              const pricePerKg = p.price_per_kg ?? rate.price_per_kg ?? 0;
+                                              const basePrice = p.base_price ?? rate.base_price ?? 0;
+                                              const pricingType = p.pricing_type || rate.pricing_type || 'per_kg';
+                                              const extra = Math.max(0, effW - minW);
+                                              const cost = pricingType === 'flat' ? basePrice : basePrice + (extra * pricePerKg);
+                                              return Number(cost).toLocaleString('id-ID');
+                                            })()}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={formatRupiah(formData.shipping_cost)}
+                                        disabled
+                                        className="flex-1 px-3 py-2 border rounded-lg border-gray-300 bg-gray-100"
+                                      />
+                                    </div>
+                                    {typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.delivery?.estimated_days && (
+                                      <p className="text-xs text-gray-500">ETA {courierRates[selectedRateIndex].delivery.estimated_days} hari</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        placeholder="0"
+                                        value={formatRupiah(formData.shipping_cost)}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseRupiah(e.target.value) }))}
+                                        className={`flex-1 px-3 py-2 border rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'border-gray-300 bg-gray-100' : (isShippingCostManuallyEdited ? 'border-blue-300 bg-blue-50' : 'border-gray-300')}`}
+                                        disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
+                                      />
+                                    </div>
+                                    {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' && (
+                                      <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
+                                    )}
+                                  </div>
                                 )}
                             </div>
 
@@ -673,6 +911,7 @@ export default function EditOrder() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Kurir
                                 </label>
+                                {/* Courier Select */}
                                 <select
                                     value={formData.courier}
                                     onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
@@ -682,10 +921,11 @@ export default function EditOrder() {
                                     <option value="">Pilih kurir</option>
                                     {couriers.map((courier) => (
                                     <option key={courier.id} value={courier.id}>
-                                        {courier.name} - {courier.description}
+                                        {courier.name}
                                         </option>
                                     ))}
                                 </select>
+
                                 {loading.couriers && (
                                     <p className="text-gray-500 text-xs mt-1">Memuat data kurir...</p>
                                 )}

@@ -31,10 +31,14 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
 
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+    const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+    const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
+    const [paymentBanks, setPaymentBanks] = useState([]);
     const [showShippingModal, setShowShippingModal] = useState(false);
     const [showPaymentHistory, setShowPaymentHistory] = useState(false);
     const [showOrderHistory, setShowOrderHistory] = useState(false);
     const dropdownRef = useRef(null);
+    const paymentDropdownRef = useRef(null);
 
     // Update local order when prop changes
     useEffect(() => {
@@ -76,6 +80,12 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                 !dropdownRef.current.contains(event.target)
             ) {
                 setShowStatusDropdown(false);
+            }
+            if (
+                paymentDropdownRef.current &&
+                !paymentDropdownRef.current.contains(event.target)
+            ) {
+                setShowPaymentDropdown(false);
             }
         };
 
@@ -151,6 +161,21 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
     };
 
     const statusBadge = getStatusBadge(localOrder.raw_status || localOrder.status);
+
+    const fetchPaymentBanks = async () => {
+        try {
+            const response = await axios.get('/api/payment-banks');
+            const banksData = response.data?.data?.data || response.data?.data || [];
+            const activeBanks = Array.isArray(banksData) ? banksData.filter(b => b.is_active) : [];
+            setPaymentBanks(activeBanks);
+        } catch (e) {
+            setPaymentBanks([]);
+        }
+    };
+
+    useEffect(() => {
+        fetchPaymentBanks();
+    }, []);
 
     // Get valid status transitions - allow all status changes
     const getValidStatusTransitions = (currentStatus) => {
@@ -506,18 +531,88 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
                                     )}
                             </div>
                             {localOrder.payment_bank && !localOrder.payment_url && (
-                                <div className="relative group">
-                                    <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-md cursor-help">
-                                        {localOrder.bank}
-                                    </span>
-                                    {/* Tooltip with bank details */}
+                                <div className="relative group" ref={paymentDropdownRef}>
+                                    <button
+                                        onClick={() => hasPermission('orders.edit') && setShowPaymentDropdown(!showPaymentDropdown)}
+                                        disabled={!hasPermission('orders.edit') || isUpdatingPayment}
+                                        className={`bg-gray-700 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 ${hasPermission('orders.edit') ? 'hover:opacity-90' : ''} ${isUpdatingPayment ? 'opacity-70' : ''}`}
+                                    >
+                                        <span>{localOrder.bank}</span>
+                                        {hasPermission('orders.edit') && (
+                                            <Icon icon="mdi:chevron-down" width="12" />
+                                        )}
+                                    </button>
                                     <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded-md p-2 whitespace-nowrap z-10 shadow-lg">
                                         <div className="font-semibold">{localOrder.payment_bank.bank_name}</div>
                                         <div>No. Rek: {localOrder.payment_bank.account_number}</div>
                                         <div>A/n: {localOrder.payment_bank.account_name}</div>
-                                        {/* Arrow */}
                                         <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
                                     </div>
+                                    {showPaymentDropdown && !localOrder.payment_url && paymentBanks.length > 0 && (
+                                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[200px]">
+                                            {paymentBanks.map((bank) => (
+                                                <button
+                                                    key={bank.id}
+                                                    onClick={async () => {
+                                                        if (isUpdatingPayment) return;
+                                                        setIsUpdatingPayment(true);
+                                                        try {
+                                                            const token =
+                                                                document
+                                                                    .querySelector('meta[name="csrf-token"]')
+                                                                    ?.getAttribute("content") ||
+                                                                localStorage.getItem("auth_token") ||
+                                                                "3|kQS8PzhP4mz4C2Ap5k5FS1tapDkeVFBExe5Mncfd1c7a3056";
+                                                            const response = await axios.put(
+                                                                `/api/orders/${localOrder.id}`,
+                                                                { payment_bank_id: bank.id },
+                                                                {
+                                                                    headers: {
+                                                                        Authorization: `Bearer ${token}`,
+                                                                        "Content-Type": "application/json",
+                                                                        Accept: "application/json",
+                                                                    },
+                                                                }
+                                                            );
+                                                            if (response.data?.status === 'success') {
+                                                                setLocalOrder(prev => ({
+                                                                    ...prev,
+                                                                    payment_bank: bank,
+                                                                    bank: `${bank.bank_name} - ${bank.account_number}`
+                                                                }));
+                                                                setShowPaymentDropdown(false);
+                                                                if (onOrderUpdate) onOrderUpdate();
+                                                                await Swal.fire({
+                                                                    title: "Berhasil!",
+                                                                    text: "Metode pembayaran berhasil diubah.",
+                                                                    icon: "success",
+                                                                    timer: 1800,
+                                                                    showConfirmButton: false,
+                                                                });
+                                                            }
+                                                        } catch (error) {
+                                                            let errorMessage = "Terjadi kesalahan saat mengubah metode pembayaran.";
+                                                            if (error.response?.data?.message) {
+                                                                errorMessage = error.response.data.message;
+                                                            }
+                                                            await Swal.fire({
+                                                                title: "Error!",
+                                                                text: errorMessage,
+                                                                icon: "error",
+                                                                confirmButtonText: "OK",
+                                                            });
+                                                        } finally {
+                                                            setIsUpdatingPayment(false);
+                                                        }
+                                                    }}
+                                                    className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 first:rounded-t-md last:rounded-b-md ${localOrder.payment_bank?.id === bank.id ? 'bg-blue-50' : ''}`}
+                                                >
+                                                    <Icon icon="mdi:bank" width="14" className="text-gray-600" />
+                                                    <span className="capitalize">{bank.bank_name} - {bank.account_number}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {localOrder.payment_url && (

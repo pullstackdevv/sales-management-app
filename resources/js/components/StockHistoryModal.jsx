@@ -17,6 +17,7 @@ export default function StockHistoryModal({
     per_page: 10,
     total: 0
   });
+  const [initialRunning, setInitialRunning] = useState(0);
   const [filters, setFilters] = useState({
     type: '',
     search: ''
@@ -49,6 +50,24 @@ export default function StockHistoryModal({
         per_page: paginatedData.per_page || 10,
         total: paginatedData.total || 0
       });
+
+      // Compute initial running from previous page (if any)
+      if ((paginatedData.current_page || 1) > 1) {
+        const prevParams = {
+          ...params,
+          page: (paginatedData.current_page || 1) - 1
+        };
+        try {
+          const prevResp = await api.get('/stock-movements', { params: prevParams });
+          const prevData = prevResp.data.data?.data || [];
+          const finalPrevRunning = computeFinalRunning(prevData);
+          setInitialRunning(finalPrevRunning);
+        } catch (e) {
+          setInitialRunning(0);
+        }
+      } else {
+        setInitialRunning(0);
+      }
     } catch (error) {
       console.error('Error fetching stock movements:', error);
       setMovements([]);
@@ -165,7 +184,7 @@ export default function StockHistoryModal({
   };
 
   const computeRowsWithRunning = (list) => {
-    let running = 0;
+    let running = initialRunning || 0;
     return list.map((m) => {
       const isAdj = m.type === 'adjustment';
       let stockIn = 0;
@@ -195,6 +214,28 @@ export default function StockHistoryModal({
         running,
       };
     });
+  };
+
+  const computeFinalRunning = (list) => {
+    let running = 0;
+    for (const m of list) {
+      const isAdj = m.type === 'adjustment';
+      if (isAdj) {
+        const noteText = (m.note || '').toLowerCase();
+        if (noteText.includes('increase')) {
+          running += m.quantity;
+        } else if (noteText.includes('decrease')) {
+          running -= m.quantity;
+        } else {
+          running = m.quantity;
+        }
+      } else if (m.type === 'in') {
+        running += m.quantity;
+      } else if (m.type === 'out') {
+        running -= m.quantity;
+      }
+    }
+    return running;
   };
 
   if (!isOpen) return null;

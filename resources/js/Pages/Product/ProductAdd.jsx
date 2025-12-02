@@ -67,20 +67,23 @@ export default function ProductAdd() {
     return parseInt(str.toString().replace(/\./g, '')) || 0;
   };
 
-  // Generate auto SKU for variant based on product name
   const generateVariantSKU = (productName, variantIndex) => {
     if (!productName) return "";
-    // Create SKU from first 3 letters of product name + index
-    const prefix = productName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
-    const paddedIndex = String(variantIndex + 1).padStart(3, '0');
-    return `${prefix}-${paddedIndex}`;
+    const sanitized = productName.replace(/[^A-Za-z0-9]/g, "");
+    const prefix = sanitized.substring(0, 6).toUpperCase();
+    const seq = String(variantIndex + 1).padStart(3, '0');
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let rand = '';
+    for (let i = 0; i < 4; i++) {
+      rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${prefix}-${seq}-${rand}`;
   };
 
   // Add new variant
   const addVariant = () => {
     const newVariantIndex = product.variants.length;
     const newVariantSKU = generateVariantSKU(product.name, newVariantIndex);
-    
     setProduct({
       ...product,
       variants: [
@@ -121,9 +124,8 @@ export default function ProductAdd() {
       ...variant,
       sku: generateVariantSKU(newName, index)
     }));
-    
-    setProduct({ 
-      ...product, 
+    setProduct({
+      ...product,
       name: newName,
       variants: updatedVariants
     });

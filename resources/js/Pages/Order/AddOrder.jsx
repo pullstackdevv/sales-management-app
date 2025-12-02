@@ -1,5 +1,5 @@
 // resources/js/Pages/Order/AddOrder.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import axios from "axios";
@@ -90,6 +90,8 @@ export default function AddOrder() {
     const [cityQuery, setCityQuery] = useState("");
     const [cityResults, setCityResults] = useState([]);
     const [searchingCity, setSearchingCity] = useState(false);
+    const [showCityDropdown, setShowCityDropdown] = useState(false);
+    const searchTimeoutRef = useRef(null);
 
     // Fetch customers dari API
     const fetchCustomers = async (search = '') => {
@@ -107,16 +109,25 @@ export default function AddOrder() {
         }
     };
 
+    const hasAnyAddressData = (addr) => {
+        return [addr.city, addr.district, addr.province, addr.postal_code, addr.address_detail]
+            .some((v) => (v || '').toString().trim() !== '');
+    };
+
     const validateNewCustomer = () => {
         const e = {};
         if (!newCustomer.full_name.trim()) e.full_name = 'Nama lengkap wajib diisi';
         if (!newCustomer.phone.trim()) e.phone = 'Nomor telepon wajib diisi';
-        else if (!/^08[0-9]{8,11}$/.test(newCustomer.phone)) e.phone = 'Format nomor telepon tidak valid';
-        if (!newAddress.district.trim() || !newAddress.city.trim() || !newAddress.province.trim()) {
-            e.city = 'Pilih kecamatan dari hasil pencarian';
+        else if (!/^08[0-9]{8,11}$/.test(newCustomer.phone)) e.phone = 'Format nomor telepon tidak valid (contoh: 081234567890)';
+        if (hasAnyAddressData(newAddress)) {
+            if (!newAddress.district?.trim() || !newAddress.city?.trim() || !newAddress.province?.trim()) {
+                e.city = 'Silakan cari dan pilih kecamatan dari dropdown';
+                e.district = 'Silakan cari dan pilih kecamatan dari dropdown';
+                e.province = 'Silakan cari dan pilih kecamatan dari dropdown';
+            }
+            if (!newAddress.address_detail?.trim()) e.address_detail = 'Alamat lengkap wajib diisi';
+            if (newAddress.postal_code?.trim() && !/^[0-9]{5}$/.test(newAddress.postal_code)) e.postal_code = 'Kode pos harus 5 digit angka';
         }
-        if (!newAddress.address_detail.trim()) e.address_detail = 'Alamat lengkap wajib diisi';
-        if (newAddress.postal_code && !/^[0-9]{5}$/.test(newAddress.postal_code)) e.postal_code = 'Kode pos harus 5 digit angka';
         setNewCustErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -158,6 +169,9 @@ export default function AddOrder() {
                 setAddCustomerModalOpen(false);
                 setNewCustomer({ full_name: "", email: "", phone: "", line_id: "", other_contact: "", category: "Pelanggan" });
                 setNewAddress({ label: "Rumah", recipient_name: "", recipient_phone: "", is_dropship: false, province: "", city: "", district: "", postal_code: "", address_detail: "", is_default: true });
+                setCityQuery("");
+                setCityResults([]);
+                setShowCityDropdown(false);
                 setNewCustErrors({});
                 Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Customer baru ditambahkan', timer: 1500, showConfirmButton: false });
             }
@@ -183,23 +197,61 @@ export default function AddOrder() {
         }
     };
 
-    const handleCitySearch = async (q) => {
-        setCityQuery(q);
-        if ((q || '').length < 2) { setCityResults([]); setSearchingCity(false); return; }
+    const debouncedCitySearch = async (query) => {
+        if (query.length < 2) {
+            setCityResults([]);
+            setShowCityDropdown(false);
+            return;
+        }
+        setSearchingCity(true);
         try {
-            setSearchingCity(true);
-            const r = await api.get('/wilayah/search-regencies', { params: { q } });
-            if (r.data.status === 'success') {
-                setCityResults(r.data.data);
+            const response = await api.get('/wilayah/search-regencies', { params: { q: query } });
+            if (response.data.status === 'success') {
+                setCityResults(response.data.data);
+                setShowCityDropdown(true);
             } else {
                 setCityResults([]);
+                setShowCityDropdown(false);
             }
-        } catch (e) {
+        } catch (error) {
             setCityResults([]);
+            setShowCityDropdown(false);
         } finally {
             setSearchingCity(false);
         }
     };
+
+    const handleCitySearch = (value) => {
+        setCityQuery(value);
+        // Reset selected location until user picks from dropdown
+        setNewAddress(prev => ({ ...prev, district: '', city: '', province: '' }));
+        setNewCustErrors(prev => ({ ...prev, city: null, district: null, province: null }));
+
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+        searchTimeoutRef.current = setTimeout(() => {
+            debouncedCitySearch(value);
+        }, 300);
+    };
+
+    const selectCity = (c) => {
+        setCityQuery(c.name);
+        setNewAddress(prev => ({ ...prev, district: c.district_name || '', city: c.regency_name, province: c.province_name }));
+        setShowCityDropdown(false);
+        setCityResults([]);
+        setNewCustErrors(prev => ({ ...prev, city: null, district: null, province: null }));
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.city-search-container')) {
+                setShowCityDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Fetch products dari API
     const fetchProducts = async (search = '') => {
@@ -444,14 +496,17 @@ export default function AddOrder() {
             const rates = res.data?.data?.rates || [];
             const allowed = ['ECO','REG','ONS'];
             const filtered = (rates || []).filter(r => {
-                const code = r?.service?.type || r?.service_type;
-                return allowed.includes((code || '').toString().toUpperCase());
+                const code = r?.service?.type || r?.service_type || r?.service?.name || '';
+                const normalized = code.toString().toUpperCase();
+                return allowed.some(k => normalized.includes(k));
             });
             setCourierRates(filtered);
-            const defIdx = selectDefaultRateIndex(filtered);
+            let defIdx = selectDefaultRateIndex(filtered);
+            if (defIdx === null && filtered.length > 0) defIdx = 0;
             setSelectedRateIndex(defIdx);
-            const svc = filtered[defIdx];
-            setFormData(prev => ({ ...prev, service_type: (svc?.service?.name || svc?.service_type || '') }));
+            const svc = typeof defIdx === 'number' ? filtered[defIdx] : null;
+            const svcName = svc?.service?.name || svc?.service_type || '';
+            setFormData(prev => ({ ...prev, service_type: svcName }));
             calculateShippingCostFromRate(filtered, district, defIdx);
             setIsShippingCostManuallyEdited(false);
         } catch (e) {
@@ -474,6 +529,19 @@ export default function AddOrder() {
         calculateShippingCostFromRate(courierRates, district, idx);
         setIsShippingCostManuallyEdited(false);
     };
+
+    useEffect(() => {
+        if (!formData.courier) return;
+        const c = couriers.find(x => String(x.id) === String(formData.courier));
+        const name = c?.name?.toLowerCase() || '';
+        if (name.includes('tiki')) {
+            fetchCourierRatesForManual();
+        } else {
+            setCourierRates([]);
+            setSelectedRateIndex(null);
+            setFormData(prev => ({ ...prev, service_type: '' }));
+        }
+    }, [formData.courier, formData.address_id, formData.origin_setting_id, orderItems, couriers]);
 
     // Handle product selection and add to cart
     const handleAddProduct = (product, variant) => {
@@ -519,6 +587,7 @@ export default function AddOrder() {
                 product_category: product.category,
                 variant_name: variant.name || variant.variant_label,
                 variant_sku: variant.sku,
+                variant_weight: variant.weight,
                 variant_stock: variant.stock,
                 quantity: 1,
                 price: variant.price
@@ -1249,8 +1318,9 @@ export default function AddOrder() {
                 </div>
             </div>
             {addCustomerModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto">
+                    <div className="relative bg-white rounded-lg w-full max-w-[95vw] sm:max-w-lg md:max-w-2xl lg:max-w-3xl shadow-xl">
+                        <div className="p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-semibold">Tambah Customer</h3>
                             <button onClick={() => setAddCustomerModalOpen(false)} className="text-gray-400 hover:text-gray-600">
@@ -1271,31 +1341,148 @@ export default function AddOrder() {
                                 <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.full_name ? 'border-red-500' : 'border-gray-300'}`} value={newCustomer.full_name} onChange={(e) => { setNewCustomer({ ...newCustomer, full_name: e.target.value }); setNewAddress({ ...newAddress, recipient_name: e.target.value }); }} placeholder="Masukkan nama lengkap" />
                             </div>
                             <div>
-                                <label className="text-sm font-medium">No. HP</label>
+                                <label className="text-sm font-medium">No. HP / Telepon</label>
                                 <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.phone ? 'border-red-500' : 'border-gray-300'}`} value={newCustomer.phone} onChange={(e) => { setNewCustomer({ ...newCustomer, phone: e.target.value }); setNewAddress({ ...newAddress, recipient_phone: e.target.value }); }} placeholder="081234567890" />
                             </div>
                             <div>
                                 <label className="text-sm font-medium">Email</label>
                                 <input type="email" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.email ? 'border-red-500' : 'border-gray-300'}`} value={newCustomer.email} onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })} placeholder="opsional" />
                             </div>
-                        </div>
-                        <div className="mt-4">
-                            <label className="text-sm font-medium">Cari Kecamatan/Kota</label>
-                            <div className="relative city-search-container">
-                                <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.city ? 'border-red-500' : 'border-gray-300'}`} value={cityQuery} onChange={(e) => handleCitySearch(e.target.value)} placeholder="Ketik minimal 2 huruf" />
-                                {searchingCity && <div className="absolute right-3 top-2.5"><Icon icon="eos-icons:loading" className="w-4 h-4 animate-spin" /></div>}
-                                {cityResults.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                        {cityResults.map((c) => (
-                                            <div key={`${c.regency_code}-${c.district_code}`} onClick={() => { setCityQuery(c.name); setNewAddress({ ...newAddress, district: c.district_name || '', city: c.regency_name, province: c.province_name }); setCityResults([]); }} className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
-                                                <div className="font-medium text-sm">{c.name}</div>
-                                                <div className="text-xs text-gray-500">{c.regency_name}, {c.province_name}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                            <div>
+                                <label className="text-sm font-medium">ID Line</label>
+                                <input type="text" className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm" value={newCustomer.line_id} onChange={(e) => setNewCustomer({ ...newCustomer, line_id: e.target.value })} placeholder="ID Line" />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Other Contact</label>
+                                <input type="text" className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm" value={newCustomer.other_contact} onChange={(e) => setNewCustomer({ ...newCustomer, other_contact: e.target.value })} placeholder="Kontak lainnya" />
                             </div>
                         </div>
+                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mt-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h4 className="text-md font-semibold text-gray-900">Kelola Alamat</h4>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm font-medium">Label Alamat</label>
+                                    <input type="text" className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm" value={newAddress.label} onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })} placeholder="Label alamat (contoh: Rumah, Kantor)" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 mt-4">
+                                <div>
+                                    <label className="text-sm font-medium">Nama Penerima</label>
+                                    <input type="text" className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm" value={newAddress.recipient_name} onChange={(e) => setNewAddress({ ...newAddress, recipient_name: e.target.value })} placeholder="Nama penerima" />
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">No. HP Penerima</label>
+                                    <input type="tel" className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm" value={newAddress.recipient_phone} onChange={(e) => setNewAddress({ ...newAddress, recipient_phone: e.target.value })} placeholder="08xxxxxxxxxx" />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 mb-4">
+                                <input type="checkbox" className="h-4 w-4" checked={!!newAddress.is_dropship} onChange={(e) => setNewAddress({ ...newAddress, is_dropship: e.target.checked })} />
+                                <span className="text-sm">Alamat Pesanan dropship</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="relative city-search-container">
+                                    <label className="text-sm font-medium text-gray-700 mb-2">
+                                        Cari Kecamatan/Kota <span className="text-red-500">*</span>
+                                        <span className="text-xs text-gray-500 ml-2">(Wajib pilih dari hasil pencarian)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                newCustErrors.city
+                                                    ? 'border-red-500'
+                                                    : (newAddress?.district && newAddress?.city)
+                                                        ? 'border-green-500 bg-green-50'
+                                                        : 'border-gray-300'
+                                            }`}
+                                            placeholder="Ketik nama kecamatan atau kota..."
+                                            value={cityQuery}
+                                            onChange={(e) => handleCitySearch(e.target.value)}
+                                            onFocus={() => setShowCityDropdown(true)}
+                                            autoComplete="off"
+                                        />
+                                        {(newAddress?.district && newAddress?.city) && (
+                                            <div className="absolute right-3 top-2.5 text-green-600">
+                                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                            </div>
+                                        )}
+                                        {searchingCity && !(newAddress?.district && newAddress?.city) && (
+                                            <div className="absolute right-3 top-2.5 text-gray-400">
+                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {showCityDropdown && cityResults.length > 0 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                            {cityResults.map((city, index) => (
+                                                <button
+                                                    key={index}
+                                                    type="button"
+                                                    onClick={() => selectCity(city)}
+                                                    className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-1 text-xs rounded ${city.district_name ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                                            {city.district_name ? 'Kecamatan' : 'Kota/Kabupaten'}
+                                                        </span>
+                                                        <span className="font-medium">{city.name}</span>
+                                                    </div>
+                                                    <div className="text-sm text-gray-500 mt-1">
+                                                        {city.district_name ? `${city.regency_name}, ${city.province_name}` : city.province_name}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {(newAddress?.district || newAddress?.city) && (
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
+                                            <div className="flex items-start gap-2">
+                                                <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                                <div className="flex-1">
+                                                    <h4 className="text-sm font-medium text-green-900 mb-2">✓ Lokasi Berhasil Dipilih:</h4>
+                                                    <div className="text-sm text-green-800 space-y-1">
+                                                        {newAddress?.district && (
+                                                            <div><strong>Kecamatan:</strong> {newAddress?.district}</div>
+                                                        )}
+                                                        {newAddress?.city && (
+                                                            <div><strong>Kota/Kabupaten:</strong> {newAddress?.city}</div>
+                                                        )}
+                                                        {newAddress?.province && (
+                                                            <div><strong>Provinsi:</strong> {newAddress?.province}</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {newCustErrors.city && (
+                                        <p className="text-red-500 text-xs mt-1">{newCustErrors.city}</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">Kode Pos (opsional)</label>
+                                    <input
+                                        type="text"
+                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.postal_code ? 'border-red-500' : 'border-gray-300'}`}
+                                        value={newAddress.postal_code}
+                                        onChange={(e) => setNewAddress({ ...newAddress, postal_code: (e.target.value || '').replace(/\D/g, '').slice(0,5) })}
+                                        placeholder="12345"
+                                        maxLength={5}
+                                    />
+                                    {newCustErrors.postal_code && (
+                                        <p className="text-red-500 text-xs mt-1">{newCustErrors.postal_code}</p>
+                                    )}
+                                </div>
+                            </div>
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="text-sm font-medium">Alamat Lengkap</label>
@@ -1306,9 +1493,11 @@ export default function AddOrder() {
                                 <input type="text" className={`w-full mt-1 border rounded px-3 py-2 text-sm ${newCustErrors.postal_code ? 'border-red-500' : 'border-gray-300'}`} value={newAddress.postal_code} onChange={(e) => setNewAddress({ ...newAddress, postal_code: (e.target.value || '').replace(/\D/g, '').slice(0,5) })} placeholder="opsional" />
                             </div>
                         </div>
+                        </div>
                         <div className="flex gap-3 pt-4">
                             <button type="button" onClick={() => setAddCustomerModalOpen(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">Batal</button>
                             <button type="button" onClick={submitNewCustomer} className="flex-1 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Simpan Customer</button>
+                        </div>
                         </div>
                     </div>
                 </div>

@@ -127,17 +127,21 @@ export default function ProductEdit() {
   // Generate auto SKU for variant based on product name
   const generateVariantSKU = (productName, variantIndex) => {
     if (!productName) return "";
-    // Create SKU from first 3 letters of product name + index
-    const prefix = productName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X');
-    const paddedIndex = String(variantIndex + 1).padStart(3, '0');
-    return `${prefix}-${paddedIndex}`;
+    const sanitized = productName.replace(/[^A-Za-z0-9]/g, "");
+    const prefix = sanitized.substring(0, 6).toUpperCase();
+    const seq = String(variantIndex + 1).padStart(3, '0');
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let rand = '';
+    for (let i = 0; i < 4; i++) {
+      rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${prefix}-${seq}-${rand}`;
   };
 
   // Add new variant
   const addVariant = () => {
     const newVariantIndex = product.variants.length;
     const newVariantSKU = generateVariantSKU(product.name, newVariantIndex);
-    
     setProduct({
       ...product,
       variants: [
@@ -174,13 +178,32 @@ export default function ProductEdit() {
 
   // Update all variant SKUs when product name changes
   const updateProductName = (newName) => {
-    const updatedVariants = product.variants.map((variant, index) => ({
-      ...variant,
-      sku: generateVariantSKU(newName, index)
-    }));
-    
-    setProduct({ 
-      ...product, 
+    const sanitized = (newName || '').replace(/[^A-Za-z0-9]/g, "");
+    const prefix = sanitized.substring(0, 6).toUpperCase();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const rand4 = () => {
+      let r = '';
+      for (let i = 0; i < 4; i++) r += chars.charAt(Math.floor(Math.random() * chars.length));
+      return r;
+    };
+    const updatedVariants = product.variants.map((variant, index) => {
+      const seq = String(index + 1).padStart(3, '0');
+      let currentSeq = seq;
+      let currentRand = rand4();
+      if (variant.sku && typeof variant.sku === 'string') {
+        const parts = variant.sku.split('-');
+        if (parts.length >= 3) {
+          currentSeq = parts[1];
+          currentRand = parts[2];
+        } else if (parts.length === 2) {
+          currentSeq = parts[1];
+          currentRand = rand4();
+        }
+      }
+      return { ...variant, sku: `${prefix}-${currentSeq}-${currentRand}` };
+    });
+    setProduct({
+      ...product,
       name: newName,
       variants: updatedVariants
     });

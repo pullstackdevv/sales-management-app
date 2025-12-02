@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\StockMovement;
+use App\Enums\StockMovementType;
 use App\Http\Resources\ProductResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -201,15 +203,16 @@ class ProductController extends Controller
                 }
 
                 $prefix = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $product->name), 0, 6));
-                $baseSku = $variant['sku'] ?? ($prefix . '-' . str_pad($index + 1, 3, '0', STR_PAD_LEFT));
+                $seq = str_pad($index + 1, 3, '0', STR_PAD_LEFT);
+                $rand = strtoupper(Str::random(4));
+                $baseSku = $variant['sku'] ?? ($prefix . '-' . $seq . '-' . $rand);
                 $skuCandidate = $baseSku;
-                $suffix = 1;
                 while (ProductVariant::where('sku', $skuCandidate)->exists()) {
-                    $skuCandidate = $baseSku . '-' . str_pad($suffix, 2, '0', STR_PAD_LEFT);
-                    $suffix++;
+                    $rand = strtoupper(Str::random(4));
+                    $skuCandidate = $prefix . '-' . $seq . '-' . $rand;
                 }
 
-                $product->variants()->create([
+                $variantModel = $product->variants()->create([
                     'variant_label' => $variant['variant_label'],
                     'sku' => $skuCandidate,
                     'price' => $variant['price'],
@@ -222,6 +225,16 @@ class ProductController extends Controller
                     'image' => $variantImagePath,
                     'created_by' => Auth::id()
                 ]);
+
+                if (($variant['stock'] ?? 0) > 0) {
+                    StockMovement::create([
+                        'product_variant_id' => $variantModel->id,
+                        'type' => StockMovementType::IN,
+                        'quantity' => (int) $variant['stock'],
+                        'note' => 'initial stock',
+                        'created_by' => Auth::id()
+                    ]);
+                }
             }
 
             DB::commit();
@@ -269,7 +282,7 @@ class ProductController extends Controller
             'variants' => 'sometimes|required|array|min:1',
             'variants.*.id' => 'sometimes|required|exists:product_variants,id',
             'variants.*.variant_label' => 'required|string|max:255',
-            'variants.*.sku' => 'required|string|max:50',
+            'variants.*.sku' => 'nullable|string|max:50',
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.discount_price' => 'nullable|numeric|min:0',
@@ -283,17 +296,17 @@ class ProductController extends Controller
         // Additional validation for variant SKU uniqueness
         if ($request->has('variants')) {
             foreach ($request->variants as $index => $variant) {
-                $query = ProductVariant::where('sku', $variant['sku']);
+                if (isset($variant['sku']) && $variant['sku'] !== null && $variant['sku'] !== '') {
+                    $query = ProductVariant::where('sku', $variant['sku']);
                 
-                // If variant has ID, exclude it from uniqueness check
-                if (isset($variant['id'])) {
-                    $query->where('id', '!=', $variant['id']);
-                }
-                
-                if ($query->exists()) {
-                    throw ValidationException::withMessages([
-                        "variants.{$index}.sku" => ['The SKU has already been taken.']
-                    ]);
+                    if (isset($variant['id'])) {
+                        $query->where('id', '!=', $variant['id']);
+                    }
+                    if ($query->exists()) {
+                        throw ValidationException::withMessages([
+                            "variants.{$index}.sku" => ['The SKU has already been taken.']
+                        ]);
+                    }
                 }
             }
         }
@@ -390,9 +403,19 @@ class ProductController extends Controller
                                 throw new \Exception("The variants.$index.image failed to upload: " . $e->getMessage());
                             }
                         }
+                        $prefix = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $product->name), 0, 6));
+                        $seq = str_pad($index + 1, 3, '0', STR_PAD_LEFT);
+                        $rand = strtoupper(Str::random(4));
+                        $baseSku = $variant['sku'] ?? ($prefix . '-' . $seq . '-' . $rand);
+                        $skuCandidate = $baseSku;
+                        while (ProductVariant::where('sku', $skuCandidate)->exists()) {
+                            $rand = strtoupper(Str::random(4));
+                            $skuCandidate = $prefix . '-' . $seq . '-' . $rand;
+                        }
+
                         $product->variants()->create([
                             'variant_label' => $variant['variant_label'],
-                            'sku' => $variant['sku'],
+                            'sku' => $skuCandidate,
                             'price' => $variant['price'],
                             'base_price' => $isOwner ? $variant['base_price'] : 0,
                             'discount_price' => $variant['discount_price'] ?? null,

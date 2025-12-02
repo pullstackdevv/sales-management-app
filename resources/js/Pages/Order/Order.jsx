@@ -17,6 +17,9 @@ export default function Order() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [dateQuick, setDateQuick] = useState('Semua');
 
   useEffect(() => {
     fetchOrders();
@@ -40,7 +43,7 @@ export default function Order() {
   useEffect(() => {
     setCurrentPage(1);
     fetchOrders(1);
-  }, [activeFilter, sourceFilter, searchTerm]);
+  }, [activeFilter, sourceFilter, searchTerm, startDate, endDate]);
   
   useEffect(() => {
     fetchOrders(currentPage);
@@ -56,6 +59,12 @@ export default function Order() {
       
       if (searchTerm) {
         params.append('search', searchTerm);
+      }
+      if (startDate) {
+        params.append('start_date', startDate);
+      }
+      if (endDate) {
+        params.append('end_date', endDate);
       }
       
       // Map filter to API status
@@ -151,6 +160,56 @@ export default function Order() {
     }
   };
 
+  const applyQuickRange = (range) => {
+    setDateQuick(range);
+    const today = new Date();
+    const toISO = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    if (range === 'Semua') {
+      setStartDate('');
+      setEndDate('');
+      return;
+    }
+    if (range === 'Hari Ini') {
+      const iso = toISO(today);
+      setStartDate(iso);
+      setEndDate(iso);
+      return;
+    }
+    if (range === '7 Hari') {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      setStartDate(toISO(start));
+      setEndDate(toISO(today));
+      return;
+    }
+    if (range === '30 Hari') {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      setStartDate(toISO(start));
+      setEndDate(toISO(today));
+      return;
+    }
+  };
+
+  const handleDateChange = (which, value) => {
+    if (which === 'start') {
+      setStartDate(value);
+      if (endDate && value && value > endDate) {
+        setEndDate(value);
+      }
+    } else {
+      setEndDate(value);
+      if (startDate && value && value < startDate) {
+        setStartDate(value);
+      }
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('id-ID', {
@@ -243,46 +302,60 @@ export default function Order() {
       <div className="p-6">
         <div className="text-xl font-semibold mb-4">Order</div>
 
-        <div className="flex flex-wrap gap-2 mb-6">
-          {[
-            'Semua Order',
-            'Belum Bayar',
-            'Dibayar',
-            'Diproses',
-            'Dikirim',
-            'Diterima',
-            'Dibatalkan',
-          ].map((label, idx) => (
-            <button
-              key={idx}
-              onClick={() => setActiveFilter(label)}
-              className={`text-sm px-3 py-1 border rounded-md transition-colors ${
-                activeFilter === label
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Status"
+          >
+            <option value="Semua Order">Semua Order</option>
+            <option value="Belum Bayar">Belum Bayar</option>
+            <option value="Dibayar">Dibayar</option>
+            <option value="Diproses">Diproses</option>
+            <option value="Dikirim">Dikirim</option>
+            <option value="Diterima">Diterima</option>
+            <option value="Dibatalkan">Dibatalkan</option>
+          </select>
 
-        {/* Source Filter */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className="text-sm font-medium text-gray-700 self-center">Filter Sumber:</span>
-          {['Semua Sumber', 'Manual', 'Web Order'].map((source) => (
-            <button
-              key={source}
-              onClick={() => setSourceFilter(source)}
-              className={`text-sm px-3 py-1 rounded-md border transition-colors ${
-                sourceFilter === source
-                  ? 'bg-green-600 text-white border-green-600'
-                  : 'border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              {source}
-            </button>
-          ))}
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Sumber"
+          >
+            <option value="Semua Sumber">Semua Sumber</option>
+            <option value="Manual">Manual</option>
+            <option value="Web Order">Web Order</option>
+          </select>
+
+          <select
+            value={dateQuick}
+            onChange={(e) => applyQuickRange(e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Rentang Cepat"
+          >
+            <option value="Semua">Semua</option>
+            <option value="Hari Ini">Hari Ini</option>
+            <option value="7 Hari">7 Hari</option>
+            <option value="30 Hari">30 Hari</option>
+          </select>
+
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => handleDateChange('start', e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Dari"
+          />
+          <span className="text-xs text-gray-500">–</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => handleDateChange('end', e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Sampai"
+          />
         </div>
 
         <div className="flex flex-wrap justify-between items-center gap-2 mb-4">

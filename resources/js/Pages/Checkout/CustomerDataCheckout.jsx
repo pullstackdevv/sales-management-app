@@ -1072,7 +1072,7 @@ const CustomerDataCheckout = () => {
       if (!addressData.district.trim() || !addressData.city.trim() || !addressData.province.trim()) {
         newErrors.district = 'Silakan cari dan pilih kecamatan dari dropdown';
         newErrors.city = 'Silakan cari dan pilih kecamatan dari dropdown';
-        requiredFields.push('Lokasi (Kecamatan/Kota - wajib pilih dari dropdown pencarian)');
+        requiredFields.push('Lokasi (Kecamatan - wajib pilih dari dropdown pencarian)');
       }
 
       if (addressData.postal_code.trim() && addressData.postal_code.length !== 5) {
@@ -1438,7 +1438,7 @@ const CustomerDataCheckout = () => {
                         {/* Location Search (Districts & Cities) */}
                         <div className="relative">
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Cari Kecamatan/Kota *
+                            Cari Kecamatan *
                           </label>
                           <input
                             type="text"
@@ -1446,7 +1446,7 @@ const CustomerDataCheckout = () => {
                             onChange={handleLocationSearch}
                             className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city || errors.district ? 'border-red-500' : 'border-gray-300'
                               }`}
-                            placeholder="Ketik nama kecamatan atau kota..."
+                            placeholder="Ketik nama kecamatan ..."
                           />
                           {(errors.city || errors.district) && (
                             <p className="text-red-500 text-sm mt-1">
@@ -2036,7 +2036,7 @@ const CustomerDataCheckout = () => {
               {/* Location Search */}
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cari Kecamatan/Kota *
+                  Cari Kecamatan *
                   <span className="text-xs text-gray-500 ml-2">(Wajib pilih dari hasil pencarian)</span>
                 </label>
                 <div className="relative">
@@ -2050,7 +2050,7 @@ const CustomerDataCheckout = () => {
                           ? 'border-green-500 bg-green-50'
                           : 'border-gray-300'
                       }`}
-                    placeholder="Ketik nama kecamatan atau kota..."
+                    placeholder="Ketik nama kecamatan..."
                     autoComplete="off"
                   />
                   {/* Success indicator */}

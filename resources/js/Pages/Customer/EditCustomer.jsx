@@ -724,7 +724,7 @@ export default function EditCustomer({ customerId }) {
 
                                     <div className="relative city-search-container">
                                         <label className="text-sm font-medium text-gray-700 mb-2">
-                                            Cari Kecamatan/Kota <span className="text-red-500">*</span>
+                                            Cari Kecamatan <span className="text-red-500">*</span>
                                             <span className="text-xs text-gray-500 ml-2">(Wajib pilih dari hasil pencarian)</span>
                                         </label>
                                         <div className="relative">
@@ -737,7 +737,7 @@ export default function EditCustomer({ customerId }) {
                                                             ? 'border-green-500 bg-green-50'
                                                             : 'border-gray-300'
                                                 }`}
-                                                placeholder="Ketik nama kecamatan atau kota..."
+                                                placeholder="Ketik nama kecamatan..."
                                                 value={cityQuery}
                                                 onChange={handleCitySearch}
                                                 onFocus={() => setShowCityDropdown(true)}
@@ -768,7 +768,7 @@ export default function EditCustomer({ customerId }) {
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             <span className={`px-2 py-1 text-xs rounded ${city.district_name ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                                                                {city.district_name ? 'Kecamatan' : 'Kota/Kabupaten'}
+                                                                {city.district_name ? 'Kecamatan' : '-'}
                                                             </span>
                                                             <span className="font-medium">{city.name}</span>
                                                         </div>

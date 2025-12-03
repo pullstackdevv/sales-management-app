@@ -227,7 +227,8 @@ export default function EditCustomer({ customerId }) {
         try {
             const response = await api.get('/wilayah/search-regencies', { params: { q: query } });
             if (response.data.status === 'success') {
-                setCityResults(response.data.data);
+                const onlyDistricts = (response.data.data || []).filter((item) => !!item.district_name);
+                setCityResults(onlyDistricts);
                 setShowCityDropdown(true);
             } else {
                 setCityResults([]);

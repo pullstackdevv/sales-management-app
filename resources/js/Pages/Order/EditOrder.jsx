@@ -276,24 +276,22 @@ export default function EditOrder() {
         );
 
         if (existingItemIndex >= 0) {
-            // Check stock before updating quantity
             const currentItem = orderItems[existingItemIndex];
-            if (currentItem.quantity >= variant.stock) {
+            const additionalAvailable = currentItem.variant_stock || 0;
+            if (additionalAvailable <= 0) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Stok Tidak Mencukupi',
-                    text: `Stok maksimal untuk ${variant.name || variant.variant_label} adalah ${variant.stock}`,
+                    text: `Tidak ada stok tambahan tersedia untuk ${variant.name || variant.variant_label}`,
                     confirmButtonText: 'OK'
                 });
                 return;
             }
-            
-            // Update quantity if item already exists
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
+            updatedItems[existingItemIndex].variant_stock = additionalAvailable - 1;
             setOrderItems(updatedItems);
         } else {
-            // Check if variant has stock before adding
             if (variant.stock <= 0) {
                 Swal.fire({
                     icon: 'warning',
@@ -303,8 +301,6 @@ export default function EditOrder() {
                 });
                 return;
             }
-            
-            // Add new item with complete variant details
             const newItem = {
                 product_variant_id: variant.id,
                 product_name: product.name,
@@ -313,7 +309,7 @@ export default function EditOrder() {
                 variant_name: variant.name || variant.variant_label,
                 variant_sku: variant.sku,
                 variant_weight: variant.weight,
-                variant_stock: variant.stock,
+                variant_stock: Math.max(0, (variant.stock || 0) - 1),
                 quantity: 1,
                 price: variant.price
             };
@@ -1040,6 +1036,7 @@ console.log(formData)
                                                             const updatedItems = [...orderItems];
                                                             if (updatedItems[index].quantity > 1) {
                                                                 updatedItems[index].quantity -= 1;
+                                                                updatedItems[index].variant_stock = (updatedItems[index].variant_stock || 0) + 1;
                                                                 setOrderItems(updatedItems);
                                                             }
                                                         }}
@@ -1055,21 +1052,21 @@ console.log(formData)
                                                         onClick={() => {
                                                             const updatedItems = [...orderItems];
                                                             const currentItem = updatedItems[index];
-                                                            const maxStock = currentItem.variant_stock || 0;
-                                                            
-                                                            if (currentItem.quantity < maxStock) {
+                                                            const additionalAvailable = currentItem.variant_stock || 0;
+                                                            if (additionalAvailable > 0) {
                                                                 updatedItems[index].quantity += 1;
+                                                                updatedItems[index].variant_stock = additionalAvailable - 1;
                                                                 setOrderItems(updatedItems);
                                                             } else {
                                                                 Swal.fire({
                                                                     icon: 'warning',
                                                                     title: 'Stok Tidak Mencukupi',
-                                                                    text: `Stok maksimal untuk ${currentItem.variant_name} adalah ${maxStock}`,
+                                                                    text: `Tidak ada stok tambahan tersedia untuk ${currentItem.variant_name}`,
                                                                     confirmButtonText: 'OK'
                                                                 });
                                                             }
                                                         }}
-                                                        disabled={item.quantity >= (item.variant_stock || 0) || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
+                                                        disabled={(item.variant_stock || 0) <= 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
                                                         className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                                                     >
                                                         <span className="text-lg font-bold">+</span>

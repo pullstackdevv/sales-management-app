@@ -897,7 +897,8 @@ const CustomerDataCheckout = () => {
       });
 
       if (response.data.status === 'success') {
-        setLocationResults(response.data.data);
+        const onlyDistricts = (response.data.data || []).filter((item) => !!item.district_name);
+        setLocationResults(onlyDistricts);
         setShowLocationDropdown(true);
       }
     } catch (error) {
@@ -1000,7 +1001,8 @@ const CustomerDataCheckout = () => {
       });
 
       if (response.data.status === 'success') {
-        setModalLocationResults(response.data.data);
+        const onlyDistricts = (response.data.data || []).filter((item) => !!item.district_name);
+        setModalLocationResults(onlyDistricts);
         setShowModalLocationDropdown(true);
       }
     } catch (error) {

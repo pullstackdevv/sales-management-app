@@ -118,7 +118,7 @@ export default function AddOrder() {
         const e = {};
         if (!newCustomer.full_name.trim()) e.full_name = 'Nama lengkap wajib diisi';
         if (!newCustomer.phone.trim()) e.phone = 'Nomor telepon wajib diisi';
-        else if (!/^08[0-9]{8,11}$/.test(newCustomer.phone)) e.phone = 'Format nomor telepon tidak valid (contoh: 081234567890)';
+        // else if (!/^08[0-9]{8,11}$/.test(newCustomer.phone)) e.phone = 'Format nomor telepon tidak valid (contoh: 081234567890)';
         if (hasAnyAddressData(newAddress)) {
             if (!newAddress.district?.trim() || !newAddress.city?.trim() || !newAddress.province?.trim()) {
                 e.city = 'Silakan cari dan pilih kecamatan dari dropdown';
@@ -207,7 +207,8 @@ export default function AddOrder() {
         try {
             const response = await api.get('/wilayah/search-regencies', { params: { q: query } });
             if (response.data.status === 'success') {
-                setCityResults(response.data.data);
+                const onlyDistricts = (response.data.data || []).filter((item) => !!item.district_name);
+                setCityResults(onlyDistricts);
                 setShowCityDropdown(true);
             } else {
                 setCityResults([]);

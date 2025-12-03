@@ -177,8 +177,8 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
 
     // Calculate totals with base_price from order_items table
     const totalSellingPrice = orderData.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
-    const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
-    const profit = totalSellingPrice - totalProductCost;
+    // const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
+    // const profit = totalSellingPrice - totalProductCost;
 
     return (
         <DashboardLayout user={auth.user}>
@@ -266,7 +266,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                                             <div className="text-xs text-gray-600">No. Rekening: {orderData.payments[0].payment_bank.account_number}</div>
                                                             <div className="text-xs text-gray-600">Atas Nama: {orderData.payments[0].payment_bank.account_name}</div>
                                                             {orderData.payments?.[0]?.amount_paid && (
-                                                                <div className="text-xs text-gray-600">Dibayar: Rp{Number(orderData.payments[0].amount_paid).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>
+                                                                <div className="text-xs text-gray-600">Dibayar: Rp{formatRupiah(orderData.payments[0].amount_paid)}</div>
                                                             )}
                                                             {orderData.payments?.[0]?.paid_at && (
                                                                 <div className="text-xs text-gray-600">Tanggal Bayar: {new Date(orderData.payments[0].paid_at).toLocaleString('id-ID')}</div>
@@ -301,7 +301,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                                 )}
                                             </div>
                                         </div>
-                                        <p className="text-lg font-bold mt-2">Rp{orderData.total_price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
+                                        <p className="text-lg font-bold mt-2">Rp{formatRupiah(orderData.total_price)}</p>
                                         {orderData.sales_channel?.name && (
                                             <p className="text-xs text-gray-500 mt-1">Sumber Order: {orderData.sales_channel.name}</p>
                                         )}
@@ -401,10 +401,10 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <div className="flex-1">
                                             <h4 className="font-medium">{item.product_name_snapshot || item.product_variant?.product?.name || '-'}</h4>
                                             <p className="text-sm text-gray-600">{item.variant_label && `(${item.variant_label})`}</p>
-                                            <p className="text-sm text-gray-600">{item.quantity} x Rp{item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
+                                            <p className="text-sm text-gray-600">{item.quantity} x Rp{formatRupiah(item.price)}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="font-bold">Rp{item.subtotal?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
+                                            <p className="font-bold">Rp{formatRupiah(item.subtotal)}</p>
                                         </div>
                                     </div>
                                 )) || (
@@ -438,7 +438,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                 </div>
                             </div>
 
-                            <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+                            {/* <div className="mt-6 bg-gray-50 p-4 rounded-lg">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-2">
                                         <Briefcase className="w-4 h-4 text-gray-600" />
@@ -453,7 +453,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                     </div>
                                     <span className="font-semibold">Rp{formatRupiah(profit)}</span>
                                 </div>
-                            </div>
+                            </div> */}
                         </div>
                     </div>
                 </div>

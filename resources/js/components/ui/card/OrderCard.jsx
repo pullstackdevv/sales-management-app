@@ -23,7 +23,7 @@ const route = (name, params = null) => {
     return '#';
 };
 
-export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, isSelected = false, onSelect }) {
+export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], onOrderUpdate, showCheckbox = false, isSelected = false, onSelect }) {
     const { hasPermission } = useAuth();
     const [localOrder, setLocalOrder] = useState(order);
     // console.log(order)
@@ -33,7 +33,7 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
     const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
-    const [paymentBanks, setPaymentBanks] = useState([]);
+    const [paymentBanks, setPaymentBanks] = useState(paymentBanksProp);
     const [showShippingModal, setShowShippingModal] = useState(false);
     const [showPaymentHistory, setShowPaymentHistory] = useState(false);
     const [showOrderHistory, setShowOrderHistory] = useState(false);
@@ -162,20 +162,9 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
 
     const statusBadge = getStatusBadge(localOrder.raw_status || localOrder.status);
 
-    const fetchPaymentBanks = async () => {
-        try {
-            const response = await axios.get('/api/payment-banks');
-            const banksData = response.data?.data?.data || response.data?.data || [];
-            const activeBanks = Array.isArray(banksData) ? banksData.filter(b => b.is_active) : [];
-            setPaymentBanks(activeBanks);
-        } catch (e) {
-            setPaymentBanks([]);
-        }
-    };
-
     useEffect(() => {
-        fetchPaymentBanks();
-    }, []);
+        setPaymentBanks(paymentBanksProp);
+    }, [paymentBanksProp]);
 
     // Get valid status transitions - allow all status changes
     const getValidStatusTransitions = (currentStatus) => {
@@ -358,7 +347,7 @@ export default function OrderCard({ order, onOrderUpdate, showCheckbox = false, 
     };
 
     const validTransitions = getValidStatusTransitions(localOrder.raw_status || localOrder.status);
-    console.log('ini order card', localOrder)
+    // console.log('ini order card', localOrder)
     return (
         <div className={`border rounded-xl p-4 mb-4 bg-white shadow-sm text-sm ${orderSource.borderColor} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
             <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center text-xs text-gray-600 border-b pb-4 mb-4">

@@ -197,6 +197,12 @@ export default function ProductData() {
     fetchProducts(search, category); // Refresh data
   };
 
+  const handlePageChange = (page) => {
+    const last = pagination?.last_page || 1;
+    const target = Math.max(1, Math.min(page, last));
+    fetchProducts(search, category, target);
+  };
+
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -517,6 +523,42 @@ export default function ProductData() {
                 </div>
               );
             })
+          )}
+          {pagination && pagination.last_page > 1 && (
+            <div className="px-4 py-3 flex items-center justify-between">
+              <div className="text-xs text-gray-500">
+                Menampilkan {products?.length || 0} dari {pagination.total || 0}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handlePageChange((pagination.current_page || 1) - 1)}
+                  disabled={(pagination.current_page || 1) <= 1}
+                  className="px-3 py-1 text-sm border rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Sebelumnya
+                </button>
+                {Array.from({ length: pagination.last_page }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    className={`px-3 py-1 text-sm rounded-md ${
+                      (pagination.current_page || 1) === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => handlePageChange((pagination.current_page || 1) + 1)}
+                  disabled={(pagination.current_page || 1) >= (pagination.last_page || 1)}
+                  className="px-3 py-1 text-sm border rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -38,6 +38,7 @@ export default function OrderDetail({ auth, order }) {
             if (response.ok) {
                 const result = await response.json();
                 setOrderData(result.data); // API returns data in result.data
+                console.log(result.data)
             } else {
                 toast.error('Gagal memuat detail order');
             }
@@ -60,7 +61,7 @@ export default function OrderDetail({ auth, order }) {
 Order #${orderData.order_number || orderData.id}
 Tanggal: ${new Date(orderData.created_at).toLocaleDateString('id-ID')}
 Customer: ${orderData.customer?.name || '-'}
-Alamat: ${orderData.shipping_address || '-'}
+Alamat: ${orderData.address.address_detail || '-'}, ${orderData.address.district || '-'}, ${orderData.address.city || '-'}, ${orderData.address.province || '-'}
 Telp: ${orderData.customer?.phone || '-'}
 
 Produk:
@@ -212,6 +213,22 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <Settings className="w-4 h-4" />
                                         <span>Atur Order</span>
                                     </button>
+
+                                    <button
+                                        onClick={handleCopyOrderDetails}
+                                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        <Copy className="w-4 h-4" />
+                                        <span>Salin Detail</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setShowPaymentHistory(true)}
+                                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                    >
+                                        <DollarSign className="w-4 h-4" />
+                                        <span>Riwayat Pembayaran</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -248,9 +265,15 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                                             <div className="font-semibold text-gray-800">{orderData.payments[0].payment_bank.bank_name}</div>
                                                             <div className="text-xs text-gray-600">No. Rekening: {orderData.payments[0].payment_bank.account_number}</div>
                                                             <div className="text-xs text-gray-600">Atas Nama: {orderData.payments[0].payment_bank.account_name}</div>
+                                                            {orderData.payments?.[0]?.amount_paid && (
+                                                                <div className="text-xs text-gray-600">Dibayar: Rp{Number(orderData.payments[0].amount_paid).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>
+                                                            )}
+                                                            {orderData.payments?.[0]?.paid_at && (
+                                                                <div className="text-xs text-gray-600">Tanggal Bayar: {new Date(orderData.payments[0].paid_at).toLocaleString('id-ID')}</div>
+                                                            )}
                                                         </div>
                                                     ) : (
-                                                        <div className="text-gray-500">Manual Transfer</div>
+                                                        <div className="text-gray-500">Payment Gateway</div>
                                                     )}
                                                 </div>
                                             </div>
@@ -279,6 +302,9 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                             </div>
                                         </div>
                                         <p className="text-lg font-bold mt-2">Rp{orderData.total_price?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '0'}</p>
+                                        {orderData.sales_channel?.name && (
+                                            <p className="text-xs text-gray-500 mt-1">Sumber Order: {orderData.sales_channel.name}</p>
+                                        )}
                                         {isWebOrder() && (
                                             <div className="mt-2 p-2 bg-blue-50 rounded-md">
                                                 <p className="text-xs text-blue-700">
@@ -298,8 +324,14 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <Truck className="w-6 h-6 text-white" />
                                     </div>
                                     <div>
-                                        <p className="font-medium">{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</p>
+                                        <p className="font-medium">{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || orderData.shipping?.courierRate?.service_type || 'Reguler'}</p>
                                         <p className="text-sm text-gray-600">Resi: {orderData.shipping?.tracking_number || '-'}</p>
+                                        {orderData.shipping?.courierRate?.estimated_days && (
+                                            <p className="text-xs text-gray-500">ETA {orderData.shipping.courierRate.estimated_days} hari</p>
+                                        )}
+                                        {orderData.shipping?.weight && (
+                                            <p className="text-xs text-gray-500">Berat: {orderData.shipping.weight} kg</p>
+                                        )}
                                     </div>
                                     <div className="ml-auto">
                                         <p className="font-bold">Rp{formatRupiah(orderData.shipping_cost)}</p>
@@ -311,11 +343,25 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                             <div className="bg-white p-6 rounded-lg shadow-sm">
                                 <h3 className="text-lg font-semibold mb-4">Dikirim Ke</h3>
                                 <div className="space-y-2">
-                                    <p className="font-medium">{orderData.customer?.name || '-'}</p>
-                                    <div className="text-sm text-gray-600 space-y-1">
-                                        <p>{orderData.shipping_address || '-'}</p>
-                                        <p>Telp: {orderData.customer?.phone || '-'}</p>
-                                    </div>
+                                    {orderData.address ? (
+                                        <>
+                                            <p className="font-medium">{orderData.address.recipient_name || orderData.customer?.name || '-'}</p>
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                                <p>{orderData.address.address_detail}</p>
+                                                <p>{orderData.address.district}, {orderData.address.city}, {orderData.address.province} {orderData.address.postal_code}</p>
+                                                <p>Telp: {orderData.address.phone || orderData.customer?.phone || '-'}</p>
+                                                {orderData.address.is_dropship && (<p className="text-xs text-gray-500">Dropship</p>)}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="font-medium">{orderData.customer?.name || '-'}</p>
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                                <p>{orderData.shipping_address || '-'}</p>
+                                                <p>Telp: {orderData.customer?.phone || '-'}</p>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -323,10 +369,12 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                             <div className="bg-white p-6 rounded-lg shadow-sm">
                                 <h3 className="text-lg font-semibold mb-4">Catatan</h3>
                                 <p className="text-sm text-gray-600">{orderData.notes || '-'}</p>
-                                <div className="mt-4">
+                                {/* <div className="mt-4">
                                     <p className="text-sm text-gray-600">Admin: {orderData.created_by?.name || '-'}</p>
-                                </div>
+                                </div> */}
                             </div>
+
+                    
                         </div>
 
                         {/* Right Column - Products */}
@@ -370,13 +418,40 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                             <div className="mt-6 pt-4 border-t">
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
+                                        <span>Subtotal Produk</span>
+                                        <span>Rp{formatRupiah(totalSellingPrice)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
                                         <span>{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</span>
                                         <span>Rp{formatRupiah(orderData.shipping_cost)}</span>
                                     </div>
+                                    {orderData.voucher?.code && (
+                                        <div className="flex justify-between text-sm">
+                                            <span>Voucher {orderData.voucher.code}</span>
+                                            <span>{orderData.voucher.type === 'percentage' ? `${orderData.voucher.value}%` : `Rp${formatRupiah(orderData.voucher.value)}`}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                         <span>TOTAL</span>
                                         <span>Rp{formatRupiah(orderData.total_price)}</span>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <Briefcase className="w-4 h-4 text-gray-600" />
+                                        <span className="text-sm text-gray-700">Biaya Produk</span>
+                                    </div>
+                                    <span className="font-medium">Rp{formatRupiah(totalProductCost)}</span>
+                                </div>
+                                <div className="flex items-center justify-between mt-2">
+                                    <div className="flex items-center space-x-2">
+                                        <TrendingUp className="w-4 h-4 text-gray-600" />
+                                        <span className="text-sm text-gray-700">Profit</span>
+                                    </div>
+                                    <span className="font-semibold">Rp{formatRupiah(profit)}</span>
                                 </div>
                             </div>
                         </div>

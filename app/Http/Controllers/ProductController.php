@@ -413,18 +413,29 @@ class ProductController extends Controller
                             $skuCandidate = $prefix . '-' . $seq . '-' . $rand;
                         }
 
-                        $product->variants()->create([
+                        $variantModel = $product->variants()->create([
                             'variant_label' => $variant['variant_label'],
                             'sku' => $skuCandidate,
                             'price' => $variant['price'],
                             'base_price' => $isOwner ? $variant['base_price'] : 0,
                             'discount_price' => $variant['discount_price'] ?? null,
                             'weight' => $variant['weight'] ?? null,
+                            'stock' => $variant['stock'] ?? 0,
                             'is_active' => $variant['is_active'] ?? true,
                             'is_storefront' => $variant['is_storefront'] ?? true,
                             'image' => $variantImagePath,
                             'created_by' => Auth::id()
                         ]);
+
+                        if ((int)($variant['stock'] ?? 0) > 0) {
+                            StockMovement::create([
+                                'product_variant_id' => $variantModel->id,
+                                'type' => StockMovementType::IN,
+                                'quantity' => (int) $variant['stock'],
+                                'note' => 'initial stock',
+                                'created_by' => Auth::id()
+                            ]);
+                        }
                     }
                 }
             }

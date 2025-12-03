@@ -25,6 +25,7 @@ const PaymentMethodCheckout = () => {
   // Promotion states
   const [promotions, setPromotions] = useState([]);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
+  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     // Ambil data checkout dari session
@@ -111,7 +112,7 @@ const PaymentMethodCheckout = () => {
       if (response.data && response.data.success && response.data.data && response.data.data.rates) {
         const rates = response.data.data.rates;
         console.log(`Found ${rates.length} courier rates for district: ${district}`);
-        const allowed = ['ECO','REG','ONS'];
+        const allowed = ['ECO', 'REG', 'ONS'];
         const filtered = (rates || []).filter(r => {
           const code = r?.service?.type || r?.service_type;
           return allowed.includes((code || '').toString().toUpperCase());
@@ -376,7 +377,7 @@ const PaymentMethodCheckout = () => {
     setSubmitting(true);
 
     try {
-      
+
 
 
 
@@ -449,7 +450,7 @@ const PaymentMethodCheckout = () => {
         items: items.map(p => ({ product_variant_id: p.product_variant_id, quantity: p.quantity })),
         shipping_cost: shippingCost,
         voucher_id: appliedVoucher ? appliedVoucher.id : null,
-        notes: 'Order dari marketplace - Payment via Xendit',
+        notes: (notes || '').trim() ? (notes || '').trim() : '-',
         guest_email: guestEmail,
         guest_phone: guestPhone,
         guest_name: guestName,
@@ -854,6 +855,8 @@ const PaymentMethodCheckout = () => {
                     </div>
                   </div>
 
+
+
                   {/* Show discount in summary */}
                   {voucherDiscount > 0 && (
                     <div className="flex justify-between text-green-600 text-sm">
@@ -938,8 +941,22 @@ const PaymentMethodCheckout = () => {
                     </div>
                   )}
 
-                  <hr className="my-3" />
 
+
+                  <div className="border-t pt-3 mb-4">
+                    <h4 className="text-sm font-medium mb-2 text-gray-700">Catatan</h4>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={3}
+                      placeholder="Tulis catatan untuk pesanan (opsional)"
+                      className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Biarkan kosong jika tidak ada</p>
+                  </div>
+
+                  <hr className="my-3" />
+                  
                   <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
                     <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
@@ -956,6 +973,8 @@ const PaymentMethodCheckout = () => {
                     {/* <p className="text-xs text-gray-500 truncate">{checkoutData.customer.address}, {checkoutData.customer.city}</p> */}
                   </div>
                 </div>
+
+
 
                 <button
                   onClick={handleContinue}

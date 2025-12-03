@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PaymentStatus;
+use App\Enums\StockMovementType;
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
+use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -213,6 +216,7 @@ class XenditController extends Controller
     public function handleWebhook(Request $request)
     {
         try {
+            DB::beginTransaction();
             // Verify webhook token if configured
             $webhookToken = config('services.xendit.webhook_token');
             if ($webhookToken && $request->header('x-callback-token') !== $webhookToken) {
@@ -244,19 +248,29 @@ class XenditController extends Controller
             // Map Xendit status to our payment status
             $paymentStatus = $this->mapXenditStatus($status);
 
-            // Update order payment status
-            $order->update([
-                'payment_status' => $paymentStatus,
-            ]);
+            $previousStatus = $order->status;
+            $order->update(['payment_status' => $paymentStatus]);
 
             // Update order status based on payment status
             if ($paymentStatus === PaymentStatus::PAID) {
-                $order->update(['status' => 'processing']); // Change to processing when paid
-                
-                // Update voucher used count if voucher was used
+                $order->update(['status' => 'processing']);
                 WebOrderController::updateVoucherUsedCount($order->id);
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
+                if ($previousStatus !== 'cancelled') {
+                    foreach ($order->items as $item) {
+                        $variant = $item->productVariant;
+                        $variant->increment('stock', $item->quantity);
+                        StockMovement::create([
+                            'product_variant_id' => $item->product_variant_id,
+                            'order_id' => $order->id,
+                            'type' => StockMovementType::IN,
+                            'quantity' => $item->quantity,
+                            'note' => "Order #{$order->order_number} cancelled - Stock returned",
+                            'created_by' => $variant->created_by ?? $order->user_id ?? 1,
+                        ]);
+                    }
+                }
             }
 
             Log::info('Order payment status updated via Xendit webhook', [
@@ -265,9 +279,11 @@ class XenditController extends Controller
                 'order_status' => $order->status,
             ]);
 
+            DB::commit();
             return response()->json(['status' => 'success']);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Xendit webhook handling failed: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
@@ -279,6 +295,7 @@ class XenditController extends Controller
     public function checkPaymentStatus($orderNumber)
     {
         try {
+            DB::beginTransaction();
             $order = Order::where('order_number', $orderNumber)->first();
             
             if (!$order || !$order->payment_token) {
@@ -302,16 +319,31 @@ class XenditController extends Controller
                 
                 // Update order if status changed
                 if ($order->payment_status !== $paymentStatus) {
-                    $order->update([
-                        'payment_status' => $paymentStatus,
-                        'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
-                    ]);
-
+                    $previousStatus = $order->status;
+                    $order->update(['payment_status' => $paymentStatus]);
                     if ($paymentStatus === PaymentStatus::PAID) {
+                        $order->update(['status' => 'processing']);
                         WebOrderController::updateVoucherUsedCount($order->id);
+                    } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
+                        $order->update(['status' => 'cancelled']);
+                        if ($previousStatus !== 'cancelled') {
+                            foreach ($order->items as $item) {
+                                $variant = $item->productVariant;
+                                $variant->increment('stock', $item->quantity);
+                                StockMovement::create([
+                                    'product_variant_id' => $item->product_variant_id,
+                                    'order_id' => $order->id,
+                                    'type' => StockMovementType::IN,
+                                    'quantity' => $item->quantity,
+                                    'note' => "Order #{$order->order_number} cancelled - Stock returned",
+                                    'created_by' => $variant->created_by ?? $order->user_id ?? 1,
+                                ]);
+                            }
+                        }
                     }
                 }
                 
+                DB::commit();
                 return response()->json([
                     'status' => 'success',
                     'payment_status' => $paymentStatus,
@@ -320,12 +352,14 @@ class XenditController extends Controller
                 ]);
             }
             
+            DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to fetch payment status from Xendit'
             ], 500);
             
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Error checking payment status: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',

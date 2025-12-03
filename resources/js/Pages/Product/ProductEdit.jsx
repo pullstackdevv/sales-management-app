@@ -660,7 +660,7 @@ export default function ProductEdit() {
                                 value={formatRibuan(variant.stock)}
                                 onChange={(e) => updateVariant(index, 'stock', parseRibuan(e.target.value))}
                                 onFocus={() => { if (variant.stock === 0) updateVariant(index, 'stock', ''); }}
-                                readOnly
+                                readOnly={!!variant.id}
                                 // required
                               />
                               <button

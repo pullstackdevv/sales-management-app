@@ -293,7 +293,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         setVerificationError('');
         setPendingCustomer(null);
     };
-console.log(orders)
+// console.log(orders)
     // Show customer data form if needed
     if (showCustomerForm) {
         return (
@@ -673,8 +673,10 @@ console.log(orders)
                                                         </p>
                                                         {order.shipping?.tracking_number && (
                                                             <p className="flex justify-between mt-1 text-xs">
-                                                                <span className="text-gray-600">Resi</span>
-                                                                <span className="font-mono">{order.shipping.tracking_number}</span>
+                                                                <span className="text-gray-600 text-sm">Cek Resi</span>
+                                                                <a href={`https://tiki.id/id/track/${order.shipping.tracking_number}`} target="_blank" rel="noopener noreferrer" className="font-mono text-sm text-blue-600 hover:text-blue-800 flex ">
+                                                                  <ExternalLink className="w-4 h-4" /> <span className='ml-1'>{order.shipping.tracking_number}</span> 
+                                                                </a>
                                                             </p>
                                                         )}
                                                         <p className="mt-3 text-xs font-semibold text-gray-500 uppercase mb-1">Metode Bayar</p>
@@ -733,9 +735,9 @@ console.log(orders)
                                                         <p className="text-sm text-gray-700 min-h-[1.5rem]">
                                                             {order.notes || '-'}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 mt-2">
+                                                        {/* <p className="text-xs text-gray-500 mt-2">
                                                             Admin: {order.createdBy?.name || '-'}
-                                                        </p>
+                                                        </p> */}
                                                     </div>
                                                 </div>
                                             </div>

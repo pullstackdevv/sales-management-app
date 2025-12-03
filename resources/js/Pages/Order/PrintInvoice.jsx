@@ -54,6 +54,29 @@ const PrintInvoice = () => {
                 return total + (weight * item.quantity);
             }, 0) || 0;
 
+            // Fetch active origin settings for company info
+            let companyInfo = {
+                name: 'SALEPARFUM',
+                address: 'Jl. Contoh No. 123, Jakarta',
+                phone: '+62 21 1234567',
+                email: 'info@saleparfum.com'
+            };
+            try {
+                const originsResp = await api.get('/origin-settings');
+                const origins = originsResp.data?.data || originsResp.data || [];
+                const active = Array.isArray(origins) ? origins.find(o => o.is_active) : null;
+                if (active) {
+                    companyInfo = {
+                        name: active.store_name || companyInfo.name,
+                        address: active.address || active.origin_address || companyInfo.address,
+                        phone: active.phone || companyInfo.phone,
+                        email: companyInfo.email
+                    };
+                }
+            } catch (e) {
+                console.warn('Failed to fetch origin settings, using default company info', e);
+            }
+
             const transformedData = {
                 invoice_number: orderData.order_number,
                 created_at: orderData.created_at,
@@ -97,12 +120,7 @@ const PrintInvoice = () => {
                     postal_code: orderData.address.postal_code,
                     is_dropship: orderData.address.is_dropship
                 } : null,
-                company: {
-                    name: 'SALEPARFUM',
-                    address: 'Jl. Contoh No. 123, Jakarta',
-                    phone: '+62 21 1234567',
-                    email: 'info@saleparfum.com'
-                }
+                company: companyInfo
             };
             // Fallback fetch courier if missing
             if (!transformedData.courier_name && orderData.shipping?.id) {

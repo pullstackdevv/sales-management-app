@@ -11,6 +11,7 @@ use App\Models\OrderPayment;
 use App\Models\Shipping;
 use App\Models\StockMovement;
 use App\Enums\StockMovementType;
+use App\Enums\PaymentStatus;
 use App\Http\Requests\Order\StoreRequest;
 use App\Http\Requests\Order\UpdateRequest;
 use Illuminate\Http\Request;
@@ -275,6 +276,7 @@ class OrderController extends Controller
                 'status' => $validated['status'] ?? 'pending',
                 'payment_status' => $validated['payment_status'] ?? 'pending',
                 'ordered_at' => now(),
+                'notes' => $validated['notes'] ?? null,
                 'is_dropship' => (bool)($validated['is_dropship'] ?? false)
             ]);
 
@@ -398,7 +400,8 @@ class OrderController extends Controller
             'amount_paid' => 'nullable|numeric|min:0',
             'proof_image' => 'nullable|string',
             'printed_at' => 'nullable|date',
-            'is_dropship' => 'nullable|boolean'
+            'is_dropship' => 'nullable|boolean',
+            'notes' => 'nullable|string|max:255'
         ]);
 
         // Batasi edit order khusus untuk order dengan payment gateway (memiliki payment_url)
@@ -577,6 +580,15 @@ class OrderController extends Controller
             // Update status if provided
             if (isset($validated['status'])) {
                 $order->update(['status' => $validated['status']]);
+
+                // Sync payment_status for manual orders (no payment_url)
+                if (is_null($order->payment_url)) {
+                    if ($validated['status'] === 'paid') {
+                        $order->update(['payment_status' => PaymentStatus::PAID]);
+                    } elseif ($validated['status'] === 'cancelled') {
+                        $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                    }
+                }
             }
 
             // Update or create payment record if payment bank is provided (manual payment)
@@ -619,6 +631,11 @@ class OrderController extends Controller
             // Update printed_at if provided
             if (isset($validated['printed_at'])) {
                 $order->update(['printed_at' => $validated['printed_at']]);
+            }
+
+            // Update notes if provided (manual orders only)
+            if (isset($validated['notes']) && is_null($order->payment_url)) {
+                $order->update(['notes' => $validated['notes']]);
             }
 
             // Update timestamp
@@ -718,6 +735,20 @@ class OrderController extends Controller
                 'status' => $validated['status'],
                 'updated_by' => Auth::id()
             ]);
+
+            // When status is paid for manual orders, sync payment_status to paid
+            if ($validated['status'] === 'paid' && is_null($order->payment_url)) {
+                $order->update([
+                    'payment_status' => PaymentStatus::PAID
+                ]);
+            }
+
+            // When status is cancelled for manual orders, sync payment_status to cancelled
+            if ($validated['status'] === 'cancelled' && is_null($order->payment_url)) {
+                $order->update([
+                    'payment_status' => PaymentStatus::CANCELLED
+                ]);
+            }
 
             // If order is cancelled, restore stock
             if ($validated['status'] === 'cancelled') {

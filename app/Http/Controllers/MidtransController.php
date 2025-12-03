@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PaymentStatus;
+use App\Enums\StockMovementType;
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
+use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Midtrans\Notification;
 use Midtrans\Snap;
@@ -162,6 +165,7 @@ class MidtransController extends Controller
     public function handleNotification(Request $request)
     {
         try {
+            DB::beginTransaction();
             Log::info('Midtrans legacy webhook raw content', [
                 'content' => $request->getContent(),
                 'headers' => $request->headers->all()
@@ -198,16 +202,29 @@ class MidtransController extends Controller
             }
 
             $paymentStatus = $this->mapTransactionStatus($transactionStatus, $fraudStatus);
+            $previousStatus = $order->status;
 
-            $order->update([
-                'payment_status' => $paymentStatus->value,
-            ]);
+            $order->update(['payment_status' => $paymentStatus->value]);
 
             if ($paymentStatus === PaymentStatus::PAID) {
                 $order->update(['status' => 'paid']);
                 WebOrderController::updateVoucherUsedCount($order->id);
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
+                if ($previousStatus !== 'cancelled') {
+                    foreach ($order->items as $item) {
+                        $variant = $item->productVariant;
+                        $variant->increment('stock', $item->quantity);
+                        StockMovement::create([
+                            'product_variant_id' => $item->product_variant_id,
+                            'order_id' => $order->id,
+                            'type' => StockMovementType::IN,
+                            'quantity' => $item->quantity,
+                            'note' => "Order #{$order->order_number} cancelled - Stock returned",
+                            'created_by' => $variant->created_by ?? $order->user_id ?? 1,
+                        ]);
+                    }
+                }
             }
 
             Log::info('Order payment status updated', [
@@ -216,9 +233,11 @@ class MidtransController extends Controller
                 'order_status' => $order->status,
             ]);
 
+            DB::commit();
             return response()->json(['status' => 'success'], 200);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Midtrans notification handling failed: ' . $e->getMessage());
 
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 200);
@@ -231,6 +250,7 @@ class MidtransController extends Controller
     public function checkPaymentStatus($orderNumber)
     {
         try {
+            DB::beginTransaction();
             $order = Order::where('order_number', $orderNumber)->first();
 
             if (!$order) {
@@ -266,6 +286,7 @@ class MidtransController extends Controller
             }
 
             if ($shouldUpdate) {
+                $previousStatus = $order->status;
                 $order->update(['payment_status' => $paymentStatusFromGateway->value]);
 
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
@@ -273,11 +294,26 @@ class MidtransController extends Controller
                     WebOrderController::updateVoucherUsedCount($order->id);
                 } elseif (in_array($paymentStatusFromGateway, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                     $order->update(['status' => 'cancelled']);
+                    if ($previousStatus !== 'cancelled') {
+                        foreach ($order->items as $item) {
+                            $variant = $item->productVariant;
+                            $variant->increment('stock', $item->quantity);
+                            StockMovement::create([
+                                'product_variant_id' => $item->product_variant_id,
+                                'order_id' => $order->id,
+                                'type' => StockMovementType::IN,
+                                'quantity' => $item->quantity,
+                                'note' => "Order #{$order->order_number} cancelled - Stock returned",
+                                'created_by' => $variant->created_by ?? $order->user_id ?? 1,
+                            ]);
+                        }
+                    }
                 }
 
                 $currentOrder = $order->fresh();
             }
 
+            DB::commit();
             return ResponseFormatter::success(
                  'Payment status retrieved successfully',
                  [
@@ -287,6 +323,7 @@ class MidtransController extends Controller
              );
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Payment status check failed: ' . $e->getMessage());
             return ResponseFormatter::error(
                 'Failed to check payment status',

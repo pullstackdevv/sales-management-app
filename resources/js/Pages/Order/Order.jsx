@@ -20,9 +20,11 @@ export default function Order() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [dateQuick, setDateQuick] = useState('Semua');
+  const [paymentBanks, setPaymentBanks] = useState([]);
 
   useEffect(() => {
     fetchOrders();
+    fetchPaymentBanksOnce();
     
     // Add event listener for page visibility change to refresh data
     const handleVisibilityChange = () => {
@@ -91,7 +93,7 @@ export default function Order() {
       const response = await api.get(url);
       const responseData = response.data.data;
       const ordersData = responseData.data || [];
-      console.log(ordersData)
+      // console.log(ordersData)
       
       // Set pagination data
       setPagination({
@@ -157,6 +159,17 @@ export default function Order() {
       console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPaymentBanksOnce = async () => {
+    try {
+      const response = await api.get('/payment-banks');
+      const banksData = response.data?.data?.data || response.data?.data || [];
+      const activeBanks = Array.isArray(banksData) ? banksData.filter(b => b.is_active) : [];
+      setPaymentBanks(activeBanks);
+    } catch (e) {
+      setPaymentBanks([]);
     }
   };
 
@@ -312,7 +325,7 @@ export default function Order() {
             <option value="Semua Order">Semua Order</option>
             <option value="Belum Bayar">Belum Bayar</option>
             <option value="Dibayar">Dibayar</option>
-            <option value="Diproses">Diproses</option>
+            {/* <option value="Diproses">Diproses</option> */}
             <option value="Dikirim">Dikirim</option>
             <option value="Diterima">Diterima</option>
             <option value="Dibatalkan">Dibatalkan</option>
@@ -405,7 +418,7 @@ export default function Order() {
         ) : (
           <>
             {orders.map((order, idx) => (
-              <OrderCard key={idx} order={order} onOrderUpdate={() => fetchOrders(currentPage)} />
+              <OrderCard key={idx} order={order} paymentBanks={paymentBanks} onOrderUpdate={() => fetchOrders(currentPage)} />
             ))}
             
             {/* Pagination */}

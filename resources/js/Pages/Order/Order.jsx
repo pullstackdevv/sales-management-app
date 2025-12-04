@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import api from '@/api/axios';
 import { Link } from '@inertiajs/react';
 import { useAuth } from '../../contexts/AuthContext';
+import Swal from 'sweetalert2';
 
 export default function Order() {
   const { hasPermission } = useAuth();
@@ -258,39 +259,33 @@ export default function Order() {
 
   // Handle print and update status to processing
   const handlePrintOrders = async () => {
-    if (selectedOrders.length === 0) return;
-
-    try {
-      setIsPrinting(true);
-      
-      // Update status to processing for selected orders
-      const updatePromises = selectedOrders.map(orderId =>
-        api.put(`/orders/${orderId}/status`, { status: 'processing' })
-      );
-      
-      await Promise.all(updatePromises);
-      
-      // Open print window with selected orders
-      const printUrl = `/cms/order/print?orders=${selectedOrders.join(',')}`;
-      window.open(printUrl, '_blank');
-      
-      // Clear selection and refresh
-      setSelectedOrders([]);
-      await fetchOrders(currentPage);
-      
+    if (selectedOrders.length === 0) {
       Swal.fire({
-        icon: 'success',
-        title: 'Berhasil!',
-        text: `${selectedOrders.length} order berhasil diprint dan diproses`,
+        icon: 'info',
+        title: 'Tidak ada order dipilih',
+        text: 'Silakan pilih minimal satu order yang sudah dibayar terlebih dahulu.',
         timer: 2000,
         showConfirmButton: false
       });
+      return;
+    }
+
+    try {
+      setIsPrinting(true);
+
+      // Open print window with selected orders (multi-invoice page)
+      const printUrl = `/cms/order/print-multiple?orders=${selectedOrders.join(',')}`;
+      window.open(printUrl, '_blank');
+
+      // Clear selection and refresh list (status & printed_at handled in print page)
+      setSelectedOrders([]);
+      await fetchOrders(currentPage);
     } catch (error) {
-      console.error('Error printing orders:', error);
+      console.error('Error opening print window:', error);
       Swal.fire({
         icon: 'error',
         title: 'Gagal!',
-        text: 'Terjadi kesalahan saat memproses print'
+        text: 'Tidak dapat membuka halaman cetak multiple.'
       });
     } finally {
       setIsPrinting(false);
@@ -382,7 +377,38 @@ export default function Order() {
             {/* {hasPermission('orders.export') && (
               <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
             )} */}
-            {hasPermission('orders.create') && (
+          
+            {/* Bulk print controls */}
+            <div className="flex items-center gap-2 ml-2">
+              <label className="inline-flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300"
+                  checked={selectedOrders.length > 0 && selectedOrders.length === orders.filter(o => o.raw_status === 'paid').length}
+                  onChange={handleSelectAll}
+                />
+                <span>Pilih semua yang sudah Dibayar</span>
+              </label>
+              <button
+                type="button"
+                onClick={handlePrintOrders}
+                disabled={isPrinting}
+                className={`text-xs px-3 py-2 rounded-md border flex items-center gap-1 ${
+                  isPrinting
+                    ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100 opacity-70'
+                    : 'border-yellow-900 text-yellow-900 hover:bg-yellow-300'
+                }`}
+              >
+                {isPrinting ? (
+                  <span>Mencetak...</span>
+                ) : (
+                  <>
+                    <span>Print Multiple</span>
+                    <span className="text-[10px] text-gray-500">({selectedOrders.length})</span>
+                  </>
+                )}
+              </button>
+                {hasPermission('orders.create') && (
               <Link
                 href={route('cms.orders.create')}
                 className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -390,6 +416,7 @@ export default function Order() {
                 Tambah Order
               </Link>
             )}
+            </div>
           </div>
         </div>
 
@@ -405,7 +432,15 @@ export default function Order() {
         ) : (
           <>
             {orders.map((order, idx) => (
-              <OrderCard key={idx} order={order} paymentBanks={paymentBanks} onOrderUpdate={() => fetchOrders(currentPage)} />
+              <OrderCard
+                key={idx}
+                order={order}
+                paymentBanks={paymentBanks}
+                onOrderUpdate={() => fetchOrders(currentPage)}
+                showCheckbox={order.raw_status === 'paid'}
+                isSelected={selectedOrders.includes(order.id)}
+                onSelect={handleSelectOrder}
+              />
             ))}
             
             {/* Pagination */}

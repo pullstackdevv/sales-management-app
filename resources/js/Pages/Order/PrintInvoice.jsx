@@ -143,6 +143,16 @@ const PrintInvoice = () => {
         }
     };
 
+    useEffect(() => {
+        if (!invoiceData?.invoice_number) return;
+
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        const safeOrder = invoiceData.invoice_number.replace(/[^A-Za-z0-9_-]/g, '_');
+        document.title = `${safeOrder}_${stamp}`;
+    }, [invoiceData]);
+
     // Fungsi untuk menyimpan pengaturan ke localStorage
     const updatePrintSettings = (newSettings) => {
         setPrintSettings(newSettings);

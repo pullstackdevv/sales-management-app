@@ -309,7 +309,7 @@ export default function Order() {
             <option value="Dibayar">Dibayar</option>
             <option value="Diproses">Diproses</option>
             <option value="Dikirim">Dikirim</option>
-            <option value="Diterima">Diterima</option>
+            {/* <option value="Diterima">Diterima</option> */}
             <option value="Dibatalkan">Dibatalkan</option>
           </select>
 

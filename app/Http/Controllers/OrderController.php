@@ -589,6 +589,29 @@ class OrderController extends Controller
                         $order->update(['payment_status' => PaymentStatus::CANCELLED]);
                     }
                 }
+
+                // Restore stock when status set to cancelled via update (manual flow)
+                if ($validated['status'] === 'cancelled') {
+                    $alreadyRestocked = StockMovement::where('order_id', $order->id)
+                        ->where('type', StockMovementType::IN)
+                        ->where('note', 'like', "Cancel Order #{$order->order_number}%")
+                        ->exists();
+                    if (!$alreadyRestocked) {
+                        foreach ($order->items as $item) {
+                            $variant = $item->productVariant;
+                            $variant->increment('stock', $item->quantity);
+                            $actorId = Auth::id() ?? $order->user_id ?? ($variant->created_by ?? null);
+                            StockMovement::create([
+                                'product_variant_id' => $item->product_variant_id,
+                                'order_id' => $order->id,
+                                'type' => StockMovementType::IN,
+                                'quantity' => $item->quantity,
+                                'note' => "Cancel Order #{$order->order_number} - Manual",
+                                'created_by' => $actorId
+                            ]);
+                        }
+                    }
+                }
             }
 
             // Update or create payment record if payment bank is provided (manual payment)

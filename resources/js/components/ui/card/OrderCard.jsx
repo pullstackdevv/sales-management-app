@@ -701,7 +701,13 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                 </div>
                 <div className="≈mt-6 pt-4 flex flex-wrap justify-end gap-2">
                     {hasPermission('orders.update_status') && (() => {
-                        const shouldShowShipping = localOrder.status === 'Paid' || localOrder.status === 'paid' || localOrder.status === 'shipped' || localOrder.status === 'Dikirim';
+                        // Show Update Shipping button only when order is in processing status
+                        const rawStatus = localOrder.raw_status || localOrder.status;
+                        const labelStatus = localOrder.status;
+
+                        const shouldShowShipping =
+                            rawStatus === 'processing' ||
+                            labelStatus === 'Diproses';
 
                         return shouldShowShipping;
                     })() && (

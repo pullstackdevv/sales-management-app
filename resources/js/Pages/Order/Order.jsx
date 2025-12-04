@@ -65,15 +65,9 @@ export default function Order() {
         'Dibatalkan': 'cancelled'
       };
       
-      // For normal filters, filter by status.
-      // For "Diproses", we ignore status and only filter by printed_at (see below).
-      if (activeFilter !== 'Semua Order' && activeFilter !== 'Diproses' && statusMap[activeFilter]) {
+      // For non-default filters, filter by status using statusMap (including "Diproses" => processing)
+      if (activeFilter !== 'Semua Order' && statusMap[activeFilter]) {
         params.append('status', statusMap[activeFilter]);
-      }
-
-      // Special case: filter "Diproses" should show ALL printed orders regardless of status
-      if (activeFilter === 'Diproses') {
-        params.append('printed', '1');
       }
       
       if (sourceFilter !== 'Semua Sumber') {

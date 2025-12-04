@@ -50,12 +50,6 @@ class OrderController extends Controller
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
             })
-            ->when($request->printed, function ($query, $printed) {
-                // Filter only orders that have been printed
-                if ($printed) {
-                    $query->whereNotNull('printed_at');
-                }
-            })
             ->when($request->source, function ($query, $source) {
                 if ($source === 'Manual') {
                     // Manual orders don't have payment_url

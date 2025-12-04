@@ -95,6 +95,18 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             ]);
         })->name('order.print-invoice');
 
+        Route::get('/order/print-multiple', function (Request $request) {
+            $ordersParam = $request->query('orders', '');
+            $orderIds = array_filter(
+                array_map('intval', array_filter(explode(',', $ordersParam))),
+                fn ($id) => $id > 0
+            );
+
+            return Inertia::render('Order/PrintMultipleInvoices', [
+                'orderIds' => $orderIds,
+            ]);
+        })->name('order.print-multiple');
+
         // Customer
         Route::get('/customer/data', function () {
             return Inertia::render('Customer/CustomerData');

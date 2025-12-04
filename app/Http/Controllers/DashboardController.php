@@ -37,6 +37,14 @@ class DashboardController extends Controller
             $todaySales = Order::whereDate('created_at', $today)
                 ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                 ->sum('total_price');
+
+            $ordersNeedProcess = Order::whereDate('created_at', $today)
+                ->where('status', 'paid')
+                ->count();
+
+            $ordersNeedShip = Order::whereDate('created_at', $today)
+                ->where('status', 'processing')
+                ->count();
             
             $weeklyRevenueData = [];
             $weeklyOrderCounts = [];
@@ -56,10 +64,22 @@ class DashboardController extends Controller
             
             $summaryCards = [
                 [
-                    'label' => 'Total Order Hari Ini',
+                    'label' => 'Total Semua Order Hari Ini',
                     'icon' => 'mdi:cart-outline',
                     'value' => $totalOrders,
                     'color' => 'bg-blue-100 text-blue-800'
+                ],
+                [
+                    'label' => 'Perlu Diproses',
+                    'icon' => 'mdi:clipboard-text-outline',
+                    'value' => $ordersNeedProcess,
+                    'color' => 'bg-orange-100 text-orange-800'
+                ],
+                [
+                    'label' => 'Perlu Dikirim',
+                    'icon' => 'mdi:truck-outline',
+                    'value' => $ordersNeedShip,
+                    'color' => 'bg-teal-100 text-teal-800'
                 ],
                 [
                     'label' => 'Pelanggan',

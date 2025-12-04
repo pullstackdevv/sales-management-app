@@ -123,7 +123,7 @@ export default function Order() {
           total: parseFloat(order.total_price),
           bank: bankInfo,
           courier: order.shipping?.courier?.name || 'N/A',
-          service_type: order.shipping?.service_type || order.shipping?.courier?.service_type || 'N/A',
+          service_type: order.shipping?.service_type || order.shipping?.courier?.service_type || '',
           resi: order.shipping?.tracking_number || '',
           products: order.items?.map(item => 
             `${item.product_name_snapshot} ${item.variant_label} (${item.quantity}x)`

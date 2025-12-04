@@ -427,6 +427,9 @@ const Homepage = () => {
     const ProductCard = memo(({ product }) => {
         const variantInfo = getVariantPriceInfo(product);
         const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
+        const hasStock = (Array.isArray(product.variants) && product.variants.length > 0)
+            ? product.variants.some(v => (v.stock ?? 0) > 0)
+            : ((product.stock ?? 0) > 0);
 
         return (
             <Link href={`/products/${product.id}`} className="block group">
@@ -442,6 +445,11 @@ const Homepage = () => {
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300"></div>
+                        {!hasStock && (
+                            <div className="absolute top-2 left-2 text-white text-xs px-2 py-1 rounded-full font-medium bg-red-600">
+                                Stok Habis
+                            </div>
+                        )}
                         {variantInfo?.hasDiscount && (
                             <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
                                 Diskon
@@ -490,6 +498,9 @@ const Homepage = () => {
     const ProductListItem = memo(({ product }) => {
         const variantInfo = getVariantPriceInfo(product);
         const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
+        const hasStock = (Array.isArray(product.variants) && product.variants.length > 0)
+            ? product.variants.some(v => (v.stock ?? 0) > 0)
+            : ((product.stock ?? 0) > 0);
 
         return (
             <Link href={`/products/${product.id}`} className="block group">
@@ -502,6 +513,11 @@ const Homepage = () => {
                                 className="w-24 h-24 sm:w-20 sm:h-20 object-cover transition-transform duration-300 group-hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg"></div>
+                            {!hasStock && (
+                                <div className="absolute top-1 left-1 text-white text-xs px-2 py-0.5 rounded font-medium bg-red-600">
+                                    Stok Habis
+                                </div>
+                            )}
                             {variantInfo?.hasDiscount && (
                                 <div className="absolute top-1 right-1 bg-green-500 text-white text-xs px-2 py-0.5 rounded font-medium">
                                     Diskon

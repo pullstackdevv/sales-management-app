@@ -59,6 +59,7 @@ export default function EditOrder() {
     
     // Error states
     const [errors, setErrors] = useState({});
+    const [cancelling, setCancelling] = useState(false);
 
     const formatRupiah = (num) => {
         if (!num || num === 0) return '';
@@ -633,6 +634,67 @@ export default function EditOrder() {
         }
     }, [originalOrder]);
 
+    const isWebOrder = () => {
+        // Consider web order if sales_channel code is WEBSITE or order has payment_url
+        return originalOrder?.sales_channel?.code === 'WEBSITE' || !!originalOrder?.payment_url;
+    };
+
+    const handleCancelWebOrder = async () => {
+        if (!originalOrder) return;
+        if (!isWebOrder()) return;
+        if (originalOrder.payment_status === 'paid' || originalOrder.status === 'cancelled') return;
+
+        const result = await Swal.fire({
+            title: 'Batalkan Web Order?',
+            text: 'Order web yang belum dibayar akan dibatalkan. Lanjutkan?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, batalkan',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#d33',
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            setCancelling(true);
+            const response = await axios.post(`/api/orders/${orderId}/update-status`, {
+                status: 'cancelled',
+            });
+
+            if (response.data?.status === 'success') {
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil',
+                    text: 'Web order berhasil dibatalkan.',
+                    timer: 2000,
+                    showConfirmButton: false,
+                });
+                // Redirect back to orders list
+                router.visit('/cms/order/data', {
+                    preserveState: false,
+                    preserveScroll: false,
+                });
+            } else {
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: response.data?.message || 'Gagal membatalkan web order.',
+                });
+            }
+        } catch (error) {
+            console.error('Error cancelling web order:', error);
+            const message = error.response?.data?.message || 'Terjadi kesalahan saat membatalkan web order.';
+            await Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: message,
+            });
+        } finally {
+            setCancelling(false);
+        }
+    };
+
     if (loading.order) {
         return (
             <DashboardLayout>
@@ -666,7 +728,7 @@ console.log(formData)
                         </div>
                     </div>
                     
-                    {/* Sales Channel & Source Badge */}
+                    {/* Sales Channel & Source Badge + Web Order Actions */}
                     <div className="flex items-center gap-3">
                         {originalOrder?.sales_channel && (
                             <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
@@ -691,6 +753,18 @@ console.log(formData)
                                 </div>
                             </div>
                         ) : null}
+
+                        {/* Cancel Web Order button - only for web orders that are not paid and not cancelled */}
+                        {isWebOrder() && originalOrder?.payment_status !== 'paid' && originalOrder?.status !== 'cancelled' && (
+                            <button
+                                onClick={handleCancelWebOrder}
+                                disabled={cancelling}
+                                className="ml-2 inline-flex items-center gap-2 px-4 py-2 border border-red-500 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                            >
+                                <Icon icon="mdi:cancel" className="w-4 h-4" />
+                                <span>{cancelling ? 'Membatalkan...' : 'Batalkan Web Order'}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 

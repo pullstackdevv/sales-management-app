@@ -143,6 +143,16 @@ const PrintInvoice = () => {
         }
     };
 
+    useEffect(() => {
+        if (!invoiceData?.invoice_number) return;
+
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+        const safeOrder = invoiceData.invoice_number.replace(/[^A-Za-z0-9_-]/g, '_');
+        document.title = `${safeOrder}_${stamp}`;
+    }, [invoiceData]);
+
     // Fungsi untuk menyimpan pengaturan ke localStorage
     const updatePrintSettings = (newSettings) => {
         setPrintSettings(newSettings);
@@ -158,55 +168,23 @@ const PrintInvoice = () => {
         updatePrintSettings(newSettings);
     };
 
-    const handlePrint = async () => {
-        try {
-            console.log('🖨️ Print Invoice Triggered', {
-                orderId,
-                orderNumber: invoiceData?.invoice_number,
-                timestamp: new Date().toISOString()
-            });
-
-            // Hanya update printed_at; tidak mengubah status
-            await api.patch(`/orders/${orderId}`, { printed_at: new Date().toISOString() });
-            
-            window.print();
-            
-            await Swal.fire({
-                title: 'Berhasil!',
-                text: `Invoice ${invoiceData?.invoice_number} berhasil diprint`,
-                icon: 'success',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#3085d6',
-                timer: 3000,
-                timerProgressBar: true
-            });
-        } catch (error) {
-            console.error('❌ Error updating printed_at:', error);
-            await Swal.fire({
-                title: 'Error!',
-                text: 'Gagal memperbarui printed_at',
-                icon: 'error',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#d33'
-            });
-            window.print();
-        }
+    // Tombol cetak saja: tidak mengubah status atau printed_at
+    const handlePrint = () => {
+        window.print();
     };
 
-    const handlePrintAndProcess = async () => {
+    // Tombol proses saja: ubah status & printed_at tanpa membuka dialog print
+    const handleProcessOnly = async () => {
         try {
-            // Skip status update if already processing
-            console.log(invoiceData.status)
+            // Skip status update jika sudah processing
             if (invoiceData?.status !== 'processing') {
                 await api.post(`/orders/${orderId}/update-status`, { status: 'processing' });
             }
             await api.patch(`/orders/${orderId}`, { printed_at: new Date().toISOString() });
 
-            window.print();
-
             await Swal.fire({
                 title: 'Berhasil!',
-                text: `Order diproses dan invoice ${invoiceData?.invoice_number} diprint`,
+                text: `Order diproses dan invoice ${invoiceData?.invoice_number} ditandai sudah diprint`,
                 icon: 'success',
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#3085d6',
@@ -214,10 +192,10 @@ const PrintInvoice = () => {
                 timerProgressBar: true
             });
         } catch (error) {
-            console.error('❌ Error update status processing:', error);
+            console.error('❌ Error update status/printed_at:', error);
             await Swal.fire({
                 title: 'Error!',
-                text: 'Gagal memperbarui status order ke processing',
+                text: 'Gagal memperbarui status order / printed_at',
                 icon: 'error',
                 confirmButtonText: 'OK',
                 confirmButtonColor: '#d33'
@@ -283,19 +261,19 @@ console.log(invoiceData)
                 <div className="no-print mb-6">
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
                         <button
-                            onClick={handlePrintAndProcess}
+                            onClick={handlePrint}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
                         >
                             <Icon icon="solar:printer-outline" className="w-5 h-5" />
                             Cetak Invoice
                         </button>
-                        {/* <button
-                            onClick={}
+                        <button
+                            onClick={handleProcessOnly}
                             className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[180px] justify-center"
                         >
-                            <Icon icon="solar:printer-minimalistic-2-line-duotone" className="w-5 h-5" />
-                            Cetak & Proses
-                        </button> */}
+                            <Icon icon="solar:check-circle-outline" className="w-5 h-5" />
+                            Proses & Tandai Sudah Diprint
+                        </button>
                         <button
                             onClick={() => setShowSettings(!showSettings)}
                             className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"

@@ -721,10 +721,14 @@ class OrderController extends Controller
             ]);
         }
 
-        // Validasi: status cancelled hanya bisa diterapkan pada order manual input
-        if ($validated['status'] === 'cancelled' && !is_null($order->payment_url)) {
+        // Validasi: status cancelled untuk web order hanya dilarang jika pembayaran sudah paid
+        if (
+            $validated['status'] === 'cancelled'
+            && !is_null($order->payment_url)
+            && $order->payment_status === PaymentStatus::PAID
+        ) {
             throw ValidationException::withMessages([
-                'status' => ['Status dibatalkan hanya dapat diterapkan pada order manual input.']
+                'status' => ['Web order yang sudah dibayar tidak dapat dibatalkan.']
             ]);
         }
 

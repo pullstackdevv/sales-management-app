@@ -23,14 +23,14 @@ const PromotionData = () => {
         try {
             setLoading(true);
             const response = await axios.get("/api/promotions");
-            
+
             let promotionsData = [];
             if (response.data.data && response.data.data.data) {
                 promotionsData = Array.isArray(response.data.data.data) ? response.data.data.data : [];
             } else if (Array.isArray(response.data.data)) {
                 promotionsData = response.data.data;
             }
-            
+
             setPromotions(promotionsData);
             setError(null);
         } catch (err) {
@@ -39,6 +39,34 @@ const PromotionData = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const saveOrder = async (ordered) => {
+        try {
+            const ids = ordered.map(p => p.id);
+            await axios.post('/api/promotions/reorder', { ids });
+        } catch (err) {
+            console.error('Error reordering promotions:', err);
+            Swal.fire('Error!', 'Gagal menyimpan urutan promosi.', 'error');
+            await fetchPromotions();
+        }
+    };
+
+    const handleMove = async (id, direction) => {
+        const list = [...promotions];
+        const index = list.findIndex(p => p.id === id);
+        if (index === -1) return;
+
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= list.length) return;
+
+        const temp = list[targetIndex];
+        list[targetIndex] = list[index];
+        list[index] = temp;
+
+        setPromotions(list);
+        await saveOrder(list);
+        Swal.fire('Berhasil!', 'Urutan promosi diperbarui.', 'success');
     };
 
     const handleAddPromotion = () => {
@@ -97,15 +125,15 @@ const PromotionData = () => {
 
     const filteredPromotions = promotions.filter((promotion) => {
         const matchesSearch = promotion.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (promotion.description && promotion.description.toLowerCase().includes(searchTerm.toLowerCase()));
-        
-        const matchesStatus = filterStatus === "all" || 
-                            (filterStatus === "active" && promotion.is_active) ||
-                            (filterStatus === "inactive" && !promotion.is_active);
-        
+            (promotion.description && promotion.description.toLowerCase().includes(searchTerm.toLowerCase()));
+
+        const matchesStatus = filterStatus === "all" ||
+            (filterStatus === "active" && promotion.is_active) ||
+            (filterStatus === "inactive" && !promotion.is_active);
+
         const matchesStorefront = filterStorefront === "all" ||
-                                (filterStorefront === "yes" && promotion.is_storefront) ||
-                                (filterStorefront === "no" && !promotion.is_storefront);
+            (filterStorefront === "yes" && promotion.is_storefront) ||
+            (filterStorefront === "no" && !promotion.is_storefront);
 
         return matchesSearch && matchesStatus && matchesStorefront;
     });
@@ -113,10 +141,10 @@ const PromotionData = () => {
     const formatDate = (dateString) => {
         if (!dateString) return '-';
         const date = new Date(dateString);
-        return date.toLocaleDateString('id-ID', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
+        return date.toLocaleDateString('id-ID', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
         });
     };
 
@@ -213,6 +241,9 @@ const PromotionData = () => {
                                         Periode
                                     </th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Urutan
+                                    </th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Status
                                     </th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -226,7 +257,7 @@ const PromotionData = () => {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {filteredPromotions.length === 0 ? (
                                     <tr>
-                                        <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                        <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                                             Tidak ada data promosi
                                         </td>
                                     </tr>
@@ -249,23 +280,43 @@ const PromotionData = () => {
                                                 <div>{formatDate(promotion.end_date)}</div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
+                                                {hasPermission('promotions.edit') && (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            onClick={() => handleMove(promotion.id, 'up')}
+                                                            className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                                                            title="Naik"
+                                                            disabled={promotions.findIndex(p => p.id === promotion.id) === 0}
+                                                        >
+                                                            <Icon icon="solar:arrow-up-outline" className="text-lg" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleMove(promotion.id, 'down')}
+                                                            className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                                                            title="Turun"
+                                                            disabled={promotions.findIndex(p => p.id === promotion.id) === promotions.length - 1}
+                                                        >
+                                                            <Icon icon="solar:arrow-down-outline" className="text-lg" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
                                                 {hasPermission('promotions.toggle_status') ? (
                                                     <button
                                                         onClick={() => toggleStatus(promotion.id)}
-                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                            promotion.is_active
+                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${promotion.is_active
                                                                 ? 'bg-green-100 text-green-800'
                                                                 : 'bg-gray-100 text-gray-800'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {promotion.is_active ? 'Aktif' : 'Tidak Aktif'}
                                                     </button>
                                                 ) : (
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                        promotion.is_active
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${promotion.is_active
                                                             ? 'bg-green-100 text-green-800'
                                                             : 'bg-gray-100 text-gray-800'
-                                                    }`}>
+                                                        }`}>
                                                         {promotion.is_active ? 'Aktif' : 'Tidak Aktif'}
                                                     </span>
                                                 )}
@@ -274,20 +325,18 @@ const PromotionData = () => {
                                                 {hasPermission('promotions.toggle_storefront') ? (
                                                     <button
                                                         onClick={() => toggleStorefront(promotion.id)}
-                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                            promotion.is_storefront
+                                                        className={`px-3 py-1 rounded-full text-xs font-medium ${promotion.is_storefront
                                                                 ? 'bg-blue-100 text-blue-800'
                                                                 : 'bg-gray-100 text-gray-800'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {promotion.is_storefront ? 'Ya' : 'Tidak'}
                                                     </button>
                                                 ) : (
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                        promotion.is_storefront
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${promotion.is_storefront
                                                             ? 'bg-blue-100 text-blue-800'
                                                             : 'bg-gray-100 text-gray-800'
-                                                    }`}>
+                                                        }`}>
                                                         {promotion.is_storefront ? 'Ya' : 'Tidak'}
                                                     </span>
                                                 )}
@@ -303,13 +352,13 @@ const PromotionData = () => {
                                                             <Icon icon="solar:pen-outline" className="text-xl" />
                                                         </button>
                                                     )}
-                                                    {hasPermission('promotions.delete') && (
+                                                    {hasPermission('promotions.edit') && (
                                                         <button
                                                             onClick={() => deletePromotion(promotion.id)}
                                                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                             title="Hapus"
                                                         >
-                                                            <Icon icon="solar:trash-bin-outline" className="text-xl" />
+                                                            <Icon icon="solar:trash-bin-minimalistic-outline" className="text-xl" />
                                                         </button>
                                                     )}
                                                 </div>

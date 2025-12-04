@@ -68,11 +68,16 @@ const AddVoucher = () => {
             console.error('Error creating voucher:', error);
             
             let errorMessage = 'Gagal menambahkan voucher';
-            if (error.response?.data?.errors) {
-                const errors = error.response.data.errors;
-                errorMessage = Object.values(errors).flat().join(', ');
-            } else if (error.response?.data?.message) {
-                errorMessage = error.response.data.message;
+            const responseData = error.response?.data;
+
+            if (responseData?.errors && Array.isArray(responseData.errors)) {
+                // Handle new backend error format: { errors: [{ field, tag, message }] }
+                errorMessage = responseData.errors.map(e => e.message).join(', ');
+            } else if (responseData?.errors) {
+                // Handle old Laravel validation format: { errors: { field: [messages] } }
+                errorMessage = Object.values(responseData.errors).flat().join(', ');
+            } else if (responseData?.message) {
+                errorMessage = responseData.message;
             }
             
             await Swal.fire({
@@ -91,6 +96,7 @@ const AddVoucher = () => {
         if (voucherType === "fixed") prefix = "SAVE";
         if (voucherType === "shipping") prefix = "SHIP";
         if (voucherType === "free_sample") prefix = "FREE";
+        if (voucherType === "shipping_free_sample") prefix = "SHIPFREE";
         const randomNum = Math.floor(Math.random() * 10000);
         return `${prefix}${randomNum}`;
     };
@@ -233,6 +239,9 @@ const AddVoucher = () => {
                                         <option value="free_sample">
                                             Free Sample (Bonus Produk)
                                         </option>
+                                        <option value="shipping_free_sample">
+                                            Potongan Ongkir + Free Sample
+                                        </option>
                                     </select>
                                     {errors.type && (
                                         <p className="text-red-500 text-sm mt-1">
@@ -244,7 +253,7 @@ const AddVoucher = () => {
                                 {voucherType !== "free_sample" && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            {voucherType === "shipping" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
+                                            {voucherType === "shipping" || "shipping_free_sample" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
                                         </label>
                                         <div className="relative">
                                             {voucherType === "percentage" && (
@@ -296,7 +305,7 @@ const AddVoucher = () => {
                                     </div>
                                 )}
 
-                                {voucherType === "free_sample" && (
+                                {(voucherType === "free_sample" || voucherType === "shipping_free_sample") && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Nama Produk Gratis *
@@ -304,7 +313,7 @@ const AddVoucher = () => {
                                         <input
                                             type="text"
                                             {...register("free_product_name", {
-                                                required: voucherType === "free_sample" ? "Nama produk gratis harus diisi" : false,
+                                                required: (voucherType === "free_sample" || voucherType === "shipping_free_sample") ? "Nama produk gratis harus diisi" : false,
                                             })}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             placeholder="Contoh: Sample Parfum 5ml"

@@ -46,7 +46,7 @@ class PromotionController extends Controller
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
                 $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
             }, function ($query) {
-                $query->latest();
+                $query->orderBy('sort_order')->latest();
             })
             ->paginate($request->per_page ?? 10);
 
@@ -264,12 +264,41 @@ class PromotionController extends Controller
         $promotions = Promotion::currentlyActive()
             ->storefront()
             ->select('id', 'title', 'description', 'start_date', 'end_date')
+            ->orderBy('sort_order')
             ->orderBy('created_at', 'desc')
             ->get();
 
         return response()->json([
             'status' => 'success',
             'data' => $promotions
+        ]);
+    }
+
+    public function reorder(Request $request): JsonResponse
+    {
+        if (!auth()->user()->hasPermission('promotions.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:promotions,id',
+        ]);
+
+        $ids = $validated['ids'];
+
+        DB::transaction(function () use ($ids) {
+            foreach ($ids as $index => $id) {
+                Promotion::where('id', $id)->update(['sort_order' => $index]);
+            }
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Urutan promosi berhasil diperbarui'
         ]);
     }
 }

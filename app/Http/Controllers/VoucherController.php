@@ -60,7 +60,7 @@ class VoucherController extends Controller
             'code' => 'required|string|max:50|unique:vouchers,code',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'required|in:percentage,fixed,shipping,free_sample',
+            'type' => 'required|in:percentage,fixed,shipping,free_sample,shipping_free_sample',
             'value' => 'required|numeric|min:0',
             'minimum_amount' => 'nullable|numeric|min:0',
             'maximum_discount' => 'nullable|numeric|min:0',
@@ -68,7 +68,7 @@ class VoucherController extends Controller
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'is_active' => 'boolean',
-            'free_product_name' => 'nullable|string|max:255'
+            'free_product_name' => 'nullable|string|max:255|required_if:type,free_sample|required_if:type,shipping_free_sample'
         ]);
 
         // Validate percentage value
@@ -124,7 +124,7 @@ class VoucherController extends Controller
             'code' => 'sometimes|required|string|max:50|unique:vouchers,code,' . $voucher->id,
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'sometimes|required|in:percentage,fixed,shipping,free_sample',
+            'type' => 'sometimes|required|in:percentage,fixed,shipping,free_sample,shipping_free_sample',
             'value' => 'sometimes|required|numeric|min:0',
             'minimum_amount' => 'nullable|numeric|min:0',
             'maximum_discount' => 'nullable|numeric|min:0',
@@ -132,7 +132,7 @@ class VoucherController extends Controller
             'start_date' => 'sometimes|required|date',
             'end_date' => 'sometimes|required|date|after:start_date',
             'is_active' => 'boolean',
-            'free_product_name' => 'nullable|string|max:255'
+            'free_product_name' => 'nullable|string|max:255|required_if:type,free_sample|required_if:type,shipping_free_sample'
         ]);
 
         if (array_key_exists('usage_limit', $validated) && $validated['usage_limit'] !== null && $validated['usage_limit'] < $voucher->used_count) {

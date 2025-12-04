@@ -211,6 +211,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('banners', BannerController::class)->except(['index', 'show']);
     Route::post('banners/reorder', [BannerController::class, 'reorder']);
 
+    // Promotions reorder (admin)
+    Route::post('promotions/reorder', [PromotionController::class, 'reorder']);
+
     // Other authenticated routes remain here
 
     // Courier rates admin API routes (import functionality)

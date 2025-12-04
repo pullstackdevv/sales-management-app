@@ -108,6 +108,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Customer/EditCustomer', ['customerId' => $id]);
         })->name('customers.edit');
 
+        Route::get('/customer/detail/{id}', function ($id) {
+            return Inertia::render('Customer/CustomerDetail', ['customerId' => $id]);
+        })->name('customers.detail');
+
         // Produk
         Route::get('/product/data', function () {
             return Inertia::render('Product/ProductData');

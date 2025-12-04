@@ -833,7 +833,7 @@ const PaymentMethodCheckout = () => {
                                   {appliedVoucher.description}
                                 </div>
                               )}
-                              {appliedVoucher.type === 'free_sample' ? (
+                              {appliedVoucher.type === 'free_sample' || appliedVoucher.type === 'shipping_free_sample' ? (
                                 <div className="text-xs text-blue-700 font-medium mt-1">
                                   🎁 Bonus Produk: {appliedVoucher.free_product_name || 'Produk Gratis'}
                                 </div>

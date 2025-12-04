@@ -83,6 +83,10 @@ export default function CustomerData() {
         window.location.href = `/cms/customer/edit/${customerId}`;
     };
 
+    const handleRowClick = (customerId) => {
+        window.location.href = `/cms/customer/detail/${customerId}`;
+    };
+
     const handleDelete = async (customer) => {
         const confirmed = await showConfirm(
             'Hapus Customer',
@@ -185,11 +189,13 @@ export default function CustomerData() {
 
                         const phoneNumber = customer.phone?.replace(/^0/, "62");
                         const waLink = `https://wa.me/${phoneNumber}`;
+                        const isClickable = hasPermission('customers.view');
 
                         return (
                             <div
                                 key={customer.id}
-                                className="grid grid-cols-12 items-center px-4 py-3 text-sm"
+                                className={`grid grid-cols-12 items-center px-4 py-3 text-sm hover:bg-gray-50 ${isClickable ? 'cursor-pointer' : ''}`}
+                                onClick={isClickable ? () => handleRowClick(customer.id) : undefined}
                             >
                                 <div className="col-span-2 flex items-center gap-3">
                                     <div
@@ -218,6 +224,7 @@ export default function CustomerData() {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="hover:underline"
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         {customer.phone}
                                     </a>
@@ -236,7 +243,7 @@ export default function CustomerData() {
                                     {hasPermission('customers.view') && addressCount > 0 && (
                                         <button 
                                             className="hover:text-green-600"
-                                            onClick={() => handleViewAddresses(customer)}
+                                            onClick={(e) => { e.stopPropagation(); handleViewAddresses(customer); }}
                                             title="Lihat Alamat"
                                         >
                                             <Icon icon="mdi:map-marker-multiple" />
@@ -245,7 +252,7 @@ export default function CustomerData() {
                                     {hasPermission('customers.edit') && (
                                         <button 
                                             className="hover:text-blue-600"
-                                            onClick={() => handleEdit(customer.id)}
+                                            onClick={(e) => { e.stopPropagation(); handleEdit(customer.id); }}
                                             title="Edit Customer"
                                         >
                                             <Icon icon="mdi:pencil-outline" />
@@ -254,7 +261,7 @@ export default function CustomerData() {
                                     {hasPermission('customers.delete') && (
                                         <button 
                                             className="hover:text-red-600"
-                                            onClick={() => handleDelete(customer)}
+                                            onClick={(e) => { e.stopPropagation(); handleDelete(customer); }}
                                             title="Hapus Customer"
                                         >
                                             <Icon icon="mdi:trash-outline" />

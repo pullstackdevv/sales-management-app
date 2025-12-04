@@ -398,7 +398,7 @@ const VoucherData = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex-col">
                                                     <span
                                                         className={getTypeBadge(
                                                             voucher.type
@@ -410,13 +410,17 @@ const VoucherData = () => {
                                                             ? "Fixed"
                                                             : voucher.type === "shipping"
                                                             ? "Potongan Ongkir"
+                                                            : voucher.type === "shipping_free_sample"
+                                                            ? "Free Sample + Potongan Ongkir"
                                                             : "Free Sample"}
                                                     </span>
-                                                    <div className="text-sm font-semibold text-gray-900">
+                                                    <div className="text-sm font-semibold text-gray-900 mt-2">
                                                         {voucher.type === "percentage"
                                                             ? `${Math.floor(voucher.value)}%`
                                                             : voucher.type === "fixed" || voucher.type === "shipping"
                                                             ? formatRupiah(voucher.value)
+                                                            : voucher.type === "shipping_free_sample"
+                                                            ? `${formatRupiah(voucher.value)} + ${voucher.free_product_name || "Produk Gratis"}`
                                                             : voucher.free_product_name || "Produk Gratis"}
                                                     </div>
                                                 </div>

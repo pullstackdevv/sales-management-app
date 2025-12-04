@@ -14,7 +14,7 @@ class Voucher extends Model
         'code',
         'name',
         'description',
-        'type', // 'percentage', 'fixed', 'free_sample', or 'shipping'
+        'type',
         'value',
         'minimum_amount',
         'maximum_discount',
@@ -100,8 +100,8 @@ class Voucher extends Model
             return 0;
         }
 
-        // Shipping voucher applies to shipping cost only (fixed amount only)
-        if ($this->type === 'shipping') {
+        // Shipping-only or shipping + free sample apply to shipping cost
+        if ($this->type === 'shipping' || $this->type === 'shipping_free_sample') {
             // Always treat as fixed amount discount on shipping
             return min($this->value, $shippingCost);
         }

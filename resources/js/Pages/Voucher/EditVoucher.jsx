@@ -301,6 +301,7 @@ const EditVoucher = ({ voucherId }) => {
                                         <option value="fixed">Nominal Tetap (Rp)</option>
                                         <option value="shipping">Potongan Ongkir</option>
                                         <option value="free_sample">Free Sample (Bonus Produk)</option>
+                                        <option value="shipping_free_sample">Potongan Ongkir + Free Sample</option>
                                     </select>
                                     {errors.type && (
                                         <p className="text-red-500 text-sm mt-1">
@@ -351,7 +352,7 @@ const EditVoucher = ({ voucherId }) => {
                                     </div>
                                 )}
 
-                                {voucherType === "free_sample" && (
+                                {(voucherType === "free_sample" || voucherType === "shipping_free_sample") && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Nama Produk Gratis *
@@ -359,7 +360,7 @@ const EditVoucher = ({ voucherId }) => {
                                         <input
                                             type="text"
                                             {...register("free_product_name", {
-                                                required: voucherType === "free_sample" ? "Nama produk gratis harus diisi" : false,
+                                                required: (voucherType === "free_sample" || voucherType === "shipping_free_sample") ? "Nama produk gratis harus diisi" : false,
                                             })}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             placeholder="Contoh: Sample Parfum 5ml"

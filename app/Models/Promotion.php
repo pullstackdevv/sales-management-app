@@ -17,6 +17,7 @@ class Promotion extends Model
         'is_storefront',
         'start_date',
         'end_date',
+        'sort_order',
         'created_by',
         'updated_by',
         'deleted_by',
@@ -27,6 +28,7 @@ class Promotion extends Model
         'is_storefront' => 'boolean',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'sort_order' => 'integer',
     ];
 
     // Relationships

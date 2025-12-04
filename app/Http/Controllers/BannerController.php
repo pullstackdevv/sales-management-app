@@ -27,7 +27,7 @@ class BannerController extends Controller
     {
         $request->validate([
             'banners' => 'required|array',
-            'banners.*' => 'file|mimes:jpg,jpeg,png,webp|max:4096|dimensions:width=800,height=200',
+            'banners.*' => 'file|mimes:jpg,jpeg,png,webp|max:4096|dimensions:ratio=4/1',
         ]);
 
         $created = [];

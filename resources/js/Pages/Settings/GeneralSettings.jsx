@@ -138,6 +138,36 @@ export default function GeneralSettings() {
     }
   };
 
+  const getImageRatio = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          resolve(img.width / img.height);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const getImageDims = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          resolve({ w: img.width, h: img.height });
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const uploadNewBanners = async () => {
     if (!newBannerFiles.length) {
       setBannerModalOpen(false);
@@ -145,6 +175,14 @@ export default function GeneralSettings() {
     }
     setSaving(true);
     try {
+      for (const f of newBannerFiles) {
+        const { w, h } = await getImageDims(f);
+        if (w !== h * 4) {
+          setSaving(false);
+          Swal.fire({ icon: "error", title: "Gagal", text: "Banner harus memiliki rasio 4:1" });
+          return;
+        }
+      }
       const fd = new FormData();
       newBannerFiles.forEach((f) => fd.append("banners[]", f));
       await api.post("/banners", fd, { headers: { "Content-Type": "multipart/form-data" } });
@@ -427,7 +465,7 @@ export default function GeneralSettings() {
           {/* Section: Banner - inline manage & reorder */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Banner Marketplace (800x200 Pixel)</h3>
+              <h3 className="text-lg font-bold">Banner Marketplace (Rasio 4:1)</h3>
               <button type="button" onClick={() => setBannerModalOpen(true)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md">Tambah Banner</button>
             </div>
             {preview.marketplace_banners?.length === 0 && (
@@ -478,7 +516,7 @@ export default function GeneralSettings() {
                       className="w-full"
                     />
                     <span className="text-sm text-gray-500 mt-1">Format: JPG, JPEG, PNG</span><br />
-                    <span className="text-sm text-gray-500 mt-1">Ukuran tepat 800x200 piksel</span>
+                    <span className="text-sm text-gray-500 mt-1">Rasio 4:1 (contoh 800x200, 1600x400, dst)</span>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 px-4 py-3 border-t">

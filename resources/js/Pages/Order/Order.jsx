@@ -23,23 +23,9 @@ export default function Order() {
   const [paymentBanks, setPaymentBanks] = useState([]);
 
   useEffect(() => {
+    // Initial fetch when component mounts
     fetchOrders();
     fetchPaymentBanksOnce();
-    
-    // Add event listener for page visibility change to refresh data
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // Page became visible, refresh data
-        fetchOrders(currentPage);
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Cleanup event listener
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
   }, []);
   
   useEffect(() => {
@@ -79,8 +65,15 @@ export default function Order() {
         'Dibatalkan': 'cancelled'
       };
       
-      if (activeFilter !== 'Semua Order' && statusMap[activeFilter]) {
+      // For normal filters, filter by status.
+      // For "Diproses", we ignore status and only filter by printed_at (see below).
+      if (activeFilter !== 'Semua Order' && activeFilter !== 'Diproses' && statusMap[activeFilter]) {
         params.append('status', statusMap[activeFilter]);
+      }
+
+      // Special case: filter "Diproses" should show ALL printed orders regardless of status
+      if (activeFilter === 'Diproses') {
+        params.append('printed', '1');
       }
       
       if (sourceFilter !== 'Semua Sumber') {
@@ -325,7 +318,7 @@ export default function Order() {
             <option value="Semua Order">Semua Order</option>
             <option value="Belum Bayar">Belum Bayar</option>
             <option value="Dibayar">Dibayar</option>
-            {/* <option value="Diproses">Diproses</option> */}
+            <option value="Diproses">Diproses</option>
             <option value="Dikirim">Dikirim</option>
             <option value="Diterima">Diterima</option>
             <option value="Dibatalkan">Dibatalkan</option>

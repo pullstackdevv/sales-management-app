@@ -105,11 +105,16 @@ const PrintMultipleInvoices = () => {
     document.title = `${orderPart}_${stamp}`;
   }, [invoices]);
 
-  const handlePrintAll = async () => {
+  // Tombol cetak semua saja: tidak mengubah status atau printed_at
+  const handlePrintAll = () => {
+    window.print();
+  };
+
+  // Tombol proses semua saja: ubah status & printed_at tanpa membuka dialog print
+  const handleProcessAllOnly = async () => {
     try {
       const nowIso = new Date().toISOString();
 
-      // Update status to processing and set printed_at for all invoices
       await Promise.all(
         invoices.map((inv) =>
           api.post(`/orders/${inv.id}/update-status`, { status: 'processing' })
@@ -120,12 +125,10 @@ const PrintMultipleInvoices = () => {
         invoices.map((inv) => api.patch(`/orders/${inv.id}`, { printed_at: nowIso }))
       );
 
-      window.print();
-
       await Swal.fire({
         icon: 'success',
         title: 'Berhasil!',
-        text: `${invoices.length} invoice berhasil diproses dan dicetak`,
+        text: `${invoices.length} invoice berhasil diproses dan ditandai sudah diprint`,
         timer: 2500,
         showConfirmButton: false,
       });
@@ -136,7 +139,6 @@ const PrintMultipleInvoices = () => {
         title: 'Gagal!',
         text: 'Terjadi kesalahan saat memproses status order sebelum cetak. Silakan cek ulang di daftar order.',
       });
-      window.print();
     }
   };
 
@@ -179,13 +181,20 @@ const PrintMultipleInvoices = () => {
       `}</style>
 
       <div className="min-h-screen bg-gray-100 py-4">
-        <div className="no-print mb-4 flex justify-center">
+        <div className="no-print mb-4 flex justify-center gap-4">
           <button
             type="button"
             onClick={handlePrintAll}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium"
           >
             Cetak Semua Invoice ({invoices.length})
+          </button>
+          <button
+            type="button"
+            onClick={handleProcessAllOnly}
+            className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg text-sm font-medium"
+          >
+            Proses & Tandai Semua Sudah Diprint
           </button>
         </div>
 

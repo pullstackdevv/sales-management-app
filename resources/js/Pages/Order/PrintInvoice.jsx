@@ -447,6 +447,11 @@ console.log(invoiceData)
                             </div>
                         </div>
 
+                        {/* Order Number Row */}
+                        <div className="border-b-2 border-black p-4">
+                            <div className="font-bold">No Pesanan: {invoiceData?.invoice_number || orderId}</div>
+                        </div>
+
                         {/* Pengirim Row */}
                         {printSettings.showCompanyInfo && (
                             <div className="border-b-2 border-black p-4">

@@ -406,13 +406,17 @@ class OrderController extends Controller
 
         // Batasi edit order khusus untuk order dengan payment gateway (memiliki payment_url)
         if (!is_null($order->payment_url)) {
-            $allowedStatusUpdates = ['shipped', 'delivered'];
-            if (isset($validated['status']) && !in_array($validated['status'], $allowedStatusUpdates)) {
-                throw ValidationException::withMessages([
-                    'status' => ['Orders with payment gateway can only be updated to shipped or delivered status.']
-                ]);
+            if (isset($validated['status'])) {
+                $status = $validated['status'];
+                $canCancel = ($status === 'cancelled') && ($order->status === 'pending');
+                $allowedStatusUpdates = ['shipped', 'delivered'];
+                $allowed = in_array($status, $allowedStatusUpdates) || $canCancel;
+                if (!$allowed) {
+                    throw ValidationException::withMessages([
+                        'status' => ['Orders with payment gateway can only be updated to shipped or delivered status.']
+                    ]);
+                }
             }
-            // Untuk gateway: hanya izinkan perubahan status, field lain diabaikan
             $validated = array_intersect_key($validated, array_flip(['status']));
         }
 
@@ -590,6 +594,10 @@ class OrderController extends Controller
                     }
                 }
 
+                if (!is_null($order->payment_url) && $validated['status'] === 'cancelled') {
+                    $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                }
+
                 // Restore stock when status set to cancelled via update (manual flow)
                 if ($validated['status'] === 'cancelled') {
                     $alreadyRestocked = StockMovement::where('order_id', $order->id)
@@ -744,14 +752,14 @@ class OrderController extends Controller
             ]);
         }
 
-        // Validasi: status cancelled untuk web order hanya dilarang jika pembayaran sudah paid
+        // Validasi: batalkan web order hanya saat status saat ini pending
         if (
             $validated['status'] === 'cancelled'
             && !is_null($order->payment_url)
-            && $order->payment_status === PaymentStatus::PAID
+            && $order->status !== 'pending'
         ) {
             throw ValidationException::withMessages([
-                'status' => ['Web order yang sudah dibayar tidak dapat dibatalkan.']
+                'status' => ['Web order hanya dapat dibatalkan saat status pending.']
             ]);
         }
 
@@ -772,6 +780,13 @@ class OrderController extends Controller
 
             // When status is cancelled for manual orders, sync payment_status to cancelled
             if ($validated['status'] === 'cancelled' && is_null($order->payment_url)) {
+                $order->update([
+                    'payment_status' => PaymentStatus::CANCELLED
+                ]);
+            }
+
+            // When status is cancelled for web orders, sync payment_status to cancelled
+            if ($validated['status'] === 'cancelled' && !is_null($order->payment_url)) {
                 $order->update([
                     'payment_status' => PaymentStatus::CANCELLED
                 ]);

@@ -37,6 +37,7 @@ use App\Http\Controllers\OriginSettingController;
 use App\Http\Controllers\GeneralSettingController;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\BannerController;
+use App\Http\Controllers\NotificationController;
 
 
 
@@ -215,6 +216,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('promotions/reorder', [PromotionController::class, 'reorder']);
 
     // Other authenticated routes remain here
+
+    // Notification routes (low stock alerts)
+    Route::prefix('notifications')->group(function () {
+        Route::get('/low-stock', [NotificationController::class, 'getLowStockNotifications']);
+        Route::post('/mark-read/{variantId}', [NotificationController::class, 'markAsRead']);
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    });
 
     // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {

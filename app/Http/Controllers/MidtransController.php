@@ -11,9 +11,10 @@ use App\Http\Controllers\WebOrderController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Midtrans\Notification;
+use Midtrans\Notification as MidtransNotification;
 use Midtrans\Snap;
 use Midtrans\Transaction;
+use App\Models\Notification;
 
 class MidtransController extends Controller
 {
@@ -223,6 +224,15 @@ class MidtransController extends Controller
                             'note' => "Order #{$order->order_number} cancelled - Stock returned",
                             'created_by' => $variant->created_by ?? $order->user_id ?? 1,
                         ]);
+                    }
+                    
+                    // Create expired notification
+                    if ($paymentStatus === PaymentStatus::EXPIRED) {
+                        try {
+                            Notification::createOrderExpired($order->load(['customer', 'address']));
+                        } catch (\Exception $e) {
+                            Log::error('Failed to create expired notification: ' . $e->getMessage());
+                        }
                     }
                 }
             }

@@ -8,6 +8,7 @@ use App\Helpers\ResponseFormatter;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -269,6 +270,15 @@ class XenditController extends Controller
                             'note' => "Order #{$order->order_number} cancelled - Stock returned",
                             'created_by' => $variant->created_by ?? $order->user_id ?? 1,
                         ]);
+                    }
+                    
+                    // Create expired notification
+                    if ($paymentStatus === PaymentStatus::EXPIRED) {
+                        try {
+                            Notification::createOrderExpired($order->load(['customer', 'address']));
+                        } catch (\Exception $e) {
+                            Log::error('Failed to create expired notification: ' . $e->getMessage());
+                        }
                     }
                 }
             }

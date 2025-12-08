@@ -217,11 +217,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Other authenticated routes remain here
 
-    // Notification routes (low stock alerts)
+    // Notification routes
     Route::prefix('notifications')->group(function () {
-        Route::get('/low-stock', [NotificationController::class, 'getLowStockNotifications']);
-        Route::post('/mark-read/{variantId}', [NotificationController::class, 'markAsRead']);
+        Route::get('/', [NotificationController::class, 'getNotifications']);
+        Route::post('/mark-read/{notificationId}', [NotificationController::class, 'markAsRead']);
         Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+        Route::post('/generate-low-stock', [NotificationController::class, 'generateLowStockNotifications']);
     });
 
     // Courier rates admin API routes (import functionality)

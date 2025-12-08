@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Notification;
+use App\Models\NotificationRead;
 use App\Models\ProductVariant;
-use App\Models\UserNotificationRead;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
     /**
-     * Get low stock notifications for the current user.
-     * Returns product variants with stock < 2 and their read status.
+     * Get all notifications for the current user.
      */
-    public function getLowStockNotifications(Request $request)
+    public function getNotifications(Request $request)
     {
         $user = Auth::user();
         
@@ -24,41 +24,46 @@ class NotificationController extends Controller
             ], 401);
         }
 
-        // Get product variants with stock < 2
-        $lowStockVariants = ProductVariant::with(['product:id,name'])
-            ->where('stock', '<', 2)
-            ->where('is_active', true)
-            ->orderBy('stock', 'asc')
-            ->get(['id', 'product_id', 'variant_label', 'sku', 'stock', 'updated_at']);
+        // Auto-generate low stock notifications
+        $this->autoGenerateLowStockNotifications();
 
-        // Get read status for this user
-        $readNotifications = UserNotificationRead::where('user_id', $user->id)
-            ->whereIn('product_variant_id', $lowStockVariants->pluck('id'))
-            ->pluck('product_variant_id')
+        // Get notifications from last 7 days, ordered by newest first
+        $notifications = Notification::where('created_at', '>=', now()->subDays(7))
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
+
+        // Get read notification IDs for this user
+        $readNotificationIds = NotificationRead::where('user_id', $user->id)
+            ->whereIn('notification_id', $notifications->pluck('id'))
+            ->pluck('notification_id')
             ->toArray();
 
         // Map notifications with read status
-        $notifications = $lowStockVariants->map(function ($variant) use ($readNotifications) {
+        $mappedNotifications = $notifications->map(function ($notif) use ($readNotificationIds) {
             return [
-                'id' => $variant->id,
-                'product_name' => $variant->product->name ?? 'Unknown Product',
-                'variant_label' => $variant->variant_label,
-                'variant_sku' => $variant->sku,
-                'stock' => $variant->stock,
-                'updated_at' => $variant->updated_at,
-                'is_read' => in_array($variant->id, $readNotifications),
+                'id' => $notif->id,
+                'type' => $notif->type,
+                'title' => $notif->title,
+                'message' => $notif->message,
+                'icon' => $notif->icon,
+                'color' => $notif->color,
+                'link' => $notif->link,
+                'data' => $notif->data,
+                'created_at' => $notif->created_at,
+                'is_read' => in_array($notif->id, $readNotificationIds),
             ];
         });
 
         // Count unread
-        $unreadCount = $notifications->where('is_read', false)->count();
+        $unreadCount = $mappedNotifications->where('is_read', false)->count();
 
         return response()->json([
             'success' => true,
             'data' => [
-                'notifications' => $notifications,
+                'notifications' => $mappedNotifications,
                 'unread_count' => $unreadCount,
-                'total_count' => $notifications->count(),
+                'total_count' => $mappedNotifications->count(),
             ]
         ]);
     }
@@ -66,7 +71,7 @@ class NotificationController extends Controller
     /**
      * Mark a notification as read for the current user.
      */
-    public function markAsRead(Request $request, $variantId)
+    public function markAsRead(Request $request, $notificationId)
     {
         $user = Auth::user();
         
@@ -77,20 +82,20 @@ class NotificationController extends Controller
             ], 401);
         }
 
-        // Check if variant exists
-        $variant = ProductVariant::find($variantId);
-        if (!$variant) {
+        // Check if notification exists
+        $notification = Notification::find($notificationId);
+        if (!$notification) {
             return response()->json([
                 'success' => false,
-                'message' => 'Product variant not found'
+                'message' => 'Notification not found'
             ], 404);
         }
 
         // Create or update read status
-        UserNotificationRead::updateOrCreate(
+        NotificationRead::updateOrCreate(
             [
                 'user_id' => $user->id,
-                'product_variant_id' => $variantId,
+                'notification_id' => $notificationId,
             ],
             [
                 'read_at' => now(),
@@ -104,7 +109,7 @@ class NotificationController extends Controller
     }
 
     /**
-     * Mark all low stock notifications as read for the current user.
+     * Mark all notifications as read for the current user.
      */
     public function markAllAsRead(Request $request)
     {
@@ -117,17 +122,16 @@ class NotificationController extends Controller
             ], 401);
         }
 
-        // Get all low stock variant IDs
-        $lowStockVariantIds = ProductVariant::where('stock', '<', 2)
-            ->where('is_active', true)
+        // Get all notification IDs from last 7 days
+        $notificationIds = Notification::where('created_at', '>=', now()->subDays(7))
             ->pluck('id');
 
         // Mark all as read
-        foreach ($lowStockVariantIds as $variantId) {
-            UserNotificationRead::updateOrCreate(
+        foreach ($notificationIds as $notificationId) {
+            NotificationRead::updateOrCreate(
                 [
                     'user_id' => $user->id,
-                    'product_variant_id' => $variantId,
+                    'notification_id' => $notificationId,
                 ],
                 [
                     'read_at' => now(),
@@ -139,5 +143,42 @@ class NotificationController extends Controller
             'success' => true,
             'message' => 'All notifications marked as read'
         ]);
+    }
+
+    /**
+     * Generate low stock notifications.
+     * This should be called periodically (e.g., via scheduler or after stock changes).
+     */
+    public function generateLowStockNotifications()
+    {
+        $created = $this->autoGenerateLowStockNotifications();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Generated {$created} low stock notifications"
+        ]);
+    }
+
+    /**
+     * Auto-generate low stock notifications for variants with stock < 2
+     */
+    private function autoGenerateLowStockNotifications(): int
+    {
+        $lowStockVariants = ProductVariant::with(['product:id,name'])
+            ->where('stock', '<', 2)
+            ->where('is_active', true)
+            ->get();
+
+        $created = 0;
+        foreach ($lowStockVariants as $variant) {
+            if ($variant->product) {
+                $notification = Notification::createLowStock($variant, $variant->product);
+                if ($notification->wasRecentlyCreated) {
+                    $created++;
+                }
+            }
+        }
+
+        return $created;
     }
 }

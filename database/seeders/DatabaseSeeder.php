@@ -38,6 +38,7 @@ class DatabaseSeeder extends Seeder
             CourierSeeder::class,
             CustomerSeeder::class,
             ProductSeeder::class,
+            TagSeeder::class,
             VoucherSeeder::class,
             ExpenseSeeder::class,
             OrderSeeder::class,

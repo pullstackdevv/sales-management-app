@@ -35,15 +35,20 @@ class DashboardController extends Controller
             $activeProducts = Product::where('is_active', true)->count();
             
             $todaySales = Order::whereDate('created_at', $today)
-                ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
-                ->sum('total_price');
-
+            ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
+            ->sum('total_price');
+            
+            $ordersNeedPayment = Order::whereDate('created_at', $today)
+                ->where('status', 'pending')
+                ->count();
             $ordersNeedProcess = Order::whereDate('created_at', $today)
                 ->where('status', 'paid')
                 ->count();
-
             $ordersNeedShip = Order::whereDate('created_at', $today)
                 ->where('status', 'processing')
+                ->count();
+            $ordersCancelled = Order::whereDate('created_at', $today)
+                ->where('status', 'cancelled')
                 ->count();
             
             $weeklyRevenueData = [];
@@ -64,22 +69,28 @@ class DashboardController extends Controller
             
             $summaryCards = [
                 [
-                    'label' => 'Total Semua Order Hari Ini',
+                    'label' => 'Order Belum Dibayar',
                     'icon' => 'mdi:cart-outline',
-                    'value' => $totalOrders,
+                    'value' => $ordersNeedPayment,
                     'color' => 'bg-blue-100 text-blue-800'
                 ],
                 [
-                    'label' => 'Perlu Diproses',
+                    'label' => 'Order $ePerlu Diproses',
                     'icon' => 'mdi:clipboard-text-outline',
                     'value' => $ordersNeedProcess,
                     'color' => 'bg-orange-100 text-orange-800'
                 ],
                 [
-                    'label' => 'Perlu Dikirim',
+                    'label' => 'Order Perlu Dikirim',
                     'icon' => 'mdi:truck-outline',
                     'value' => $ordersNeedShip,
                     'color' => 'bg-teal-100 text-teal-800'
+                ],
+                [
+                    'label' => 'Order Dibatalkan',
+                    'icon' => 'mdi:close',
+                    'value' => $ordersCancelled,
+                    'color' => 'bg-red-100 text-red-800'
                 ],
                 [
                     'label' => 'Pelanggan',
@@ -93,20 +104,51 @@ class DashboardController extends Controller
                     'value' => $activeProducts,
                     'color' => 'bg-yellow-100 text-yellow-800'
                 ],
-                [
-                    'label' => 'Penjualan Hari Ini',
+                
+            ];
+
+            $isOwner = false;
+            try {
+                if (method_exists(Auth::user(), 'roles')) {
+                    $isOwner = Auth::user()->roles()->where(function($q){ $q->where('name', 'owner')->orWhere('id', 1); })->exists();
+                } elseif (property_exists(Auth::user(), 'role_id')) {
+                    $isOwner = ((int) (Auth::user()->role_id ?? 0)) === 1;
+                }
+            } catch (\Throwable $e) {
+                $isOwner = false;
+            }
+
+            $summaryCards[] = [
+                'label' => 'Total Order Hari Ini',
+                'icon' => 'mdi:cart-outline',
+                'value' => $totalOrders,
+                'color' => 'bg-blue-100 text-blue-800'
+            ];
+
+            if ($isOwner) {
+                $summaryCards[] = [
+                    'label' => 'Pendapatan Hari Ini',
                     'icon' => 'mdi:cash-multiple',
                     'value' => 'Rp ' . number_format($todaySales, 0, ',', '.'),
                     'color' => 'bg-purple-100 text-purple-800'
-                ]
-            ];
+                ];
+            }
             
-            $salesChart = [
-                'categories' => $labels,
-                'data' => $weeklyRevenueData,
-                'ordersCount' => $weeklyOrderCounts,
-                'title' => 'Pendapatan 7 Hari Terakhir'
-            ];
+            if ($isOwner) {
+                $salesChart = [
+                    'categories' => $labels,
+                    'data' => $weeklyRevenueData,
+                    'ordersCount' => $weeklyOrderCounts,
+                    'title' => 'Pendapatan 7 Hari Terakhir'
+                ];
+            } else {
+                $salesChart = [
+                    'categories' => [],
+                    'data' => [],
+                    'ordersCount' => [],
+                    'title' => ''
+                ];
+            }
 
             $todayOrdersList = Order::with(['customer', 'salesChannel'])
                 ->whereDate('created_at', $today)
@@ -133,9 +175,9 @@ class DashboardController extends Controller
 
             $todayOrdersSummary = [
                 'total' => $todayOrdersList->count(),
-                'total_revenue' => (float) Order::whereDate('created_at', $today)
+                'total_revenue' => $isOwner ? (float) Order::whereDate('created_at', $today)
                     ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
-                    ->sum('total_price'),
+                    ->sum('total_price') : null,
                 'by_status' => [
                     'pending' => (int) ($statusCounts['pending'] ?? 0),
                     'paid' => (int) ($statusCounts['paid'] ?? 0),

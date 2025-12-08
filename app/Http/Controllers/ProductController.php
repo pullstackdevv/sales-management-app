@@ -28,7 +28,7 @@ class ProductController extends Controller
                 'message' => 'Unauthorized. You do not have permission to view products.'
             ], 403);
         }
-        $products = Product::with(['variants', 'categories'])
+        $products = Product::with(['variants', 'categories', 'tags'])
             ->when($request->search, function($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
@@ -37,6 +37,12 @@ class ProductController extends Controller
                 $ids = is_array($ids) ? $ids : [$ids];
                 $query->whereHas('categories', function($q) use ($ids) {
                     $q->whereIn('product_categories.id', $ids);
+                });
+            })
+            ->when($request->tag_ids, function($query, $ids) {
+                $ids = is_array($ids) ? $ids : [$ids];
+                $query->whereHas('tags', function($q) use ($ids) {
+                    $q->whereIn('tags.id', $ids);
                 });
             })
             ->when($request->category, function($query, $category) {
@@ -60,7 +66,7 @@ class ProductController extends Controller
         $products = Product::with(['variants' => function($query) {
                 $query->where('is_active', true)
                       ->where('is_storefront', true);
-            }, 'categories'])
+            }, 'categories', 'tags'])
             ->where('is_storefront', true)
             ->where('is_active', true)
             ->when($request->search, function($query, $search) {
@@ -71,6 +77,12 @@ class ProductController extends Controller
                 $ids = is_array($ids) ? $ids : [$ids];
                 $query->whereHas('categories', function($q) use ($ids) {
                     $q->whereIn('product_categories.id', $ids);
+                });
+            })
+            ->when($request->tag_ids, function($query, $ids) {
+                $ids = is_array($ids) ? $ids : [$ids];
+                $query->whereHas('tags', function($q) use ($ids) {
+                    $q->whereIn('tags.id', $ids);
                 });
             })
             ->when($request->category, function($query, $category) {
@@ -140,6 +152,8 @@ class ProductController extends Controller
             'is_active' => 'boolean',
             'is_storefront' => 'boolean',
             'variants' => 'required|array|min:1',
+            'tag_ids' => 'nullable|array',
+            'tag_ids.*' => 'exists:tags,id',
             'variants.*.variant_label' => 'required|string|max:255',
             'variants.*.sku' => 'nullable|string|max:255',
             'variants.*.price' => 'required|numeric|min:0',
@@ -184,6 +198,10 @@ class ProductController extends Controller
                 $product->categories()->sync($validated['category_ids']);
             } elseif (!empty($validated['category_id'])) {
                 $product->categories()->sync([$validated['category_id']]);
+            }
+
+            if (!empty($validated['tag_ids'])) {
+                $product->tags()->sync($validated['tag_ids']);
             }
 
             foreach ($validated['variants'] as $index => $variant) {
@@ -254,7 +272,7 @@ class ProductController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => new ProductResource($product->load(['variants', 'createdBy', 'categories']))
+            'data' => new ProductResource($product->load(['variants', 'createdBy', 'categories', 'tags']))
         ]);
     }
 
@@ -276,6 +294,8 @@ class ProductController extends Controller
             'category_id' => 'nullable|exists:product_categories,id',
             'category_ids' => 'nullable|array',
             'category_ids.*' => 'exists:product_categories,id',
+            'tag_ids' => 'nullable|array',
+            'tag_ids.*' => 'exists:tags,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'is_active' => 'boolean',
             'is_storefront' => 'boolean',
@@ -347,6 +367,10 @@ class ProductController extends Controller
                 $product->categories()->sync($validated['category_ids']);
             } elseif (!empty($validated['category_id'])) {
                 $product->categories()->sync([$validated['category_id']]);
+            }
+
+            if (array_key_exists('tag_ids', $validated)) {
+                $product->tags()->sync($validated['tag_ids'] ?? []);
             }
 
             if (isset($validated['variants'])) {
@@ -445,7 +469,7 @@ class ProductController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Product updated successfully',
-                'data' => new ProductResource($product->load(['variants', 'createdBy', 'categories']))
+                'data' => new ProductResource($product->load(['variants', 'createdBy', 'categories', 'tags']))
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -634,5 +658,28 @@ class ProductController extends Controller
             DB::rollBack();
             throw $e;
         }
+    }
+
+    public function syncTags(Request $request, Product $product): JsonResponse
+    {
+        if (!Auth::user()->hasPermission('products.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit products.'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'tag_ids' => 'required|array',
+            'tag_ids.*' => 'exists:tags,id',
+        ]);
+
+        $product->tags()->sync($validated['tag_ids']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Tags updated successfully',
+            'data' => new ProductResource($product->load(['tags']))
+        ]);
     }
 }

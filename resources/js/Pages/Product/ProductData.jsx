@@ -261,9 +261,10 @@ export default function ProductData() {
             <div className="col-span-1">Stok</div>
             <div className="col-span-1">Varian</div>
             <div className="col-span-2">Kategori</div>
+            <div className="col-span-1">Tag</div>
             <div className="col-span-1">Status</div>
             <div className="col-span-1">Storefront</div>
-            <div className="col-span-2 text-right">Aksi</div>
+            <div className="col-span-1 flex justify-center">Aksi</div>
           </div>
 
           {loading ? (
@@ -371,6 +372,22 @@ export default function ProductData() {
                         </span>
                       )}
                     </div>
+                    <div className="col-span-1 mr-4">
+                      {Array.isArray(product.tags) && product.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {product.tags.map((c) => (
+                            <span key={c.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                              {c.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {product.tag || 'Tanpa tag'}
+                        </span>
+                      )}
+                    </div>
+                    
                     <div className="col-span-1">
                       <span className="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">
                         Aktif
@@ -384,7 +401,7 @@ export default function ProductData() {
                         {product.is_storefront ? 'Ya' : 'Tidak'}
                       </span>
                     </div>
-                    <div className="col-span-2 flex justify-end gap-2 text-lg text-gray-500">
+                    <div className="col-span-1 flex justify-center gap-2 text-lg text-gray-500">
                       {hasPermission('products.view') && (
                         <button
                           className="hover:text-blue-600 transition-colors"

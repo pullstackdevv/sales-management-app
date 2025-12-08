@@ -23,10 +23,14 @@ const Homepage = () => {
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
-        per_page: 1000, // Set high value to fetch all products
+        per_page: 100, // Set high value to fetch all products
         total: 0,
     });
     const [bannerUrls, setBannerUrls] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [tagProducts, setTagProducts] = useState({});
+    const [tagLoading, setTagLoading] = useState(false);
+    const [selectedTag, setSelectedTag] = useState(null);
     // Removed: addToCart integration on homepage cards
 
     // Derive categories from loaded products (fallback to string/slug if available)
@@ -61,6 +65,10 @@ const Homepage = () => {
         return Array.from(map.values());
     }, [products]);
 
+    const visibleTags = useMemo(() => {
+        return tags.filter((t) => Array.isArray(tagProducts[t.id]) && tagProducts[t.id].length > 0);
+    }, [tags, tagProducts]);
+
     const fetchProducts = useCallback(async (page = 1) => {
         try {
             setLoading(true);
@@ -69,6 +77,7 @@ const Homepage = () => {
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
                 ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
                 sort: sortBy,
             };
 
@@ -88,7 +97,7 @@ const Homepage = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [selectedTag]);
 
     // Debounced search effect
     useEffect(() => {
@@ -98,6 +107,7 @@ const Homepage = () => {
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
                 ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
                 sort: sortBy,
             };
 
@@ -141,7 +151,7 @@ const Homepage = () => {
         }, 500); // 500ms delay
 
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, selectedTag]);
 
     // Effect for category and sort changes (immediate)
     useEffect(() => {
@@ -150,6 +160,7 @@ const Homepage = () => {
             per_page: pagination.per_page,
             search: searchQuery || undefined,
             ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+            ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
             sort: sortBy,
         };
 
@@ -175,18 +186,16 @@ const Homepage = () => {
         };
 
         fetchData();
-    }, [selectedCategory, sortBy]);
+    }, [selectedCategory, sortBy, selectedTag]);
 
-    // Effect for pagination - Disabled when showing all products
+    // Effect for pagination - fetch on any current_page change
     useEffect(() => {
-        // Skip pagination effect when per_page is set to show all products
-        if (pagination.per_page >= 1000) return;
-
         const params = {
             page: pagination.current_page,
             per_page: pagination.per_page,
             search: searchQuery || undefined,
             ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+            ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
             sort: sortBy,
         };
 
@@ -211,10 +220,8 @@ const Homepage = () => {
             }
         };
 
-        if (pagination.current_page > 1) {
-            fetchData();
-        }
-    }, [pagination.current_page]);
+        fetchData();
+    }, [pagination.current_page, selectedTag]);
 
     // Initial load
     useEffect(() => {
@@ -223,6 +230,7 @@ const Homepage = () => {
             per_page: pagination.per_page,
             search: searchQuery || undefined,
             category: selectedCategory || undefined,
+            ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
             sort: sortBy,
         };
 
@@ -272,6 +280,27 @@ const Homepage = () => {
             }
         };
         loadSettings();
+        const loadTags = async () => {
+            try {
+                setTagLoading(true);
+                const res = await axios.get('/api/tags', { params: { per_page: 10, is_active: 1 } });
+                const list = res.data?.data?.data || [];
+                setTags(list);
+                const fetchByTag = async (tagId) => {
+                    const r = await productsAPI.getProducts({ per_page: 10, tag_ids: [tagId] });
+                    return r?.data?.data || [];
+                };
+                const entries = await Promise.all(list.map(async (t) => [t.id, await fetchByTag(t.id)]));
+                const map = {};
+                entries.forEach(([id, arr]) => { map[id] = arr; });
+                setTagProducts(map);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setTagLoading(false);
+            }
+        };
+        loadTags();
     }, []);
 
 
@@ -353,36 +382,55 @@ const Homepage = () => {
         setPagination(prev => ({ ...prev, current_page: 1 }));
     };
 
+    const applyTagFilter = (tagId) => {
+        setSelectedTag(tagId ?? null);
+        setProducts([]);
+        setPagination(prev => ({ ...prev, current_page: 1 }));
+    };
+
     // Client-side sorting as fallback
     const sortedProducts = useMemo(() => {
         if (!products || products.length === 0) return [];
 
         const sorted = [...products];
+        const hasProductStock = (product) => {
+            if (Array.isArray(product.variants) && product.variants.length > 0) {
+                return product.variants.some(v => (v.stock ?? 0) > 0);
+            }
+            return ((product.stock ?? 0) > 0);
+        };
 
         switch (sortBy) {
             case 'name':
-                return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                break;
             case 'price_asc':
-                return sorted.sort((a, b) => {
+                sorted.sort((a, b) => {
                     const priceA = getProductPrice(a);
                     const priceB = getProductPrice(b);
                     return priceA - priceB;
                 });
+                break;
             case 'price_desc':
-                return sorted.sort((a, b) => {
+                sorted.sort((a, b) => {
                     const priceA = getProductPrice(a);
                     const priceB = getProductPrice(b);
                     return priceB - priceA;
                 });
+                break;
             case 'stock':
-                return sorted.sort((a, b) => {
+                sorted.sort((a, b) => {
                     const stockA = a.stock || 0;
                     const stockB = b.stock || 0;
                     return stockB - stockA;
                 });
+                break;
             default:
-                return sorted;
+                break;
         }
+        const inStock = sorted.filter(p => hasProductStock(p));
+        const outStock = sorted.filter(p => !hasProductStock(p));
+        return [...inStock, ...outStock];
     }, [products, sortBy]);
 
     const setCurrentPage = (page) => {
@@ -400,26 +448,28 @@ const Homepage = () => {
         let hasDiscount = false;
 
         product.variants.forEach(variant => {
-            const price = variant.discount_price || variant.price;
-            const originalPrice = variant.price;
+            const vPrice = typeof variant.price === 'string' ? parseFloat(variant.price) : variant.price;
+            const vDiscount = typeof variant.discount_price === 'string' ? parseFloat(variant.discount_price) : variant.discount_price;
 
-            if (price < minPrice) {
-                minPrice = price;
+            const effectivePrice = (vDiscount && vDiscount > 0 && vDiscount < vPrice) ? vDiscount : vPrice;
+
+            if (effectivePrice < minPrice) {
+                minPrice = effectivePrice;
             }
-            if (originalPrice < minOriginalPrice) {
-                minOriginalPrice = originalPrice;
+            if (vPrice < minOriginalPrice) {
+                minOriginalPrice = vPrice;
             }
-            if (variant.discount_price && variant.discount_price < variant.price) {
+            if (vDiscount && vDiscount > 0 && vDiscount < vPrice) {
                 hasDiscount = true;
             }
         });
 
-        if (minPrice === Infinity) return null;
+        if (!isFinite(minPrice)) return null;
 
         return {
             minPrice,
             minOriginalPrice,
-            hasDiscount
+            hasDiscount: hasDiscount || (isFinite(minOriginalPrice) && minPrice < minOriginalPrice)
         };
     }, []);
 
@@ -634,6 +684,7 @@ const Homepage = () => {
                         </div>
                     </div>
 
+                
                     {/* Categories Filter */}
                     {categories.length > 1 && (
                         <div className="mb-6">
@@ -710,6 +761,38 @@ const Homepage = () => {
             {/* Products Section */}
             <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    {visibleTags.length > 0 && !searchQuery && !searchLoading && (
+                        <div className="space-y-10 mb-10">
+                            {visibleTags.map((tag) => (
+                                <div key={tag.id}>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-xl sm:text-lg font-semibold text-gray-900">
+                                            {tag.name}
+                                        </h2>
+                                        <button onClick={() => {
+                                            applyTagFilter(tag.id);
+                                            const el = document.getElementById('results-info');
+                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }} className="text-sm px-3 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50">Lihat lainnya</button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-4 sm:gap-6">
+                                        {(Array.isArray(tagProducts[tag.id]) ? tagProducts[tag.id].slice(0, 5) : []).map((p) => (
+                                            <ProductCard key={`tag-${tag.id}-prod-${p.id}`} product={p} />
+                                        ))}
+                                        {tagLoading && Array.from({ length: 5 }).map((_, i) => (
+                                            <div key={`skeleton-${tag.id}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-100 h-full animate-pulse">
+                                                <div className="bg-gray-200" style={{ aspectRatio: '1 / 1' }}></div>
+                                                <div className="p-3 space-y-2">
+                                                    <div className="h-4 bg-gray-200 rounded"></div>
+                                                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     {loading ? (
                         <div className="flex justify-center items-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -717,12 +800,27 @@ const Homepage = () => {
                     ) : (
                         <>
                             {/* Results Info */}
-                            <div className="mb-6">
-                                <p className="text-base sm:text-sm text-gray-600 px-2 sm:px-0">
+                            <div className="mb-6 flex items-center" id="results-info">
+                                <p className="text-base sm:text-sm text-gray-600 px-2 sm:px-0 mr-7">
                                     Menampilkan {sortedProducts.length} produk
                                     {selectedCategory && ` dalam kategori "${categories.find(c => c.id === selectedCategory)?.name}"`}
                                     {searchQuery && ` untuk "${searchQuery}"`}
                                 </p>
+                                {visibleTags.length > 0 && !searchQuery && !searchLoading && (
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            onClick={() => applyTagFilter(null)}
+                                            className={`px-3 py-1 text-sm rounded-md border ${selectedTag == null ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                        >Semua Produk</button>
+                                        {visibleTags.map((t) => (
+                                            <button
+                                                key={`chip-${t.id}`}
+                                                onClick={() => applyTagFilter(t.id)}
+                                                className={`px-3 py-1 text-sm rounded-md border ${selectedTag === t.id ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                            >{t.name}</button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Products Grid/List */}

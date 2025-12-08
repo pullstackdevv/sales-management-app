@@ -130,7 +130,7 @@ export default function Dashboard() {
 
                 {/* Summary Cards */}
                 {!loading && !error && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         {dashboardData.summaryCards && dashboardData.summaryCards.length > 0 ? (
                             dashboardData.summaryCards.map((item, i) => (
                                 <div
@@ -157,16 +157,12 @@ export default function Dashboard() {
                 )}
 
                 {/* Chart */}
-                {!loading && !error && (
+                {!loading && !error && (dashboardData.salesChart?.categories?.length || 0) > 0 && (
                     <div className="bg-white rounded-lg shadow p-6">
-                        {dashboardData.salesChart && (dashboardData.salesChart.categories?.length || 0) > 0 ? (
-                            <HighchartsReact
-                                highcharts={Highcharts}
-                                options={salesChartOptions}
-                            />
-                        ) : (
-                            <div className="text-center text-gray-600 py-8">Grafik belum memiliki data.</div>
-                        )}
+                        <HighchartsReact
+                            highcharts={Highcharts}
+                            options={salesChartOptions}
+                        />
                     </div>
                 )}
 
@@ -178,7 +174,7 @@ export default function Dashboard() {
                                     <h2 className="text-lg font-semibold">Order Hari Ini</h2>
                                     {dashboardData.activity.todayOrders?.summary && (
                                         <div className="text-sm text-gray-600">
-                                            Total: {formatNumber(dashboardData.activity.todayOrders.summary.total)} • Pendapatan: Rp {formatNumber(dashboardData.activity.todayOrders.summary.total_revenue)}
+                                            Total: {formatNumber(dashboardData.activity.todayOrders.summary.total)}{dashboardData.activity.todayOrders.summary.total_revenue != null ? ` • Pendapatan: Rp ${formatNumber(dashboardData.activity.todayOrders.summary.total_revenue)}` : ''}
                                         </div>
                                     )}
                                 </div>

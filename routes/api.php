@@ -37,6 +37,7 @@ use App\Http\Controllers\OriginSettingController;
 use App\Http\Controllers\GeneralSettingController;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\BannerController;
+use App\Http\Controllers\TagController;
 
 
 
@@ -109,6 +110,8 @@ Route::apiResource('products', ProductController::class);
 Route::apiResource('products.variants', ProductVariantController::class);
 // Product Category routes
 Route::apiResource('product-categories', ProductCategoryController::class);
+// Tags routes
+Route::apiResource('tags', TagController::class);
 // Customer routes
 Route::apiResource('customers', CustomerController::class);
 Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
@@ -220,6 +223,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
     });
+
+    // Product tags sync
+    Route::post('products/{product}/tags/sync', [ProductController::class, 'syncTags']);
 });
 
 // Public voucher routes (for checkout)

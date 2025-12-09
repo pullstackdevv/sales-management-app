@@ -23,7 +23,7 @@ const Homepage = () => {
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
-        per_page: 100, // Set high value to fetch all products
+        per_page: 200,
         total: 0,
     });
     const [bannerUrls, setBannerUrls] = useState([]);
@@ -66,8 +66,29 @@ const Homepage = () => {
     }, [products]);
 
     const visibleTags = useMemo(() => {
-        return tags.filter((t) => Array.isArray(tagProducts[t.id]) && tagProducts[t.id].length > 0);
+        const filtered = tags.filter((t) => Array.isArray(tagProducts[t.id]) && tagProducts[t.id].length > 0);
+        const getOrderIndex = (name) => {
+            const n = (name || '').toLowerCase();
+            const compact = n.replace(/\s+/g, ' ').trim();
+            if (compact.includes('new arrival')) return 0; // matches 'New Arrival' or 'New Arrivals'
+            if (compact.includes('best seller') || compact.includes('customer favorites')) return 1; // matches variants with parentheses
+            if (compact.includes('promo') || compact.includes('diskon')) return 2; // matches 'Promo / Diskon'
+            return 999;
+        };
+        return filtered.sort((a, b) => {
+            const pa = getOrderIndex(a.name);
+            const pb = getOrderIndex(b.name);
+            if (pa !== pb) return pa - pb;
+            return (a.name || '').localeCompare(b.name || '');
+        });
     }, [tags, tagProducts]);
+
+    const tagsToRender = useMemo(() => {
+        if (selectedTag) {
+            return visibleTags.filter((t) => t.id === selectedTag);
+        }
+        return visibleTags;
+    }, [visibleTags, selectedTag]);
 
     const fetchProducts = useCallback(async (page = 1) => {
         try {
@@ -107,7 +128,6 @@ const Homepage = () => {
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
                 ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
-                ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
                 sort: sortBy,
             };
 
@@ -151,7 +171,7 @@ const Homepage = () => {
         }, 500); // 500ms delay
 
         return () => clearTimeout(timer);
-    }, [searchQuery, selectedTag]);
+    }, [searchQuery]);
 
     // Effect for category and sort changes (immediate)
     useEffect(() => {
@@ -160,7 +180,6 @@ const Homepage = () => {
             per_page: pagination.per_page,
             search: searchQuery || undefined,
             ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
-            ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
             sort: sortBy,
         };
 
@@ -186,7 +205,7 @@ const Homepage = () => {
         };
 
         fetchData();
-    }, [selectedCategory, sortBy, selectedTag]);
+    }, [selectedCategory, sortBy]);
 
     // Effect for pagination - fetch on any current_page change
     useEffect(() => {
@@ -195,7 +214,6 @@ const Homepage = () => {
             per_page: pagination.per_page,
             search: searchQuery || undefined,
             ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
-            ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
             sort: sortBy,
         };
 
@@ -221,7 +239,7 @@ const Homepage = () => {
         };
 
         fetchData();
-    }, [pagination.current_page, selectedTag]);
+    }, [pagination.current_page]);
 
     // Initial load
     useEffect(() => {
@@ -230,7 +248,6 @@ const Homepage = () => {
             per_page: pagination.per_page,
             search: searchQuery || undefined,
             category: selectedCategory || undefined,
-            ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
             sort: sortBy,
         };
 
@@ -283,17 +300,9 @@ const Homepage = () => {
         const loadTags = async () => {
             try {
                 setTagLoading(true);
-                const res = await axios.get('/api/tags', { params: { per_page: 10, is_active: 1 } });
+                const res = await axios.get('/api/tags', { params: { per_page: 100, is_active: 1 } });
                 const list = res.data?.data?.data || [];
                 setTags(list);
-                const fetchByTag = async (tagId) => {
-                    const r = await productsAPI.getProducts({ per_page: 10, tag_ids: [tagId] });
-                    return r?.data?.data || [];
-                };
-                const entries = await Promise.all(list.map(async (t) => [t.id, await fetchByTag(t.id)]));
-                const map = {};
-                entries.forEach(([id, arr]) => { map[id] = arr; });
-                setTagProducts(map);
             } catch (e) {
                 console.error(e);
             } finally {
@@ -302,6 +311,23 @@ const Homepage = () => {
         };
         loadTags();
     }, []);
+
+    useEffect(() => {
+        if (!Array.isArray(tags) || tags.length === 0) {
+            setTagProducts({});
+            return;
+        }
+        const map = {};
+        tags.forEach((t) => {
+            map[t.id] = (Array.isArray(products) ? products.filter((p) => {
+                const ids = Array.isArray(p.tag_ids)
+                    ? p.tag_ids
+                    : (Array.isArray(p.tags) ? p.tags.map((x) => x.id) : []);
+                return ids.includes(t.id);
+            }) : []);
+        });
+        setTagProducts(map);
+    }, [tags, products]);
 
 
     // Robust price extraction function to handle various price field formats
@@ -384,9 +410,13 @@ const Homepage = () => {
 
     const applyTagFilter = (tagId) => {
         setSelectedTag(tagId ?? null);
-        setProducts([]);
         setPagination(prev => ({ ...prev, current_page: 1 }));
     };
+
+    const untaggedProducts = useMemo(() => {
+        if (!Array.isArray(products)) return [];
+        return products.filter((p) => !Array.isArray(p.tags) || p.tags.length === 0);
+    }, [products]);
 
     // Client-side sorting as fallback
     const sortedProducts = useMemo(() => {
@@ -662,8 +692,8 @@ const Homepage = () => {
             )}
 
             {/* Search and Filters */}
-            <div className="bg-white border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div className="sticky top-14 sm:top-16 z-50 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-4">
                     {/* Search Bar */}
                     <div className="mb-6">
                         <div className="max-w-lg mx-auto relative">
@@ -684,14 +714,14 @@ const Homepage = () => {
                         </div>
                     </div>
 
-                
+
                     {/* Categories Filter */}
                     {categories.length > 1 && (
-                        <div className="mb-6">
-                            <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+                        <div className="">
+                            <div className="flex flex-nowrap overflow-x-auto sm:overflow-x-visible scroll-smooth snap-x snap-mandatory gap-2 sm:gap-3 sm:flex-wrap sm:justify-center px-4 max-w-[90vw] sm:max-w-none mx-auto overflow-hidden">
                                 <button
                                     onClick={() => handleCategoryChange('')}
-                                    className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
+                                    className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
                                             ? 'bg-gray-900 text-white border-gray-900'
                                             : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
                                         }`}
@@ -702,7 +732,7 @@ const Homepage = () => {
                                     <button
                                         key={cat.id}
                                         onClick={() => handleCategoryChange(cat.id)}
-                                        className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
+                                        className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
                                                 ? 'bg-gray-900 text-white border-gray-900'
                                                 : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
                                             }`}
@@ -714,12 +744,17 @@ const Homepage = () => {
                         </div>
                     )}
 
-                    {/* Filters and Controls */}
-                    <div className="bg-white rounded-lg border border-gray-100 p-4 sm:p-4">
-                        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                            {/* Sort */}
+                    
+                </div>
+            </div>
+
+            {/* Filters and Controls (non-sticky) */}
+            <div className="bg-white border-b border-gray-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="bg-white rounded-lg border border-gray-100 p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center">
                             <div className="flex items-center gap-3 w-full sm:w-auto">
-                                <label className="text-base sm:text-sm text-gray-600 whitespace-nowrap">Urutkan:</label>
+                                <label className="hidden sm:block text-base sm:text-sm text-gray-600 whitespace-nowrap">Urutkan:</label>
                                 <select
                                     value={sortBy}
                                     onChange={(e) => handleSortChange(e.target.value)}
@@ -732,13 +767,28 @@ const Homepage = () => {
                                 </select>
                             </div>
 
-                            {/* View Toggle */}
-                            <div className="flex border border-gray-300 rounded-md overflow-hidden">
+                            {visibleTags.length > 0 && !searchQuery && !searchLoading && (
+                                <div className="w-full sm:w-auto flex flex-nowrap sm:flex-wrap overflow-x-auto scroll-smooth snap-x snap-mandatory gap-2 max-w-[90vw] sm:max-w-none">
+                                    <button
+                                        onClick={() => applyTagFilter(null)}
+                                        className={`px-3 py-1 text-sm rounded-md border ${selectedTag == null ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                    >Semua Produk</button>
+                                    {visibleTags.map((t) => (
+                                        <button
+                                            key={`chip-${t.id}`}
+                                            onClick={() => applyTagFilter(t.id)}
+                                            className={`px-3 py-1 text-sm rounded-md border ${selectedTag === t.id ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                        >{t.name}</button>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="hidden sm:flex border border-gray-300 rounded-md overflow-hidden sm:ml-auto">
                                 <button
                                     onClick={() => setViewMode('grid')}
                                     className={`p-3 sm:p-2 ${viewMode === 'grid'
-                                            ? 'bg-gray-900 text-white'
-                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                        ? 'bg-gray-900 text-white'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
                                     <Grid className="h-5 w-5 sm:h-4 sm:w-4" />
@@ -746,8 +796,8 @@ const Homepage = () => {
                                 <button
                                     onClick={() => setViewMode('list')}
                                     className={`p-3 sm:p-2 ${viewMode === 'list'
-                                            ? 'bg-gray-900 text-white'
-                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                        ? 'bg-gray-900 text-white'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
                                     <List className="h-5 w-5 sm:h-4 sm:w-4" />
@@ -757,26 +807,20 @@ const Homepage = () => {
                     </div>
                 </div>
             </div>
-
             {/* Products Section */}
             <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {visibleTags.length > 0 && !searchQuery && !searchLoading && (
+                    {tagsToRender.length > 0 && !searchQuery && !searchLoading && (
                         <div className="space-y-10 mb-10">
-                            {visibleTags.map((tag) => (
+                            {tagsToRender.map((tag) => (
                                 <div key={tag.id}>
-                                    <div className="flex items-center justify-between mb-4">
+                                    <div className="mb-4">
                                         <h2 className="text-xl sm:text-lg font-semibold text-gray-900">
                                             {tag.name}
                                         </h2>
-                                        <button onClick={() => {
-                                            applyTagFilter(tag.id);
-                                            const el = document.getElementById('results-info');
-                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                        }} className="text-sm px-3 py-1 rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50">Lihat lainnya</button>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-4 sm:gap-6">
-                                        {(Array.isArray(tagProducts[tag.id]) ? tagProducts[tag.id].slice(0, 5) : []).map((p) => (
+                                        {(Array.isArray(tagProducts[tag.id]) ? tagProducts[tag.id] : []).map((p) => (
                                             <ProductCard key={`tag-${tag.id}-prod-${p.id}`} product={p} />
                                         ))}
                                         {tagLoading && Array.from({ length: 5 }).map((_, i) => (
@@ -793,7 +837,7 @@ const Homepage = () => {
                             ))}
                         </div>
                     )}
-                    {loading ? (
+                    {selectedTag != null ? null : loading ? (
                         <div className="flex justify-center items-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
                         </div>
@@ -806,46 +850,40 @@ const Homepage = () => {
                                     {selectedCategory && ` dalam kategori "${categories.find(c => c.id === selectedCategory)?.name}"`}
                                     {searchQuery && ` untuk "${searchQuery}"`}
                                 </p>
-                                {visibleTags.length > 0 && !searchQuery && !searchLoading && (
-                                    <div className="flex flex-wrap gap-2">
-                                        <button
-                                            onClick={() => applyTagFilter(null)}
-                                            className={`px-3 py-1 text-sm rounded-md border ${selectedTag == null ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
-                                        >Semua Produk</button>
-                                        {visibleTags.map((t) => (
-                                            <button
-                                                key={`chip-${t.id}`}
-                                                onClick={() => applyTagFilter(t.id)}
-                                                className={`px-3 py-1 text-sm rounded-md border ${selectedTag === t.id ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
-                                            >{t.name}</button>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
 
                             {/* Products Grid/List */}
-                            {sortedProducts.length === 0 ? (
+                            {selectedTag != null ? null : (
+                                (visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null ? untaggedProducts : sortedProducts).length === 0
+                            ) ? (
                                 <div className="text-center py-12 px-4">
                                     <Filter className="mx-auto h-16 w-16 sm:h-12 sm:w-12 text-gray-300 mb-4" />
                                     <h3 className="text-xl sm:text-lg font-medium text-gray-900 mb-2">Tidak ada produk ditemukan</h3>
                                     <p className="text-base sm:text-sm text-gray-500">Coba ubah kata kunci pencarian atau filter</p>
                                 </div>
                             ) : (
-                                <div className={
-                                    viewMode === 'grid'
-                                        ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6"
-                                        : "space-y-4"
-                                }>
-                                    {sortedProducts.map((product) => (
+                                <>
+                                    {(visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null) && (
+                                        <div className="mb-4">
+                                            {/* <h2 className="text-xl sm:text-lg font-semibold text-gray-900">Produk Tanpa Tag</h2> */}
+                                        </div>
+                                    )}
+                                    <div className={
                                         viewMode === 'grid'
-                                            ? <ProductCard key={product.id} product={product} />
-                                            : <ProductListItem key={product.id} product={product} />
-                                    ))}
-                                </div>
+                                            ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6"
+                                            : "space-y-4"
+                                    }>
+                                        {(visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null ? untaggedProducts : sortedProducts).map((product) => (
+                                            viewMode === 'grid'
+                                                ? <ProductCard key={product.id} product={product} />
+                                                : <ProductListItem key={product.id} product={product} />
+                                        ))}
+                                    </div>
+                                </>
                             )}
 
                             {/* Pagination - Hidden when showing all products */}
-                            {pagination.last_page > 1 && pagination.per_page < 1000 && (
+                            {selectedTag != null ? null : (pagination.last_page > 1 && pagination.per_page < 1000) && (
                                 <div className="flex justify-center items-center space-x-4 mt-12">
                                     <button
                                         onClick={() => {

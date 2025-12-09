@@ -75,7 +75,7 @@ class DashboardController extends Controller
                     'color' => 'bg-blue-100 text-blue-800'
                 ],
                 [
-                    'label' => 'Order $ePerlu Diproses',
+                    'label' => 'Order Perlu Diproses',
                     'icon' => 'mdi:clipboard-text-outline',
                     'value' => $ordersNeedProcess,
                     'color' => 'bg-orange-100 text-orange-800'

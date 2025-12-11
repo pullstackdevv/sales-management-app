@@ -23,7 +23,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
-use App\Models\Notification;
+use App\Helpers\NotificationHelper;
 
 class OrderController extends Controller
 {
@@ -356,18 +356,14 @@ class OrderController extends Controller
             DB::commit();
 
             // Create notification for new order
-            try {
-                Notification::createNewOrder($order->load('customer'));
-                
-                // Check and create low stock notifications
-                foreach ($validated['items'] as $item) {
-                    $variant = ProductVariant::find($item['product_variant_id']);
-                    if ($variant && $variant->stock < 2) {
-                        Notification::createLowStock($variant, $variant->product);
-                    }
+            NotificationHelper::newOrder($order->load('customer'));
+            
+            // Check and create low stock notifications
+            foreach ($validated['items'] as $item) {
+                $variant = ProductVariant::find($item['product_variant_id']);
+                if ($variant && $variant->stock < 2) {
+                    NotificationHelper::lowStock($variant, $variant->product);
                 }
-            } catch (\Exception $e) {
-                Log::error('Failed to create notification: ' . $e->getMessage());
             }
 
             return response()->json([

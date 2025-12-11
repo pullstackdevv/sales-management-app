@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Midtrans\Notification as MidtransNotification;
 use Midtrans\Snap;
 use Midtrans\Transaction;
-use App\Models\Notification;
+use App\Helpers\NotificationHelper;
 
 class MidtransController extends Controller
 {
@@ -228,11 +228,7 @@ class MidtransController extends Controller
                     
                     // Create expired notification
                     if ($paymentStatus === PaymentStatus::EXPIRED) {
-                        try {
-                            Notification::createOrderExpired($order->load(['customer', 'address']));
-                        } catch (\Exception $e) {
-                            Log::error('Failed to create expired notification: ' . $e->getMessage());
-                        }
+                        NotificationHelper::orderExpired($order->load(['customer', 'address']));
                     }
                 }
             }

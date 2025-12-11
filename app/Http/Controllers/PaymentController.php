@@ -86,19 +86,24 @@ class PaymentController extends Controller
      */
     private function createXenditPayment($order)
     {
-        // Prepare customer data
+        // Prepare customer data with fallbacks to prevent empty values
         $customerName = $order->isGuestOrder()
-            ? $order->address->name
-            : $order->customer->name;
+            ? ($order->address->name ?? $order->guest_name ?? 'Guest Customer')
+            : ($order->customer->name ?? 'Customer');
         $customerEmail = $order->isGuestOrder()
-            ? $order->guest_email
-            : $order->customer->email;
+            ? ($order->guest_email ?? 'guest@example.com')
+            : ($order->customer->email ?? 'customer@example.com');
         $customerPhone = $order->isGuestOrder()
-            ? $order->guest_phone
-            : $order->customer->phone;
+            ? ($order->guest_phone ?? '')
+            : ($order->customer->phone ?? '');
 
-        $nameParts = explode(' ', $customerName, 2);
-        $givenNames = $nameParts[0];
+        // Ensure customerName is never empty
+        if (empty(trim($customerName))) {
+            $customerName = 'Guest Customer';
+        }
+
+        $nameParts = explode(' ', trim($customerName), 2);
+        $givenNames = !empty($nameParts[0]) ? $nameParts[0] : 'Guest';
         $surname = isset($nameParts[1]) && !empty($nameParts[1]) ? $nameParts[1] : 'Customer';
 
         // Prepare items

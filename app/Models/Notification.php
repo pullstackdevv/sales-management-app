@@ -12,6 +12,8 @@ class Notification extends Model
     const TYPE_NEW_ORDER = 'new_order';
     const TYPE_LOW_STOCK = 'low_stock';
     const TYPE_ORDER_EXPIRED = 'order_expired';
+    const TYPE_ORDER_STATUS_CHANGED = 'order_status_changed';
+    const TYPE_PAYMENT_RECEIVED = 'payment_received';
 
     protected $fillable = [
         'type',

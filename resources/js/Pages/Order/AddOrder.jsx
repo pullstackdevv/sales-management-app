@@ -177,20 +177,26 @@ export default function AddOrder() {
             }
         } catch (error) {
             let msg = 'Gagal menambahkan customer';
+
             if (error.response?.data?.errors) {
+                // Always copy ALL server-side errors into state
                 setNewCustErrors(error.response.data.errors);
-                msg = 'Mohon periksa data yang dimasukkan';
+
+                // Build a user-friendly summary from the first error we find
+                const firstKey = Object.keys(error.response.data.errors)[0];
+                const firstMsg = error.response.data.errors[firstKey][0];
+
+                if (firstKey === 'email' && /sudah.*terdaftar|has.*already.*been.*taken/i.test(firstMsg)) {
+                    msg = 'Email sudah terdaftar, silakan gunakan email lain';
+                } else if (firstKey === 'phone' && /sudah.*terdaftar/i.test(firstMsg)) {
+                    msg = 'Nomor telepon sudah terdaftar, gunakan nomor lain';
+                } else {
+                    msg = firstMsg; // show the actual server message
+                }
             } else if (error.response?.data?.message) {
                 msg = error.response.data.message;
-            }
-
-            // Handle email already exists error
-            if (error.response?.status === 422 && error.response?.data?.errors?.email) {
-                const emailErrors = error.response.data.errors.email;
-                if (emailErrors.includes('email sudah terdaftar') || emailErrors.includes('The email has already been taken.')) {
-                    msg = 'Email sudah terdaftar, silakan gunakan email lain';
-                    setNewCustErrors(prev => ({ ...prev, email: msg }));
-                }
+            } else {
+                msg = 'Mohon periksa data yang dimasukkan';
             }
 
             Swal.fire({ icon: 'error', title: 'Error', text: msg });

@@ -1048,10 +1048,7 @@ const CustomerDataCheckout = () => {
         newErrors.phone = 'Nomor telepon minimal 10 digit';
       }
 
-      if (!formData.email.trim()) {
-        newErrors.email = 'Email wajib diisi';
-        requiredFields.push('Email');
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         newErrors.email = 'Format email tidak valid';
       }
 
@@ -1127,7 +1124,7 @@ const CustomerDataCheckout = () => {
         // Create new customer via API
         const newCustomerData = {
           name: formData.full_name,
-          email: formData.email,
+          email: (formData.email || '').trim() ? formData.email : null,
           phone: formData.phone,
           line_id: formData.line_id || null,
           other_contact: formData.other_contact || null,
@@ -1181,11 +1178,11 @@ const CustomerDataCheckout = () => {
             });
 
             setErrors(validationErrors);
-
+            const phoneError = validationErrors.phone;
             Swal.fire({
               icon: 'error',
-              title: 'Data Tidak Lengkap',
-              text: 'Mohon lengkapi semua field yang diperlukan',
+              title: phoneError ? 'Nomor Telepon Sudah Terdaftar' : 'Data Tidak Lengkap',
+              text: phoneError || 'Mohon lengkapi semua field yang diperlukan',
               confirmButtonColor: '#3b82f6'
             });
             return;
@@ -1414,7 +1411,7 @@ const CustomerDataCheckout = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Mail className="w-4 h-4 inline mr-1" />
-                        Email *
+                        Email (opsional)
                       </label>
                       <input
                         type="email"

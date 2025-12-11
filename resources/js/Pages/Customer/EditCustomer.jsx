@@ -434,15 +434,15 @@ export default function EditCustomer({ customerId }) {
                 } else {
                     // Handle object format validation errors
                     setErrors(apiErrors);
-                    errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
+                    errorMessage = apiErrors.phone?.[0] || 'Mohon periksa kembali data yang Anda masukkan';
                  }
              } else if (error.response?.data?.message) {
                  errorMessage = error.response.data.message;
              }
-            
+
             Swal.fire({
                 icon: 'error',
-                title: 'Gagal!',
+                title: errorMessage?.toLowerCase().includes('telepon') ? 'Nomor Telepon Sudah Terdaftar' : 'Gagal!',
                 text: errorMessage,
                 confirmButtonColor: '#3B82F6'
             });

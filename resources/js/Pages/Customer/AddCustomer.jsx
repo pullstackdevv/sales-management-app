@@ -408,16 +408,15 @@ export default function AddCustomer() {
                 const apiErrors = error.response.data.errors;
                 if (apiErrors) {
                     if (Array.isArray(apiErrors)) {
-                        // e.g., [{ field: 'phone', message: 'invalid' }]
                         const entries = apiErrors.map((e, i) => [e.field || `Error ${i+1}`, e.message || JSON.stringify(e)]);
                         listHtml = buildListHtml(entries);
-                        errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
+                        const phoneErr = apiErrors.find(e => (e.field === 'phone') && e.message);
+                        errorMessage = phoneErr?.message || 'Mohon periksa kembali data yang Anda masukkan';
                     } else if (typeof apiErrors === 'object') {
-                        // e.g., { phone: ['invalid'], email: ['required'] }
                         setErrors(apiErrors);
                         const entries = Object.entries(apiErrors);
                         listHtml = buildListHtml(entries);
-                        errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
+                        errorMessage = apiErrors.phone?.[0] || 'Mohon periksa kembali data yang Anda masukkan';
                     }
                 } else if (error.response.data.message) {
                     errorMessage = error.response.data.message;
@@ -426,7 +425,7 @@ export default function AddCustomer() {
 
             Swal.fire({
                 icon: 'error',
-                title: 'Gagal!',
+                title: (errorMessage || '').toLowerCase().includes('telepon') ? 'Nomor Telepon Sudah Terdaftar' : 'Gagal!',
                 html: listHtml
                     ? `<div style="text-align:left">${errorMessage}<ul style="margin-left:1rem; list-style:disc;">${listHtml}</ul></div>`
                     : errorMessage,

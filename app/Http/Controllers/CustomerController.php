@@ -57,7 +57,7 @@ class CustomerController extends Controller
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'email' => 'nullable|string|email|max:255|unique:customers,email,NULL,id,deleted_at,NULL',
-                'phone' => 'required|string|max:20',
+                'phone' => 'required|string|max:20|unique:customers,phone,NULL,id,deleted_at,NULL',
                 'line_id' => 'nullable|string|max:255',
                 'other_contact' => 'nullable|string|max:255',
                 'category' => 'required|string|max:255',
@@ -82,7 +82,8 @@ class CustomerController extends Controller
                 'addresses.*.district.required' => 'Kecamatan wajib diisi',
                 'addresses.*.postal_code.regex' => 'Kode pos harus 5 digit angka',
                 'addresses.*.address_detail.required' => 'Alamat lengkap wajib diisi',
-                'email.unique' => 'Email sudah terdaftar, gunakan email lain'
+                'email.unique' => 'Email sudah terdaftar, gunakan email lain',
+                'phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
             ]);
         } catch (ValidationException $e) {
             return response()->json([
@@ -176,7 +177,7 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|nullable|string|email|max:255|unique:customers,email,' . $customer->id . ',id,deleted_at,NULL',
-            'phone' => 'sometimes|required|string|max:20',
+            'phone' => 'sometimes|required|string|max:20|unique:customers,phone,' . $customer->id . ',id,deleted_at,NULL',
             'line_id' => 'sometimes|nullable|string|max:255',
             'other_contact' => 'sometimes|nullable|string|max:255',
             'category' => 'sometimes|required|string|max:255',
@@ -192,6 +193,8 @@ class CustomerController extends Controller
             'addresses.*.address_detail' => 'required_with:addresses|string',
             'addresses.*.is_default' => 'boolean',
             'addresses.*.is_dropship' => 'boolean'
+        ], [
+            'phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
         ]);
 
         try {
@@ -252,16 +255,12 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        if ($customer->orders()->exists()) {
-            throw ValidationException::withMessages([
-                'customer' => ['Cannot delete customer that has orders.']
-            ]);
-        }
+        // Allow soft delete even if customer has orders to preserve relations
 
         try {
             DB::beginTransaction();
 
-            // Delete all addresses
+            // Soft delete all addresses to keep order relations intact
             $customer->addresses()->delete();
             
             // Delete the customer

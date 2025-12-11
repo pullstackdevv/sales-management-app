@@ -32,6 +32,7 @@ class StoreRequest extends FormRequest
             'district' => 'required|string|max:100',
             'postal_code' => 'nullable|string|regex:/^\d{5}$/',
             'is_default' => 'boolean',
+            'is_dropship' => 'boolean',
         ];
     }
 }

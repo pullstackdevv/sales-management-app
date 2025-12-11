@@ -691,11 +691,11 @@ const Homepage = () => {
                 </div>
             )}
 
-            {/* Search and Filters */}
-            <div className="sticky top-14 sm:top-16 z-50 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-4">
+            {/* Sticky Search Only */}
+            <div className="sticky top-14 sm:top-16 z-40 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
                     {/* Search Bar */}
-                    <div className="mb-6">
+                    <div className="mb-4">
                         <div className="max-w-lg mx-auto relative">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input
@@ -713,40 +713,39 @@ const Homepage = () => {
                             )}
                         </div>
                     </div>
+                </div>
+            </div>
 
-
-                    {/* Categories Filter */}
-                    {categories.length > 1 && (
-                        <div className="">
-                            <div className="flex flex-nowrap overflow-x-auto sm:overflow-x-visible scroll-smooth snap-x snap-mandatory gap-2 sm:gap-3 sm:flex-wrap sm:justify-center px-4 max-w-[90vw] sm:max-w-none mx-auto overflow-hidden">
+            {/* Categories (non-sticky) */}
+            {categories.length > 1 && (
+                <div className="bg-white border-b border-gray-100">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                        <div className="flex flex-nowrap overflow-x-auto sm:overflow-x-visible scroll-smooth snap-x snap-mandatory gap-2 sm:gap-3 sm:flex-wrap sm:justify-center px-4 max-w-[90vw] sm:max-w-none mx-auto overflow-hidden">
+                            <button
+                                onClick={() => handleCategoryChange('')}
+                                className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
+                                        ? 'bg-gray-900 text-white border-gray-900'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                                    }`}
+                            >
+                                Semua
+                            </button>
+                            {categories.slice(1).map((cat) => (
                                 <button
-                                    onClick={() => handleCategoryChange('')}
-                                    className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
+                                    key={cat.id}
+                                    onClick={() => handleCategoryChange(cat.id)}
+                                    className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
                                             ? 'bg-gray-900 text-white border-gray-900'
                                             : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
                                         }`}
                                 >
-                                    Semua
+                                    {cat.name}
                                 </button>
-                                {categories.slice(1).map((cat) => (
-                                    <button
-                                        key={cat.id}
-                                        onClick={() => handleCategoryChange(cat.id)}
-                                        className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
-                                                ? 'bg-gray-900 text-white border-gray-900'
-                                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
-                                            }`}
-                                    >
-                                        {cat.name}
-                                    </button>
-                                ))}
-                            </div>
+                            ))}
                         </div>
-                    )}
-
-                    
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Filters and Controls (non-sticky) */}
             <div className="bg-white border-b border-gray-100">

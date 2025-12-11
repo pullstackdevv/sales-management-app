@@ -50,7 +50,7 @@ export default function MarketplaceLayout({ children }) {
         <AuthProvider>
             <div className="min-h-screen bg-gray-50">
                 {/* Header */}
-                <header className="bg-white shadow-sm sticky top-0 z-50">
+                <header className="bg-white shadow-sm sticky top-0 z-[60]">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between items-center h-14 sm:h-16">
                             {/* Logo */}
@@ -59,8 +59,6 @@ export default function MarketplaceLayout({ children }) {
                             </div>
 
                             {/* Desktop Navigation - Removed for cleaner look */}
-
-
                             {/* Right side icons */}
                             <div className="flex items-center space-x-2 sm:space-x-4">
                                 {/* Pesanan Saya */}

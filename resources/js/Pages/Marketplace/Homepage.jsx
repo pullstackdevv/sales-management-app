@@ -31,6 +31,7 @@ const Homepage = () => {
     const [tagProducts, setTagProducts] = useState({});
     const [tagLoading, setTagLoading] = useState(false);
     const [selectedTag, setSelectedTag] = useState(null);
+    const [tagHasAnyProducts, setTagHasAnyProducts] = useState({});
     // Removed: addToCart integration on homepage cards
 
     // Derive categories from loaded products (fallback to string/slug if available)
@@ -66,13 +67,13 @@ const Homepage = () => {
     }, [products]);
 
     const visibleTags = useMemo(() => {
-        const filtered = (Array.isArray(tags) ? tags : []);
+        const filtered = (Array.isArray(tags) ? tags : []).filter((t) => !!tagHasAnyProducts[t.id]);
         const getOrderIndex = (name) => {
             const n = (name || '').toLowerCase();
             const compact = n.replace(/\s+/g, ' ').trim();
-            if (compact.includes('new arrival')) return 0; // matches 'New Arrival' or 'New Arrivals'
-            if (compact.includes('best seller') || compact.includes('customer favorites')) return 1; // matches variants with parentheses
-            if (compact.includes('promo') || compact.includes('diskon')) return 2; // matches 'Promo / Diskon'
+            if (compact.includes('new arrival')) return 0;
+            if (compact.includes('best seller') || compact.includes('customer favorites')) return 1;
+            if (compact.includes('promo') || compact.includes('diskon')) return 2;
             return 999;
         };
         return filtered.sort((a, b) => {
@@ -81,14 +82,15 @@ const Homepage = () => {
             if (pa !== pb) return pa - pb;
             return (a.name || '').localeCompare(b.name || '');
         });
-    }, [tags]);
+    }, [tags, tagHasAnyProducts]);
 
     const tagsToRender = useMemo(() => {
         if (selectedTag) {
-            return (Array.isArray(tags) ? tags : []).filter((t) => t.id === selectedTag);
+            return (Array.isArray(tags) ? tags : [])
+                .filter((t) => t.id === selectedTag && !!tagHasAnyProducts[t.id]);
         }
-        return (Array.isArray(tags) ? tags : []).filter((t) => Array.isArray(tagProducts[t.id]) && tagProducts[t.id].length > 0);
-    }, [tags, tagProducts, selectedTag]);
+        return (Array.isArray(tags) ? tags : []).filter((t) => !!tagHasAnyProducts[t.id]);
+    }, [tags, tagHasAnyProducts, selectedTag]);
 
     const fetchProducts = useCallback(async (page = 1) => {
         try {
@@ -315,19 +317,103 @@ const Homepage = () => {
     useEffect(() => {
         if (!Array.isArray(tags) || tags.length === 0) {
             setTagProducts({});
+            setTagHasAnyProducts({});
             return;
         }
-        const map = {};
-        tags.forEach((t) => {
-            map[t.id] = (Array.isArray(products) ? products.filter((p) => {
-                const ids = Array.isArray(p.tag_ids)
-                    ? p.tag_ids
-                    : (Array.isArray(p.tags) ? p.tags.map((x) => x.id) : []);
-                return ids.includes(t.id);
-            }) : []);
-        });
-        setTagProducts(map);
-    }, [tags, products]);
+        let cancelled = false;
+        const checkExistence = async () => {
+            try {
+                setTagLoading(true);
+                const baseParams = {
+                    page: 1,
+                    per_page: 1,
+                    search: searchQuery || undefined,
+                    ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                    sort: sortBy,
+                };
+                const results = {};
+                const ids = tags.map(t => t.id);
+                const limit = 5;
+                let idx = 0;
+                while (idx < ids.length) {
+                    const slice = ids.slice(idx, idx + limit);
+                    const promises = slice.map(async (id) => {
+                        const resp = await productsAPI.getProducts({ ...baseParams, tag_ids: [id] });
+                        const payload = resp?.data || {};
+                        const items = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.data?.data) ? payload.data.data : []);
+                        const filtered = items.filter((p) => matchesSelectedCategory(p));
+                        results[id] = filtered.length > 0;
+                    });
+                    await Promise.all(promises);
+                    idx += limit;
+                    if (cancelled) break;
+                }
+                if (!cancelled) setTagHasAnyProducts(results);
+            } catch (e) {
+                if (!cancelled) console.error(e);
+            } finally {
+                if (!cancelled) setTagLoading(false);
+            }
+        };
+        checkExistence();
+        return () => { cancelled = true; };
+    }, [tags, selectedCategory, searchQuery, sortBy]);
+
+    useEffect(() => {
+        if (!Array.isArray(tagsToRender) || tagsToRender.length === 0) {
+            return;
+        }
+        let cancelled = false;
+        const loadVisibleTags = async () => {
+            try {
+                const baseParams = {
+                    page: 1,
+                    per_page: 200,
+                    search: searchQuery || undefined,
+                    ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                    sort: sortBy,
+                };
+                const map = { ...tagProducts };
+                const limit = 3;
+                let idx = 0;
+                const vis = tagsToRender.map(t => t.id);
+                while (idx < vis.length) {
+                    const slice = vis.slice(idx, idx + limit);
+                    const promises = slice.map(async (id) => {
+                        if (Array.isArray(map[id]) && map[id].length > 0) return;
+                        const resp = await productsAPI.getProducts({ ...baseParams, tag_ids: [id] });
+                        const payload = resp?.data || {};
+                        const items = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.data?.data) ? payload.data.data : []);
+                        map[id] = items.filter((p) => matchesSelectedCategory(p));
+                    });
+                    await Promise.all(promises);
+                    idx += limit;
+                    if (cancelled) break;
+                }
+                if (!cancelled) setTagProducts(map);
+            } catch (e) {
+                if (!cancelled) console.error(e);
+            }
+        };
+        loadVisibleTags();
+        return () => { cancelled = true; };
+    }, [tagsToRender, selectedCategory, searchQuery, sortBy]);
+
+    const matchesSelectedCategory = useCallback((product) => {
+        if (selectedCategory === '' || selectedCategory == null) return true;
+        const catIds = Array.isArray(product.categories) ? product.categories.map((c) => c.id) : [];
+        const catNames = Array.isArray(product.categories) ? product.categories.map((c) => c.name) : [];
+        const primaryId = product.category_id ?? (product.product_category?.id ?? null);
+        const primaryName = product.category ?? (product.product_category?.name ?? null);
+        if (typeof selectedCategory === 'number') {
+            return catIds.includes(selectedCategory) || primaryId === selectedCategory;
+        }
+        return catNames.includes(selectedCategory) || primaryName === selectedCategory;
+    }, [selectedCategory]);
+
+    useEffect(() => {
+        setTagProducts({});
+    }, [selectedCategory, searchQuery]);
 
 
     // Robust price extraction function to handle various price field formats
@@ -808,30 +894,34 @@ const Homepage = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {tagsToRender.length > 0 && !searchQuery && !searchLoading && (
                         <div className="space-y-10 mb-10">
-                            {tagsToRender.map((tag) => (
-                                <div key={tag.id}>
-                                    <div className="mb-4">
-                                        <h2 className="text-xl sm:text-lg font-semibold text-gray-900">
-                                            {tag.name}
-                                        </h2>
-                                        <span className="text-sm text-gray-500">{tag.description}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-4 sm:gap-6">
-                                        {(Array.isArray(tagProducts[tag.id]) ? tagProducts[tag.id] : []).map((p) => (
-                                            <ProductCard key={`tag-${tag.id}-prod-${p.id}`} product={p} />
-                                        ))}
-                                        {tagLoading && Array.from({ length: 5 }).map((_, i) => (
-                                            <div key={`skeleton-${tag.id}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-100 h-full animate-pulse">
-                                                <div className="bg-gray-200" style={{ aspectRatio: '1 / 1' }}></div>
-                                                <div className="p-3 space-y-2">
-                                                    <div className="h-4 bg-gray-200 rounded"></div>
-                                                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                            {tagsToRender.map((tag) => {
+                                const list = (Array.isArray(tagProducts[tag.id]) ? tagProducts[tag.id] : []).filter((p) => matchesSelectedCategory(p));
+                                if (!list || list.length === 0) return null;
+                                return (
+                                    <div key={tag.id}>
+                                        <div className="mb-4">
+                                            <h2 className="text-xl sm:text-lg font-semibold text-gray-900">
+                                                {tag.name}
+                                            </h2>
+                                            <span className="text-sm text-gray-500">{tag.description}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-4 sm:gap-6">
+                                            {list.map((p) => (
+                                                <ProductCard key={`tag-${tag.id}-prod-${p.id}`} product={p} />
+                                            ))}
+                                            {tagLoading && Array.from({ length: 5 }).map((_, i) => (
+                                                <div key={`skeleton-${tag.id}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-100 h-full animate-pulse">
+                                                    <div className="bg-gray-200" style={{ aspectRatio: '1 / 1' }}></div>
+                                                    <div className="p-3 space-y-2">
+                                                        <div className="h-4 bg-gray-200 rounded"></div>
+                                                        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                     {selectedTag != null ? null : loading ? (

@@ -260,6 +260,9 @@ class XenditController extends Controller
             if ($paymentStatus === PaymentStatus::PAID) {
                 $order->update(['status' => 'processing']);
                 WebOrderController::updateVoucherUsedCount($order->id);
+                
+                // Create payment received notification
+                NotificationHelper::paymentReceived($order->load(['customer', 'address']));
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
                 if ($previousStatus !== 'cancelled') {
@@ -334,6 +337,9 @@ class XenditController extends Controller
                     if ($paymentStatus === PaymentStatus::PAID) {
                         $order->update(['status' => 'processing']);
                         WebOrderController::updateVoucherUsedCount($order->id);
+                        
+                        // Create payment received notification
+                        NotificationHelper::paymentReceived($order->load(['customer', 'address']));
                     } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                         $order->update(['status' => 'cancelled']);
                         if ($previousStatus !== 'cancelled') {

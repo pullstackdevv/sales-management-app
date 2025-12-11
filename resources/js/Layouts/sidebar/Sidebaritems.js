@@ -126,6 +126,7 @@ const SidebarContent = [
         icon: "solar:chart-outline",
         id: uniqueId(),
         permission: "reports.view",
+        role: "owner",
         children: [
             {
                 name: "Grafik Penjualan",
@@ -133,6 +134,7 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/cms/report/sales",
                 permission: "reports.sales",
+                role: "owner",
             },
             {
                 name: "Grafik Keuntungan",
@@ -140,6 +142,7 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/cms/report/profit",
                 permission: "reports.profit",
+                role: "owner",
             },
             {
                 name: "Data Transaksi Bank",
@@ -147,6 +150,7 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/cms/report/bank",
                 permission: "reports.bank",
+                role: "owner",
             },
             {
                 name: "Ekspedisi",
@@ -154,6 +158,7 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/cms/report/courier",
                 permission: "reports.courier",
+                role: "owner",
             },
         ],
     },

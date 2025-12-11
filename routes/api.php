@@ -88,6 +88,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);
         Route::get('sales', [ReportController::class, 'sales']);
+        Route::get('sales/daily', [ReportController::class, 'salesDaily']);
         Route::get('profit', [ReportController::class, 'profit']);
         Route::get('bank-transactions', [ReportController::class, 'bankTransactions']);
         Route::get('courier-data', [ReportController::class, 'courierData']);

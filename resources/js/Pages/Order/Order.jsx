@@ -117,7 +117,7 @@ export default function Order() {
           ordered_at: order.ordered_at, // Add raw date for PaymentHistoryModal
           customer: order.customer?.name || 'N/A',
           recipient_name: order.address?.recipient_name || order.customer?.name || 'N/A',
-          admin: 'Admin', // Default admin name
+          admin: (order.processed_by?.name) || (order.createdBy?.name) || '—',
           status: getStatusLabel(order.status),
           raw_status: order.status, // Add raw status for timeline logic
           total: parseFloat(order.total_price),

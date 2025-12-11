@@ -25,6 +25,7 @@ class Order extends Model
         'ordered_at',
         'printed_at',
         'updated_by',
+        'processed_by',
         'guest_email',
         'guest_phone',
         'notes',
@@ -88,6 +89,11 @@ class Order extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function processedBy()
+    {
+        return $this->belongsTo(User::class, 'processed_by');
     }
 
     // Helper methods for guest checkout

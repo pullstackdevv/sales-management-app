@@ -155,14 +155,14 @@ class DashboardController extends Controller
                 ->latest()
                 ->take(10)
                 ->get()
-                ->map(function ($o) {
+                ->map(function ($o) use ($isOwner) {
                     return [
                         'id' => $o->id,
                         'order_number' => $o->order_number,
                         'customer_name' => optional($o->customer)->name,
                         'status' => $o->status,
                         'payment_status' => $o->payment_status,
-                        'total_price' => (float) $o->total_price,
+                        'total_price' => $isOwner ? (float) $o->total_price : null,
                         'created_at' => $o->created_at->toDateTimeString(),
                         'sales_channel' => optional($o->salesChannel)->name,
                     ];
@@ -220,6 +220,7 @@ class DashboardController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
+                    'isOwner' => $isOwner,
                     'summaryCards' => $summaryCards,
                     'salesChart' => $salesChart,
                     'activity' => [

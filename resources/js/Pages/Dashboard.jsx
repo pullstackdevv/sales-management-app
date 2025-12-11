@@ -186,7 +186,9 @@ export default function Dashboard() {
                                             <th className="px-6 py-3 text-left">Order</th>
                                             <th className="px-6 py-3 text-left">Customer</th>
                                             <th className="px-6 py-3 text-left">Status</th>
-                                            <th className="px-6 py-3 text-left">Total</th>
+                                            {dashboardData.isOwner && (
+                                                <th className="px-6 py-3 text-left">Total</th>
+                                            )}
                                             <th className="px-6 py-3 text-left">Waktu</th>
                                         </tr>
                                     </thead>
@@ -201,13 +203,15 @@ export default function Dashboard() {
                                                             {o.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3">Rp {formatNumber(o.total_price || 0)}</td>
+                                                    {dashboardData.isOwner && (
+                                                        <td className="px-6 py-3">Rp {formatNumber(o.total_price || 0)}</td>
+                                                    )}
                                                     <td className="px-6 py-3 text-gray-600">{new Date(o.created_at).toLocaleTimeString('id-ID')}</td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={5} className="px-6 py-6 text-center text-gray-600">Belum ada order hari ini.</td>
+                                                <td colSpan={dashboardData.isOwner ? 5 : 4} className="px-6 py-6 text-center text-gray-600">Belum ada order hari ini.</td>
                                             </tr>
                                         )}
                                     </tbody>

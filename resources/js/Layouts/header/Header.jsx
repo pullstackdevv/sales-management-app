@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { usePage } from "@inertiajs/react";
 import FullLogo from "../shared/logo/FullLogo";
 import ChangePasswordModal from "../../components/ChangePasswordModal";
+import NotificationDropdown from "./NotificationDropdown";
 
 const Header = ({ onHamburgerClick, isSidebarOpen }) => {
   const [isSticky, setIsSticky] = useState(false);
@@ -63,6 +64,9 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
 
           {/* Right - Actions */}
           <div className="flex items-center gap-4 ml-auto">
+            
+            {/* Notifications */}
+            <NotificationDropdown />
 
             {/* Avatar & Dropdown */}
             <div className="relative">

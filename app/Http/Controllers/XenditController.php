@@ -8,6 +8,7 @@ use App\Helpers\ResponseFormatter;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
+use App\Helpers\NotificationHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -52,19 +53,23 @@ class XenditController extends Controller
                 );
             }
 
-            // Prepare customer data
             $customerName = $order->isGuestOrder() 
-                ? $order->address->name 
-                : $order->customer->name;
+                ? ($order->address->name ?? $order->guest_name ?? 'Guest Customer')
+                : ($order->customer->name ?? 'Customer');
             $customerEmail = $order->isGuestOrder() 
-                ? $order->guest_email 
-                : $order->customer->email;
+                ? ($order->guest_email ?? 'guest@example.com')
+                : ($order->customer->email ?? 'customer@example.com');
             $customerPhone = $order->isGuestOrder() 
-                ? $order->guest_phone 
-                : $order->customer->phone;
+                ? ($order->guest_phone ?? '')
+                : ($order->customer->phone ?? '');
 
-            $nameParts = explode(' ', $customerName, 2);
-            $givenNames = $nameParts[0];
+
+            if (empty(trim($customerName))) {
+                $customerName = 'Guest Customer';
+            }
+
+            $nameParts = explode(' ', trim($customerName), 2);
+            $givenNames = !empty($nameParts[0]) ? $nameParts[0] : 'Guest';
             $surname = isset($nameParts[1]) && !empty($nameParts[1]) ? $nameParts[1] : 'Customer';
 
             // Prepare items
@@ -129,7 +134,7 @@ class XenditController extends Controller
                 'external_id' => $order->order_number,
                 'amount' => (int) $order->total_price,
                 'description' => $description,
-                'invoice_duration' => 86400, // 24 hours
+                'invoice_duration' => 10, // 24 hours
                 'customer' => [
                     'given_names' => $givenNames,
                     'surname' => $surname,
@@ -255,6 +260,9 @@ class XenditController extends Controller
             if ($paymentStatus === PaymentStatus::PAID) {
                 $order->update(['status' => 'processing']);
                 WebOrderController::updateVoucherUsedCount($order->id);
+                
+                // Create payment received notification
+                NotificationHelper::paymentReceived($order->load(['customer', 'address']));
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
                 if ($previousStatus !== 'cancelled') {
@@ -269,6 +277,11 @@ class XenditController extends Controller
                             'note' => "Order #{$order->order_number} cancelled - Stock returned",
                             'created_by' => $variant->created_by ?? $order->user_id ?? 1,
                         ]);
+                    }
+                    
+                    // Create expired notification
+                    if ($paymentStatus === PaymentStatus::EXPIRED) {
+                        NotificationHelper::orderExpired($order->load(['customer', 'address']));
                     }
                 }
             }
@@ -324,6 +337,9 @@ class XenditController extends Controller
                     if ($paymentStatus === PaymentStatus::PAID) {
                         $order->update(['status' => 'processing']);
                         WebOrderController::updateVoucherUsedCount($order->id);
+                        
+                        // Create payment received notification
+                        NotificationHelper::paymentReceived($order->load(['customer', 'address']));
                     } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                         $order->update(['status' => 'cancelled']);
                         if ($previousStatus !== 'cancelled') {

@@ -23,6 +23,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use App\Helpers\NotificationHelper;
 
 class OrderController extends Controller
 {
@@ -353,6 +354,17 @@ class OrderController extends Controller
             // Vouchers are only handled in web orders with payment gateway
 
             DB::commit();
+
+            // Create notification for new order
+            NotificationHelper::newOrder($order->load('customer'));
+            
+            // Check and create low stock notifications
+            foreach ($validated['items'] as $item) {
+                $variant = ProductVariant::find($item['product_variant_id']);
+                if ($variant && $variant->stock < 2) {
+                    NotificationHelper::lowStock($variant, $variant->product);
+                }
+            }
 
             return response()->json([
                 'status' => 'success',

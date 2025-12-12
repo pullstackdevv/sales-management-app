@@ -193,26 +193,32 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         }
     };
 
-    // Search customers by name (using same method as CustomerDataCheckout)
+    // Search customers by email or phone (using guest-lookup endpoint)
     const searchCustomers = async (query) => {
-        if (!query || query.trim().length < 2) {
+        if (!query || query.trim().length < 3) {
             setCustomers([]);
             return;
         }
 
         setSearchLoading(true);
         try {
-            const response = await api.get('/customers', {
-                params: {
-                    search: query,
-                    per_page: 10
-                }
-            });
-            if (response.data.status === 'success') {
-                setCustomers(response.data.data.data || []);
+            // Determine if search is email or phone
+            const isEmail = query.includes('@');
+            const lookupData = isEmail 
+                ? { email: query.trim() }
+                : { phone: query.trim().replace(/[^0-9+]/g, '') };
+
+            const response = await api.post('/customers/guest-lookup', lookupData);
+            
+            if (response.data.status === 'success' && response.data.data) {
+                // Found customer - wrap in array for UI compatibility
+                setCustomers([response.data.data]);
+            } else {
+                setCustomers([]);
             }
         } catch (error) {
             console.error('Error searching customers:', error);
+            setCustomers([]);
         } finally {
             setSearchLoading(false);
         }
@@ -325,7 +331,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                             setSearchTerm(e.target.value);
                                             searchCustomers(e.target.value);
                                         }}
-                                        placeholder="Cari berdasarkan nama..."
+                                        placeholder="Ketik email atau nomor HP Anda..."
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         autoFocus
                                     />

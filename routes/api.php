@@ -37,6 +37,7 @@ use App\Http\Controllers\OriginSettingController;
 use App\Http\Controllers\GeneralSettingController;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\BannerController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TagController;
 
 
@@ -111,14 +112,13 @@ Route::apiResource('products', ProductController::class);
 Route::apiResource('products.variants', ProductVariantController::class);
 // Product Category routes
 Route::apiResource('product-categories', ProductCategoryController::class);
+// Guest customer endpoints (secure - validates ownership via email/phone)
+Route::post('customers/guest-lookup', [CustomerController::class, 'guestLookup']);
+Route::post('customers/guest-store', [CustomerController::class, 'guestStore']);
+Route::put('customers/guest-update/{customer}', [CustomerController::class, 'guestUpdate']);
+Route::post('customers/{customer}/guest-delete-address/{address}', [CustomerController::class, 'guestDeleteAddress']);
 // Tags routes
 Route::apiResource('tags', TagController::class);
-// Customer routes
-Route::apiResource('customers', CustomerController::class);
-Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
-Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
-Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
-
 Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);
 
 // Other authenticated routes
@@ -132,6 +132,12 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()
             ->json(Auth::user());
     });
+
+    // Customer routes (protected - sensitive data, full CRUD for admin)
+    Route::apiResource('customers', CustomerController::class);
+    Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+    Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
+    Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
 
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
@@ -219,6 +225,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('promotions/reorder', [PromotionController::class, 'reorder']);
 
     // Other authenticated routes remain here
+
+    // Notification routes
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'getNotifications']);
+        Route::post('/mark-read/{notificationId}', [NotificationController::class, 'markAsRead']);
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+        Route::post('/generate-low-stock', [NotificationController::class, 'generateLowStockNotifications']);
+    });
 
     // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {

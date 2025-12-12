@@ -11,9 +11,10 @@ use App\Http\Controllers\WebOrderController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Midtrans\Notification;
+use Midtrans\Notification as MidtransNotification;
 use Midtrans\Snap;
 use Midtrans\Transaction;
+use App\Helpers\NotificationHelper;
 
 class MidtransController extends Controller
 {
@@ -209,6 +210,9 @@ class MidtransController extends Controller
             if ($paymentStatus === PaymentStatus::PAID) {
                 $order->update(['status' => 'paid']);
                 WebOrderController::updateVoucherUsedCount($order->id);
+                
+                // Create payment received notification
+                NotificationHelper::paymentReceived($order->load(['customer', 'address']));
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
                 if ($previousStatus !== 'cancelled') {
@@ -223,6 +227,11 @@ class MidtransController extends Controller
                             'note' => "Order #{$order->order_number} cancelled - Stock returned",
                             'created_by' => $variant->created_by ?? $order->user_id ?? 1,
                         ]);
+                    }
+                    
+                    // Create expired notification
+                    if ($paymentStatus === PaymentStatus::EXPIRED) {
+                        NotificationHelper::orderExpired($order->load(['customer', 'address']));
                     }
                 }
             }
@@ -292,6 +301,9 @@ class MidtransController extends Controller
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     $order->update(['status' => 'paid']);
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    
+                    // Create payment received notification
+                    NotificationHelper::paymentReceived($order->load(['customer', 'address']));
                 } elseif (in_array($paymentStatusFromGateway, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                     $order->update(['status' => 'cancelled']);
                     if ($previousStatus !== 'cancelled') {

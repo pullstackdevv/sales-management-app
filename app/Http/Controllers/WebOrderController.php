@@ -13,6 +13,7 @@ use App\Enums\StockMovementType;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Voucher;
+use App\Helpers\NotificationHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -296,6 +297,17 @@ class WebOrderController extends Controller
             // This prevents counting vouchers for unpaid orders
 
             DB::commit();
+
+            // Create notification for new order
+            NotificationHelper::newOrder($order->load(['customer', 'address']));
+            
+            // Check and create low stock notifications
+            foreach ($orderItems as $item) {
+                $variant = ProductVariant::find($item['product_variant_id']);
+                if ($variant && $variant->stock < 2) {
+                    NotificationHelper::lowStock($variant, $variant->product);
+                }
+            }
 
             return ResponseFormatter::success(
                 'Order created successfully',

@@ -8,6 +8,7 @@ use App\Helpers\ResponseFormatter;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
+use App\Helpers\NotificationHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -86,19 +87,24 @@ class PaymentController extends Controller
      */
     private function createXenditPayment($order)
     {
-        // Prepare customer data
+        // Prepare customer data with fallbacks to prevent empty values
         $customerName = $order->isGuestOrder()
-            ? $order->address->name
-            : $order->customer->name;
+            ? ($order->address->name ?? $order->guest_name ?? 'Guest Customer')
+            : ($order->customer->name ?? 'Customer');
         $customerEmail = $order->isGuestOrder()
-            ? $order->guest_email
-            : $order->customer->email;
+            ? ($order->guest_email ?? 'guest@example.com')
+            : ($order->customer->email ?? 'customer@example.com');
         $customerPhone = $order->isGuestOrder()
-            ? $order->guest_phone
-            : $order->customer->phone;
+            ? ($order->guest_phone ?? '')
+            : ($order->customer->phone ?? '');
 
-        $nameParts = explode(' ', $customerName, 2);
-        $givenNames = $nameParts[0];
+        // Ensure customerName is never empty
+        if (empty(trim($customerName))) {
+            $customerName = 'Guest Customer';
+        }
+
+        $nameParts = explode(' ', trim($customerName), 2);
+        $givenNames = !empty($nameParts[0]) ? $nameParts[0] : 'Guest';
         $surname = isset($nameParts[1]) && !empty($nameParts[1]) ? $nameParts[1] : 'Customer';
 
         // Prepare items
@@ -418,8 +424,16 @@ class PaymentController extends Controller
         if ($paymentStatus === PaymentStatus::PAID) {
             $order->update(['status' => 'processing']);
             WebOrderController::updateVoucherUsedCount($order->id);
+            
+            // Create payment received notification
+            NotificationHelper::paymentReceived($order->load(['customer', 'address']));
         } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
             $order->update(['status' => 'cancelled']);
+            
+            // Create expired notification
+            if ($paymentStatus === PaymentStatus::EXPIRED) {
+                NotificationHelper::orderExpired($order->load(['customer', 'address']));
+            }
         }
 
         Log::info('Order payment status updated via Xendit webhook', [
@@ -474,8 +488,16 @@ class PaymentController extends Controller
         if ($paymentStatus === PaymentStatus::PAID) {
             $order->update(['status' => 'processing']);
             WebOrderController::updateVoucherUsedCount($order->id);
+            
+            // Create payment received notification
+            NotificationHelper::paymentReceived($order->load(['customer', 'address']));
         } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
             $order->update(['status' => 'cancelled']);
+            
+            // Create expired notification
+            if ($paymentStatus === PaymentStatus::EXPIRED) {
+                NotificationHelper::orderExpired($order->load(['customer', 'address']));
+            }
         }
 
         Log::info('Order payment status updated via Midtrans webhook', [
@@ -541,6 +563,9 @@ class PaymentController extends Controller
 
                 if ($paymentStatus === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    
+                    // Create payment received notification
+                    NotificationHelper::paymentReceived($order->load(['customer', 'address']));
                 }
 
                 // Handle cancellation or expiry: restore stock with note
@@ -620,6 +645,9 @@ class PaymentController extends Controller
 
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    
+                    // Create payment received notification
+                    NotificationHelper::paymentReceived($order->load(['customer', 'address']));
                 }
 
                 // Handle cancellation/expiry/failed: restore stock with note

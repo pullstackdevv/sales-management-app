@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('notifications', function (Blueprint $table) {
             $table->id();
-            $table->enum('type', ['new_order', 'low_stock', 'order_expired']);
+            $table->enum('type', ['new_order', 'low_stock', 'order_expired', 'order_status_changed', 'payment_received']);
             $table->string('title');
             $table->text('message');
             $table->string('icon')->nullable();

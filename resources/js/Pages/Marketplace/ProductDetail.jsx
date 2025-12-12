@@ -301,23 +301,14 @@ export default function ProductDetail() {
             setCustomers([]);
             return;
         }
-        
+
         setOrderLoading(prev => ({ ...prev, customers: true }));
         try {
-            // Determine if search is email or phone
-            const isEmail = search.includes('@');
-            const lookupData = isEmail 
-                ? { email: search.trim() }
-                : { phone: search.trim().replace(/[^0-9+]/g, '') };
+            const response = await axios.get('/api/customers', {
+                params: { search, per_page: 50 }
+            });
+            setCustomers(response.data.data.data || []);
 
-            const response = await axios.post('/api/customers/guest-lookup', lookupData);
-            
-            if (response.data.status === 'success' && response.data.data) {
-                // Found customer - wrap in array for UI compatibility
-                setCustomers([response.data.data]);
-            } else {
-                setCustomers([]);
-            }
         } catch (error) {
             console.error('Error fetching customers:', error);
             setCustomers([]);

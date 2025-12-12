@@ -451,6 +451,15 @@ class CustomerController extends Controller
             $normalizedCustomerPhone = preg_replace('/^62/', '0', $normalizedCustomerPhone);
             $normalizedInputPhone = preg_replace('/^62/', '0', $normalizedInputPhone);
             $isVerified = $normalizedCustomerPhone === $normalizedInputPhone;
+            
+            \Log::info('Guest verify phone comparison', [
+                'customer_id' => $customer->id,
+                'customer_phone_raw' => $customer->phone,
+                'input_phone_raw' => $validated['verification_value'],
+                'customer_phone_normalized' => $normalizedCustomerPhone,
+                'input_phone_normalized' => $normalizedInputPhone,
+                'is_verified' => $isVerified
+            ]);
         } else {
             $isVerified = strtolower($customer->email) === strtolower($validated['verification_value']);
         }

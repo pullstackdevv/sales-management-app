@@ -326,7 +326,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                             setSearchTerm(e.target.value);
                                             searchCustomers(e.target.value);
                                         }}
-                                        placeholder="Ketik email atau nomor HP Anda..."
+                                        placeholder="Cari berdasarkan nama..."
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         autoFocus
                                     />

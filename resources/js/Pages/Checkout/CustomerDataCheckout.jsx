@@ -1182,7 +1182,7 @@ const CustomerDataCheckout = () => {
             const phoneError = validationErrors.phone;
             Swal.fire({
               icon: 'error',
-              title: 'Data Tidak Lengkap',
+              // title: 'Data Tidak Lengkap',
               text: 'Mohon lengkapi semua field yang diperlukan',
               title: phoneError ? 'Nomor Telepon Sudah Terdaftar' : 'Data Tidak Lengkap',
               text: phoneError || 'Mohon lengkapi semua field yang diperlukan',

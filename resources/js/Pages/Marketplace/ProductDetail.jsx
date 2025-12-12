@@ -295,26 +295,19 @@ export default function ProductDetail() {
         }
     };
 
-    // Fetch customers using guest-lookup (search by email or phone)
+    // Fetch customers using guest-lookup (search by name - returns masked data)
     const fetchCustomers = async (search = '') => {
-        if (!search || search.trim().length < 3) {
+        if (!search || search.trim().length < 2) {
             setCustomers([]);
             return;
         }
         
         setOrderLoading(prev => ({ ...prev, customers: true }));
         try {
-            // Determine if search is email or phone
-            const isEmail = search.includes('@');
-            const lookupData = isEmail 
-                ? { email: search.trim() }
-                : { phone: search.trim().replace(/[^0-9+]/g, '') };
-
-            const response = await axios.post('/api/customers/guest-lookup', lookupData);
+            const response = await axios.post('/api/customers/guest-lookup', { search: search.trim() });
             
-            if (response.data.status === 'success' && response.data.data) {
-                // Found customer - wrap in array for UI compatibility
-                setCustomers([response.data.data]);
+            if (response.data.status === 'success') {
+                setCustomers(response.data.data || []);
             } else {
                 setCustomers([]);
             }

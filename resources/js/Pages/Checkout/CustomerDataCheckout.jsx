@@ -271,32 +271,24 @@ const CustomerDataCheckout = () => {
     }
   };
 
-  // Guest lookup - search customer by email or phone (secure endpoint)
-  const fetchCustomerByLookup = async (searchValue = '') => {
-    if (!searchValue || searchValue.trim().length < 3) {
+  // Guest lookup - search customer by name (returns masked phone/email)
+  const fetchCustomers = async (search = '') => {
+    if (!search || search.trim().length < 2) {
       setCustomers([]);
       return;
     }
 
     try {
       setSearchLoading(true);
-      
-      // Determine if search is email or phone
-      const isEmail = searchValue.includes('@');
-      const lookupData = isEmail 
-        ? { email: searchValue.trim() }
-        : { phone: searchValue.trim().replace(/[^0-9+]/g, '') };
+      const response = await api.post('/customers/guest-lookup', { search: search.trim() });
 
-      const response = await api.post('/customers/guest-lookup', lookupData);
-
-      if (response.data.status === 'success' && response.data.data) {
-        // Found customer - wrap in array for UI compatibility
-        setCustomers([response.data.data]);
+      if (response.data.status === 'success') {
+        setCustomers(response.data.data || []);
       } else {
         setCustomers([]);
       }
     } catch (error) {
-      console.error('Error looking up customer:', error);
+      console.error('Error searching customers:', error);
       setCustomers([]);
     } finally {
       setSearchLoading(false);
@@ -306,9 +298,9 @@ const CustomerDataCheckout = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm && customerType === 'existing') {
-        fetchCustomerByLookup(searchTerm);
+        fetchCustomers(searchTerm);
       }
-    }, 500); // Slightly longer debounce for lookup
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm, customerType]);
 
@@ -324,78 +316,62 @@ const CustomerDataCheckout = () => {
     };
   }, []);
 
-  // Handle customer selection - directly select since guest-lookup already validates by email/phone
+  // Handle customer selection - show verification modal first
   const handleCustomerSelect = (customer) => {
-    // Since guest-lookup requires exact email/phone match, no additional verification needed
-    setSelectedCustomer(customer);
-    setSearchTerm(customer.name);
+    setPendingCustomer(customer);
+    setVerificationPhone('');
+    setVerificationEmail('');
+    setPhoneVerificationError('');
+    setVerificationMethod(customer.has_email ? 'phone' : 'phone'); // Default to phone
+    setShowPhoneVerification(true);
     setCustomers([]);
-    
-    // Use addresses from guest-lookup response if available
-    if (customer.addresses && customer.addresses.length > 0) {
-      const addresses = customer.addresses.map(addr => ({
-        ...addr,
-        recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
-      }));
-      setCustomerAddresses(addresses);
-      
-      // Auto-select default address or first address
-      const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
-      setSelectedAddressId(defaultAddress.id);
-    } else {
-      // Fallback: fetch addresses if not included in response
-      fetchCustomerAddressesAfterSelection(customer);
-    }
   };
 
-  // Handle verification (phone or email)
+  // Handle verification (phone or email) - uses guest-verify endpoint
   const handleVerification = async () => {
-    if (verificationMethod === 'phone') {
-      if (!verificationPhone.trim()) {
-        setPhoneVerificationError('Nomor HP wajib diisi');
-        return;
-      }
-
-      // Normalize phone numbers for comparison (remove spaces, dashes, etc.)
-      const normalizePhone = (phone) => {
-        return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+62/, '0').replace(/^62/, '0');
-      };
-
-      const customerPhone = normalizePhone(pendingCustomer.phone || '');
-      const inputPhone = normalizePhone(verificationPhone);
-
-      if (customerPhone !== inputPhone) {
-        setPhoneVerificationError('Nomor HP tidak sesuai dengan data customer');
-        return;
-      }
-    } else if (verificationMethod === 'email') {
-      if (!verificationEmail.trim()) {
-        setPhoneVerificationError('Email wajib diisi');
-        return;
-      }
-
-      // Normalize and compare emails (case insensitive)
-      const customerEmail = (pendingCustomer.email || '').toLowerCase().trim();
-      const inputEmail = verificationEmail.toLowerCase().trim();
-
-      if (!customerEmail) {
-        setPhoneVerificationError('Customer ini tidak memiliki email terdaftar');
-        return;
-      }
-
-      if (customerEmail !== inputEmail) {
-        setPhoneVerificationError('Email tidak sesuai dengan data customer');
-        return;
-      }
+    const verificationValue = verificationMethod === 'phone' ? verificationPhone : verificationEmail;
+    
+    if (!verificationValue?.trim()) {
+      setPhoneVerificationError(verificationMethod === 'phone' ? 'Nomor HP wajib diisi' : 'Email wajib diisi');
+      return;
     }
 
-    // Verified, proceed with customer selection
-    setSelectedCustomer(pendingCustomer);
-    setSearchTerm(pendingCustomer.name);
-    setShowPhoneVerification(false);
+    try {
+      // Call guest-verify endpoint to verify and get full customer data with addresses
+      const response = await api.post('/customers/guest-verify', {
+        customer_id: pendingCustomer.id,
+        verification_type: verificationMethod,
+        verification_value: verificationValue.trim()
+      });
 
-    // Fetch customer addresses
-    await fetchCustomerAddressesAfterSelection(pendingCustomer.id);
+      if (response.data.status === 'success' && response.data.data) {
+        const verifiedCustomer = response.data.data;
+        
+        // Verified, proceed with customer selection
+        setSelectedCustomer(verifiedCustomer);
+        setSearchTerm(verifiedCustomer.name);
+        setShowPhoneVerification(false);
+
+        // Use addresses from verified response
+        if (verifiedCustomer.addresses && verifiedCustomer.addresses.length > 0) {
+          const addresses = verifiedCustomer.addresses.map(addr => ({
+            ...addr,
+            recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
+          }));
+          setCustomerAddresses(addresses);
+          
+          // Auto-select default address or first address
+          const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
+          setSelectedAddressId(defaultAddress.id);
+        } else {
+          setCustomerAddresses([]);
+        }
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      const errorMessage = error.response?.data?.message || 'Verifikasi gagal';
+      setPhoneVerificationError(errorMessage);
+    }
   };
 
   // Cancel verification
@@ -1608,7 +1584,7 @@ const CustomerDataCheckout = () => {
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className={`w-full px-3 py-2 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.customer ? 'border-red-500' : 'border-gray-300'
                             }`}
-                          placeholder="Ketik email atau nomor HP Anda..."
+                          placeholder="Ketik nama atau nomor telepon customer..."
                         />
                         <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                         {searchLoading && (

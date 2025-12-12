@@ -114,6 +114,7 @@ Route::apiResource('products.variants', ProductVariantController::class);
 Route::apiResource('product-categories', ProductCategoryController::class);
 // Guest customer endpoints (secure - validates ownership via email/phone)
 Route::post('customers/guest-lookup', [CustomerController::class, 'guestLookup']);
+Route::post('customers/guest-verify', [CustomerController::class, 'guestVerify']);
 Route::post('customers/guest-store', [CustomerController::class, 'guestStore']);
 Route::put('customers/guest-update/{customer}', [CustomerController::class, 'guestUpdate']);
 Route::post('customers/{customer}/guest-delete-address/{address}', [CustomerController::class, 'guestDeleteAddress']);

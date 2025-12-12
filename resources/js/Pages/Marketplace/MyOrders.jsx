@@ -193,26 +193,19 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         }
     };
 
-    // Search customers by email or phone (using guest-lookup endpoint)
+    // Search customers by name (using guest-lookup endpoint - returns masked data)
     const searchCustomers = async (query) => {
-        if (!query || query.trim().length < 3) {
+        if (!query || query.trim().length < 2) {
             setCustomers([]);
             return;
         }
 
         setSearchLoading(true);
         try {
-            // Determine if search is email or phone
-            const isEmail = query.includes('@');
-            const lookupData = isEmail 
-                ? { email: query.trim() }
-                : { phone: query.trim().replace(/[^0-9+]/g, '') };
-
-            const response = await api.post('/customers/guest-lookup', lookupData);
+            const response = await api.post('/customers/guest-lookup', { search: query.trim() });
             
-            if (response.data.status === 'success' && response.data.data) {
-                // Found customer - wrap in array for UI compatibility
-                setCustomers([response.data.data]);
+            if (response.data.status === 'success') {
+                setCustomers(response.data.data || []);
             } else {
                 setCustomers([]);
             }
@@ -331,7 +324,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                             setSearchTerm(e.target.value);
                                             searchCustomers(e.target.value);
                                         }}
-                                        placeholder="Ketik email atau nomor HP Anda..."
+                                        placeholder="Cari berdasarkan nama..."
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         autoFocus
                                     />

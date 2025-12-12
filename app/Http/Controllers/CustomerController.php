@@ -386,42 +386,114 @@ class CustomerController extends Controller
     }
 
     /**
-     * Guest lookup - find customer by email or phone (for checkout)
-     * Only returns the customer's own data, not all customers
+     * Guest lookup - search customers by name for checkout
+     * Returns masked data (phone/email partially hidden) for privacy
+     * User must verify with full phone/email to access full data
      */
     public function guestLookup(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => 'required_without:phone|nullable|email',
-            'phone' => 'required_without:email|nullable|string',
+            'search' => 'required|string|min:2',
         ]);
 
-        $query = Customer::with(['addresses']);
+        $search = $validated['search'];
 
-        if (!empty($validated['email']) && !empty($validated['phone'])) {
-            // Both provided - must match both
-            $query->where('email', $validated['email'])
-                  ->where('phone', $validated['phone']);
-        } elseif (!empty($validated['email'])) {
-            $query->where('email', $validated['email']);
-        } elseif (!empty($validated['phone'])) {
-            $query->where('phone', $validated['phone']);
-        }
+        $customers = Customer::where(function($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%");
+            })
+            ->limit(10)
+            ->get(['id', 'name', 'phone', 'email']);
 
-        $customer = $query->first();
+        // Return customers with masked phone/email for privacy
+        $maskedCustomers = $customers->map(function($customer) {
+            return [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'phone' => $this->maskPhone($customer->phone),
+                'email' => $this->maskEmail($customer->email),
+                'has_email' => !empty($customer->email),
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $maskedCustomers
+        ]);
+    }
+
+    /**
+     * Guest verify - verify customer ownership and return full data with addresses
+     */
+    public function guestVerify(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|integer',
+            'verification_type' => 'required|in:phone,email',
+            'verification_value' => 'required|string',
+        ]);
+
+        $customer = Customer::with(['addresses'])->find($validated['customer_id']);
 
         if (!$customer) {
             return response()->json([
-                'status' => 'success',
-                'data' => null,
-                'message' => 'Customer not found'
-            ]);
+                'status' => 'error',
+                'message' => 'Customer tidak ditemukan'
+            ], 404);
         }
 
+        // Verify based on type
+        $isVerified = false;
+        if ($validated['verification_type'] === 'phone') {
+            $normalizedCustomerPhone = preg_replace('/[^0-9]/', '', $customer->phone);
+            $normalizedInputPhone = preg_replace('/[^0-9]/', '', $validated['verification_value']);
+            // Also handle +62 vs 0 prefix
+            $normalizedCustomerPhone = preg_replace('/^62/', '0', $normalizedCustomerPhone);
+            $normalizedInputPhone = preg_replace('/^62/', '0', $normalizedInputPhone);
+            $isVerified = $normalizedCustomerPhone === $normalizedInputPhone;
+        } else {
+            $isVerified = strtolower($customer->email) === strtolower($validated['verification_value']);
+        }
+
+        if (!$isVerified) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validated['verification_type'] === 'phone' 
+                    ? 'Nomor HP tidak sesuai dengan data customer'
+                    : 'Email tidak sesuai dengan data customer'
+            ], 403);
+        }
+
+        // Verification successful - return full customer data with addresses
         return response()->json([
             'status' => 'success',
             'data' => $customer
         ]);
+    }
+
+    /**
+     * Mask phone number for privacy (show first 4 and last 2 digits)
+     */
+    private function maskPhone(?string $phone): ?string
+    {
+        if (!$phone) return null;
+        $clean = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($clean) <= 6) return $phone;
+        return substr($clean, 0, 4) . str_repeat('*', strlen($clean) - 6) . substr($clean, -2);
+    }
+
+    /**
+     * Mask email for privacy (show first 2 chars and domain)
+     */
+    private function maskEmail(?string $email): ?string
+    {
+        if (!$email) return null;
+        $parts = explode('@', $email);
+        if (count($parts) !== 2) return $email;
+        $name = $parts[0];
+        $domain = $parts[1];
+        if (strlen($name) <= 2) return $email;
+        return substr($name, 0, 2) . str_repeat('*', strlen($name) - 2) . '@' . $domain;
     }
 
     /**

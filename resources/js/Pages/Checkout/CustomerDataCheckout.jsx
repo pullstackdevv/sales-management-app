@@ -146,8 +146,10 @@ const CustomerDataCheckout = () => {
         setCustomerType('existing');
         setSelectedCustomer(checkoutData.customer);
 
-        // Fetch customer addresses using guest-lookup
-        fetchCustomerAddressesFromSession();
+        // Fetch customer addresses only if customer_id exists and is valid
+        if (checkoutData.customer.customer_id && checkoutData.customer.customer_id !== '') {
+          fetchCustomerAddressesFromSession(checkoutData.customer.customer_id);
+        }
       } else {
         // New customer
         setCustomerType('new');
@@ -174,48 +176,20 @@ const CustomerDataCheckout = () => {
   }, []);
 
   // Fetch customer addresses from session (when loading existing customer from session)
-  // Uses guest-lookup with email/phone from session data
-  const fetchCustomerAddressesFromSession = async () => {
+  const fetchCustomerAddressesFromSession = async (customerId) => {
     try {
       setAddressesLoading(true);
-      const checkoutData = checkoutSession.get();
-      
-      // Use email or phone from session to lookup customer with addresses
-      const email = checkoutData.customer?.email;
-      const phone = checkoutData.customer?.whatsapp || checkoutData.customer?.phone;
-      
-      if (!email && !phone) {
-        // If no email/phone, try to use addresses from session directly
-        if (checkoutData.customer?.addresses && checkoutData.customer.addresses.length > 0) {
-          const addresses = checkoutData.customer.addresses.map(addr => ({
-            ...addr,
-            recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
-          }));
-          setCustomerAddresses(addresses);
-          
-          if (checkoutData.customer.address_id) {
-            setSelectedAddressId(checkoutData.customer.address_id);
-          } else {
-            const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
-            setSelectedAddressId(defaultAddress.id);
-          }
-        }
-        return;
-      }
+      const response = await api.get(`/customers/${customerId}/addresses`);
 
-      // Use guest-lookup to get fresh customer data with addresses
-      const lookupData = email ? { email } : { phone };
-      const response = await api.post('/customers/guest-lookup', lookupData);
-
-      if (response.data.status === 'success' && response.data.data) {
-        const customer = response.data.data;
-        const addresses = (customer.addresses || []).map(addr => ({
+      if (response.data.status === 'success') {
+        const addresses = (response.data.data || []).map(addr => ({
           ...addr,
           recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
         }));
         setCustomerAddresses(addresses);
 
         // Check if there's a selected address in session
+        const checkoutData = checkoutSession.get();
         if (checkoutData.customer && checkoutData.customer.address_id) {
           setSelectedAddressId(checkoutData.customer.address_id);
         } else if (addresses.length > 0) {
@@ -233,25 +207,12 @@ const CustomerDataCheckout = () => {
   };
 
   // Fetch customer addresses after customer selection (from search)
-  // Uses guest-lookup with customer email/phone
-  const fetchCustomerAddressesAfterSelection = async (customer) => {
+  const fetchCustomerAddressesAfterSelection = async (customerId) => {
     try {
       setAddressesLoading(true);
-      
-      // Use email or phone from customer to lookup with addresses
-      const email = customer?.email;
-      const phone = customer?.phone;
-      
-      if (!email && !phone) {
-        setCustomerAddresses([]);
-        return;
-      }
-
-      const lookupData = email ? { email } : { phone };
-      const response = await api.post('/customers/guest-lookup', lookupData);
-      
-      if (response.data.status === 'success' && response.data.data) {
-        const addresses = (response.data.data.addresses || []).map(addr => ({
+      const response = await api.get(`/customers/${customerId}/addresses`);
+      if (response.data.status === 'success') {
+        const addresses = (response.data.data || []).map(addr => ({
           ...addr,
           recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
         }));
@@ -271,32 +232,22 @@ const CustomerDataCheckout = () => {
     }
   };
 
-  // Guest lookup - search customer by email or phone (secure endpoint)
-  const fetchCustomerByLookup = async (searchValue = '') => {
-    if (!searchValue || searchValue.trim().length < 3) {
-      setCustomers([]);
-      return;
-    }
-
+  // Fetch customers for search
+  const fetchCustomers = async (search = '') => {
     try {
       setSearchLoading(true);
-      
-      // Determine if search is email or phone
-      const isEmail = searchValue.includes('@');
-      const lookupData = isEmail 
-        ? { email: searchValue.trim() }
-        : { phone: searchValue.trim().replace(/[^0-9+]/g, '') };
+      const response = await api.get('/customers', {
+        params: {
+          search: search,
+          per_page: 10
+        }
+      });
 
-      const response = await api.post('/customers/guest-lookup', lookupData);
-
-      if (response.data.status === 'success' && response.data.data) {
-        // Found customer - wrap in array for UI compatibility
-        setCustomers([response.data.data]);
-      } else {
-        setCustomers([]);
+      if (response.data.status === 'success') {
+        setCustomers(response.data.data.data || []);
       }
     } catch (error) {
-      console.error('Error looking up customer:', error);
+      console.error('Error fetching customers:', error);
       setCustomers([]);
     } finally {
       setSearchLoading(false);
@@ -306,9 +257,9 @@ const CustomerDataCheckout = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm && customerType === 'existing') {
-        fetchCustomerByLookup(searchTerm);
+        fetchCustomers(searchTerm);
       }
-    }, 500); // Slightly longer debounce for lookup
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm, customerType]);
 
@@ -324,28 +275,15 @@ const CustomerDataCheckout = () => {
     };
   }, []);
 
-  // Handle customer selection - directly select since guest-lookup already validates by email/phone
+  // Handle customer selection - show verification first
   const handleCustomerSelect = (customer) => {
-    // Since guest-lookup requires exact email/phone match, no additional verification needed
-    setSelectedCustomer(customer);
-    setSearchTerm(customer.name);
+    setPendingCustomer(customer);
+    setVerificationPhone('');
+    setVerificationEmail('');
+    setPhoneVerificationError('');
+    setVerificationMethod('phone'); // Default to phone
+    setShowPhoneVerification(true);
     setCustomers([]);
-    
-    // Use addresses from guest-lookup response if available
-    if (customer.addresses && customer.addresses.length > 0) {
-      const addresses = customer.addresses.map(addr => ({
-        ...addr,
-        recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
-      }));
-      setCustomerAddresses(addresses);
-      
-      // Auto-select default address or first address
-      const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
-      setSelectedAddressId(defaultAddress.id);
-    } else {
-      // Fallback: fetch addresses if not included in response
-      fetchCustomerAddressesAfterSelection(customer);
-    }
   };
 
   // Handle verification (phone or email)
@@ -408,17 +346,10 @@ const CustomerDataCheckout = () => {
     setVerificationMethod('phone');
   };
 
-  // Add new customer address - uses guest-update endpoint
+  // Add new customer address
   const addCustomerAddress = async (customerId, addressData) => {
     try {
-      // Use guest-update to add new address (address without id = new)
-      const guestUpdateData = {
-        verify_email: selectedCustomer?.email || null,
-        verify_phone: selectedCustomer?.phone || null,
-        addresses: [addressData] // New address without id
-      };
-
-      const response = await api.put(`/customers/guest-update/${customerId}`, guestUpdateData);
+      const response = await api.post(`/customers/${customerId}/addresses`, addressData);
 
       if (response.data.status === 'success') {
         return response.data.data;
@@ -427,22 +358,34 @@ const CustomerDataCheckout = () => {
       }
     } catch (error) {
       console.error('Error adding customer address:', error);
-      let errorMessage = error.response?.data?.message || 'Gagal menambah alamat';
+
+      let errorMessage = 'Gagal menambah alamat';
+
+      if (error.response?.data?.errors) {
+        const apiErrors = error.response.data.errors;
+
+        if (Array.isArray(apiErrors)) {
+          const specificError = apiErrors.find(err => err.message);
+          if (specificError) {
+            errorMessage = specificError.message;
+          } else {
+            errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
+          }
+        } else {
+          errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
+        }
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
       throw new Error(errorMessage);
     }
   };
 
-  // Update customer address - uses guest-update endpoint
+  // Update customer address
   const updateCustomerAddress = async (customerId, addressId, addressData) => {
     try {
-      // Use guest-update to update existing address (address with id = update)
-      const guestUpdateData = {
-        verify_email: selectedCustomer?.email || null,
-        verify_phone: selectedCustomer?.phone || null,
-        addresses: [{ ...addressData, id: addressId }]
-      };
-
-      const response = await api.put(`/customers/guest-update/${customerId}`, guestUpdateData);
+      const response = await api.put(`/customers/${customerId}/addresses/${addressId}`, addressData);
 
       if (response.data.status === 'success') {
         return response.data.data;
@@ -451,22 +394,34 @@ const CustomerDataCheckout = () => {
       }
     } catch (error) {
       console.error('Error updating customer address:', error);
-      let errorMessage = error.response?.data?.message || 'Gagal memperbarui alamat';
+
+      let errorMessage = 'Gagal memperbarui alamat';
+
+      if (error.response?.data?.errors) {
+        const apiErrors = error.response.data.errors;
+
+        if (Array.isArray(apiErrors)) {
+          const specificError = apiErrors.find(err => err.message);
+          if (specificError) {
+            errorMessage = specificError.message;
+          } else {
+            errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
+          }
+        } else {
+          errorMessage = 'Mohon periksa kembali data yang Anda masukkan';
+        }
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
       throw new Error(errorMessage);
     }
   };
 
-  // Update customer with addresses array (for bulk update) - uses guest-update endpoint
+  // Update customer with addresses array (for bulk update)
   const updateCustomerWithAddresses = async (customerId, customerData) => {
     try {
-      // Add verification data for guest-update endpoint
-      const guestUpdateData = {
-        ...customerData,
-        verify_email: selectedCustomer?.email || null,
-        verify_phone: selectedCustomer?.phone || null,
-      };
-
-      const response = await api.put(`/customers/guest-update/${customerId}`, guestUpdateData);
+      const response = await api.put(`/customers/${customerId}`, customerData);
 
       if (response.data.status === 'success') {
         return response.data.data;
@@ -620,11 +575,8 @@ const CustomerDataCheckout = () => {
 
     if (result.isConfirmed) {
       try {
-        // Use guest-delete-address endpoint with verification
-        const response = await api.post(`/customers/${getCustomerId(selectedCustomer)}/guest-delete-address/${address.id}`, {
-          verify_email: selectedCustomer?.email || null,
-          verify_phone: selectedCustomer?.phone || null,
-        });
+        // Use the new delete address endpoint
+        const response = await api.delete(`/customers/${getCustomerId(selectedCustomer)}/addresses/${address.id}`);
 
         if (response.data.status === 'success') {
           // Update local state with the returned addresses
@@ -771,21 +723,15 @@ const CustomerDataCheckout = () => {
         successMessage = 'Alamat baru berhasil ditambahkan';
       }
 
-      // Refresh customer addresses using guest-lookup
-      const email = selectedCustomer?.email;
-      const phone = selectedCustomer?.phone;
-      if (email || phone) {
-        const lookupData = email ? { email } : { phone };
-        const refreshResponse = await api.post('/customers/guest-lookup', lookupData);
-        if (refreshResponse.data.status === 'success' && refreshResponse.data.data) {
-          const addresses = refreshResponse.data.data.addresses || [];
-          setCustomerAddresses(addresses);
+      // Refresh customer addresses
+      const response = await api.get(`/customers/${getCustomerId(selectedCustomer)}/addresses`);
+      if (response.data.status === 'success') {
+        setCustomerAddresses(response.data.data || []);
 
-          // If this is a new address and no address is selected, select this one
-          if (!editingAddress && !selectedAddressId && addresses.length > 0) {
-            const newAddress = addresses[addresses.length - 1];
-            setSelectedAddressId(newAddress.id);
-          }
+        // If this is a new address and no address is selected, select this one
+        if (!editingAddress && !selectedAddressId && response.data.data.length > 0) {
+          const newAddress = response.data.data[response.data.data.length - 1];
+          setSelectedAddressId(newAddress.id);
         }
       }
 
@@ -1196,14 +1142,66 @@ const CustomerDataCheckout = () => {
           }]
         };
 
-        // Use guest-store endpoint (public, no auth required)
-        const response = await api.post('/customers/guest-store', newCustomerData);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]');
 
-        if (response.data.status !== 'success' || !response.data.data) {
-          throw new Error(response.data.message || 'Gagal membuat customer baru');
+        // Get auth token from localStorage or session
+        const authToken = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+
+        const response = await fetch('/api/customers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            ...(csrfToken && { 'X-CSRF-TOKEN': csrfToken.getAttribute('content') }),
+            ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+          },
+          body: JSON.stringify(newCustomerData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('API Error:', errorData);
+
+          // Handle validation errors (422)
+          if (response.status === 422 && errorData.errors) {
+            const validationErrors = {};
+            Object.keys(errorData.errors).forEach(key => {
+              // Convert backend field names to frontend field names
+              if (key.startsWith('addresses.0.')) {
+                const fieldName = key.replace('addresses.0.', '');
+                if (fieldName === 'recipient_name') validationErrors.recipient_name = errorData.errors[key][0];
+                else if (fieldName === 'recipient_phone') validationErrors.recipient_phone = errorData.errors[key][0];
+                else validationErrors[fieldName] = errorData.errors[key][0];
+              } else {
+                validationErrors[key] = errorData.errors[key][0];
+              }
+            });
+
+            setErrors(validationErrors);
+
+            const phoneError = validationErrors.phone;
+            Swal.fire({
+              icon: 'error',
+              title: 'Data Tidak Lengkap',
+              text: 'Mohon lengkapi semua field yang diperlukan',
+              title: phoneError ? 'Nomor Telepon Sudah Terdaftar' : 'Data Tidak Lengkap',
+              text: phoneError || 'Mohon lengkapi semua field yang diperlukan',
+              confirmButtonColor: '#3b82f6'
+            });
+            return;
+          }
+
+          throw new Error(`Gagal membuat customer baru: ${errorData.message || response.statusText}`);
         }
 
-        const createdCustomer = response.data.data;
+        const result = await response.json();
+        console.log('API Response:', result);
+
+        if (!result.data) {
+          throw new Error('Response data is missing');
+        }
+
+        const createdCustomer = result.data;
 
         if (!createdCustomer.addresses || createdCustomer.addresses.length === 0) {
           throw new Error('No addresses found in created customer');
@@ -1264,37 +1262,11 @@ const CustomerDataCheckout = () => {
         throw new Error('Gagal menyimpan data ke session');
       }
     } catch (error) {
-      let displayMessage = 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.';
-      if (error?.response?.data) {
-        if (typeof error.response.data.message === 'string' && error.response.data.message.trim()) {
-          displayMessage = error.response.data.message;
-        }
-        const apiErrors = error.response.data.errors;
-        if (apiErrors) {
-          if (Array.isArray(apiErrors)) {
-            const specific = apiErrors.find(e => e.message);
-            if (specific && specific.message) {
-              displayMessage = specific.message;
-            }
-          } else if (apiErrors.phone && Array.isArray(apiErrors.phone) && apiErrors.phone[0]) {
-            displayMessage = apiErrors.phone[0];
-          } else {
-            const first = Object.values(apiErrors)[0];
-            if (Array.isArray(first) && first[0]) {
-              displayMessage = first[0];
-            }
-          }
-        }
-      } else if (error && typeof error.message === 'string' && error.message.trim()) {
-        displayMessage = error.message;
-      }
-      if (/nomor hp|nomor telepon/i.test(displayMessage) && /terdaftar/i.test(displayMessage)) {
-        displayMessage = 'Nomor HP sudah terdaftar, gunakan nomor lain atau pilih customer yang ada';
-      }
+      console.error('Error in handleContinue:', error);
       Swal.fire({
         icon: 'error',
         title: 'Terjadi Kesalahan',
-        text: displayMessage,
+        text: error.message || 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.',
         confirmButtonColor: '#3b82f6'
       });
       setLoading(false);
@@ -1494,8 +1466,8 @@ const CustomerDataCheckout = () => {
                                 >
                                   <div className="flex items-center gap-2">
                                     <span className={`px-2 py-1 text-xs rounded ${location.type === 'Kecamatan'
-                                        ? 'bg-blue-100 text-blue-800'
-                                        : 'bg-green-100 text-green-800'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-green-100 text-green-800'
                                       }`}>
                                       {location.type}
                                     </span>
@@ -1634,7 +1606,7 @@ const CustomerDataCheckout = () => {
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className={`w-full px-3 py-2 pl-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.customer ? 'border-red-500' : 'border-gray-300'
                             }`}
-                          placeholder="Ketik email atau nomor HP Anda..."
+                          placeholder="Ketik nama atau nomor telepon customer..."
                         />
                         <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                         {searchLoading && (
@@ -1724,8 +1696,8 @@ const CustomerDataCheckout = () => {
                               <label
                                 key={address.id}
                                 className={`block p-3 border rounded-lg cursor-pointer transition-colors ${selectedAddressId == address.id
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-300 hover:border-gray-400'
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-300 hover:border-gray-400'
                                   }`}
                               >
                                 <input
@@ -1778,8 +1750,8 @@ const CustomerDataCheckout = () => {
                                     </p>
                                   </div>
                                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedAddressId == address.id
-                                      ? 'border-blue-500 bg-blue-500'
-                                      : 'border-gray-300'
+                                    ? 'border-blue-500 bg-blue-500'
+                                    : 'border-gray-300'
                                     }`}>
                                     {selectedAddressId == address.id && (
                                       <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -1901,8 +1873,8 @@ const CustomerDataCheckout = () => {
                     setPhoneVerificationError('');
                   }}
                   className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${verificationMethod === 'phone'
-                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
-                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                    : 'border-gray-300 text-gray-700 hover:border-gray-400'
                     }`}
                 >
                   <Phone className="w-4 h-4 inline-block mr-2" />
@@ -1915,8 +1887,8 @@ const CustomerDataCheckout = () => {
                     setPhoneVerificationError('');
                   }}
                   className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${verificationMethod === 'email'
-                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
-                      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                    : 'border-gray-300 text-gray-700 hover:border-gray-400'
                     }`}
                   disabled={!pendingCustomer?.email}
                 >
@@ -2073,10 +2045,10 @@ const CustomerDataCheckout = () => {
                     value={modalLocationQuery}
                     onChange={handleModalLocationSearch}
                     className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${addressFormErrors.city || addressFormErrors.district
-                        ? 'border-red-500'
-                        : (newAddressData.district && newAddressData.city)
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-300'
+                      ? 'border-red-500'
+                      : (newAddressData.district && newAddressData.city)
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-gray-300'
                       }`}
                     placeholder="Ketik nama kecamatan..."
                     autoComplete="off"
@@ -2108,8 +2080,8 @@ const CustomerDataCheckout = () => {
                       >
                         <div className="flex items-center gap-2">
                           <span className={`px-2 py-1 text-xs rounded ${location.type === 'Kecamatan'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-green-100 text-green-800'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-green-100 text-green-800'
                             }`}>
                             {location.type}
                           </span>

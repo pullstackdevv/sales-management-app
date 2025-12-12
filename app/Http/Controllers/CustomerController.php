@@ -24,9 +24,9 @@ class CustomerController extends Controller
         //             ->orWhere('phone', 'like', "%{$search}%")
         //             ->orWhere('email', 'like', "%{$search}%");
         //     })
-            $customers = Customer::with(['addresses'])
+        $customers = Customer::with(['addresses'])
             ->withCount(['addresses'])
-            ->when($request->search, function($query, $search) {
+            ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
@@ -128,7 +128,7 @@ class CustomerController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'Server Error: ' . $e->getMessage(),
@@ -143,7 +143,7 @@ class CustomerController extends Controller
             'status' => 'success',
             'data' => $customer->load([
                 'addresses',
-                'orders' => function($q) {
+                'orders' => function ($q) {
                     $q->with(['items', 'payments', 'shipping'])
                         ->latest();
                 }
@@ -209,7 +209,7 @@ class CustomerController extends Controller
             if (isset($validated['addresses']) && !empty($validated['addresses'])) {
                 // Delete existing addresses
                 $customer->addresses()->delete();
-                
+
                 // Create new addresses
                 foreach ($validated['addresses'] as $index => $addressData) {
                     $customer->addresses()->create([
@@ -255,14 +255,18 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        // Allow soft delete even if customer has orders to preserve relations
+        // if ($customer->orders()->exists()) {
+        //     throw ValidationException::withMessages([
+        //         'customer' => ['Cannot delete customer that has orders.']
+        //     ]);
+        // }
 
         try {
             DB::beginTransaction();
 
-            // Soft delete all addresses to keep order relations intact
+            // Delete all addresses
             $customer->addresses()->delete();
-            
+
             // Delete the customer
             $customer->update(['deleted_by' => Auth::id()]);
             $customer->delete();
@@ -336,7 +340,7 @@ class CustomerController extends Controller
 
             // Find the address
             $address = $customer->addresses()->findOrFail($addressId);
-            
+
             // Check if this is the only address
             $addressCount = $customer->addresses()->count();
             if ($addressCount <= 1) {
@@ -351,7 +355,7 @@ class CustomerController extends Controller
                 $newDefaultAddress = $customer->addresses()
                     ->where('id', '!=', $addressId)
                     ->first();
-                
+
                 if ($newDefaultAddress) {
                     $newDefaultAddress->update(['is_default' => true]);
                 }
@@ -367,10 +371,9 @@ class CustomerController extends Controller
                 'message' => 'Alamat berhasil dihapus',
                 'data' => $customer->addresses()->orderBy('is_default', 'desc')->orderBy('created_at', 'asc')->get()
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
                 return response()->json([
                     'status' => 'error',
@@ -381,312 +384,6 @@ class CustomerController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan saat menghapus alamat'
-            ], 500);
-        }
-    }
-
-    /**
-     * Guest lookup - find customer by email or phone (for checkout)
-     * Only returns the customer's own data, not all customers
-     */
-    public function guestLookup(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'email' => 'required_without:phone|nullable|email',
-            'phone' => 'required_without:email|nullable|string',
-        ]);
-
-        $query = Customer::with(['addresses']);
-
-        if (!empty($validated['email']) && !empty($validated['phone'])) {
-            // Both provided - must match both
-            $query->where('email', $validated['email'])
-                  ->where('phone', $validated['phone']);
-        } elseif (!empty($validated['email'])) {
-            $query->where('email', $validated['email']);
-        } elseif (!empty($validated['phone'])) {
-            $query->where('phone', $validated['phone']);
-        }
-
-        $customer = $query->first();
-
-        if (!$customer) {
-            return response()->json([
-                'status' => 'success',
-                'data' => null,
-                'message' => 'Customer not found'
-            ]);
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $customer
-        ]);
-    }
-
-    /**
-     * Guest store - create new customer (for checkout)
-     * Public endpoint for guest registration during checkout
-     */
-    public function guestStore(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'nullable|email|max:255',
-            'phone' => 'required|string|max:20',
-            'category' => 'nullable|string|max:50',
-            'line_id' => 'nullable|string|max:100',
-            'other_contact' => 'nullable|string|max:255',
-            'addresses' => 'nullable|array',
-            'addresses.*.label' => 'required_with:addresses|string|max:50',
-            'addresses.*.recipient_name' => 'required_with:addresses|string|max:255',
-            'addresses.*.recipient_phone' => 'required_with:addresses|string|max:20',
-            'addresses.*.address_detail' => 'required_with:addresses|string',
-            'addresses.*.city' => 'required_with:addresses|string|max:100',
-            'addresses.*.province' => 'required_with:addresses|string|max:100',
-            'addresses.*.postal_code' => 'nullable|string|max:10',
-            'addresses.*.district' => 'nullable|string|max:100',
-            'addresses.*.is_default' => 'nullable|boolean',
-        ]);
-
-        try {
-            DB::beginTransaction();
-
-            // Check if customer already exists
-            $existingCustomer = Customer::where('phone', $validated['phone'])
-                ->when(!empty($validated['email']), function ($query) use ($validated) {
-                    $query->orWhere('email', $validated['email']);
-                })
-                ->first();
-
-            if ($existingCustomer) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Customer dengan email atau nomor HP ini sudah terdaftar'
-                ], 422);
-            }
-
-            $customer = Customer::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'] ?? null,
-                'phone' => $validated['phone'],
-                'category' => $validated['category'] ?? 'Pelanggan',
-                'line_id' => $validated['line_id'] ?? null,
-                'other_contact' => $validated['other_contact'] ?? null,
-                'is_active' => true,
-            ]);
-
-            // Create addresses if provided
-            if (!empty($validated['addresses'])) {
-                foreach ($validated['addresses'] as $index => $addressData) {
-                    $customer->addresses()->create([
-                        'label' => $addressData['label'],
-                        'recipient_name' => $addressData['recipient_name'],
-                        'phone' => $addressData['recipient_phone'],
-                        'address_detail' => $addressData['address_detail'],
-                        'city' => $addressData['city'],
-                        'province' => $addressData['province'],
-                        'postal_code' => $addressData['postal_code'] ?? null,
-                        'district' => $addressData['district'] ?? null,
-                        'is_default' => $index === 0,
-                    ]);
-                }
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $customer->load('addresses'),
-                'message' => 'Customer berhasil dibuat'
-            ], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Gagal membuat customer: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Guest update - update customer's own data (for checkout)
-     * Validates ownership via email/phone before allowing update
-     */
-    public function guestUpdate(Request $request, $customerId): JsonResponse
-    {
-        $validated = $request->validate([
-            'verify_email' => 'required_without:verify_phone|nullable|email',
-            'verify_phone' => 'required_without:verify_email|nullable|string',
-            'name' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:20',
-            'addresses' => 'nullable|array',
-            'addresses.*.id' => 'nullable|integer',
-            'addresses.*.label' => 'required_with:addresses|string|max:50',
-            'addresses.*.recipient_name' => 'required_with:addresses|string|max:255',
-            'addresses.*.recipient_phone' => 'required_with:addresses|string|max:20',
-            'addresses.*.address_detail' => 'required_with:addresses|string',
-            'addresses.*.city' => 'required_with:addresses|string|max:100',
-            'addresses.*.province' => 'required_with:addresses|string|max:100',
-            'addresses.*.postal_code' => 'nullable|string|max:10',
-            'addresses.*.district' => 'nullable|string|max:100',
-            'addresses.*.is_default' => 'nullable|boolean',
-        ]);
-
-        try {
-            // Find customer and verify ownership
-            $customer = Customer::find($customerId);
-            
-            if (!$customer) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Customer tidak ditemukan'
-                ], 404);
-            }
-
-            // Verify ownership
-            $isOwner = false;
-            if (!empty($validated['verify_email']) && $customer->email === $validated['verify_email']) {
-                $isOwner = true;
-            }
-            if (!empty($validated['verify_phone'])) {
-                $normalizedCustomerPhone = preg_replace('/[^0-9]/', '', $customer->phone);
-                $normalizedVerifyPhone = preg_replace('/[^0-9]/', '', $validated['verify_phone']);
-                if ($normalizedCustomerPhone === $normalizedVerifyPhone) {
-                    $isOwner = true;
-                }
-            }
-
-            if (!$isOwner) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Verifikasi gagal - email atau nomor HP tidak sesuai'
-                ], 403);
-            }
-
-            // Update customer basic info if provided
-            $updateData = array_filter([
-                'name' => $validated['name'] ?? null,
-                'email' => $validated['email'] ?? null,
-                'phone' => $validated['phone'] ?? null,
-            ], fn($v) => $v !== null);
-
-            if (!empty($updateData)) {
-                $customer->update($updateData);
-            }
-
-            // Update addresses if provided
-            if (isset($validated['addresses'])) {
-                foreach ($validated['addresses'] as $addressData) {
-                    if (!empty($addressData['id'])) {
-                        // Update existing address
-                        $address = $customer->addresses()->find($addressData['id']);
-                        if ($address) {
-                            $address->update([
-                                'label' => $addressData['label'],
-                                'recipient_name' => $addressData['recipient_name'],
-                                'recipient_phone' => $addressData['recipient_phone'],
-                                'address_detail' => $addressData['address_detail'],
-                                'city' => $addressData['city'],
-                                'province' => $addressData['province'],
-                                'postal_code' => $addressData['postal_code'] ?? null,
-                                'district' => $addressData['district'] ?? null,
-                                'is_default' => $addressData['is_default'] ?? false,
-                            ]);
-                        }
-                    } else {
-                        // Create new address
-                        $customer->addresses()->create([
-                            'label' => $addressData['label'],
-                            'recipient_name' => $addressData['recipient_name'],
-                            'recipient_phone' => $addressData['recipient_phone'],
-                            'address_detail' => $addressData['address_detail'],
-                            'city' => $addressData['city'],
-                            'province' => $addressData['province'],
-                            'postal_code' => $addressData['postal_code'] ?? null,
-                            'district' => $addressData['district'] ?? null,
-                            'is_default' => $addressData['is_default'] ?? false,
-                        ]);
-                    }
-                }
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $customer->fresh()->load('addresses'),
-                'message' => 'Customer berhasil diupdate'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Gagal update customer: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Guest delete address - delete customer's own address (for checkout)
-     * Validates ownership via email/phone before allowing delete
-     */
-    public function guestDeleteAddress(Request $request, $customerId, $addressId): JsonResponse
-    {
-        $validated = $request->validate([
-            'verify_email' => 'required_without:verify_phone|nullable|email',
-            'verify_phone' => 'required_without:verify_email|nullable|string',
-        ]);
-
-        try {
-            $customer = Customer::find($customerId);
-            
-            if (!$customer) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Customer tidak ditemukan'
-                ], 404);
-            }
-
-            // Verify ownership
-            $isOwner = false;
-            if (!empty($validated['verify_email']) && $customer->email === $validated['verify_email']) {
-                $isOwner = true;
-            }
-            if (!empty($validated['verify_phone'])) {
-                $normalizedCustomerPhone = preg_replace('/[^0-9]/', '', $customer->phone);
-                $normalizedVerifyPhone = preg_replace('/[^0-9]/', '', $validated['verify_phone']);
-                if ($normalizedCustomerPhone === $normalizedVerifyPhone) {
-                    $isOwner = true;
-                }
-            }
-
-            if (!$isOwner) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Verifikasi gagal - email atau nomor HP tidak sesuai'
-                ], 403);
-            }
-
-            // Find and delete the address
-            $address = $customer->addresses()->find($addressId);
-            
-            if (!$address) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Alamat tidak ditemukan'
-                ], 404);
-            }
-
-            $address->delete();
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $customer->fresh()->addresses,
-                'message' => 'Alamat berhasil dihapus'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Gagal menghapus alamat: ' . $e->getMessage()
             ], 500);
         }
     }

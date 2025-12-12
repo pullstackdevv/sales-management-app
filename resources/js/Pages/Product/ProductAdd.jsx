@@ -163,6 +163,7 @@ export default function ProductAdd() {
         formData.append(`variants[${index}][sku]`, variant.sku);
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price);
+        formData.append(`variants[${index}][discount_price]`, variant.discount_price || '');
         const weightKg = variant.weight ? Number(variant.weight) / 1000 : 0;
         formData.append(`variants[${index}][weight]`, weightKg);
         const normalizedStock = (variant.stock === '' || variant.stock === null || variant.stock === undefined)

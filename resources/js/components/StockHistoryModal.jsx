@@ -185,7 +185,7 @@ export default function StockHistoryModal({
 
   const computeRowsWithRunning = (list) => {
     let running = initialRunning || 0;
-    return list.map((m) => {
+    const rows = list.map((m) => {
       const isAdj = m.type === 'adjustment';
       let stockIn = 0;
       let stockOut = 0;
@@ -214,6 +214,17 @@ export default function StockHistoryModal({
         running,
       };
     });
+
+    const isLastPage = pagination.current_page >= pagination.last_page;
+    const currentStock = Number(variant?.stock ?? 0);
+    if (rows.length > 0 && isLastPage) {
+      const finalRunning = rows[rows.length - 1].running;
+      const delta = currentStock - finalRunning;
+      if (delta !== 0) {
+        return rows.map(r => ({ ...r, running: r.running + delta }));
+      }
+    }
+    return rows;
   };
 
   const computeFinalRunning = (list) => {
@@ -312,21 +323,32 @@ export default function StockHistoryModal({
                   <tr className="text-left border-b">
                     <th className="px-3 py-2">Tanggal</th>
                     <th className="px-3 py-2">Deskripsi</th>
+                    <th className="px-3 py-2">Admin</th>
                     <th className="px-3 py-2">Stock In</th>
                     <th className="px-3 py-2">Stock Out</th>
                     <th className="px-3 py-2">Running Stock</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {computeRowsWithRunning(movements).map((m) => (
-                    <tr key={m.id} className="border-b hover:bg-gray-50">
-                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(m.created_at)}</td>
-                      <td className="px-3 py-2">{getDescription(m)}</td>
-                      <td className="px-3 py-2 text-green-600 font-semibold">{m.stockIn || ''}</td>
-                      <td className="px-3 py-2 text-red-600 font-semibold">{m.stockOut || ''}</td>
-                      <td className="px-3 py-2 font-semibold">{m.running}</td>
-                    </tr>
-                  ))}
+                  {computeRowsWithRunning(movements).map((m) => {
+                    const adminName = (
+                      m?.order?.processed_by?.name ||
+                      m?.order?.processedBy?.name ||
+                      m?.created_by?.name ||
+                      m?.createdBy?.name ||
+                      ''
+                    );
+                    return (
+                      <tr key={m.id} className="border-b hover:bg-gray-50">
+                        <td className="px-3 py-2 whitespace-nowrap">{formatDate(m.created_at)}</td>
+                        <td className="px-3 py-2">{getDescription(m)}</td>
+                        <td className="px-3 py-2">{adminName || '-'}</td>
+                        <td className="px-3 py-2 text-green-600 font-semibold">{m.stockIn || ''}</td>
+                        <td className="px-3 py-2 text-red-600 font-semibold">{m.stockOut || ''}</td>
+                        <td className="px-3 py-2 font-semibold">{m.running}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

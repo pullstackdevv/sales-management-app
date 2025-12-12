@@ -32,6 +32,7 @@ class UpdateRequest extends FormRequest
             'district' => 'sometimes|required|string|max:100',
             'postal_code' => 'sometimes|required|string|max:10',
             'is_default' => 'sometimes|boolean',
+            'is_dropship' => 'sometimes|boolean',
         ];
     }
 }

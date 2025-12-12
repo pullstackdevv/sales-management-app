@@ -38,6 +38,7 @@ use App\Http\Controllers\GeneralSettingController;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\BannerController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\TagController;
 
 
 
@@ -88,6 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);
         Route::get('sales', [ReportController::class, 'sales']);
+        Route::get('sales/daily', [ReportController::class, 'salesDaily']);
         Route::get('profit', [ReportController::class, 'profit']);
         Route::get('bank-transactions', [ReportController::class, 'bankTransactions']);
         Route::get('courier-data', [ReportController::class, 'courierData']);
@@ -115,7 +117,8 @@ Route::post('customers/guest-lookup', [CustomerController::class, 'guestLookup']
 Route::post('customers/guest-store', [CustomerController::class, 'guestStore']);
 Route::put('customers/guest-update/{customer}', [CustomerController::class, 'guestUpdate']);
 Route::post('customers/{customer}/guest-delete-address/{address}', [CustomerController::class, 'guestDeleteAddress']);
-
+// Tags routes
+Route::apiResource('tags', TagController::class);
 Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);
 
 // Other authenticated routes
@@ -235,6 +238,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
     });
+
+    // Product tags sync
+    Route::post('products/{product}/tags/sync', [ProductController::class, 'syncTags']);
 });
 
 // Public voucher routes (for checkout)

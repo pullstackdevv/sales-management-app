@@ -27,6 +27,8 @@ export default function ProductEdit() {
   const [productImagePreview, setProductImagePreview] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [tags, setTags] = useState([]);
+  const [loadingTags, setLoadingTags] = useState(true);
 
   const canViewBasePrice = isOwner;
 
@@ -61,6 +63,7 @@ export default function ProductEdit() {
       setProductId(id);
       fetchProduct(id);
       fetchCategories();
+      fetchTags();
     } else {
       Swal.fire({
         icon: 'error',
@@ -85,6 +88,19 @@ export default function ProductEdit() {
     }
   };
 
+  // Fetch tags
+  const fetchTags = async () => {
+    try {
+      setLoadingTags(true);
+      const response = await api.get('/tags?per_page=100&is_active=1');
+      setTags(response.data.data.data || []);
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
   // Fetch product data
   const fetchProduct = async (id) => {
     try {
@@ -95,6 +111,7 @@ export default function ProductEdit() {
       setProduct({
         name: productData?.name || "",
         category_ids: Array.isArray(productData?.categories) ? productData.categories.map(c => c.id) : [],
+        tag_ids: Array.isArray(productData?.tags) ? productData.tags.map(t => t.id) : [],
         description: productData?.description || "",
         // keep existing image path so it can be previewed
         image: productData?.image || "",
@@ -265,6 +282,11 @@ export default function ProductEdit() {
           formData.append(`category_ids[${idx}]`, cid);
         });
       }
+      if (Array.isArray(product.tag_ids)) {
+        product.tag_ids.forEach((tid, idx) => {
+          formData.append(`tag_ids[${idx}]`, tid);
+        });
+      }
       formData.append('is_active', product.is_active ? '1' : '0');
       formData.append('is_storefront', product.is_storefront ? '1' : '0');
       
@@ -408,9 +430,38 @@ export default function ProductEdit() {
                           </label>
                         ))}
                       </div>
+                  </div>
+                  {errors.category_ids && (
+                    <p className="text-red-500 text-xs mt-1">{errors.category_ids[0]}</p>
+                  )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Tag</label>
+                    <div className={`border rounded-md p-3 ${errors.tag_ids ? 'border-red-500' : 'border-gray-300'}`}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {tags.map((tag) => (
+                          <label key={tag.id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              value={tag.id}
+                              checked={Array.isArray(product.tag_ids) && product.tag_ids.includes(tag.id)}
+                              onChange={(e) => {
+                                const id = parseInt(e.target.value);
+                                const checked = e.target.checked;
+                                const current = Array.isArray(product.tag_ids) ? product.tag_ids : [];
+                                const next = checked ? [...current, id] : current.filter((x) => x !== id);
+                                setProduct({ ...product, tag_ids: next });
+                              }}
+                              disabled={loadingTags}
+                            />
+                            <span>{tag.name}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                    {errors.category_ids && (
-                      <p className="text-red-500 text-xs mt-1">{errors.category_ids[0]}</p>
+                    {errors.tag_ids && (
+                      <p className="text-red-500 text-xs mt-1">{errors.tag_ids[0]}</p>
                     )}
                   </div>
 

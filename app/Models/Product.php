@@ -53,6 +53,11 @@ class Product extends Model
         return $this->belongsToMany(ProductCategory::class, 'product_product_category');
     }
 
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class, 'product_tag');
+    }
+
     // Helper method to get the minimum selling price from variants
     public function getMinPriceAttribute()
     {

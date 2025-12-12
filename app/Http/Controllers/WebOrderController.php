@@ -59,8 +59,8 @@ class WebOrderController extends Controller
                 'courier_rate_id' => 'nullable|exists:courier_rates,id',
                 'service_type' => 'nullable|string|max:50',
                 
-                // Guest checkout fields (required if user not logged in)
-                'guest_email' => 'required_without:user_id|email',
+                // Guest checkout fields (email optional; phone required and used to reuse/create customer)
+                'guest_email' => 'nullable|email',
                 'guest_phone' => 'required_without:user_id|string|max:20',
                 'guest_name' => 'required_without:user_id|string|max:255',
                 
@@ -148,7 +148,7 @@ class WebOrderController extends Controller
                     }
                 } else {
                     $customer = Customer::firstOrCreate(
-                        ['email' => $request->guest_email],
+                        ['phone' => $request->guest_phone],
                         [
                             'name' => $request->guest_name,
                             'phone' => $request->guest_phone,

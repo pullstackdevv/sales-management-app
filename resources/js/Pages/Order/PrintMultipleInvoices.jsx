@@ -33,6 +33,28 @@ const PrintMultipleInvoices = () => {
         const promises = ids.map((id) => api.get(`/orders/${id}`));
         const responses = await Promise.all(promises);
 
+        let companyInfo = {
+          name: 'SALEPARFUM',
+          address: 'Jl. Contoh No. 123, Jakarta',
+          phone: '+62 21 1234567',
+          email: 'info@saleparfum.com'
+        };
+        try {
+          const originsResp = await api.get('/origin-settings');
+          const origins = originsResp.data?.data || originsResp.data || [];
+          const active = Array.isArray(origins) ? origins.find(o => o.is_active) : null;
+          if (active) {
+            companyInfo = {
+              name: active.store_name || companyInfo.name,
+              address: active.address || active.origin_address || companyInfo.address,
+              phone: active.phone || companyInfo.phone,
+              email: companyInfo.email
+            };
+          }
+        } catch (e) {
+          console.warn('Failed to fetch origin settings for multiple invoices, using defaults', e);
+        }
+
         const mapped = responses.map((res) => res.data.data).map((orderData) => {
           const totalWeight =
             orderData.items?.reduce((total, item) => {
@@ -59,6 +81,15 @@ const PrintMultipleInvoices = () => {
                 unit_price: item.price,
                 total_price: item.price * item.quantity,
               })) || [],
+            tax_amount: orderData.tax_amount || 0,
+            tax_rate: orderData.tax_rate || 0,
+            discount_amount: orderData.discount_amount || 0,
+            voucher_id: orderData.voucher_id || null,
+            voucher: orderData.voucher ? {
+              code: orderData.voucher.code,
+              type: orderData.voucher.type,
+              value: orderData.voucher.value
+            } : null,
             total_amount: orderData.total_price,
             total_weight: totalWeight,
             courier_name: orderData.shipping?.courier?.name || null,
@@ -68,16 +99,19 @@ const PrintMultipleInvoices = () => {
               null,
             shipping_address: orderData.address
               ? {
-                  recipient_name: orderData.address.recipient_name,
-                  phone: orderData.address.phone,
-                  address_detail: orderData.address.address_detail,
-                  city: orderData.address.city,
-                  province: orderData.address.province,
-                  district: orderData.address.district,
-                  postal_code: orderData.address.postal_code,
-                  is_dropship: orderData.address.is_dropship,
-                }
+                recipient_name: orderData.address.recipient_name,
+                phone: orderData.address.phone,
+                address_detail: orderData.address.address_detail,
+                city: orderData.address.city,
+                province: orderData.address.province,
+                district: orderData.address.district,
+                postal_code: orderData.address.postal_code,
+                is_dropship: orderData.address.is_dropship,
+              }
               : null,
+            company: companyInfo
+            ,
+            notes: orderData.notes
           };
         });
 
@@ -215,9 +249,20 @@ const PrintMultipleInvoices = () => {
                 </div>
 
                 <div className="border-b-2 border-black p-4">
+                  <div className="font-bold">No Pesanan: {inv.invoice_number || inv.id}</div>
+                </div>
+
+                <div className="border-b-2 border-black p-4">
                   <div className="font-bold">
-                    Kepada: {inv.shipping_address?.recipient_name || 'Customer'} (
-                    {inv.shipping_address?.phone || '-'})
+                    Pengirim: {inv.shipping_address?.is_dropship
+                      ? `${inv.customer?.name || 'Customer'} - ${inv.customer?.phone || '083867000077'}`
+                      : `${inv.company?.name || 'SALEPARFUM'} - ${inv.company?.phone || '083867000077'}`}
+                  </div>
+                </div>
+
+                <div className="border-b-2 border-black p-4">
+                  <div className="font-bold">
+                    Kepada: {inv.shipping_address?.recipient_name || 'Customer'} ({inv.shipping_address?.phone || '-'})
                   </div>
                 </div>
 
@@ -226,13 +271,9 @@ const PrintMultipleInvoices = () => {
                   <div className="text-sm leading-relaxed">
                     {inv.shipping_address ? (
                       <>
-                        {inv.shipping_address.address_detail}
-                        <br />
-                        {inv.shipping_address.city}, {inv.shipping_address.province}{' '}
-                        {inv.shipping_address.postal_code}
-                        <br />
-                        {inv.shipping_address.district && `${inv.shipping_address.district}`}
-                        <br />
+                        {inv.shipping_address.address_detail}<br />
+                        {inv.shipping_address.city}, {inv.shipping_address.province} {inv.shipping_address.postal_code}<br />
+                        {inv.shipping_address.district && `${inv.shipping_address.district}`}<br />
                         {inv.shipping_address.phone && `${inv.shipping_address.phone}`}
                       </>
                     ) : (
@@ -246,23 +287,44 @@ const PrintMultipleInvoices = () => {
                   <div className="text-sm">
                     {inv.items?.map((item, idx) => (
                       <div key={idx} className="mb-1">
-                        • {item.product_name} {item.description && `- ${item.description}`} (Qty:{' '}
-                        {item.quantity})
+                        • {item.product_name} {item.description && `- ${item.description}`} (Qty: {item.quantity})
                       </div>
                     ))}
                   </div>
                 </div>
 
+                {(inv.voucher || (inv.discount_amount || 0) > 0) && (
+                  <div className="border-b-2 border-black p-4">
+                    <div className="font-bold mb-2">Catatan Voucher:</div>
+                    <div className="text-sm">
+                      {inv.voucher
+                        ? `Voucher ${inv.voucher.code} • ${inv.voucher.type.toUpperCase()} • Nilai: ${Number(inv.voucher.value).toLocaleString('id-ID')}`
+                        : `Diskon: Rp ${Number(Math.round(inv.discount_amount || 0)).toLocaleString('id-ID')}`}
+                    </div>
+                  </div>
+                )}
+
                 <div className="p-4">
                   <div className="font-bold text-lg">
-                    Total: Rp
-                    {Number(Math.round(inv.total_amount || 0)).toLocaleString('id-ID')}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Order #{inv.invoice_number} • {new Date(inv.created_at).toLocaleString('id-ID')}
+                    Total: Rp{Number(Math.round(inv.total_amount || 0)).toLocaleString('id-ID')}
                   </div>
                 </div>
+
+                {inv.notes && (
+                  <div className="p-4">
+                    <div className="font-bold mb-2">Catatan:</div>
+                    <div className="bg-gray-50 p-4 rounded">
+                      <p className="text-gray-700">{inv.notes}</p>
+                    </div>
+                  </div>
+                )}
               </div>
+               <div className="pt-6 mt-4 ">
+                  <div className="text-center text-gray-600">
+                    <p>Terima kasih atas kepercayaan Anda!</p>
+                    <p className="text-sm mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                  </div>
+                </div>
             </div>
           ))}
         </div>

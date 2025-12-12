@@ -29,6 +29,14 @@ class ProductResource extends JsonResource
                     ];
                 });
             }),
+            'tags' => $this->whenLoaded('tags', function() {
+                return $this->tags->map(function($t) {
+                    return [
+                        'id' => $t->id,
+                        'name' => $t->name,
+                    ];
+                });
+            }),
             'description' => $this->description,
             'image' => $this->image,
             'is_active' => $this->is_active,
@@ -47,6 +55,9 @@ class ProductResource extends JsonResource
             
             // Variants
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
+            'tag_ids' => $this->whenLoaded('tags', function() {
+                return $this->tags->pluck('id');
+            }),
             
             // Metadata
             'created_at' => $this->created_at,

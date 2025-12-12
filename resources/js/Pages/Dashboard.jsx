@@ -130,7 +130,7 @@ export default function Dashboard() {
 
                 {/* Summary Cards */}
                 {!loading && !error && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         {dashboardData.summaryCards && dashboardData.summaryCards.length > 0 ? (
                             dashboardData.summaryCards.map((item, i) => (
                                 <div
@@ -157,16 +157,12 @@ export default function Dashboard() {
                 )}
 
                 {/* Chart */}
-                {!loading && !error && (
+                {!loading && !error && (dashboardData.salesChart?.categories?.length || 0) > 0 && (
                     <div className="bg-white rounded-lg shadow p-6">
-                        {dashboardData.salesChart && (dashboardData.salesChart.categories?.length || 0) > 0 ? (
-                            <HighchartsReact
-                                highcharts={Highcharts}
-                                options={salesChartOptions}
-                            />
-                        ) : (
-                            <div className="text-center text-gray-600 py-8">Grafik belum memiliki data.</div>
-                        )}
+                        <HighchartsReact
+                            highcharts={Highcharts}
+                            options={salesChartOptions}
+                        />
                     </div>
                 )}
 
@@ -178,7 +174,7 @@ export default function Dashboard() {
                                     <h2 className="text-lg font-semibold">Order Hari Ini</h2>
                                     {dashboardData.activity.todayOrders?.summary && (
                                         <div className="text-sm text-gray-600">
-                                            Total: {formatNumber(dashboardData.activity.todayOrders.summary.total)} • Pendapatan: Rp {formatNumber(dashboardData.activity.todayOrders.summary.total_revenue)}
+                                            Total: {formatNumber(dashboardData.activity.todayOrders.summary.total)}{dashboardData.activity.todayOrders.summary.total_revenue != null ? ` • Pendapatan: Rp ${formatNumber(dashboardData.activity.todayOrders.summary.total_revenue)}` : ''}
                                         </div>
                                     )}
                                 </div>
@@ -190,7 +186,9 @@ export default function Dashboard() {
                                             <th className="px-6 py-3 text-left">Order</th>
                                             <th className="px-6 py-3 text-left">Customer</th>
                                             <th className="px-6 py-3 text-left">Status</th>
-                                            <th className="px-6 py-3 text-left">Total</th>
+                                            {dashboardData.isOwner && (
+                                                <th className="px-6 py-3 text-left">Total</th>
+                                            )}
                                             <th className="px-6 py-3 text-left">Waktu</th>
                                         </tr>
                                     </thead>
@@ -205,13 +203,15 @@ export default function Dashboard() {
                                                             {o.status}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-3">Rp {formatNumber(o.total_price || 0)}</td>
+                                                    {dashboardData.isOwner && (
+                                                        <td className="px-6 py-3">Rp {formatNumber(o.total_price || 0)}</td>
+                                                    )}
                                                     <td className="px-6 py-3 text-gray-600">{new Date(o.created_at).toLocaleTimeString('id-ID')}</td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={5} className="px-6 py-6 text-center text-gray-600">Belum ada order hari ini.</td>
+                                                <td colSpan={dashboardData.isOwner ? 5 : 4} className="px-6 py-6 text-center text-gray-600">Belum ada order hari ini.</td>
                                             </tr>
                                         )}
                                     </tbody>

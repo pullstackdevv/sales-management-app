@@ -23,10 +23,15 @@ const Homepage = () => {
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
-        per_page: 1000, // Set high value to fetch all products
+        per_page: 200,
         total: 0,
     });
     const [bannerUrls, setBannerUrls] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [tagProducts, setTagProducts] = useState({});
+    const [tagLoading, setTagLoading] = useState(false);
+    const [selectedTag, setSelectedTag] = useState(null);
+    const [tagHasAnyProducts, setTagHasAnyProducts] = useState({});
     // Removed: addToCart integration on homepage cards
 
     // Derive categories from loaded products (fallback to string/slug if available)
@@ -61,6 +66,32 @@ const Homepage = () => {
         return Array.from(map.values());
     }, [products]);
 
+    const visibleTags = useMemo(() => {
+        const filtered = (Array.isArray(tags) ? tags : []).filter((t) => !!tagHasAnyProducts[t.id]);
+        const getOrderIndex = (name) => {
+            const n = (name || '').toLowerCase();
+            const compact = n.replace(/\s+/g, ' ').trim();
+            if (compact.includes('new arrival')) return 0;
+            if (compact.includes('best seller') || compact.includes('customer favorites')) return 1;
+            if (compact.includes('promo') || compact.includes('diskon')) return 2;
+            return 999;
+        };
+        return filtered.sort((a, b) => {
+            const pa = getOrderIndex(a.name);
+            const pb = getOrderIndex(b.name);
+            if (pa !== pb) return pa - pb;
+            return (a.name || '').localeCompare(b.name || '');
+        });
+    }, [tags, tagHasAnyProducts]);
+
+    const tagsToRender = useMemo(() => {
+        if (selectedTag) {
+            return (Array.isArray(tags) ? tags : [])
+                .filter((t) => t.id === selectedTag && !!tagHasAnyProducts[t.id]);
+        }
+        return (Array.isArray(tags) ? tags : []).filter((t) => !!tagHasAnyProducts[t.id]);
+    }, [tags, tagHasAnyProducts, selectedTag]);
+
     const fetchProducts = useCallback(async (page = 1) => {
         try {
             setLoading(true);
@@ -69,6 +100,7 @@ const Homepage = () => {
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
                 ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
                 sort: sortBy,
             };
 
@@ -88,7 +120,7 @@ const Homepage = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [selectedTag]);
 
     // Debounced search effect
     useEffect(() => {
@@ -177,11 +209,8 @@ const Homepage = () => {
         fetchData();
     }, [selectedCategory, sortBy]);
 
-    // Effect for pagination - Disabled when showing all products
+    // Effect for pagination - fetch on any current_page change
     useEffect(() => {
-        // Skip pagination effect when per_page is set to show all products
-        if (pagination.per_page >= 1000) return;
-
         const params = {
             page: pagination.current_page,
             per_page: pagination.per_page,
@@ -211,9 +240,7 @@ const Homepage = () => {
             }
         };
 
-        if (pagination.current_page > 1) {
-            fetchData();
-        }
+        fetchData();
     }, [pagination.current_page]);
 
     // Initial load
@@ -272,7 +299,121 @@ const Homepage = () => {
             }
         };
         loadSettings();
+        const loadTags = async () => {
+            try {
+                setTagLoading(true);
+                const res = await axios.get('/api/tags', { params: { per_page: 100, is_active: 1 } });
+                const list = res.data?.data?.data || [];
+                setTags(list);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setTagLoading(false);
+            }
+        };
+        loadTags();
     }, []);
+
+    useEffect(() => {
+        if (!Array.isArray(tags) || tags.length === 0) {
+            setTagProducts({});
+            setTagHasAnyProducts({});
+            return;
+        }
+        let cancelled = false;
+        const checkExistence = async () => {
+            try {
+                setTagLoading(true);
+                const baseParams = {
+                    page: 1,
+                    per_page: 1,
+                    search: searchQuery || undefined,
+                    ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                    sort: sortBy,
+                };
+                const results = {};
+                const ids = tags.map(t => t.id);
+                const limit = 5;
+                let idx = 0;
+                while (idx < ids.length) {
+                    const slice = ids.slice(idx, idx + limit);
+                    const promises = slice.map(async (id) => {
+                        const resp = await productsAPI.getProducts({ ...baseParams, tag_ids: [id] });
+                        const payload = resp?.data || {};
+                        const items = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.data?.data) ? payload.data.data : []);
+                        const filtered = items.filter((p) => matchesSelectedCategory(p));
+                        results[id] = filtered.length > 0;
+                    });
+                    await Promise.all(promises);
+                    idx += limit;
+                    if (cancelled) break;
+                }
+                if (!cancelled) setTagHasAnyProducts(results);
+            } catch (e) {
+                if (!cancelled) console.error(e);
+            } finally {
+                if (!cancelled) setTagLoading(false);
+            }
+        };
+        checkExistence();
+        return () => { cancelled = true; };
+    }, [tags, selectedCategory, searchQuery, sortBy]);
+
+    useEffect(() => {
+        if (!Array.isArray(tagsToRender) || tagsToRender.length === 0) {
+            return;
+        }
+        let cancelled = false;
+        const loadVisibleTags = async () => {
+            try {
+                const baseParams = {
+                    page: 1,
+                    per_page: 200,
+                    search: searchQuery || undefined,
+                    ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                    sort: sortBy,
+                };
+                const map = { ...tagProducts };
+                const limit = 3;
+                let idx = 0;
+                const vis = tagsToRender.map(t => t.id);
+                while (idx < vis.length) {
+                    const slice = vis.slice(idx, idx + limit);
+                    const promises = slice.map(async (id) => {
+                        if (Array.isArray(map[id]) && map[id].length > 0) return;
+                        const resp = await productsAPI.getProducts({ ...baseParams, tag_ids: [id] });
+                        const payload = resp?.data || {};
+                        const items = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.data?.data) ? payload.data.data : []);
+                        map[id] = items.filter((p) => matchesSelectedCategory(p));
+                    });
+                    await Promise.all(promises);
+                    idx += limit;
+                    if (cancelled) break;
+                }
+                if (!cancelled) setTagProducts(map);
+            } catch (e) {
+                if (!cancelled) console.error(e);
+            }
+        };
+        loadVisibleTags();
+        return () => { cancelled = true; };
+    }, [tagsToRender, selectedCategory, searchQuery, sortBy]);
+
+    const matchesSelectedCategory = useCallback((product) => {
+        if (selectedCategory === '' || selectedCategory == null) return true;
+        const catIds = Array.isArray(product.categories) ? product.categories.map((c) => c.id) : [];
+        const catNames = Array.isArray(product.categories) ? product.categories.map((c) => c.name) : [];
+        const primaryId = product.category_id ?? (product.product_category?.id ?? null);
+        const primaryName = product.category ?? (product.product_category?.name ?? null);
+        if (typeof selectedCategory === 'number') {
+            return catIds.includes(selectedCategory) || primaryId === selectedCategory;
+        }
+        return catNames.includes(selectedCategory) || primaryName === selectedCategory;
+    }, [selectedCategory]);
+
+    useEffect(() => {
+        setTagProducts({});
+    }, [selectedCategory, searchQuery]);
 
 
     // Robust price extraction function to handle various price field formats
@@ -353,36 +494,59 @@ const Homepage = () => {
         setPagination(prev => ({ ...prev, current_page: 1 }));
     };
 
+    const applyTagFilter = (tagId) => {
+        setSelectedTag(tagId ?? null);
+        setPagination(prev => ({ ...prev, current_page: 1 }));
+    };
+
+    const untaggedProducts = useMemo(() => {
+        if (!Array.isArray(products)) return [];
+        return products.filter((p) => !Array.isArray(p.tags) || p.tags.length === 0);
+    }, [products]);
+
     // Client-side sorting as fallback
     const sortedProducts = useMemo(() => {
         if (!products || products.length === 0) return [];
 
         const sorted = [...products];
+        const hasProductStock = (product) => {
+            if (Array.isArray(product.variants) && product.variants.length > 0) {
+                return product.variants.some(v => (v.stock ?? 0) > 0);
+            }
+            return ((product.stock ?? 0) > 0);
+        };
 
         switch (sortBy) {
             case 'name':
-                return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                break;
             case 'price_asc':
-                return sorted.sort((a, b) => {
+                sorted.sort((a, b) => {
                     const priceA = getProductPrice(a);
                     const priceB = getProductPrice(b);
                     return priceA - priceB;
                 });
+                break;
             case 'price_desc':
-                return sorted.sort((a, b) => {
+                sorted.sort((a, b) => {
                     const priceA = getProductPrice(a);
                     const priceB = getProductPrice(b);
                     return priceB - priceA;
                 });
+                break;
             case 'stock':
-                return sorted.sort((a, b) => {
+                sorted.sort((a, b) => {
                     const stockA = a.stock || 0;
                     const stockB = b.stock || 0;
                     return stockB - stockA;
                 });
+                break;
             default:
-                return sorted;
+                break;
         }
+        const inStock = sorted.filter(p => hasProductStock(p));
+        const outStock = sorted.filter(p => !hasProductStock(p));
+        return [...inStock, ...outStock];
     }, [products, sortBy]);
 
     const setCurrentPage = (page) => {
@@ -400,26 +564,28 @@ const Homepage = () => {
         let hasDiscount = false;
 
         product.variants.forEach(variant => {
-            const price = variant.discount_price || variant.price;
-            const originalPrice = variant.price;
+            const vPrice = typeof variant.price === 'string' ? parseFloat(variant.price) : variant.price;
+            const vDiscount = typeof variant.discount_price === 'string' ? parseFloat(variant.discount_price) : variant.discount_price;
 
-            if (price < minPrice) {
-                minPrice = price;
+            const effectivePrice = (vDiscount && vDiscount > 0 && vDiscount < vPrice) ? vDiscount : vPrice;
+
+            if (effectivePrice < minPrice) {
+                minPrice = effectivePrice;
             }
-            if (originalPrice < minOriginalPrice) {
-                minOriginalPrice = originalPrice;
+            if (vPrice < minOriginalPrice) {
+                minOriginalPrice = vPrice;
             }
-            if (variant.discount_price && variant.discount_price < variant.price) {
+            if (vDiscount && vDiscount > 0 && vDiscount < vPrice) {
                 hasDiscount = true;
             }
         });
 
-        if (minPrice === Infinity) return null;
+        if (!isFinite(minPrice)) return null;
 
         return {
             minPrice,
             minOriginalPrice,
-            hasDiscount
+            hasDiscount: hasDiscount || (isFinite(minOriginalPrice) && minPrice < minOriginalPrice)
         };
     }, []);
 
@@ -612,10 +778,10 @@ const Homepage = () => {
             )}
 
             {/* Search and Filters */}
-            <div className="bg-white border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div className="sticky top-14 sm:top-16 z-50 bg-white/95 backdrop-blur border-b">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-45 sm:py-4">
                     {/* Search Bar */}
-                    <div className="mb-6">
+                    <div className='mt-2 mb-4'>
                         <div className="max-w-lg mx-auto relative">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input
@@ -633,42 +799,44 @@ const Homepage = () => {
                             )}
                         </div>
                     </div>
+                </div>
+            </div>
+            {/* Categories Filter */}
+            {categories.length > 1 && (
+                <div className="bg-white pt-4">
+                    <div className="flex flex-nowrap overflow-x-auto sm:overflow-x-visible scroll-smooth snap-x snap-mandatory gap-2 sm:gap-3 sm:flex-wrap sm:justify-center px-4 max-w-[90vw] sm:max-w-none mx-auto overflow-hidden">
+                        <button
+                            onClick={() => handleCategoryChange('')}
+                            className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
+                                ? 'bg-gray-900 text-white border-gray-900'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                                }`}
+                        >
+                            Semua
+                        </button>
+                        {categories.slice(1).map((cat) => (
+                            <button
+                                key={cat.id}
+                                onClick={() => handleCategoryChange(cat.id)}
+                                className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
+                                    ? 'bg-gray-900 text-white border-gray-900'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                                    }`}
+                            >
+                                {cat.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
-                    {/* Categories Filter */}
-                    {categories.length > 1 && (
-                        <div className="mb-6">
-                            <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
-                                <button
-                                    onClick={() => handleCategoryChange('')}
-                                    className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
-                                            ? 'bg-gray-900 text-white border-gray-900'
-                                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
-                                        }`}
-                                >
-                                    Semua
-                                </button>
-                                {categories.slice(1).map((cat) => (
-                                    <button
-                                        key={cat.id}
-                                        onClick={() => handleCategoryChange(cat.id)}
-                                        className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
-                                                ? 'bg-gray-900 text-white border-gray-900'
-                                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
-                                            }`}
-                                    >
-                                        {cat.name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Filters and Controls */}
-                    <div className="bg-white rounded-lg border border-gray-100 p-4 sm:p-4">
-                        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                            {/* Sort */}
+            {/* Filters and Controls (non-sticky) */}
+            <div className="bg-white border-b border-gray-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="bg-white rounded-lg border border-gray-100 p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center">
                             <div className="flex items-center gap-3 w-full sm:w-auto">
-                                <label className="text-base sm:text-sm text-gray-600 whitespace-nowrap">Urutkan:</label>
+                                <label className="hidden sm:block text-base sm:text-sm text-gray-600 whitespace-nowrap">Urutkan:</label>
                                 <select
                                     value={sortBy}
                                     onChange={(e) => handleSortChange(e.target.value)}
@@ -681,13 +849,28 @@ const Homepage = () => {
                                 </select>
                             </div>
 
-                            {/* View Toggle */}
-                            <div className="flex border border-gray-300 rounded-md overflow-hidden">
+                            {visibleTags.length > 0 && !searchQuery && !searchLoading && (
+                                <div className="w-full sm:w-auto flex flex-nowrap sm:flex-wrap overflow-x-auto scroll-smooth snap-x snap-mandatory gap-2 max-w-[90vw] sm:max-w-none">
+                                    <button
+                                        onClick={() => applyTagFilter(null)}
+                                        className={`px-3 py-1 text-sm rounded-md border ${selectedTag == null ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                    >Semua Produk</button>
+                                    {visibleTags.map((t) => (
+                                        <button
+                                            key={`chip-${t.id}`}
+                                            onClick={() => applyTagFilter(t.id)}
+                                            className={`px-3 py-1 text-sm rounded-md border ${selectedTag === t.id ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                                        >{t.name}</button>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="hidden sm:flex border border-gray-300 rounded-md overflow-hidden sm:ml-auto">
                                 <button
                                     onClick={() => setViewMode('grid')}
                                     className={`p-3 sm:p-2 ${viewMode === 'grid'
-                                            ? 'bg-gray-900 text-white'
-                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                        ? 'bg-gray-900 text-white'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
                                     <Grid className="h-5 w-5 sm:h-4 sm:w-4" />
@@ -695,8 +878,8 @@ const Homepage = () => {
                                 <button
                                     onClick={() => setViewMode('list')}
                                     className={`p-3 sm:p-2 ${viewMode === 'list'
-                                            ? 'bg-gray-900 text-white'
-                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                        ? 'bg-gray-900 text-white'
+                                        : 'bg-white text-gray-600 hover:bg-gray-50'
                                         }`}
                                 >
                                     <List className="h-5 w-5 sm:h-4 sm:w-4" />
@@ -706,19 +889,50 @@ const Homepage = () => {
                     </div>
                 </div>
             </div>
-
             {/* Products Section */}
             <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {loading ? (
+                    {tagsToRender.length > 0 && !searchQuery && !searchLoading && (
+                        <div className="space-y-10 mb-10">
+                            {tagsToRender.map((tag) => {
+                                const list = (Array.isArray(tagProducts[tag.id]) ? tagProducts[tag.id] : []).filter((p) => matchesSelectedCategory(p));
+                                if (!list || list.length === 0) return null;
+                                return (
+                                    <div key={tag.id}>
+                                        <div className="mb-4">
+                                            <h2 className="text-xl sm:text-lg font-semibold text-gray-900">
+                                                {tag.name}
+                                            </h2>
+                                            <span className="text-sm text-gray-500">{tag.description}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-4 sm:gap-6">
+                                            {list.map((p) => (
+                                                <ProductCard key={`tag-${tag.id}-prod-${p.id}`} product={p} />
+                                            ))}
+                                            {tagLoading && Array.from({ length: 5 }).map((_, i) => (
+                                                <div key={`skeleton-${tag.id}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-100 h-full animate-pulse">
+                                                    <div className="bg-gray-200" style={{ aspectRatio: '1 / 1' }}></div>
+                                                    <div className="p-3 space-y-2">
+                                                        <div className="h-4 bg-gray-200 rounded"></div>
+                                                        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    {selectedTag != null ? null : loading ? (
                         <div className="flex justify-center items-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
                         </div>
                     ) : (
                         <>
                             {/* Results Info */}
-                            <div className="mb-6">
-                                <p className="text-base sm:text-sm text-gray-600 px-2 sm:px-0">
+                            <div className="mb-6 flex items-center" id="results-info">
+                                <p className="text-base sm:text-sm text-gray-600 px-2 sm:px-0 mr-7">
                                     Menampilkan {sortedProducts.length} produk
                                     {selectedCategory && ` dalam kategori "${categories.find(c => c.id === selectedCategory)?.name}"`}
                                     {searchQuery && ` untuk "${searchQuery}"`}
@@ -726,28 +940,37 @@ const Homepage = () => {
                             </div>
 
                             {/* Products Grid/List */}
-                            {sortedProducts.length === 0 ? (
+                            {selectedTag != null ? null : (
+                                (visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null ? untaggedProducts : sortedProducts).length === 0
+                            ) ? (
                                 <div className="text-center py-12 px-4">
                                     <Filter className="mx-auto h-16 w-16 sm:h-12 sm:w-12 text-gray-300 mb-4" />
                                     <h3 className="text-xl sm:text-lg font-medium text-gray-900 mb-2">Tidak ada produk ditemukan</h3>
                                     <p className="text-base sm:text-sm text-gray-500">Coba ubah kata kunci pencarian atau filter</p>
                                 </div>
                             ) : (
-                                <div className={
-                                    viewMode === 'grid'
-                                        ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6"
-                                        : "space-y-4"
-                                }>
-                                    {sortedProducts.map((product) => (
+                                <>
+                                    {(visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null) && (
+                                        <div className="mb-4">
+                                            {/* <h2 className="text-xl sm:text-lg font-semibold text-gray-900">Produk Tanpa Tag</h2> */}
+                                        </div>
+                                    )}
+                                    <div className={
                                         viewMode === 'grid'
-                                            ? <ProductCard key={product.id} product={product} />
-                                            : <ProductListItem key={product.id} product={product} />
-                                    ))}
-                                </div>
+                                            ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6"
+                                            : "space-y-4"
+                                    }>
+                                        {(visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null ? untaggedProducts : sortedProducts).map((product) => (
+                                            viewMode === 'grid'
+                                                ? <ProductCard key={product.id} product={product} />
+                                                : <ProductListItem key={product.id} product={product} />
+                                        ))}
+                                    </div>
+                                </>
                             )}
 
                             {/* Pagination - Hidden when showing all products */}
-                            {pagination.last_page > 1 && pagination.per_page < 1000 && (
+                            {selectedTag != null ? null : (pagination.last_page > 1 && pagination.per_page < 1000) && (
                                 <div className="flex justify-center items-center space-x-4 mt-12">
                                     <button
                                         onClick={() => {

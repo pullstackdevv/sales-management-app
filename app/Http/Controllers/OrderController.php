@@ -35,7 +35,7 @@ class OrderController extends Controller
                 'message' => 'Unauthorized. You do not have permission to view orders.'
             ], 403);
         }
-        $orders = Order::with(['customer', 'address', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
+        $orders = Order::with(['customer', 'address', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'processedBy', 'salesChannel'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('order_number', 'like', "%{$search}%")
@@ -780,7 +780,8 @@ class OrderController extends Controller
 
             $order->update([
                 'status' => $validated['status'],
-                'updated_by' => Auth::id()
+                'updated_by' => Auth::id(),
+                'processed_by' => $validated['status'] === 'processing' ? Auth::id() : $order->processed_by
             ]);
 
             // When status is paid for manual orders, sync payment_status to paid
@@ -825,7 +826,7 @@ class OrderController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order status updated successfully',
-                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy'])
+                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'processedBy'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

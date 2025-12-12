@@ -618,7 +618,19 @@ export default function EditOrder() {
             setSelectedRateIndex(null);
             setFormData(prev => ({ ...prev, service_type: '' }));
         }
-    }, [formData.courier, formData.address_id, formData.origin_setting_id, orderItems, couriers]);
+    }, [formData.courier, formData.address_id, formData.origin_setting_id, couriers]);
+
+    useEffect(() => {
+        const c = couriers.find(x => String(x.id) === String(formData.courier));
+        const name = c?.name?.toLowerCase() || '';
+        if (!name.includes('tiki')) return;
+        if (typeof selectedRateIndex !== 'number' || !courierRates[selectedRateIndex]) return;
+        const addressId = parseInt(formData.address_id);
+        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
+        const dest = selectedAddress || selectedCustomer || originalOrder?.customer || null;
+        const district = dest?.district || '';
+        calculateShippingCostFromRate(courierRates, district, selectedRateIndex);
+    }, [orderItems]);
 
     useEffect(() => {
         if (origins && origins.length > 0 && !formData.origin_setting_id) {

@@ -450,12 +450,12 @@ class CustomerController extends Controller
         ]);
 
         try {
+            DB::beginTransaction();
+
             // Check if customer already exists
             $existingCustomer = Customer::where('phone', $validated['phone'])
-                ->orWhere(function($query) use ($validated) {
-                    if (!empty($validated['email'])) {
-                        $query->where('email', $validated['email']);
-                    }
+                ->when(!empty($validated['email']), function ($query) use ($validated) {
+                    $query->orWhere('email', $validated['email']);
                 })
                 ->first();
 
@@ -482,16 +482,18 @@ class CustomerController extends Controller
                     $customer->addresses()->create([
                         'label' => $addressData['label'],
                         'recipient_name' => $addressData['recipient_name'],
-                        'recipient_phone' => $addressData['recipient_phone'],
+                        'phone' => $addressData['recipient_phone'],
                         'address_detail' => $addressData['address_detail'],
                         'city' => $addressData['city'],
                         'province' => $addressData['province'],
                         'postal_code' => $addressData['postal_code'] ?? null,
                         'district' => $addressData['district'] ?? null,
-                        'is_default' => $index === 0, // First address is default
+                        'is_default' => $index === 0,
                     ]);
                 }
             }
+
+            DB::commit();
 
             return response()->json([
                 'status' => 'success',
@@ -499,6 +501,7 @@ class CustomerController extends Controller
                 'message' => 'Customer berhasil dibuat'
             ], 201);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Gagal membuat customer: ' . $e->getMessage()

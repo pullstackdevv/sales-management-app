@@ -203,6 +203,20 @@ export default function ProductData() {
     fetchProducts(search, category, target);
   };
 
+  const getPageSlots = (current, last) => {
+    if (!last || last <= 7) {
+      return Array.from({ length: last }, (_, i) => i + 1);
+    }
+    const start = Math.max(2, current - 2);
+    const end = Math.min(last - 1, current + 2);
+    const slots = [1];
+    if (start > 2) slots.push('…');
+    for (let i = start; i <= end; i++) slots.push(i);
+    if (end < last - 1) slots.push('…');
+    slots.push(last);
+    return slots;
+  };
+
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -554,18 +568,22 @@ export default function ProductData() {
                 >
                   Sebelumnya
                 </button>
-                {Array.from({ length: pagination.last_page }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => handlePageChange(page)}
-                    className={`px-3 py-1 text-sm rounded-md ${
-                      (pagination.current_page || 1) === page
-                        ? 'bg-blue-600 text-white'
-                        : 'border text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {page}
-                  </button>
+                {getPageSlots(pagination.current_page || 1, pagination.last_page || 1).map((slot, idx) => (
+                  typeof slot === 'number' ? (
+                    <button
+                      key={`p-${slot}`}
+                      onClick={() => handlePageChange(slot)}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        (pagination.current_page || 1) === slot
+                          ? 'bg-blue-600 text-white'
+                          : 'border text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  ) : (
+                    <span key={`e-${idx}`} className="px-2 text-sm text-gray-500">{slot}</span>
+                  )
                 ))}
                 <button
                   onClick={() => handlePageChange((pagination.current_page || 1) + 1)}

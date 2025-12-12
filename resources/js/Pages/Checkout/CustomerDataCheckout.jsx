@@ -1263,12 +1263,40 @@ const CustomerDataCheckout = () => {
       }
     } catch (error) {
       console.error('Error in handleContinue:', error);
+      let displayMessage = 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.';
+      if (error?.response?.data) {
+        if (typeof error.response.data.message === 'string' && error.response.data.message.trim()) {
+          displayMessage = error.response.data.message;
+        }
+        const apiErrors = error.response.data.errors;
+        if (apiErrors) {
+          if (Array.isArray(apiErrors)) {
+            const specific = apiErrors.find(e => e.message);
+            if (specific && specific.message) {
+              displayMessage = specific.message;
+            }
+          } else if (apiErrors.phone && Array.isArray(apiErrors.phone) && apiErrors.phone[0]) {
+            displayMessage = apiErrors.phone[0];
+          } else {
+            const first = Object.values(apiErrors)[0];
+            if (Array.isArray(first) && first[0]) {
+              displayMessage = first[0];
+            }
+          }
+        }
+      } else if (error && typeof error.message === 'string' && error.message.trim()) {
+        displayMessage = error.message;
+      }
+      if (/nomor hp|nomor telepon/i.test(displayMessage) && /terdaftar/i.test(displayMessage)) {
+        displayMessage = 'Nomor HP sudah terdaftar, gunakan nomor lain atau pilih customer yang ada';
+      }
       Swal.fire({
         icon: 'error',
         title: 'Terjadi Kesalahan',
-        text: error.message || 'Terjadi kesalahan saat menyimpan data. Silakan coba lagi.',
+        text: displayMessage,
         confirmButtonColor: '#3b82f6'
       });
+    } finally {
       setLoading(false);
     }
   };

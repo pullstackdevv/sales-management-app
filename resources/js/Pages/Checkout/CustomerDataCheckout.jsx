@@ -421,7 +421,9 @@ const CustomerDataCheckout = () => {
   // Update customer with addresses array (for bulk update)
   const updateCustomerWithAddresses = async (customerId, customerData) => {
     try {
-      const response = await api.put(`/customers/${customerId}`, customerData);
+      const response = await api.put(`/customers/${customerId}`, {
+        addresses: customerData.addresses,
+      });
 
       if (response.data.status === 'success') {
         return response.data.data;
@@ -678,12 +680,6 @@ const CustomerDataCheckout = () => {
         });
 
         const customerPayload = {
-          name: selectedCustomer.name,
-          email: selectedCustomer.email,
-          phone: selectedCustomer.phone,
-          category: selectedCustomer.category || 'Pelanggan',
-          line_id: selectedCustomer.line_id,
-          other_contact: selectedCustomer.other_contact,
           addresses: updatedAddresses
         };
 
@@ -710,12 +706,6 @@ const CustomerDataCheckout = () => {
         const newAddresses = [...normalizedExistingAddresses, { ...addressPayload, id: null }];
 
         const customerPayload = {
-          name: selectedCustomer.name,
-          email: selectedCustomer.email,
-          phone: selectedCustomer.phone,
-          category: selectedCustomer.category || 'Pelanggan',
-          line_id: selectedCustomer.line_id,
-          other_contact: selectedCustomer.other_contact,
           addresses: newAddresses
         };
 
@@ -723,15 +713,19 @@ const CustomerDataCheckout = () => {
         successMessage = 'Alamat baru berhasil ditambahkan';
       }
 
-      // Refresh customer addresses
-      const response = await api.get(`/customers/${getCustomerId(selectedCustomer)}/addresses`);
-      if (response.data.status === 'success') {
-        setCustomerAddresses(response.data.data || []);
+      // Refresh customer addresses via public addresses endpoint
+      const refresh = await api.get(`/customers/${getCustomerId(selectedCustomer)}/addresses`);
+      if (refresh.data.status === 'success') {
+        const addresses = (refresh.data.data || []).map(addr => ({
+          ...addr,
+          recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
+        }));
+        setCustomerAddresses(addresses);
 
-        // If this is a new address and no address is selected, select this one
-        if (!editingAddress && !selectedAddressId && response.data.data.length > 0) {
-          const newAddress = response.data.data[response.data.data.length - 1];
-          setSelectedAddressId(newAddress.id);
+        // If this is a new address and no address is selected, select default or last
+        if (!editingAddress && !selectedAddressId && addresses.length > 0) {
+          const defaultAddress = addresses.find(a => a.is_default) || addresses[addresses.length - 1];
+          setSelectedAddressId(defaultAddress.id);
         }
       }
 
@@ -1183,7 +1177,7 @@ const CustomerDataCheckout = () => {
             Swal.fire({
               icon: 'error',
               // title: 'Data Tidak Lengkap',
-              text: 'Mohon lengkapi semua field yang diperlukan',
+              // text: 'Mohon lengkapi semua field yang diperlukan',
               title: phoneError ? 'Nomor Telepon Sudah Terdaftar' : 'Data Tidak Lengkap',
               text: phoneError || 'Mohon lengkapi semua field yang diperlukan',
               confirmButtonColor: '#3b82f6'
@@ -2246,5 +2240,6 @@ const CustomerDataCheckout = () => {
     </MarketplaceLayout>
   );
 };
+
 
 export default CustomerDataCheckout;

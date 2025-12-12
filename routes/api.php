@@ -112,11 +112,10 @@ Route::apiResource('products', ProductController::class);
 Route::apiResource('products.variants', ProductVariantController::class);
 // Product Category routes
 Route::apiResource('product-categories', ProductCategoryController::class);
-// Guest customer endpoints (secure - validates ownership via email/phone)
-Route::post('customers/guest-lookup', [CustomerController::class, 'guestLookup']);
-Route::post('customers/guest-store', [CustomerController::class, 'guestStore']);
-Route::put('customers/guest-update/{customer}', [CustomerController::class, 'guestUpdate']);
-Route::post('customers/{customer}/guest-delete-address/{address}', [CustomerController::class, 'guestDeleteAddress']);
+Route::apiResource('customers', CustomerController::class);
+Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
+Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
 // Tags routes
 Route::apiResource('tags', TagController::class);
 Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);
@@ -134,10 +133,10 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Customer routes (protected - sensitive data, full CRUD for admin)
-    Route::apiResource('customers', CustomerController::class);
-    Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
-    Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
-    Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
+    // Route::apiResource('customers', CustomerController::class);
+    // Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+    // Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
+    // Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
 
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);

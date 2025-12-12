@@ -194,7 +194,7 @@ class CustomerController extends Controller
             'addresses.*.is_default' => 'boolean',
             'addresses.*.is_dropship' => 'boolean'
         ], [
-            'phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
+            'addresses.*.recipient_phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
         ]);
 
         try {

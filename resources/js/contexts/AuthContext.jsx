@@ -15,44 +15,18 @@ export const AuthProvider = ({ children }) => {
     const { auth } = usePage().props;
     
     const user = auth?.user || null;
-    const roles = user?.roles || [];
-    const primaryRole = roles[0] || null;
-    
-    // Get all permissions from all user roles (combined)
-    const permissions = useMemo(() => {
-        if (!roles || roles.length === 0) return [];
-        
-        const allPermissions = new Set();
-        roles.forEach(role => {
-            if (role.permissions && Array.isArray(role.permissions)) {
-                role.permissions.forEach(permission => {
-                    if (typeof permission === 'string') {
-                        allPermissions.add(permission);
-                    } else if (permission?.name) {
-                        allPermissions.add(permission.name);
-                    }
-                });
-            }
-        });
-        
-        return Array.from(allPermissions);
-    }, [roles]);
+    const role = user?.role || null;
+    const permissions = role?.permissions || [];
     
     // Check if user has permission
     const hasPermission = (permission) => {
         if (!permissions || permissions.length === 0) return false;
         
-        // Owner has all permissions (wildcard)
+        // Owner has all permissions
         if (permissions.includes('*')) return true;
         
         // Check specific permission
-        if (permissions.includes(permission)) return true;
-        
-        // Check module-level permission (e.g., 'orders' matches 'orders.view')
-        const modulePermissions = permissions.filter(p => p.startsWith(permission + '.'));
-        if (modulePermissions.length > 0) return true;
-        
-        return false;
+        return permissions.includes(permission);
     };
     
     // Check if user has any of the permissions
@@ -69,21 +43,18 @@ export const AuthProvider = ({ children }) => {
     
     // Check if user has specific role
     const hasRole = (roleName) => {
-        if (!roles || roles.length === 0) return false;
-        return roles.some(role => role.name === roleName);
+        return role?.name === roleName;
     };
     
     // Check if user has any of the roles
     const hasAnyRole = (roleList) => {
         if (!Array.isArray(roleList)) return false;
-        return roleList.some(roleName => hasRole(roleName));
+        return roleList.includes(role?.name);
     };
     
     const value = useMemo(() => ({
         user,
-        roles,
-        role: primaryRole, // For backward compatibility
-        primaryRole,
+        role,
         permissions,
         hasPermission,
         hasAnyPermission,
@@ -95,7 +66,7 @@ export const AuthProvider = ({ children }) => {
         isAdmin: hasRole('admin'),
         isStaff: hasRole('staff'),
         isCashier: hasRole('cashier')
-    }), [user, roles, primaryRole, permissions]);
+    }), [user, role, permissions]);
     
     return (
         <AuthContext.Provider value={value}>

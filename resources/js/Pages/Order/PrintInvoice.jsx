@@ -3,7 +3,6 @@ import { Head, usePage } from '@inertiajs/react';
 import { Icon } from '@iconify/react';
 import api from '@/api/axios';
 import { toast } from 'sonner';
-import Swal from 'sweetalert2';
 
 const PrintInvoice = () => {
     const { orderId } = usePage().props;
@@ -30,16 +29,6 @@ const PrintInvoice = () => {
     });
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('popup') !== '1') {
-            const url = new URL(window.location.href);
-            url.searchParams.set('popup', '1');
-            window.open(url.toString(), '_blank', 'noopener');
-            window.history.back();
-        }
-    }, []);
-
-    useEffect(() => {
         fetchInvoiceData();
     }, [orderId]);
 
@@ -54,34 +43,9 @@ const PrintInvoice = () => {
                 return total + (weight * item.quantity);
             }, 0) || 0;
 
-            // Fetch active origin settings for company info
-            let companyInfo = {
-                name: 'SALEPARFUM',
-                address: 'Jl. Contoh No. 123, Jakarta',
-                phone: '+62 21 1234567',
-                email: 'info@saleparfum.com'
-            };
-            try {
-                const originsResp = await api.get('/origin-settings');
-                const origins = originsResp.data?.data || originsResp.data || [];
-                const active = Array.isArray(origins) ? origins.find(o => o.is_active) : null;
-                if (active) {
-                    companyInfo = {
-                        name: active.store_name || companyInfo.name,
-                        address: active.address || active.origin_address || companyInfo.address,
-                        phone: active.phone || companyInfo.phone,
-                        email: companyInfo.email
-                    };
-                }
-            } catch (e) {
-                console.warn('Failed to fetch origin settings, using default company info', e);
-            }
-
             const transformedData = {
                 invoice_number: orderData.order_number,
                 created_at: orderData.created_at,
-                status:orderData.status,
-                is_dropship: !!orderData.is_dropship,
                 customer: orderData.customer,
                 items: orderData.items?.map(item => ({
                     product_name: item.product_name_snapshot || item.product_variant?.product?.name || 'Product',
@@ -93,16 +57,8 @@ const PrintInvoice = () => {
                 tax_amount: orderData.tax_amount || 0,
                 tax_rate: orderData.tax_rate || 0,
                 discount_amount: orderData.discount_amount || 0,
-                voucher_id: orderData.voucher_id || null,
-                voucher: orderData.voucher ? {
-                    code: orderData.voucher.code,
-                    type: orderData.voucher.type,
-                    value: orderData.voucher.value
-                } : null,
                 total_amount: orderData.total_price,
                 total_weight: totalWeight,
-                courier_name: orderData.shipping?.courier?.name || null,
-                service_type: orderData.shipping?.courier_rate?.service_type || orderData.shipping?.service_type || null,
                 payment_info: orderData.payments?.[0] ? {
                     status: orderData.payments[0].status,
                     method: orderData.payments[0].payment_method,
@@ -110,29 +66,13 @@ const PrintInvoice = () => {
                 } : null,
                 notes: orderData.notes,
                 shipping: orderData.shipping,
-                shipping_address: orderData.address ? {
-                    recipient_name: orderData.address.recipient_name,
-                    phone: orderData.address.phone,
-                    address_detail: orderData.address.address_detail,
-                    city: orderData.address.city,
-                    province: orderData.address.province,
-                    district: orderData.address.district,
-                    postal_code: orderData.address.postal_code,
-                    is_dropship: orderData.address.is_dropship
-                } : null,
-                company: companyInfo
-            };
-            // Fallback fetch courier if missing
-            if (!transformedData.courier_name && orderData.shipping?.id) {
-                try {
-                    const shipResp = await api.get(`/orders/${orderId}/shipping/${orderData.shipping.id}`);
-                    const shipData = shipResp.data.data;
-                    transformedData.courier_name = shipData.courier?.name || transformedData.courier_name;
-                    transformedData.service_type = shipData.courier_rate?.service_type || shipData.service_type || transformedData.service_type;
-                } catch (e) {
-                    console.warn('Failed to fetch shipping detail:', e);
+                company: {
+                    name: 'SALEPARFUM',
+                    address: 'Jl. Contoh No. 123, Jakarta',
+                    phone: '+62 21 1234567',
+                    email: 'info@saleparfum.com'
                 }
-            }
+            };
             setInvoiceData(transformedData);
         } catch (error) {
             console.error('Error fetching invoice data:', error);
@@ -142,16 +82,6 @@ const PrintInvoice = () => {
             setLoading(false);
         }
     };
-
-    useEffect(() => {
-        if (!invoiceData?.invoice_number) return;
-
-        const now = new Date();
-        const pad = (n) => String(n).padStart(2, '0');
-        const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-        const safeOrder = invoiceData.invoice_number.replace(/[^A-Za-z0-9_-]/g, '_');
-        document.title = `${safeOrder}_${stamp}`;
-    }, [invoiceData]);
 
     // Fungsi untuk menyimpan pengaturan ke localStorage
     const updatePrintSettings = (newSettings) => {
@@ -168,39 +98,8 @@ const PrintInvoice = () => {
         updatePrintSettings(newSettings);
     };
 
-    // Tombol cetak saja: tidak mengubah status atau printed_at
     const handlePrint = () => {
         window.print();
-    };
-
-    // Tombol proses saja: ubah status & printed_at tanpa membuka dialog print
-    const handleProcessOnly = async () => {
-        try {
-            // Skip status update jika sudah processing
-            if (invoiceData?.status !== 'processing') {
-                await api.post(`/orders/${orderId}/update-status`, { status: 'processing' });
-            }
-            await api.patch(`/orders/${orderId}`, { printed_at: new Date().toISOString() });
-
-            await Swal.fire({
-                title: 'Berhasil!',
-                text: `Order diproses dan invoice ${invoiceData?.invoice_number} ditandai sudah diprint`,
-                icon: 'success',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#3085d6',
-                timer: 2500,
-                timerProgressBar: true
-            });
-        } catch (error) {
-            console.error('❌ Error update status/printed_at:', error);
-            await Swal.fire({
-                title: 'Error!',
-                text: 'Gagal memperbarui status order / printed_at',
-                icon: 'error',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#d33'
-            });
-        }
     };
 
     if (loading) {
@@ -238,7 +137,7 @@ const PrintInvoice = () => {
             </div>
         );
     }
-console.log(invoiceData)
+
     return (
         <>
             <Head title={`Invoice - Order #${orderId}`} />
@@ -268,26 +167,19 @@ console.log(invoiceData)
                             Cetak Invoice
                         </button>
                         <button
-                            onClick={handleProcessOnly}
-                            className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[180px] justify-center"
-                        >
-                            <Icon icon="solar:check-circle-outline" className="w-5 h-5" />
-                            Proses & Tandai Sudah Diprint
-                        </button>
-                        <button
                             onClick={() => setShowSettings(!showSettings)}
                             className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
                         >
                             <Icon icon="solar:settings-outline" className="w-5 h-5" />
                             Pengaturan Cetak
                         </button>
-                        {/* <button
+                        <button
                             onClick={() => window.history.back()}
                             className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 min-w-[140px] justify-center"
                         >
                             <Icon icon="solar:arrow-left-outline" className="w-5 h-5" />
                             Kembali
-                        </button> */}
+                        </button>
                     </div>
 
                     {/* Panel Pengaturan Cetak */}
@@ -437,28 +329,21 @@ console.log(invoiceData)
                         {/* Header Row */}
                         <div className="grid grid-cols-3 border-b-2 border-black">
                             <div className="border-r-2 border-black p-4 font-bold text-lg">
-                                {invoiceData?.courier_name || 'KURIR'}
+                                {printSettings.showCompanyInfo ? (invoiceData?.company?.name || 'SALEPARFUM') : 'SALEPARFUM'}
                             </div>
                             <div className="border-r-2 border-black p-4 font-bold text-lg text-center">
-                                {(invoiceData?.service_type || 'SERVICE').toString().toUpperCase()}
+                                INSTANT
                             </div>
                             <div className="p-4 font-bold text-lg text-center">
                                 {invoiceData?.total_weight ? `${invoiceData.total_weight}kg` : '0.5kg'}
                             </div>
                         </div>
 
-                        {/* Order Number Row */}
-                        <div className="border-b-2 border-black p-4">
-                            <div className="font-bold">No Pesanan: {invoiceData?.invoice_number || orderId}</div>
-                        </div>
-
                         {/* Pengirim Row */}
                         {printSettings.showCompanyInfo && (
                             <div className="border-b-2 border-black p-4">
                                 <div className="font-bold">
-                                    Pengirim: {invoiceData?.shipping_address?.is_dropship
-                                        ? `${invoiceData?.customer?.name || 'Customer'} - ${invoiceData?.customer?.phone || '083867000077'}`
-                                        : `${invoiceData?.company?.name || 'SALEPARFUM'} - ${invoiceData?.company?.phone || '083867000077'}`}
+                                    Pengirim: {invoiceData?.company?.name || 'SALEPARFUM'} - {invoiceData?.company?.phone || '083867000077'}
                                 </div>
                             </div>
                         )}
@@ -467,7 +352,7 @@ console.log(invoiceData)
                         {printSettings.showCustomerInfo && (
                             <div className="border-b-2 border-black p-4">
                                 <div className="font-bold">
-                                    Kepada: {invoiceData?.shipping_address?.recipient_name || 'Customer'} ({invoiceData?.shipping_address?.phone || '-'})
+                                    Kepada: {invoiceData?.customer?.name || 'MILA'} ({invoiceData?.customer?.phone || '6285693468592'})
                                 </div>
                             </div>
                         )}
@@ -477,16 +362,27 @@ console.log(invoiceData)
                             <div className="border-b-2 border-black p-4">
                                 <div className="font-bold mb-2">Alamat:</div>
                                 <div className="text-sm leading-relaxed">
-                                     {invoiceData?.shipping_address ? (
+                                     {invoiceData?.shipping?.address ? (
                                          <>
-                                             {invoiceData.shipping_address.address_detail}<br/>
-                                             {invoiceData.shipping_address.city}, {invoiceData.shipping_address.province} {invoiceData.shipping_address.postal_code}<br/>
-                                             {invoiceData.shipping_address.district && `${invoiceData.shipping_address.district}`}<br/>
-                                             {invoiceData.shipping_address.phone && `${invoiceData.shipping_address.phone}`}
+                                             {invoiceData.shipping.address.street}<br/>
+                                             {invoiceData.shipping.address.city}, {invoiceData.shipping.address.state} {invoiceData.shipping.address.postal_code}<br/>
+                                             {invoiceData.shipping.address.country}<br/>
+                                             {invoiceData.shipping.phone && `+${invoiceData.shipping.phone}`}
+                                         </>
+                                     ) : invoiceData?.customer?.address ? (
+                                         <>
+                                             {invoiceData.customer.address.street}<br/>
+                                             {invoiceData.customer.address.city}, {invoiceData.customer.address.state} {invoiceData.customer.address.postal_code}<br/>
+                                             {invoiceData.customer.address.country}
                                          </>
                                      ) : (
                                          <>
-                                             Alamat tidak tersedia
+                                             Kahfi Signature, Jl. Moh. Kahfi I Blok 10M,<br/>
+                                             Ciganjur, Kec.Jagakarsa Kota Jakarta Selatan,<br/>
+                                             Daerah Khusus Ibukota Jakarta<br/>
+                                             12630<br/>
+                                             +62/856-9346-8592, KotaJakarta Selatan,<br/>
+                                             DKI Jakarta, 12630 12630
                                          </>
                                      )}
                                  </div>
@@ -509,23 +405,11 @@ console.log(invoiceData)
                             </div>
                         )}
 
-                        {/* Voucher Note Row */}
-                        {(invoiceData?.voucher || (invoiceData?.discount_amount || 0) > 0) && (
-                            <div className="border-b-2 border-black p-4">
-                                <div className="font-bold mb-2">Catatan Voucher:</div>
-                                <div className="text-sm">
-                                    {invoiceData?.voucher
-                                        ? `Voucher ${invoiceData.voucher.code} • ${invoiceData.voucher.type.toUpperCase()} • Nilai: ${Number(invoiceData.voucher.value).toLocaleString('id-ID')}`
-                                        : `Diskon: Rp ${Number(Math.round(invoiceData.discount_amount || 0)).toLocaleString('id-ID')}`}
-                                </div>
-                            </div>
-                        )}
-
                         {/* Total Row */}
                         {printSettings.showTotal && (
                             <div className="p-4">
                                 <div className="font-bold text-lg">
-                                     Total: Rp{Number(Math.round(invoiceData?.total_amount || 0)).toLocaleString('id-ID')}
+                                     Total: Rp{invoiceData?.total_amount?.toLocaleString('id-ID', { maximumFractionDigits: 0 }) || '2.199.000'}
                                  </div>
                             </div>
                         )}

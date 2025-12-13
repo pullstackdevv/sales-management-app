@@ -50,7 +50,4 @@ return [
         'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
     ],
 
-    // Payment gateway selection: 'xendit' or 'midtrans'
-    'payment_gateway' => env('PAYMENT_GATEWAY', 'xendit'),
-
 ];

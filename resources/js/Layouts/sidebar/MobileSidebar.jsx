@@ -39,7 +39,7 @@ const MobileSidebar = ({ isOpen, onClose }) => {
           <div className="flex-1 overflow-y-auto">
             <div className="px-4 py-4 space-y-2">
               {SidebarContent.map((item) => (
-                <PermissionGuard key={item.id} permission={item.permission} role={item.role} roles={item.roles}>
+                <PermissionGuard key={item.id} permission={item.permission}>
                   <div>
                     {/* Render menu utama */}
                     {!item.children ? (
@@ -56,9 +56,7 @@ const MobileSidebar = ({ isOpen, onClose }) => {
                         {/* Render submenu */}
                         <div className="ml-6 space-y-1">
                           {item.children.map((child) => (
-                            <PermissionGuard key={child.id} permission={child.permission} role={child.role} roles={child.roles}>
-                              <NavItems item={child} onClick={onClose} />
-                            </PermissionGuard>
+                            <NavItems item={child} key={child.id} onClick={onClose} />
                           ))}
                         </div>
                       </div>

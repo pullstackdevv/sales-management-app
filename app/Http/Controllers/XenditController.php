@@ -3,14 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PaymentStatus;
-use App\Enums\StockMovementType;
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
-use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
-use App\Helpers\NotificationHelper;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -53,23 +49,19 @@ class XenditController extends Controller
                 );
             }
 
+            // Prepare customer data
             $customerName = $order->isGuestOrder() 
-                ? ($order->address->name ?? $order->guest_name ?? 'Guest Customer')
-                : ($order->customer->name ?? 'Customer');
+                ? $order->address->name 
+                : $order->customer->name;
             $customerEmail = $order->isGuestOrder() 
-                ? ($order->guest_email ?? 'guest@example.com')
-                : ($order->customer->email ?? 'customer@example.com');
+                ? $order->guest_email 
+                : $order->customer->email;
             $customerPhone = $order->isGuestOrder() 
-                ? ($order->guest_phone ?? '')
-                : ($order->customer->phone ?? '');
+                ? $order->guest_phone 
+                : $order->customer->phone;
 
-
-            if (empty(trim($customerName))) {
-                $customerName = 'Guest Customer';
-            }
-
-            $nameParts = explode(' ', trim($customerName), 2);
-            $givenNames = !empty($nameParts[0]) ? $nameParts[0] : 'Guest';
+            $nameParts = explode(' ', $customerName, 2);
+            $givenNames = $nameParts[0];
             $surname = isset($nameParts[1]) && !empty($nameParts[1]) ? $nameParts[1] : 'Customer';
 
             // Prepare items
@@ -101,11 +93,14 @@ class XenditController extends Controller
                 'voucher_id' => $order->voucher_id,
                 'has_voucher_relation' => $order->voucher ? true : false,
                 'voucher_code' => $order->voucher ? $order->voucher->code : null,
-                'voucher_type' => $order->voucher ? $order->voucher->type : null,
                 'discount_amount' => $order->discount_amount,
                 'total_price' => $order->total_price,
                 'shipping_cost' => $order->shipping_cost,
             ]);
+
+            // Note: Xendit doesn't support negative prices for discount items
+            // Instead, we use the discounted total_price in the amount field
+            // The invoice description will show the discount information
 
             // Calculate totals for logging
             $originalTotal = $order->items->sum(function($item) {
@@ -118,15 +113,13 @@ class XenditController extends Controller
                 'discount_amount' => $order->discount_amount,
                 'final_amount' => $order->total_price,
                 'voucher_code' => $order->voucher ? $order->voucher->code : null,
-                'voucher_type' => $order->voucher ? $order->voucher->type : null,
                 'items_count' => count($items)
             ]);
 
             // Prepare description with discount info if applicable
             $description = 'Order Payment - ' . $order->order_number;
             if ($order->voucher && $order->discount_amount > 0) {
-                $discountType = $order->voucher->type === 'shipping' ? 'Diskon Ongkir' : 'Diskon';
-                $description .= ' (' . $discountType . ': ' . $order->voucher->code . ' -Rp' . number_format((float)$order->discount_amount, 0, ',', '.') . ')';
+                $description .= ' (Diskon: ' . $order->voucher->code . ' -Rp' . number_format((float)$order->discount_amount, 0, ',', '.') . ')';
             }
 
             // Prepare invoice data
@@ -134,7 +127,7 @@ class XenditController extends Controller
                 'external_id' => $order->order_number,
                 'amount' => (int) $order->total_price,
                 'description' => $description,
-                'invoice_duration' => 10, // 24 hours
+                'invoice_duration' => 86400, // 24 hours
                 'customer' => [
                     'given_names' => $givenNames,
                     'surname' => $surname,
@@ -150,20 +143,15 @@ class XenditController extends Controller
                     'customer_id' => $order->customer_id,
                     'address_id' => $order->address_id,
                     'voucher_code' => $order->voucher ? $order->voucher->code : null,
-                    'voucher_type' => $order->voucher ? $order->voucher->type : null,
                     'discount_amount' => $order->discount_amount
                 ]
             ];
             
-            // Add discount as negative fee (Xendit supports this)
+            // Add fees to show discount as negative fee (Xendit supports this)
             if ($order->voucher && $order->discount_amount > 0) {
-                $discountLabel = $order->voucher->type === 'shipping' 
-                    ? 'Shipping Discount - ' . $order->voucher->code
-                    : 'Voucher Discount - ' . $order->voucher->code;
-                    
                 $invoiceData['fees'] = [
                     [
-                        'type' => $discountLabel,
+                        'type' => 'Voucher Discount - ' . $order->voucher->code,
                         'value' => -(int) $order->discount_amount
                     ]
                 ];
@@ -221,7 +209,6 @@ class XenditController extends Controller
     public function handleWebhook(Request $request)
     {
         try {
-            DB::beginTransaction();
             // Verify webhook token if configured
             $webhookToken = config('services.xendit.webhook_token');
             if ($webhookToken && $request->header('x-callback-token') !== $webhookToken) {
@@ -253,37 +240,19 @@ class XenditController extends Controller
             // Map Xendit status to our payment status
             $paymentStatus = $this->mapXenditStatus($status);
 
-            $previousStatus = $order->status;
-            $order->update(['payment_status' => $paymentStatus]);
+            // Update order payment status
+            $order->update([
+                'payment_status' => $paymentStatus,
+            ]);
 
             // Update order status based on payment status
             if ($paymentStatus === PaymentStatus::PAID) {
-                $order->update(['status' => 'processing']);
-                WebOrderController::updateVoucherUsedCount($order->id);
+                $order->update(['status' => 'processing']); // Change to processing when paid
                 
-                // Create payment received notification
-                NotificationHelper::paymentReceived($order->load(['customer', 'address']));
+                // Update voucher used count if voucher was used
+                WebOrderController::updateVoucherUsedCount($order->id);
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
-                if ($previousStatus !== 'cancelled') {
-                    foreach ($order->items as $item) {
-                        $variant = $item->productVariant;
-                        $variant->increment('stock', $item->quantity);
-                        StockMovement::create([
-                            'product_variant_id' => $item->product_variant_id,
-                            'order_id' => $order->id,
-                            'type' => StockMovementType::IN,
-                            'quantity' => $item->quantity,
-                            'note' => "Order #{$order->order_number} cancelled - Stock returned",
-                            'created_by' => $variant->created_by ?? $order->user_id ?? 1,
-                        ]);
-                    }
-                    
-                    // Create expired notification
-                    if ($paymentStatus === PaymentStatus::EXPIRED) {
-                        NotificationHelper::orderExpired($order->load(['customer', 'address']));
-                    }
-                }
             }
 
             Log::info('Order payment status updated via Xendit webhook', [
@@ -292,11 +261,9 @@ class XenditController extends Controller
                 'order_status' => $order->status,
             ]);
 
-            DB::commit();
             return response()->json(['status' => 'success']);
 
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Xendit webhook handling failed: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
@@ -308,7 +275,6 @@ class XenditController extends Controller
     public function checkPaymentStatus($orderNumber)
     {
         try {
-            DB::beginTransaction();
             $order = Order::where('order_number', $orderNumber)->first();
             
             if (!$order || !$order->payment_token) {
@@ -332,34 +298,12 @@ class XenditController extends Controller
                 
                 // Update order if status changed
                 if ($order->payment_status !== $paymentStatus) {
-                    $previousStatus = $order->status;
-                    $order->update(['payment_status' => $paymentStatus]);
-                    if ($paymentStatus === PaymentStatus::PAID) {
-                        $order->update(['status' => 'processing']);
-                        WebOrderController::updateVoucherUsedCount($order->id);
-                        
-                        // Create payment received notification
-                        NotificationHelper::paymentReceived($order->load(['customer', 'address']));
-                    } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
-                        $order->update(['status' => 'cancelled']);
-                        if ($previousStatus !== 'cancelled') {
-                            foreach ($order->items as $item) {
-                                $variant = $item->productVariant;
-                                $variant->increment('stock', $item->quantity);
-                                StockMovement::create([
-                                    'product_variant_id' => $item->product_variant_id,
-                                    'order_id' => $order->id,
-                                    'type' => StockMovementType::IN,
-                                    'quantity' => $item->quantity,
-                                    'note' => "Order #{$order->order_number} cancelled - Stock returned",
-                                    'created_by' => $variant->created_by ?? $order->user_id ?? 1,
-                                ]);
-                            }
-                        }
-                    }
+                    $order->update([
+                        'payment_status' => $paymentStatus,
+                        'status' => $paymentStatus === 'paid' ? 'processing' : $order->status
+                    ]);
                 }
                 
-                DB::commit();
                 return response()->json([
                     'status' => 'success',
                     'payment_status' => $paymentStatus,
@@ -368,14 +312,12 @@ class XenditController extends Controller
                 ]);
             }
             
-            DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to fetch payment status from Xendit'
             ], 500);
             
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Error checking payment status: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',

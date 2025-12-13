@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { router, Link } from '@inertiajs/react';
 import { Icon } from '@iconify/react';
-import {
+import { 
     ShoppingCart,
     CheckCircle,
     X,
     User,
     MapPin,
     Store,
-    ArrowLeft,
 } from 'lucide-react';
 import { productsAPI } from '@/api/products';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
@@ -30,7 +29,7 @@ export default function ProductDetail() {
     const [currentImage, setCurrentImage] = useState(null);
     const [imageLoading, setImageLoading] = useState(false);
     const { addToCart: addToCartHook } = useCart();
-
+    
     // Order states
     const [showOrderModal, setShowOrderModal] = useState(false);
     const [orderFormData, setOrderFormData] = useState({
@@ -65,7 +64,7 @@ export default function ProductDetail() {
             setLoading(true);
             const response = await productsAPI.getProduct(id);
             console.log('API response:', response);
-
+            
             // Laravel API returns {status: 'success', data: product}
             // Extract the actual product data from the nested structure
             let productData = response;
@@ -74,7 +73,7 @@ export default function ProductDetail() {
             } else if (response.data) {
                 productData = response.data;
             }
-
+            
             console.log('Extracted product data:', productData);
             setProduct(productData);
         } catch (err) {
@@ -96,7 +95,7 @@ export default function ProductDetail() {
     // Get all available images (product + variants) with selected variant prioritized
     const getAllImages = () => {
         const images = [];
-
+        
         // Add selected variant image first if exists
         if (selectedVariant && selectedVariant.image) {
             images.push({
@@ -108,7 +107,7 @@ export default function ProductDetail() {
                 isSelected: true
             });
         }
-
+        
         // Add product image if exists and not already added
         if (product && product.image) {
             images.push({
@@ -118,7 +117,7 @@ export default function ProductDetail() {
                 type: 'product'
             });
         }
-
+        
         // Add other variant images if exist (excluding selected variant)
         if (product && product.variants) {
             getStorefrontVariants().forEach(variant => {
@@ -133,7 +132,7 @@ export default function ProductDetail() {
                 }
             });
         }
-
+        
         return images;
     };
 
@@ -272,17 +271,17 @@ export default function ProductDetail() {
         console.log('product:', product);
         console.log('selectedVariant:', selectedVariant);
         console.log('quantity:', quantity);
-
+        
         if (product && product.is_active !== false && selectedVariant && getCurrentStock() > 0) {
             // Initialize checkout session with product data
             // Pass parameters correctly to initWithProduct function
             console.log('Initializing checkout session with product:', product.name);
             checkoutSession.initWithProduct(product, selectedVariant, quantity);
-
+            
             // Verify data was saved
             const savedData = checkoutSession.get();
             console.log('Data saved to session storage:', savedData);
-
+            
             // Navigate to checkout flow
             console.log('Navigating to checkout.product');
             router.visit(route('checkout.product'));
@@ -295,25 +294,16 @@ export default function ProductDetail() {
         }
     };
 
-    // Fetch customers using guest-lookup (search by name - returns masked data)
+    // Fetch customers dari API
     const fetchCustomers = async (search = '') => {
-        if (!search || search.trim().length < 2) {
-            setCustomers([]);
-            return;
-        }
-
         setOrderLoading(prev => ({ ...prev, customers: true }));
         try {
-            const response = await axios.post('/api/customers/guest-lookup', { search: search.trim() });
-            
-            if (response.data.status === 'success') {
-                setCustomers(response.data.data || []);
-            } else {
-                setCustomers([]);
-            }
+            const response = await axios.get('/api/customers', {
+                params: { search, per_page: 50 }
+            });
+            setCustomers(response.data.data.data || []);
         } catch (error) {
             console.error('Error fetching customers:', error);
-            setCustomers([]);
         } finally {
             setOrderLoading(prev => ({ ...prev, customers: false }));
         }
@@ -342,7 +332,7 @@ export default function ProductDetail() {
         setOrderFormData(prev => ({ ...prev, customer_id: customer.id }));
         setCustomerAddresses(customer.addresses || []);
         setSearchCustomer(customer.name);
-
+        
         // Auto select first address if available
         if (customer.addresses && customer.addresses.length > 0) {
             setOrderFormData(prev => ({ ...prev, address_id: customer.addresses[0].id }));
@@ -375,16 +365,14 @@ export default function ProductDetail() {
                 items: [{
                     product_variant_id: selectedVariant.id,
                     quantity: quantity,
-                    price: selectedVariant.discount_price && selectedVariant.discount_price > 0
-                        ? selectedVariant.discount_price
-                        : selectedVariant.price
+                    price: selectedVariant.price
                 }],
                 shipping_cost: orderFormData.shipping_cost,
                 notes: orderFormData.notes
             };
 
             const response = await axios.post('/api/orders', orderData);
-
+            
             if (response.data.status === 'success') {
                 Swal.fire({
                     icon: 'success',
@@ -449,7 +437,7 @@ export default function ProductDetail() {
                 <div className="bg-gray-50 min-h-screen flex items-center justify-center">
                     <div className="text-center">
                         <p className="text-red-500 text-lg mb-4">{error || 'Product not found'}</p>
-                        <Link
+                        <Link 
                             href="/"
                             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                         >
@@ -464,55 +452,44 @@ export default function ProductDetail() {
     return (
         <MarketplaceLayout>
             <div className="min-h-screen bg-gray-50 py-4 sm:py-6">
-
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="mb-2 sm:mb-4">
-                        <Link
-                            href="/"
-                            className="inline-flex items-center text-gray-600 hover:text-gray-900 text-sm sm:text-base"
-                        >
-                            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                            Kembali
-                        </Link>
-                    </div>
+
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
                         {/* Product Image Gallery */}
                         <div className="space-y-4">
                             {/* Main Image */}
-                            <div
-                                className="w-full rounded-sm overflow-hidden bg-white border border-gray-100 relative mx-auto"
-                                style={{ aspectRatio: '1 / 1', maxWidth: 400, maxHeight: 400 }}
-                            >
+                            <div className="aspect-square w-full rounded-sm overflow-hidden bg-white border border-gray-100 relative">
                                 {imageLoading && (
                                     <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10">
                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
                                     </div>
                                 )}
-                                <img
-                                    src={currentImage || 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'}
+                                <img 
+                                    src={currentImage || 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
                                     alt={product.name}
                                     className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                                     onLoad={() => setImageLoading(false)}
                                     onError={() => setImageLoading(false)}
                                 />
                             </div>
-
+                            
                             {/* Image Thumbnails - Shopee Style */}
                             {getAllImages().length > 0 && (
                                 <div className="space-y-2">
-                                    <div className="flex gap-1 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                                    <div className="flex gap-1 overflow-x-auto pb-2" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
                                         {getAllImages().map((image, index) => (
                                             <button
                                                 key={image.id}
                                                 onClick={() => handleImageChange(image.url)}
-                                                className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded border overflow-hidden transition-all duration-200 relative ${currentImage === image.url
-                                                    ? 'border-red-500 ring-1 ring-red-200'
-                                                    : 'border-gray-300 hover:border-gray-400'
-                                                    }`}
+                                                className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded border overflow-hidden transition-all duration-200 relative ${
+                                                    currentImage === image.url
+                                                        ? 'border-red-500 ring-1 ring-red-200'
+                                                        : 'border-gray-300 hover:border-gray-400'
+                                                }`}
                                                 title={image.label}
                                             >
-                                                <img
-                                                    src={image.url}
+                                                <img 
+                                                    src={image.url} 
                                                     alt={image.label}
                                                     className="w-full h-full object-cover"
                                                 />
@@ -523,7 +500,7 @@ export default function ProductDetail() {
                                             </button>
                                         ))}
                                     </div>
-
+                                    
                                     {/* Current image info */}
                                     {selectedVariant && selectedVariant.image && currentImage === (selectedVariant.image.startsWith('http') ? selectedVariant.image : `/storage/${selectedVariant.image}`) && (
                                         <div className="text-center">
@@ -534,7 +511,7 @@ export default function ProductDetail() {
                                     )}
                                 </div>
                             )}
-
+                            
                             {/* Image Labels */}
                             {getAllImages().length > 1 && (
                                 <div className="text-center">
@@ -558,22 +535,11 @@ export default function ProductDetail() {
                                 <div className="flex flex-col space-y-2">
                                     {/* Current Selected Price */}
                                     <div className="flex items-center space-x-3">
-                                        {selectedVariant?.discount_price && selectedVariant.discount_price > 0 ? (
-                                            <>
-                                                <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
-                                                    {formatPrice(selectedVariant.discount_price)}
-                                                </span>
-                                                <span className="text-lg sm:text-base text-gray-500 line-through">
-                                                    {formatPrice(getCurrentPrice())}
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
-                                                {formatPrice(getCurrentPrice())}
-                                            </span>
-                                        )}
+                                        <span className="text-2xl sm:text-2xl lg:text-3xl font-medium text-gray-900">
+                                            {formatPrice(getCurrentPrice())}
+                                        </span>
                                     </div>
-
+                                    
                                     {/* Price Range for Multiple Variants */}
                                     {getStorefrontVariants().length > 1 && (
                                         <div className="text-sm text-gray-600">
@@ -581,8 +547,9 @@ export default function ProductDetail() {
                                         </div>
                                     )}
                                 </div>
-                                <p className={`text-base sm:text-sm ${product.is_active !== false && getCurrentStock() > 0 ? 'text-green-600' : 'text-red-500'
-                                    }`}>
+                                <p className={`text-base sm:text-sm ${
+                                    product.is_active !== false && getCurrentStock() > 0 ? 'text-green-600' : 'text-red-500'
+                                }`}>
                                     {product.is_active !== false && getCurrentStock() > 0 ? `Stok: ${getCurrentStock()}` : 'Tidak Tersedia'}
                                 </p>
                             </div>
@@ -599,13 +566,15 @@ export default function ProductDetail() {
                                                 key={variant.id}
                                                 onClick={() => handleVariantSelect(variant)}
                                                 disabled={!variant.is_active || variant.stock <= 0}
-                                                className={`p-4 sm:p-3 text-left border rounded-lg sm:rounded-sm text-base sm:text-sm transition-all duration-200 ${selectedVariant?.id === variant.id
-                                                    ? 'border-gray-700 bg-gray-50'
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                                    } ${!variant.is_active || variant.stock <= 0
+                                                className={`p-4 sm:p-3 text-left border rounded-lg sm:rounded-sm text-base sm:text-sm transition-all duration-200 ${
+                                                    selectedVariant?.id === variant.id
+                                                        ? 'border-gray-700 bg-gray-50'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                } ${
+                                                    !variant.is_active || variant.stock <= 0
                                                         ? 'opacity-50 cursor-not-allowed'
                                                         : 'cursor-pointer'
-                                                    }`}
+                                                }`}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div className="font-normal text-gray-800">
@@ -618,15 +587,8 @@ export default function ProductDetail() {
                                                 <div className="text-sm sm:text-xs text-gray-500 mt-1">
                                                     {variant.stock > 0 ? `Stok: ${variant.stock}` : 'Habis'}
                                                 </div>
-                                                <div className="text-sm sm:text-xs text-gray-600 mt-1 flex items-center gap-2">
-                                                    {variant.discount_price && variant.discount_price > 0 ? (
-                                                        <>
-                                                            <span className="font-medium text-gray-900">{formatPrice(variant.discount_price)}</span>
-                                                            <span className="line-through text-gray-500">{formatPrice(variant.price)}</span>
-                                                        </>
-                                                    ) : (
-                                                        <span>{formatPrice(variant.price)}</span>
-                                                    )}
+                                                <div className="text-sm sm:text-xs text-gray-600 mt-1">
+                                                    {formatPrice(variant.price)}
                                                 </div>
                                             </button>
                                         ))}
@@ -672,10 +634,11 @@ export default function ProductDetail() {
                                 <button
                                     onClick={addToCart}
                                     disabled={product.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
-                                    className={`w-full py-3 sm:py-2.5 px-4 border text-base sm:text-sm font-normal transition-all duration-200 flex items-center justify-center rounded-lg sm:rounded-sm ${product.is_active !== false && getCurrentStock() > 0 && selectedVariant
-                                        ? 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 bg-white'
-                                        : 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
-                                        }`}
+                                    className={`w-full py-3 sm:py-2.5 px-4 border text-base sm:text-sm font-normal transition-all duration-200 flex items-center justify-center rounded-lg sm:rounded-sm ${
+                                        product.is_active !== false && getCurrentStock() > 0 && selectedVariant
+                                            ? 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 bg-white' 
+                                            : 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                                    }`}
                                 >
                                     <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
                                     Tambah ke Keranjang
@@ -683,10 +646,11 @@ export default function ProductDetail() {
                                 <button
                                     onClick={buyNow}
                                     disabled={product.is_active === false || getCurrentStock() <= 0 || !selectedVariant}
-                                    className={`w-full py-3 sm:py-2.5 px-4 text-base sm:text-sm font-normal transition-all duration-200 rounded-lg sm:rounded-sm ${product.is_active !== false && getCurrentStock() > 0 && selectedVariant
-                                        ? 'bg-gray-800 text-white hover:bg-gray-900'
-                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        }`}
+                                    className={`w-full py-3 sm:py-2.5 px-4 text-base sm:text-sm font-normal transition-all duration-200 rounded-lg sm:rounded-sm ${
+                                        product.is_active !== false && getCurrentStock() > 0 && selectedVariant
+                                            ? 'bg-gray-800 text-white hover:bg-gray-900' 
+                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }`}
                                 >
                                     Beli Sekarang
                                 </button>
@@ -706,10 +670,11 @@ export default function ProductDetail() {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`py-4 sm:py-3 px-1 border-b-2 text-base sm:text-sm font-normal ${activeTab === tab.id
-                                            ? 'border-gray-700 text-gray-800'
-                                            : 'border-transparent text-gray-500 hover:text-gray-600'
-                                            }`}
+                                        className={`py-4 sm:py-3 px-1 border-b-2 text-base sm:text-sm font-normal ${
+                                            activeTab === tab.id
+                                                ? 'border-gray-700 text-gray-800'
+                                                : 'border-transparent text-gray-500 hover:text-gray-600'
+                                        }`}
                                     >
                                         {tab.label}
                                     </button>
@@ -721,7 +686,7 @@ export default function ProductDetail() {
                             {activeTab === 'description' && (
                                 <div className="prose prose-sm max-w-none">
                                     {product.description ? (
-                                        <div
+                                        <div 
                                             className="text-gray-600 leading-relaxed text-base sm:text-sm"
                                             dangerouslySetInnerHTML={{ __html: product.description }}
                                         />
@@ -769,8 +734,8 @@ export default function ProductDetail() {
                             <div className="bg-gray-50 p-4 rounded-lg">
                                 <h3 className="font-medium text-gray-900 mb-2">Produk yang Dipesan</h3>
                                 <div className="flex items-center space-x-3">
-                                    <img
-                                        src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://via.placeholder.com/60x60?text=No+Image'}
+                                    <img 
+                                        src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://via.placeholder.com/60x60?text=No+Image'} 
                                         alt={product.name}
                                         className="w-12 h-12 object-cover rounded"
                                     />
@@ -780,15 +745,7 @@ export default function ProductDetail() {
                                             <p className="text-xs text-gray-500">{selectedVariant.variant_label}</p>
                                         )}
                                         <p className="text-xs text-gray-600">
-                                            {selectedVariant?.discount_price && selectedVariant.discount_price > 0 ? (
-                                                <>
-                                                    <span className="font-medium">{formatPrice(selectedVariant.discount_price)}</span>
-                                                    <span className="line-through ml-1">{formatPrice(getCurrentPrice())}</span>
-                                                    <span className="ml-1">x {quantity} = {formatPrice(selectedVariant.discount_price * quantity)}</span>
-                                                </>
-                                            ) : (
-                                                <>{formatPrice(getCurrentPrice())} x {quantity} = {formatPrice(getCurrentPrice() * quantity)}</>
-                                            )}
+                                            {formatPrice(getCurrentPrice())} x {quantity} = {formatPrice(getCurrentPrice() * quantity)}
                                         </p>
                                     </div>
                                 </div>
@@ -806,15 +763,16 @@ export default function ProductDetail() {
                                         placeholder="Cari customer..."
                                         value={searchCustomer}
                                         onChange={(e) => setSearchCustomer(e.target.value)}
-                                        className={`w-full px-3 py-2 border rounded-lg ${orderErrors.customer_id ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                        className={`w-full px-3 py-2 border rounded-lg ${
+                                            orderErrors.customer_id ? 'border-red-500' : 'border-gray-300'
+                                        }`}
                                     />
                                     {orderLoading.customers && (
                                         <div className="absolute right-3 top-3">
                                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                                         </div>
                                     )}
-
+                                    
                                     {/* Customer dropdown */}
                                     {searchCustomer && customers.length > 0 && !selectedCustomer && (
                                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
@@ -845,8 +803,9 @@ export default function ProductDetail() {
                                 <select
                                     value={orderFormData.address_id}
                                     onChange={(e) => setOrderFormData(prev => ({ ...prev, address_id: e.target.value }))}
-                                    className={`w-full px-3 py-2 border rounded-lg ${orderErrors.address_id ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    className={`w-full px-3 py-2 border rounded-lg ${
+                                        orderErrors.address_id ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                     disabled={!selectedCustomer || customerAddresses.length === 0}
                                 >
                                     <option value="">Pilih alamat pengiriman</option>
@@ -873,11 +832,12 @@ export default function ProductDetail() {
                                     <Store className="inline h-4 w-4 mr-1" />
                                     Sales Channel
                                 </label>
-                                <select
+                                <select 
                                     value={orderFormData.sales_channel_id}
                                     onChange={(e) => setOrderFormData(prev => ({ ...prev, sales_channel_id: e.target.value }))}
-                                    className={`w-full px-3 py-2 border rounded-lg ${orderErrors.sales_channel_id ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    className={`w-full px-3 py-2 border rounded-lg ${
+                                        orderErrors.sales_channel_id ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 >
                                     <option value="">Pilih sales channel</option>
                                     {salesChannels.map((channel) => (
@@ -953,10 +913,11 @@ export default function ProductDetail() {
                             <button
                                 onClick={handleOrderSubmit}
                                 disabled={orderLoading.submitting}
-                                className={`px-6 py-2 rounded-lg transition-colors ${orderLoading.submitting
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-gray-800 text-white hover:bg-gray-900'
-                                    }`}
+                                className={`px-6 py-2 rounded-lg transition-colors ${
+                                    orderLoading.submitting
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-gray-800 text-white hover:bg-gray-900'
+                                }`}
                             >
                                 {orderLoading.submitting ? 'Memproses...' : 'Buat Order'}
                             </button>

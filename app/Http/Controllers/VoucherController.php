@@ -48,27 +48,18 @@ class VoucherController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('vouchers.create')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized. You do not have permission to create vouchers.'
-            ], 403);
-        }
-
         $validated = $request->validate([
             'code' => 'required|string|max:50|unique:vouchers,code',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'required|in:percentage,fixed,shipping,free_sample,shipping_free_sample',
+            'type' => 'required|in:percentage,fixed',
             'value' => 'required|numeric|min:0',
             'minimum_amount' => 'nullable|numeric|min:0',
             'maximum_discount' => 'nullable|numeric|min:0',
             'usage_limit' => 'nullable|integer|min:1',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
-            'is_active' => 'boolean',
-            'free_product_name' => 'nullable|string|max:255|required_if:type,free_sample|required_if:type,shipping_free_sample'
+            'is_active' => 'boolean'
         ]);
 
         // Validate percentage value
@@ -112,39 +103,24 @@ class VoucherController extends Controller
 
     public function update(Request $request, Voucher $voucher): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('vouchers.edit')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized. You do not have permission to edit vouchers.'
-            ], 403);
-        }
-
         $validated = $request->validate([
             'code' => 'sometimes|required|string|max:50|unique:vouchers,code,' . $voucher->id,
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'sometimes|required|in:percentage,fixed,shipping,free_sample,shipping_free_sample',
+            'type' => 'sometimes|required|in:percentage,fixed',
             'value' => 'sometimes|required|numeric|min:0',
             'minimum_amount' => 'nullable|numeric|min:0',
             'maximum_discount' => 'nullable|numeric|min:0',
             'usage_limit' => 'nullable|integer|min:1',
             'start_date' => 'sometimes|required|date',
             'end_date' => 'sometimes|required|date|after:start_date',
-            'is_active' => 'boolean',
-            'free_product_name' => 'nullable|string|max:255|required_if:type,free_sample|required_if:type,shipping_free_sample'
+            'is_active' => 'boolean'
         ]);
-
-        if (array_key_exists('usage_limit', $validated) && $validated['usage_limit'] !== null && $validated['usage_limit'] < $voucher->used_count) {
-            throw ValidationException::withMessages([
-                'usage_limit' => ['Batas Penggunaan tidak boleh kurang dari pemakaian saat ini.']
-            ]);
-        }
 
         // Validate percentage value
         if (isset($validated['type']) && $validated['type'] === 'percentage' && isset($validated['value']) && $validated['value'] > 100) {
             throw ValidationException::withMessages([
-                'value' => ['Nilai Persentase tidak boleh lebih dari 100.']
+                'value' => ['Percentage value cannot be greater than 100.']
             ]);
         }
 
@@ -171,12 +147,10 @@ class VoucherController extends Controller
 
     public function destroy(Voucher $voucher): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('vouchers.delete')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized. You do not have permission to delete vouchers.'
-            ], 403);
+        if ($voucher->orders()->exists()) {
+            throw ValidationException::withMessages([
+                'voucher' => ['Cannot delete voucher that has been used in orders.']
+            ]);
         }
 
         try {
@@ -199,14 +173,6 @@ class VoucherController extends Controller
 
     public function toggleStatus(Voucher $voucher): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('vouchers.toggle_status')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized. You do not have permission to toggle voucher status.'
-            ], 403);
-        }
-
         try {
             DB::beginTransaction();
 
@@ -232,8 +198,7 @@ class VoucherController extends Controller
     {
         $validated = $request->validate([
             'code' => 'required|string',
-            'order_amount' => 'required|numeric|min:0',
-            'shipping_cost' => 'nullable|numeric|min:0'
+            'order_amount' => 'required|numeric|min:0'
         ]);
 
         $voucher = Voucher::where('code', $validated['code'])->first();
@@ -252,8 +217,7 @@ class VoucherController extends Controller
             ], 422);
         }
 
-        $shippingCost = $validated['shipping_cost'] ?? 0;
-        $discount = $voucher->calculateDiscount($validated['order_amount'], $shippingCost);
+        $discount = $voucher->calculateDiscount($validated['order_amount']);
 
         return response()->json([
             'status' => 'success',

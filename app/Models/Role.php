@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Support\Collection;
 
 class Role extends Model
 {
@@ -14,33 +12,24 @@ class Role extends Model
     protected $fillable = [
         'name',
         'description',
+        'permissions',
         'is_active',
         'is_system',
     ];
 
     protected $casts = [
+        'permissions' => 'array',
         'is_active' => 'boolean',
         'is_system' => 'boolean',
     ];
 
-    /**
-     * Get the users that have this role.
-     */
-    public function users(): BelongsToMany
+    public function users()
     {
-        return $this->belongsToMany(User::class, 'user_has_roles');
+        return $this->hasMany(User::class, 'role_id');
     }
 
     /**
-     * Get the permissions for this role.
-     */
-    public function permissions(): BelongsToMany
-    {
-        return $this->belongsToMany(Permission::class, 'role_has_permissions');
-    }
-
-    /**
-     * Check if role has a specific permission.
+     * Check if role has a specific permission
      */
     public function hasPermission(string $permission): bool
     {
@@ -48,15 +37,15 @@ class Role extends Model
             return false;
         }
 
-        $permissions = $this->permissions()->pluck('name');
+        $permissions = $this->permissions ?? [];
         
         // Owner has all permissions
-        if ($permissions->contains('*')) {
+        if (in_array('*', $permissions)) {
             return true;
         }
 
         // Check exact permission
-        if ($permissions->contains($permission)) {
+        if (in_array($permission, $permissions)) {
             return true;
         }
 
@@ -73,9 +62,6 @@ class Role extends Model
         return false;
     }
 
-    /**
-     * Check if role has any of the given permissions.
-     */
     public function hasAnyPermission(array $permissions): bool
     {
         foreach ($permissions as $permission) {
@@ -86,9 +72,6 @@ class Role extends Model
         return false;
     }
 
-    /**
-     * Check if role has all of the given permissions.
-     */
     public function hasAllPermissions(array $permissions): bool
     {
         foreach ($permissions as $permission) {
@@ -97,66 +80,6 @@ class Role extends Model
             }
         }
         return true;
-    }
-
-    /**
-     * Assign permission(s) to role.
-     */
-    public function givePermissionTo(string|array|Permission $permissions): self
-    {
-        $permissions = is_array($permissions) ? $permissions : [$permissions];
-
-        foreach ($permissions as $permission) {
-            $permModel = $permission instanceof Permission 
-                ? $permission 
-                : Permission::where('name', $permission)->firstOrFail();
-            $this->permissions()->syncWithoutDetaching($permModel);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Remove permission(s) from role.
-     */
-    public function revokePermissionTo(string|array|Permission $permissions): self
-    {
-        $permissions = is_array($permissions) ? $permissions : [$permissions];
-
-        foreach ($permissions as $permission) {
-            $permModel = $permission instanceof Permission 
-                ? $permission 
-                : Permission::where('name', $permission)->first();
-            if ($permModel) {
-                $this->permissions()->detach($permModel);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * Sync permissions (replace all existing permissions).
-     */
-    public function syncPermissions(array $permissions): self
-    {
-        $permissionIds = collect($permissions)->map(function ($permission) {
-            return $permission instanceof Permission 
-                ? $permission->id 
-                : Permission::where('name', $permission)->firstOrFail()->id;
-        });
-
-        $this->permissions()->sync($permissionIds);
-
-        return $this;
-    }
-
-    /**
-     * Get all permission names for this role.
-     */
-    public function getPermissionNames(): array
-    {
-        return $this->permissions()->pluck('name')->toArray();
     }
 
     /**

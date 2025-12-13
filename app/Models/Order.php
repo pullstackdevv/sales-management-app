@@ -23,16 +23,13 @@ class Order extends Model
         'shipping_cost',
         'status',
         'ordered_at',
-        'printed_at',
         'updated_by',
-        'processed_by',
         'guest_email',
         'guest_phone',
         'notes',
         'payment_token',
         'payment_url',
         'payment_status',
-        'is_dropship',
     ];
 
     protected $casts = [
@@ -40,20 +37,18 @@ class Order extends Model
         'discount_amount' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'ordered_at' => 'datetime',
-        'printed_at' => 'datetime',
         'payment_status' => PaymentStatus::class,
-        'is_dropship' => 'boolean',
     ];
 
     // Relationships
     public function customer()
     {
-        return $this->belongsTo(Customer::class)->withTrashed();
+        return $this->belongsTo(Customer::class);
     }
 
     public function address()
     {
-        return $this->belongsTo(CustomerAddress::class, 'address_id')->withTrashed();
+        return $this->belongsTo(CustomerAddress::class, 'address_id');
     }
 
     public function user()
@@ -89,11 +84,6 @@ class Order extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'user_id');
-    }
-
-    public function processedBy()
-    {
-        return $this->belongsTo(User::class, 'processed_by');
     }
 
     // Helper methods for guest checkout

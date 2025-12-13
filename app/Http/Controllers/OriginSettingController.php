@@ -42,9 +42,6 @@ class OriginSettingController extends Controller
         ]);
 
         $origin = OriginSetting::create($validated);
-        if (!empty($validated['is_active']) && $validated['is_active']) {
-            OriginSetting::where('id', '!=', $origin->id)->update(['is_active' => false]);
-        }
         return response()->json([
             'success' => true,
             'data' => $origin,
@@ -82,9 +79,6 @@ class OriginSettingController extends Controller
         ]);
 
         $originSetting->update($validated);
-        if (!empty($validated['is_active']) && $validated['is_active']) {
-            OriginSetting::where('id', '!=', $originSetting->id)->update(['is_active' => false]);
-        }
         return response()->json([
             'success' => true,
             'data' => $originSetting,

@@ -6,10 +6,8 @@ import VoucherCard from "../../components/ui/card/VoucherCard";
 import Swal from "sweetalert2";
 import { router } from "@inertiajs/react";
 import { debugComponent, debugApi } from "../../utils/devtools";
-import { useAuth } from "../../contexts/AuthContext";
 
 const VoucherData = () => {
-    const { hasPermission } = useAuth();
     const [vouchers, setVouchers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -19,15 +17,15 @@ const VoucherData = () => {
     const [viewMode, setViewMode] = useState("table");
 
     const handleAddVoucher = () => {
-        router.visit('/cms/voucher/create');
+        router.visit('/voucher/create');
     };
 
     const handleEditVoucher = (id) => {
-        router.visit(`/cms/voucher/edit/${id}`);
+        router.visit(`/voucher/edit/${id}`);
     };
 
     const handleViewVoucher = (id) => {
-        router.visit(`/cms/voucher/view/${id}`);
+        router.visit(`/voucher/view/${id}`);
     };
 
     const deleteVoucher = async (id) => {
@@ -139,14 +137,8 @@ const VoucherData = () => {
         const baseClasses = "px-2 py-1 text-xs font-medium rounded";
         if (type === "percentage") {
             return `${baseClasses} bg-blue-100 text-blue-800`;
-        } else if (type === "fixed") {
-            return `${baseClasses} bg-purple-100 text-purple-800`;
-        } else if (type === "shipping") {
-            return `${baseClasses} bg-orange-100 text-orange-800`;
-        } else if (type === "free_sample") {
-            return `${baseClasses} bg-green-100 text-green-800`;
         } else {
-            return `${baseClasses} bg-gray-100 text-gray-800`;
+            return `${baseClasses} bg-purple-100 text-purple-800`;
         }
     };
 
@@ -162,15 +154,13 @@ const VoucherData = () => {
                         Kelola voucher dan promosi untuk pelanggan
                     </p>
                 </div>
-                {hasPermission('vouchers.create') && (
-                    <button 
-                        onClick={handleAddVoucher}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                    >
-                        <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
-                        Tambah Voucher
-                    </button>
-                )}
+                <button 
+                    onClick={handleAddVoucher}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                    <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
+                    Tambah Voucher
+                </button>
             </div>
 
             {loading ? (
@@ -301,7 +291,6 @@ const VoucherData = () => {
                                     <option value="all">Semua Tipe</option>
                                     <option value="percentage">Persentase</option>
                                     <option value="fixed">Fixed Amount</option>
-                                    <option value="free_sample">Free Sample</option>
                                 </select>
                                 <select
                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -398,7 +387,7 @@ const VoucherData = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex-col">
+                                                <div className="flex items-center gap-2">
                                                     <span
                                                         className={getTypeBadge(
                                                             voucher.type
@@ -406,22 +395,14 @@ const VoucherData = () => {
                                                     >
                                                         {voucher.type === "percentage"
                                                             ? "Persentase"
-                                                            : voucher.type === "fixed"
-                                                            ? "Fixed"
-                                                            : voucher.type === "shipping"
-                                                            ? "Potongan Ongkir"
-                                                            : voucher.type === "shipping_free_sample"
-                                                            ? "Free Sample + Potongan Ongkir"
-                                                            : "Free Sample"}
+                                                            : "Fixed"}
                                                     </span>
-                                                    <div className="text-sm font-semibold text-gray-900 mt-2">
+                                                    <div className="text-sm font-semibold text-gray-900">
                                                         {voucher.type === "percentage"
-                                                            ? `${Math.floor(voucher.value)}%`
-                                                            : voucher.type === "fixed" || voucher.type === "shipping"
-                                                            ? formatRupiah(voucher.value)
-                                                            : voucher.type === "shipping_free_sample"
-                                                            ? `${formatRupiah(voucher.value)} + ${voucher.free_product_name || "Produk Gratis"}`
-                                                            : voucher.free_product_name || "Produk Gratis"}
+                                                            ? `${voucher.value}%`
+                                                            : formatRupiah(
+                                                                    voucher.value
+                                                                )}
                                                     </div>
                                                 </div>
                                             </td>

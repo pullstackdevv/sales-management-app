@@ -3,7 +3,6 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers'
 import ReactDOM from 'react-dom/client'
 import '../css/app.css'; // <--- WAJIB!
 import { enableReactDevTools } from './utils/devtools';
-import { AuthProvider } from './contexts/AuthContext';
 
 // Enable React DevTools in development
 if (import.meta.env.DEV) {
@@ -11,13 +10,8 @@ if (import.meta.env.DEV) {
 }
 
 createInertiaApp({
-  resolve: (name) => {
-    const page = resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx'));
-    page.then((module) => {
-      module.default.layout = module.default.layout || ((page) => <AuthProvider>{page}</AuthProvider>);
-    });
-    return page;
-  },
+  resolve: name =>
+    resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
   setup({ el, App, props }) {
     ReactDOM.createRoot(el).render(<App {...props} />)
   },

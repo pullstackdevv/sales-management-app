@@ -21,12 +21,10 @@ class CustomerAddress extends Model
         'district',
         'postal_code',
         'is_default',
-        'is_dropship',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
-        'is_dropship' => 'boolean',
     ];
 
     // Relationships

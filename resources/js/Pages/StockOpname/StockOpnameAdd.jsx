@@ -22,16 +22,6 @@ export default function StockOpnameAdd() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
 
-  const formatRibuan = (num) => {
-    if (!num || num === 0) return '';
-    return Math.floor(num).toLocaleString('id-ID');
-  };
-
-  const parseRibuan = (str) => {
-    if (!str) return 0;
-    return parseInt(str.toString().replace(/\./g, '')) || 0;
-  };
-
   // Fetch products with search
   const fetchProducts = async (search = '') => {
     setLoading(prev => ({ ...prev, products: true }));
@@ -74,13 +64,9 @@ export default function StockOpnameAdd() {
   const updateRow = (id, field, value) => {
     setRows(rows.map(row => {
       if (row.id === id) {
-        const updatedRow = { ...row };
+        const updatedRow = { ...row, [field]: value };
         if (field === 'physical_stock') {
-          const valNum = typeof value === 'string' ? parseRibuan(value) : (Number(value) || 0);
-          updatedRow.physical_stock = valNum;
-          updatedRow.difference = valNum - updatedRow.system_stock;
-        } else {
-          updatedRow[field] = value;
+          updatedRow.difference = parseInt(value || 0) - updatedRow.system_stock;
         }
         return updatedRow;
       }
@@ -375,25 +361,25 @@ export default function StockOpnameAdd() {
                     </td>
                     <td className="py-3 px-4">
                       <input
-                        type="text"
-                        value={formatRibuan(row.system_stock)}
+                        type="number"
+                        value={row.system_stock}
                         readOnly
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                       />
                     </td>
                     <td className="py-3 px-4">
                       <input
-                        type="text"
-                        value={formatRibuan(row.physical_stock)}
+                        type="number"
+                        value={row.physical_stock}
                         onChange={(e) => updateRow(row.id, 'physical_stock', e.target.value)}
-                        placeholder="0"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        min="0"
                       />
                     </td>
                     <td className="py-3 px-4">
                       <input
-                        type="text"
-                        value={`${row.difference > 0 ? '+' : ''}${formatRibuan(row.difference)}`}
+                        type="number"
+                        value={row.difference}
                         readOnly
                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 ${
                           row.difference > 0 ? 'text-green-600' : row.difference < 0 ? 'text-red-600' : 'text-gray-600'

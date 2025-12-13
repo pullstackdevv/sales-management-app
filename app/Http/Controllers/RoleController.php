@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Role;
-use App\Models\Permission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,7 +13,6 @@ class RoleController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        
         $roles = Role::withCount('users')
             ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%");
@@ -31,7 +29,7 @@ class RoleController extends Controller
             return [
                 'role' => $role->name,
                 'description' => $role->description,
-                'permissions' => $role->getPermissionNames(),
+                'permissions' => $role->permissions ?? [],
                 'is_active' => $role->is_active,
                 'is_system' => $role->is_system,
                 'users_count' => $role->users_count
@@ -46,14 +44,6 @@ class RoleController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('roles.create')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized. You do not have permission to create roles.'
-            ], 403);
-        }
-
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:roles,name',
             'description' => 'nullable|string|max:255',
@@ -65,14 +55,7 @@ class RoleController extends Controller
         try {
             DB::beginTransaction();
 
-            $role = Role::create([
-                'name' => $validated['name'],
-                'description' => $validated['description'] ?? null,
-                'is_active' => $validated['is_active'] ?? true,
-            ]);
-
-            // Sync permissions
-            $role->syncPermissions($validated['permissions']);
+            $role = Role::create($validated);
 
             DB::commit();
 
@@ -82,7 +65,7 @@ class RoleController extends Controller
                 'data' => [
                     'role' => $role->name,
                     'description' => $role->description,
-                    'permissions' => $role->getPermissionNames(),
+                    'permissions' => $role->permissions ?? [],
                     'is_active' => $role->is_active,
                     'is_system' => $role->is_system
                 ]
@@ -100,7 +83,7 @@ class RoleController extends Controller
             'data' => [
                 'role' => $role->name,
                 'description' => $role->description,
-                'permissions' => $role->getPermissionNames(),
+                'permissions' => $role->permissions ?? [],
                 'is_active' => $role->is_active,
                 'is_system' => $role->is_system,
                 'users_count' => $role->users()->count()
@@ -110,14 +93,6 @@ class RoleController extends Controller
 
     public function update(Request $request, string $roleName): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('roles.edit')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized. You do not have permission to edit roles.'
-            ], 403);
-        }
-
         $role = Role::where('name', $roleName)->firstOrFail();
 
         $validated = $request->validate([
@@ -129,13 +104,11 @@ class RoleController extends Controller
         try {
             DB::beginTransaction();
 
-            // Update role description
+            // Hanya update field yang diizinkan
             $role->update([
                 'description' => $validated['description'] ?? $role->description,
+                'permissions' => $validated['permissions']
             ]);
-
-            // Sync permissions
-            $role->syncPermissions($validated['permissions']);
 
             DB::commit();
 
@@ -145,7 +118,7 @@ class RoleController extends Controller
                 'data' => [
                     'role' => $role->name,
                     'description' => $role->description,
-                    'permissions' => $role->getPermissionNames(),
+                    'permissions' => $role->permissions ?? [],
                     'is_active' => $role->is_active,
                     'is_system' => $role->is_system
                 ]
@@ -159,14 +132,6 @@ class RoleController extends Controller
 
     public function destroy(Role $role): JsonResponse
     {
-        // Check permission
-        if (!Auth::user()->hasPermission('roles.delete')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized. You do not have permission to delete roles.'
-            ], 403);
-        }
-
         if ($role->is_system) {
             throw ValidationException::withMessages([
                 'role' => ['Cannot delete system role.']
@@ -219,7 +184,7 @@ class RoleController extends Controller
                 'data' => [
                     'role' => $role->name,
                     'description' => $role->description,
-                    'permissions' => $role->getPermissionNames(),
+                    'permissions' => $role->permissions ?? [],
                     'is_active' => $role->is_active,
                     'is_system' => $role->is_system
                 ]
@@ -235,16 +200,6 @@ class RoleController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => Role::getAllPermissions()
-        ]);
-    }
-
-    public function getAllPermissions(): JsonResponse
-    {
-        $permissions = Permission::orderBy('module')->orderBy('name')->get();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => $permissions
         ]);
     }
 }

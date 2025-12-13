@@ -7,7 +7,6 @@ import { Timeline, TimelineItem, TimelinePoint } from "flowbite-react";
 import PaymentHistoryModal from "../modal/PaymentHistoryModal";
 import ShippingUpdateModal from "../modal/ShippingUpdateModal";
 import OrderHistoryModal from "../modal/OrderHistoryModal";
-import { useAuth } from "../../../contexts/AuthContext";
 
 // Helper function for route generation
 const route = (name, params = null) => {
@@ -23,22 +22,16 @@ const route = (name, params = null) => {
     return '#';
 };
 
-export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], onOrderUpdate, showCheckbox = false, isSelected = false, onSelect }) {
-    const { hasPermission } = useAuth();
+export default function OrderCard({ order, onOrderUpdate }) {
     const [localOrder, setLocalOrder] = useState(order);
-    // console.log(order)
 
 
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-    const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
-    const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
-    const [paymentBanks, setPaymentBanks] = useState(paymentBanksProp);
     const [showShippingModal, setShowShippingModal] = useState(false);
     const [showPaymentHistory, setShowPaymentHistory] = useState(false);
     const [showOrderHistory, setShowOrderHistory] = useState(false);
     const dropdownRef = useRef(null);
-    const paymentDropdownRef = useRef(null);
 
     // Update local order when prop changes
     useEffect(() => {
@@ -46,18 +39,10 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
     }, [order]);
 
 
+
+    // Helper function to determine order source
     const getOrderSource = (order) => {
-        // Check if order has sales_channel and if it's WEBSITE
-        if (order.sales_channel && order.sales_channel === 'WEBSITE') {
-            return {
-                type: 'website',
-                label: 'Website Resmi',
-                icon: 'mdi:globe',
-                bgColor: 'bg-blue-100',
-                textColor: 'text-blue-700',
-                borderColor: 'border-blue-200'
-            };
-        }
+
 
         // Default to manual admin order
         return {
@@ -80,12 +65,6 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                 !dropdownRef.current.contains(event.target)
             ) {
                 setShowStatusDropdown(false);
-            }
-            if (
-                paymentDropdownRef.current &&
-                !paymentDropdownRef.current.contains(event.target)
-            ) {
-                setShowPaymentDropdown(false);
             }
         };
 
@@ -162,18 +141,11 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
 
     const statusBadge = getStatusBadge(localOrder.raw_status || localOrder.status);
 
-    useEffect(() => {
-        setPaymentBanks(paymentBanksProp);
-    }, [paymentBanksProp]);
-
     // Get valid status transitions - allow all status changes
     const getValidStatusTransitions = (currentStatus) => {
-        const isWebOrder = !!localOrder.payment_url || localOrder.sales_channel === 'WEBSITE';
-        if (currentStatus === 'delivered') return [];
         const allStatuses = ["pending", "paid", "shipped", "delivered", "cancelled"];
-        if (isWebOrder && currentStatus === 'pending') return [];
-        const base = allStatuses.filter((status) => status !== currentStatus);
-        return isWebOrder ? base.filter((s) => s !== 'cancelled') : base;
+        // Return all statuses except the current one
+        return allStatuses.filter((status) => status !== currentStatus);
     };
 
     // Helper function to get status label in Indonesian
@@ -346,80 +318,13 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
         }
     };
 
-    const handleCancelOrder = async () => {
-        const result = await Swal.fire({
-            title: "Konfirmasi",
-            text: "Apakah Anda yakin ingin membatalkan order ini?",
-            icon: "question",
-            showCancelButton: true,
-            confirmButtonColor: "#d33",
-            cancelButtonColor: "#3085d6",
-            confirmButtonText: "Ya, Batalkan",
-            cancelButtonText: "Batal",
-        });
-
-        if (!result.isConfirmed) return;
-
-        try {
-            const token =
-                document
-                    .querySelector('meta[name="csrf-token"]')
-                    ?.getAttribute("content") ||
-                localStorage.getItem("auth_token") ||
-                "3|kQS8PzhP4mz4C2Ap5k5FS1tapDkeVFBExe5Mncfd1c7a3056";
-
-            const response = await axios.post(
-                `/api/orders/${localOrder.id}/update-status`,
-                { status: 'cancelled' },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                        Accept: "application/json",
-                    },
-                }
-            );
-
-            await Swal.fire({
-                title: "Berhasil!",
-                text: "Order berhasil dibatalkan.",
-                icon: "success",
-                timer: 2000,
-                showConfirmButton: false,
-            });
-
-            setLocalOrder(prev => ({ ...prev, status: 'cancelled', payment_status: 'cancelled' }));
-            if (onOrderUpdate) onOrderUpdate();
-        } catch (error) {
-            let errorMessage = "Terjadi kesalahan saat membatalkan order.";
-            if (error.response?.data?.message) {
-                errorMessage = error.response.data.message;
-            }
-            await Swal.fire({
-                title: "Error!",
-                text: errorMessage,
-                icon: "error",
-                confirmButtonText: "OK",
-            });
-        }
-    };
-
     const validTransitions = getValidStatusTransitions(localOrder.raw_status || localOrder.status);
-    // console.log('ini order card', localOrder)
+
     return (
-        <div className={`border rounded-xl p-4 mb-4 bg-white shadow-sm text-sm ${orderSource.borderColor} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}>
+        <div className={`border rounded-xl p-4 mb-4 bg-white shadow-sm text-sm ${orderSource.borderColor}`}>
             <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center text-xs text-gray-600 border-b pb-4 mb-4">
                 <div className="grid">
                     <div className="flex items-center gap-2 mb-1">
-                        {showCheckbox && (
-                            <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => onSelect(localOrder.id)}
-                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                        )}
                         <Link
                             href={route('cms.orders.show', localOrder.id)}
                             className="text-blue-600 font-semibold text-base hover:text-blue-800"
@@ -472,19 +377,13 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
 
             <div className="flex flex-col md:flex-row justify-between gap-6">
                 <div className="flex-1 grid gap-2">
-                    {localOrder.is_dropship && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200 mt-1 w-fit">
-                            <Icon icon="mdi:package-variant-closed" width={12} />
-                            Dropship
-                        </span>
-                    )}
                     <div>
                         <div className="text-gray-500">Pemesan</div>
                         <div className="font-bold">{localOrder.customer}</div>
                     </div>
                     <div>
                         <div className="text-gray-500">Dikirim kepada</div>
-                        <div className="font-bold">{localOrder.recipient_name || localOrder.customer}</div>
+                        <div className="font-bold">{localOrder.customer}</div>
                     </div>
                     <div>
                         <div className="text-gray-500">Admin</div>
@@ -504,19 +403,17 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                             <div className="relative" ref={dropdownRef}>
                                 <button
                                     onClick={() =>
-                                        hasPermission('orders.update_status') && setShowStatusDropdown(
+                                        setShowStatusDropdown(
                                             !showStatusDropdown
                                         )
                                     }
                                     disabled={
-                                        !hasPermission('orders.update_status') ||
                                         isUpdatingStatus ||
                                         validTransitions.length === 0
                                     }
                                     className={`${statusBadge.bgColor} ${statusBadge.textColor
                                         } text-xs font-semibold px-2 py-1 rounded-md flex items-center gap-1 ${validTransitions.length > 0 &&
-                                            !isUpdatingStatus &&
-                                            hasPermission('orders.update_status')
+                                            !isUpdatingStatus
                                             ? "hover:opacity-80 cursor-pointer"
                                             : "cursor-default"
                                         } ${isUpdatingStatus ? "opacity-50" : ""}`}
@@ -578,88 +475,18 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                                     )}
                             </div>
                             {localOrder.payment_bank && !localOrder.payment_url && (
-                                <div className="relative group" ref={paymentDropdownRef}>
-                                    <button
-                                        onClick={() => hasPermission('orders.edit') && setShowPaymentDropdown(!showPaymentDropdown)}
-                                        disabled={!hasPermission('orders.edit') || isUpdatingPayment}
-                                        className={`bg-gray-700 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 ${hasPermission('orders.edit') ? 'hover:opacity-90' : ''} ${isUpdatingPayment ? 'opacity-70' : ''}`}
-                                    >
-                                        <span>{localOrder.bank}</span>
-                                        {hasPermission('orders.edit') && (
-                                            <Icon icon="mdi:chevron-down" width="12" />
-                                        )}
-                                    </button>
+                                <div className="relative group">
+                                    <span className="bg-gray-700 text-white text-xs px-2 py-1 rounded-md cursor-help">
+                                        {localOrder.bank}
+                                    </span>
+                                    {/* Tooltip with bank details */}
                                     <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded-md p-2 whitespace-nowrap z-10 shadow-lg">
                                         <div className="font-semibold">{localOrder.payment_bank.bank_name}</div>
                                         <div>No. Rek: {localOrder.payment_bank.account_number}</div>
                                         <div>A/n: {localOrder.payment_bank.account_name}</div>
+                                        {/* Arrow */}
                                         <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
                                     </div>
-                                    {showPaymentDropdown && !localOrder.payment_url && paymentBanks.length > 0 && (
-                                        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[200px]">
-                                            {paymentBanks.map((bank) => (
-                                                <button
-                                                    key={bank.id}
-                                                    onClick={async () => {
-                                                        if (isUpdatingPayment) return;
-                                                        setIsUpdatingPayment(true);
-                                                        try {
-                                                            const token =
-                                                                document
-                                                                    .querySelector('meta[name="csrf-token"]')
-                                                                    ?.getAttribute("content") ||
-                                                                localStorage.getItem("auth_token") ||
-                                                                "3|kQS8PzhP4mz4C2Ap5k5FS1tapDkeVFBExe5Mncfd1c7a3056";
-                                                            const response = await axios.put(
-                                                                `/api/orders/${localOrder.id}`,
-                                                                { payment_bank_id: bank.id },
-                                                                {
-                                                                    headers: {
-                                                                        Authorization: `Bearer ${token}`,
-                                                                        "Content-Type": "application/json",
-                                                                        Accept: "application/json",
-                                                                    },
-                                                                }
-                                                            );
-                                                            if (response.data?.status === 'success') {
-                                                                setLocalOrder(prev => ({
-                                                                    ...prev,
-                                                                    payment_bank: bank,
-                                                                    bank: `${bank.bank_name} - ${bank.account_number}`
-                                                                }));
-                                                                setShowPaymentDropdown(false);
-                                                                if (onOrderUpdate) onOrderUpdate();
-                                                                await Swal.fire({
-                                                                    title: "Berhasil!",
-                                                                    text: "Metode pembayaran berhasil diubah.",
-                                                                    icon: "success",
-                                                                    timer: 1800,
-                                                                    showConfirmButton: false,
-                                                                });
-                                                            }
-                                                        } catch (error) {
-                                                            let errorMessage = "Terjadi kesalahan saat mengubah metode pembayaran.";
-                                                            if (error.response?.data?.message) {
-                                                                errorMessage = error.response.data.message;
-                                                            }
-                                                            await Swal.fire({
-                                                                title: "Error!",
-                                                                text: errorMessage,
-                                                                icon: "error",
-                                                                confirmButtonText: "OK",
-                                                            });
-                                                        } finally {
-                                                            setIsUpdatingPayment(false);
-                                                        }
-                                                    }}
-                                                    className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 first:rounded-t-md last:rounded-b-md ${localOrder.payment_bank?.id === bank.id ? 'bg-blue-50' : ''}`}
-                                                >
-                                                    <Icon icon="mdi:bank" width="14" className="text-gray-600" />
-                                                    <span className="capitalize">{bank.bank_name} - {bank.account_number}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             )}
                             {localOrder.payment_url && (
@@ -670,9 +497,9 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                                     </span>
                                     {localOrder.payment_status && (
                                         <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 ${localOrder.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
-                                            localOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                localOrder.payment_status === 'expired' ? 'bg-red-100 text-red-700' :
-                                                    'bg-gray-100 text-gray-700'
+                                                localOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                    localOrder.payment_status === 'expired' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-700'
                                             }`}>
                                             <Icon icon={
                                                 localOrder.payment_status === 'paid' ? 'mdi:check-circle' :
@@ -702,7 +529,7 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                             </div>
                             <div>
                                 <div className="font-semibold">
-                                    {localOrder.courier} - {localOrder.service_type}
+                                    {localOrder.courier}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                     Resi : {localOrder.resi || "-"}
@@ -732,43 +559,24 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
 
             <div className="flex justify-between border-t mt-4">
                 <div className="flex items-center gap-2 mt-4">
-                    {hasPermission('orders.print') && (
-                        <Link
-                            href={`/cms/order/print-invoice/${localOrder.id}`}
-                            className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
-                        >
-                            <Icon icon="mdi:printer" width="16" />
-                            Print
-                        </Link>
-                    )}
-                    {localOrder.printed_at && (
-                        <span className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                            <Icon icon="mdi:check-circle" width="14" />
-                            Sudah Diprint
-                        </span>
-                    )}
-                    {hasPermission('orders.view') && (
-                        <button
-                            onClick={() => setShowOrderHistory(true)}
-                            className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
-                        >
-                            <Icon icon="mdi:history" width="16" />
-                            Lihat Riwayat
-                        </button>
-                    )}
+                    <Link 
+                        href={`/cms/order/print-invoice/${localOrder.id}`}
+                        className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
+                    >
+                        <Icon icon="mdi:printer" width="16" />
+                        Print
+                    </Link>
+                    <button
+                        onClick={() => setShowOrderHistory(true)}
+                        className="flex items-center gap-1 border px-3 py-1 rounded-md text-sm hover:bg-gray-100"
+                    >
+                        <Icon icon="mdi:history" width="16" />
+                        Lihat Riwayat
+                    </button>
                 </div>
                 <div className="≈mt-6 pt-4 flex flex-wrap justify-end gap-2">
-                    {hasPermission('orders.update_status') && (() => {
-                        const rawStatus = localOrder.raw_status || localOrder.status;
-                        const labelStatus = localOrder.status;
-
-                        const shouldShowShipping =
-                            rawStatus === 'processing' ||
-                            rawStatus === 'shipped' ||
-                            rawStatus === 'delivered' ||
-                            labelStatus === 'Diproses' ||
-                            labelStatus === 'Dikirim' ||
-                            labelStatus === 'Diterima';
+                    {(() => {
+                        const shouldShowShipping = localOrder.status === 'Paid' || localOrder.status === 'paid' || localOrder.status === 'shipped' || localOrder.status === 'Dikirim';
 
                         return shouldShowShipping;
                     })() && (
@@ -780,7 +588,7 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                                 Update Shipping
                             </button>
                         )}
-                    {hasPermission('orders.update_status') && (() => {
+                    {(() => {
                         const shouldShow = localOrder.status !== 'delivered' && localOrder.status !== 'Diterima';
 
                         return shouldShow;
@@ -792,31 +600,13 @@ export default function OrderCard({ order, paymentBanks: paymentBanksProp = [], 
                                 Tandai diterima
                             </button>
                         )}
-                    {hasPermission('orders.update_status') && (() => {
-                        const rawStatus = localOrder.raw_status || localOrder.status;
-                        const labelStatus = localOrder.status;
-                        const isWebOrder = !!localOrder.payment_url || localOrder.sales_channel === 'WEBSITE';
-                        const canCancelWeb = isWebOrder && (rawStatus === 'pending' || labelStatus === 'Belum Bayar');
-                        const canCancelManual = !isWebOrder && !(rawStatus === 'delivered' || rawStatus === 'cancelled' || labelStatus === 'Diterima' || labelStatus === 'Dibatalkan');
-                        return canCancelWeb || canCancelManual;
-                    })() && (
-                            <button
-                                onClick={handleCancelOrder}
-                                className="border border-red-600 text-red-600 px-4 py-1.5 rounded-md hover:bg-red-50 flex items-center gap-2"
-                            >
-                                <Icon icon="mdi:close-circle" width="16" />
-                                Batalkan
-                            </button>
-                        )}
-                    {hasPermission('orders.edit') && (
-                        <Link
-                            href={route('cms.orders.edit', localOrder.id)}
-                            className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md hover:bg-blue-50 flex items-center gap-2"
-                        >
-                            <Icon icon="mdi:pencil" width="16" />
-                            Edit Order
-                        </Link>
-                    )}
+                    <Link
+                        href={route('cms.orders.edit', localOrder.id)}
+                        className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md hover:bg-blue-50 flex items-center gap-2"
+                    >
+                        <Icon icon="mdi:pencil" width="16" />
+                        Edit Order
+                    </Link>
                 </div>
             </div>
 

@@ -28,17 +28,13 @@ class DatabaseSeeder extends Seeder
         // ]);
 
         $this->call([
-            UserSeeder::class,
-            PermissionSeeder::class,
             RoleSeeder::class,
-            AssignUserRolesSeeder::class,
-            InteractiveUserRoleSeeder::class,
+            UserSeeder::class,
             SalesChannelSeeder::class,
             PaymentBankSeeder::class,
             CourierSeeder::class,
             CustomerSeeder::class,
             ProductSeeder::class,
-            TagSeeder::class,
             VoucherSeeder::class,
             ExpenseSeeder::class,
             OrderSeeder::class,

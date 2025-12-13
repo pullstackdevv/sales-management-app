@@ -80,14 +80,9 @@ export default function AddressManager({ customerId, addresses, onAddressesChang
 
     const handleAddressChange = (field, value) => {
         const newAddresses = [...localAddresses];
-        let newValue = value;
-        // Sanitize postal code input: numeric only, max 5 digits, optional
-        if (field === 'postal_code') {
-            newValue = (value || '').replace(/\D/g, '').slice(0, 5);
-        }
         newAddresses[activeAddressIndex] = {
             ...newAddresses[activeAddressIndex],
-            [field]: newValue
+            [field]: value
         };
         setLocalAddresses(newAddresses);
         onAddressesChange(newAddresses);
@@ -95,14 +90,6 @@ export default function AddressManager({ customerId, addresses, onAddressesChang
         // Clear specific field error
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }));
-        }
-        // Real-time postal code error when partially filled
-        if (field === 'postal_code') {
-            if (newValue.length > 0 && newValue.length < 5) {
-                setErrors(prev => ({ ...prev, postal_code: 'Kode pos harus 5 digit angka' }));
-            } else {
-                setErrors(prev => ({ ...prev, postal_code: null }));
-            }
         }
     };
 
@@ -195,13 +182,14 @@ export default function AddressManager({ customerId, addresses, onAddressesChang
                 hasErrors = true;
             }
             
-            // Postal code optional: only validate format if provided
-            if (address.postal_code.trim()) {
-                if (!/^[0-9]{5}$/.test(address.postal_code)) {
-                    newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
-                    if (index === activeAddressIndex) newErrors.postal_code = 'Kode pos harus 5 digit angka';
-                    hasErrors = true;
-                }
+            if (!address.postal_code.trim()) {
+                newErrors[`postal_code_${index}`] = 'Kode pos wajib diisi';
+                if (index === activeAddressIndex) newErrors.postal_code = 'Kode pos wajib diisi';
+                hasErrors = true;
+            } else if (!/^[0-9]{5}$/.test(address.postal_code)) {
+                newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
+                if (index === activeAddressIndex) newErrors.postal_code = 'Kode pos harus 5 digit angka';
+                hasErrors = true;
             }
             
             if (!address.address_detail.trim()) {
@@ -395,21 +383,21 @@ export default function AddressManager({ customerId, addresses, onAddressesChang
                 {/* Postal Code */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Kode Pos (opsional)
+                        Kode Pos *
                     </label>
-                <input
-                    type="text"
-                    value={currentAddress.postal_code || ''}
-                    onChange={(e) => handleAddressChange('postal_code', e.target.value)}
-                    className={`w-full border rounded px-3 py-2 text-sm ${
-                        errors.postal_code ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="12345"
-                    maxLength={5}
-                />
-                {errors.postal_code && (
-                    <p className="text-red-500 text-xs mt-1">{errors.postal_code}</p>
-                )}
+                    <input
+                        type="text"
+                        value={currentAddress.postal_code || ''}
+                        onChange={(e) => handleAddressChange('postal_code', e.target.value)}
+                        className={`w-full border rounded px-3 py-2 text-sm ${
+                            errors.postal_code ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                        placeholder="12345"
+                        maxLength={5}
+                    />
+                    {errors.postal_code && (
+                        <p className="text-red-500 text-xs mt-1">{errors.postal_code}</p>
+                    )}
                 </div>
 
                 {/* Address Detail */}

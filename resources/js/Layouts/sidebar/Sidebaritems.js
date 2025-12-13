@@ -6,13 +6,13 @@ const SidebarContent = [
         icon: "solar:widget-add-line-duotone",
         id: uniqueId(),
         url: "/cms/dashboard",
-        permission: "dashboard.view",
+        permission: "dashboard",
     },
     {
         name: "Order",
         icon: "solar:cart-outline",
         id: uniqueId(),
-        permission: "orders.view",
+        permission: "orders",
         children: [
             {
                 name: "Semua order",
@@ -44,7 +44,7 @@ const SidebarContent = [
         name: "Produk",
         icon: "solar:box-outline",
         id: uniqueId(),
-        permission: "products.view",
+        permission: "products",
         children: [
             {
                 name: "Daftar Produk",
@@ -52,12 +52,7 @@ const SidebarContent = [
                 id: uniqueId(),
                 url: "/cms/product/data",
             },
-            {
-                name: "Kategori Produk",
-                icon: "solar:folder-outline",
-                id: uniqueId(),
-                url: "/cms/product/category/data",
-            },
+
         ],
     },
     {
@@ -65,13 +60,13 @@ const SidebarContent = [
         icon: "solar:clipboard-check-outline",
         id: uniqueId(),
         url: "/cms/stock-opname/data",
-        permission: "stock.view",
+        permission: "stock",
     },
     {
         name: "Voucher",
         icon: "solar:ticket-outline",
         id: uniqueId(),
-        permission: "vouchers.view",
+        permission: "vouchers",
         children: [
             {
                 name: "Daftar Voucher",
@@ -88,93 +83,39 @@ const SidebarContent = [
         ],
     },
     {
-        name: "Promosi",
-        icon: "solar:tag-price-outline",
-        id: uniqueId(),
-        permission: "promotions.view",
-        children: [
-            {
-                name: "Daftar Promosi",
-                icon: "solar:clipboard-list-outline",
-                id: uniqueId(),
-                url: "/cms/promotion/data",
-            },
-            {
-                name: "Tambah Promosi",
-                icon: "solar:add-circle-outline",
-                id: uniqueId(),
-                url: "/cms/promotion/create",
-            },
-        ],
-    },
-    {
         name: "Data Customer",
         icon: "flowbite:users-group-outline",
         id: uniqueId(),
         url: "/cms/customer/data",
-        permission: "customers.view",
+        permission: "customers",
     },
     {
         name: "Expense",
         icon: "solar:money-bag-outline",
         id: uniqueId(),
         url: "/cms/expense",
-        permission: "expenses.view",
+        permission: "expenses",
     },
     {
         name: "Report",
         icon: "solar:chart-outline",
         id: uniqueId(),
-        permission: "reports.view",
-        role: "owner",
-        children: [
-            {
-                name: "Grafik Penjualan",
-                icon: "solar:graph-outline",
-                id: uniqueId(),
-                url: "/cms/report/sales",
-                permission: "reports.sales",
-                role: "owner",
-            },
-            {
-                name: "Grafik Keuntungan",
-                icon: "solar:chart-2-outline",
-                id: uniqueId(),
-                url: "/cms/report/profit",
-                permission: "reports.profit",
-                role: "owner",
-            },
-            {
-                name: "Data Transaksi Bank",
-                icon: "solar:card-outline",
-                id: uniqueId(),
-                url: "/cms/report/bank",
-                permission: "reports.bank",
-                role: "owner",
-            },
-            {
-                name: "Ekspedisi",
-                icon: "solar:box-outline",
-                id: uniqueId(),
-                url: "/cms/report/courier",
-                permission: "reports.courier",
-                role: "owner",
-            },
-        ],
+        url: "/cms/report",
+        permission: "reports",
     },
     {
         name: "Analyzer",
         icon: "solar:cpu-outline",
         id: uniqueId(),
         url: "/cms/analyzer",
-        permission: "reports.analyzer",
+        permission: "reports",
     },
     {
         name: "Setting",
         icon: "solar:settings-outline",
         id: uniqueId(),
         url: "/cms/settings",
-        permission: "settings.view",
+        permission: "settings",
     },
 ];
 

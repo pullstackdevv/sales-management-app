@@ -14,7 +14,7 @@ class Voucher extends Model
         'code',
         'name',
         'description',
-        'type',
+        'type', // 'percentage' or 'fixed'
         'value',
         'minimum_amount',
         'maximum_discount',
@@ -23,7 +23,6 @@ class Voucher extends Model
         'start_date',
         'end_date',
         'is_active',
-        'free_product_name', // For free_sample type
         'created_by',
         'updated_by',
         'deleted_by',
@@ -35,8 +34,8 @@ class Voucher extends Model
         'maximum_discount' => 'decimal:2',
         'usage_limit' => 'integer',
         'used_count' => 'integer',
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'start_date' => 'datetime',
+        'end_date' => 'datetime',
         'is_active' => 'boolean',
     ];
 
@@ -89,21 +88,10 @@ class Voucher extends Model
         return $this->isValid() && $orderAmount >= $this->minimum_amount;
     }
 
-    public function calculateDiscount($orderAmount, $shippingCost = 0)
+    public function calculateDiscount($orderAmount)
     {
         if (!$this->canBeUsed($orderAmount)) {
             return 0;
-        }
-
-        // Free sample doesn't give discount, just bonus product
-        if ($this->type === 'free_sample') {
-            return 0;
-        }
-
-        // Shipping-only or shipping + free sample apply to shipping cost
-        if ($this->type === 'shipping' || $this->type === 'shipping_free_sample') {
-            // Always treat as fixed amount discount on shipping
-            return min($this->value, $shippingCost);
         }
 
         if ($this->type === 'percentage') {

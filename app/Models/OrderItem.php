@@ -35,7 +35,7 @@ class OrderItem extends Model
 
     public function productVariant()
     {
-        return $this->belongsTo(ProductVariant::class)->withTrashed();
+        return $this->belongsTo(ProductVariant::class);
     }
 
     public function product()

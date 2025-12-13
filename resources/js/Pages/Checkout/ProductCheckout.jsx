@@ -61,7 +61,7 @@ const ProductCheckout = () => {
     
     let total = 0;
     Object.values(selectedVariants).forEach(({ variant, quantity }) => {
-      const price = variant ? (variant.discount_price || variant.price) : product.price;
+      const price = variant ? variant.price : product.price;
       total += price * quantity;
     });
     
@@ -305,14 +305,7 @@ const ProductCheckout = () => {
                                     <div>
                                       <div className="font-medium text-gray-900">{variant.name}</div>
                                       <div className="text-sm text-gray-500">
-                                        {variant.discount_price ? (
-                                          <>
-                                            <span className="line-through text-gray-400">Rp {variant.price.toLocaleString('id-ID')}</span>
-                                            <span className="ml-2 text-green-600 font-medium">Rp {variant.discount_price.toLocaleString('id-ID')}</span>
-                                          </>
-                                        ) : (
-                                          `Rp ${variant.price.toLocaleString('id-ID')}`
-                                        )}
+                                        Rp {variant.price.toLocaleString('id-ID')}
                                       </div>
                                       <div className={`text-xs ${
                                         variant.stock <= 0 
@@ -391,18 +384,11 @@ const ProductCheckout = () => {
                             <div>
                               <div className="font-medium text-sm">{variant.variant_label}</div>
                               <div className="text-xs text-gray-500">
-                                {variant.discount_price ? (
-                                  <>
-                                    <span className="line-through text-gray-400">Rp {variant.price.toLocaleString('id-ID')}</span>
-                                    <span className="ml-2 text-green-600 font-medium">Rp {variant.discount_price.toLocaleString('id-ID')}</span>
-                                  </>
-                                ) : (
-                                  `Rp ${variant.price.toLocaleString('id-ID')}`
-                                )} × {quantity}
+                                Rp {variant.price.toLocaleString('id-ID')} × {quantity}
                               </div>
                             </div>
                             <div className="text-sm font-medium">
-                              Rp {((variant.discount_price || variant.price) * quantity).toLocaleString('id-ID')}
+                              Rp {(variant.price * quantity).toLocaleString('id-ID')}
                             </div>
                           </div>
                         </div>

@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\DB;
 use Milon\Barcode\Facades\DNS1DFacade;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,12 +22,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        date_default_timezone_set(config('app.timezone'));
-        if (config('database.default') === 'mysql') {
-            try {
-                DB::statement("SET time_zone = '+07:00'");
-            } catch (\Throwable $e) {
-            }
-        }
+        //
     }
 }

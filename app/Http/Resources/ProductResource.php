@@ -19,24 +19,6 @@ class ProductResource extends JsonResource
             'name' => $this->name,
             'sku' => $this->sku,
             'category' => $this->category,
-            'category_id' => $this->category_id,
-            'categories' => $this->whenLoaded('categories', function() {
-                return $this->categories->map(function($c) {
-                    return [
-                        'id' => $c->id,
-                        'name' => $c->name,
-                        'slug' => $c->slug,
-                    ];
-                });
-            }),
-            'tags' => $this->whenLoaded('tags', function() {
-                return $this->tags->map(function($t) {
-                    return [
-                        'id' => $t->id,
-                        'name' => $t->name,
-                    ];
-                });
-            }),
             'description' => $this->description,
             'image' => $this->image,
             'is_active' => $this->is_active,
@@ -55,9 +37,6 @@ class ProductResource extends JsonResource
             
             // Variants
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
-            'tag_ids' => $this->whenLoaded('tags', function() {
-                return $this->tags->pluck('id');
-            }),
             
             // Metadata
             'created_at' => $this->created_at,

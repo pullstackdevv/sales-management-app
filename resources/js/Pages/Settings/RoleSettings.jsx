@@ -5,10 +5,8 @@ import TableComponent from "../../components/ui/table/TableComponent";
 import api from "@/api/axios";
 import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
-import { useAuth } from "../../contexts/AuthContext";
 
 export default function RoleSettings() {
-  const { hasPermission } = useAuth();
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,40 +19,24 @@ export default function RoleSettings() {
     permissions: []
   });
   
-  const [availablePermissions, setAvailablePermissions] = useState([]);
+  const [availablePermissions] = useState([
+    'dashboard',
+    'orders',
+    'products',
+    'customers',
+    'stock',
+    'vouchers',
+    'expenses',
+    'reports',
+    'settings'
+  ]);
   
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState(null);
 
   useEffect(() => {
     fetchRoles();
-    fetchPermissions();
   }, []);
-
-  const fetchPermissions = async () => {
-    try {
-      const response = await api.get('/permissions');
-      if (response.data.status === 'success') {
-        setAvailablePermissions(response.data.data || []);
-      }
-    } catch (err) {
-      console.error('Error fetching permissions:', err);
-    }
-  };
-
-  // Desired module order for permissions grouping
-  const moduleOrder = [
-    'dashboard',
-    'orders',
-    'products',
-    'stock',
-    'vouchers',
-    'promotions',
-    'customers',
-    'expenses',
-    'reports',
-    'settings',
-  ];
 
   const resetForm = () => {
     setFormData({
@@ -247,15 +229,13 @@ export default function RoleSettings() {
       label: "Aksi",
       render: (row) => (
         <div className="flex gap-2">
-          {hasPermission('roles.edit') && (
-            <button
-              onClick={() => openEditModal(row)}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
-            >
-              <Icon icon="mdi:pencil" width={16} height={16} />
-              Edit
-            </button>
-          )}
+          <button
+            onClick={() => openEditModal(row)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm flex items-center gap-1"
+          >
+            <Icon icon="mdi:pencil" width={16} height={16} />
+            Edit
+          </button>
         </div>
       ),
     },
@@ -344,38 +324,22 @@ export default function RoleSettings() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Permissions ({formData.permissions.length} selected)
+                  Permissions
                 </label>
-                <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
-                  {/* Group by module with custom order */}
-                  {moduleOrder
-                    .map((module) => ({
-                      module,
-                      perms: availablePermissions.filter((perm) => perm.module === module),
-                    }))
-                    .filter(({ perms }) => perms.length > 0)
-                    .map(({ module, perms }) => (
-                      <div key={module} className="border-b border-gray-200 last:border-b-0">
-                        <div className="bg-gray-50 px-4 py-2 font-medium text-sm text-gray-700 capitalize">
-                          {module} ({perms.length})
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 p-4">
-                          {perms.map((permission) => (
-                            <label key={permission.name} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                              <input
-                                type="checkbox"
-                                checked={formData.permissions.includes(permission.name)}
-                                onChange={() => handlePermissionChange(permission.name)}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <span className="text-sm text-gray-700">
-                                {permission.display_name}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto border border-gray-200 rounded-md p-4">
+                  {availablePermissions.map((permission) => (
+                    <label key={permission} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={formData.permissions.includes(permission)}
+                        onChange={() => handlePermissionChange(permission)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">
+                        {permission}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>

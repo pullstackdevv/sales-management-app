@@ -14,14 +14,6 @@ class ExpenseController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        // Check permission
-        if (!auth()->user()->hasPermission('expenses.view')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized access'
-            ], 403);
-        }
-
         $expenses = Expense::with(['creator'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -52,14 +44,6 @@ class ExpenseController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        // Check permission
-        if (!auth()->user()->hasPermission('expenses.create')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized access'
-            ], 403);
-        }
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
@@ -103,14 +87,6 @@ class ExpenseController extends Controller
 
     public function show(Expense $expense): JsonResponse
     {
-        // Check permission
-        if (!auth()->user()->hasPermission('expenses.view')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized access'
-            ], 403);
-        }
-
         return response()->json([
             'status' => 'success',
             'data' => $expense->load('creator')
@@ -119,14 +95,6 @@ class ExpenseController extends Controller
 
     public function update(Request $request, Expense $expense): JsonResponse
     {
-        // Check permission
-        if (!auth()->user()->hasPermission('expenses.edit')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized access'
-            ], 403);
-        }
-
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string|max:500',
@@ -180,14 +148,6 @@ class ExpenseController extends Controller
 
     public function destroy(Expense $expense): JsonResponse
     {
-        // Check permission
-        if (!auth()->user()->hasPermission('expenses.delete')) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthorized access'
-            ], 403);
-        }
-
         try {
             DB::beginTransaction();
 

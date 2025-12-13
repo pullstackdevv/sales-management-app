@@ -81,10 +81,6 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Order/EditOrder', ['orderId' => $id]);
         })->name('orders.edit');
 
-        Route::get('/order/manage/{id}', function ($id) {
-            return Inertia::render('Order/EditOrder', ['orderId' => $id]);
-        })->name('order.manage');
-
         Route::get('/order/detail/{id}', function ($id) {
             return Inertia::render('Order/OrderDetail', ['orderId' => $id]);
         })->name('orders.detail');
@@ -94,18 +90,6 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
                 'orderId' => $id
             ]);
         })->name('order.print-invoice');
-
-        Route::get('/order/print-multiple', function (Request $request) {
-            $ordersParam = $request->query('orders', '');
-            $orderIds = array_filter(
-                array_map('intval', array_filter(explode(',', $ordersParam))),
-                fn ($id) => $id > 0
-            );
-
-            return Inertia::render('Order/PrintMultipleInvoices', [
-                'orderIds' => $orderIds,
-            ]);
-        })->name('order.print-multiple');
 
         // Customer
         Route::get('/customer/data', function () {
@@ -120,10 +104,6 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Customer/EditCustomer', ['customerId' => $id]);
         })->name('customers.edit');
 
-        Route::get('/customer/detail/{id}', function ($id) {
-            return Inertia::render('Customer/CustomerDetail', ['customerId' => $id]);
-        })->name('customers.detail');
-
         // Produk
         Route::get('/product/data', function () {
             return Inertia::render('Product/ProductData');
@@ -136,19 +116,6 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
         Route::get('/product/edit/{id}', function ($id) {
             return Inertia::render('Product/ProductEdit', ['productId' => $id]);
         })->name('products.edit');
-
-        // Product Category
-        Route::get('/product/category/data', function () {
-            return Inertia::render('Product/ProductCategoryData');
-        })->name('product-categories.index');
-
-        Route::get('/product/category/add', function () {
-            return Inertia::render('Product/ProductCategoryAdd');
-        })->name('product-categories.create');
-
-        Route::get('/product/category/edit/{id}', function ($id) {
-            return Inertia::render('Product/ProductCategoryEdit', ['categoryId' => $id]);
-        })->name('product-categories.edit');
 
         // stock opname
         Route::get('/stock-opname/data', function () {
@@ -215,10 +182,6 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Settings/index', ['activeMenu' => 'role']);
         })->name('settings.role');
 
-        Route::get('/settings/permission', function () {
-            return Inertia::render('Settings/index', ['activeMenu' => 'permission']);
-        })->name('settings.permission');
-
         Route::get('/settings/dashboard', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'dashboard']);
         })->name('settings.dashboard');
@@ -253,31 +216,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Voucher/ViewVoucher', ['voucherId' => $id]);
         })->name('vouchers.view');
 
-        // Promotion
-        Route::get('/promotion/data', [\App\Http\Controllers\PromotionController::class, 'data'])->name('promotions.index');
-        Route::get('/promotion/create', [\App\Http\Controllers\PromotionController::class, 'create'])->name('promotions.create');
-        Route::get('/promotion/edit/{promotion}', [\App\Http\Controllers\PromotionController::class, 'edit'])->name('promotions.edit');
-
-        // Reports
+        // analizer
         Route::get('/report', function () {
             return Inertia::render('Report/index');
         })->name('reports.index');
-
-        Route::get('/report/sales', function () {
-            return Inertia::render('Report/SalesReport');
-        })->name('reports.sales');
-
-        Route::get('/report/profit', function () {
-            return Inertia::render('Report/ProfitReport');
-        })->name('reports.profit');
-
-        Route::get('/report/bank', function () {
-            return Inertia::render('Report/BankReport');
-        })->name('reports.bank');
-
-        Route::get('/report/courier', function () {
-            return Inertia::render('Report/CourierReport');
-        })->name('reports.courier');
 
         Route::get('/analyzer', function () {
             return Inertia::render('Report/Analyzer');
@@ -346,12 +288,10 @@ Route::get('/profile', function () {
 Route::post('/order/create', [WebOrderController::class, 'createOrder'])->name('marketplace.order.create');
 Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->name('marketplace.order.show');
 
-// Track Orders (public - for all customers)
-Route::get('/track-orders', [WebOrderController::class, 'trackOrdersPage'])->name('marketplace.track-orders');
-Route::post('/track-orders/search', [WebOrderController::class, 'searchTrackOrders'])->name('marketplace.track-orders.search');
-
-// User Orders (public - based on session customer data)
-Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');
+// User Orders (only for authenticated users)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/orders', [WebOrderController::class, 'getUserOrders'])->name('marketplace.orders');
+});
 
 // Midtrans Payment Routes (tanpa middleware untuk callback)
 Route::prefix('payment')->name('payment.')->group(function () {

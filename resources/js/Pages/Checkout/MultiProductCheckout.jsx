@@ -223,15 +223,25 @@ const MultiProductCheckout = () => {
                         <div className="md:w-1/4">
                           <img
                             src={(() => {
-                              const raw = product?.image || product?.product_image || product?.images?.[0]?.image_url;
-                              if (!raw) {
+                              // Check multiple possible image sources
+                              const imageUrl = product?.image || product?.product_image || product?.images?.[0]?.image_url;
+                              
+                              if (!imageUrl) {
                                 return 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg';
                               }
-                              if (raw.startsWith('http')) return raw;
-                              if (raw.startsWith('/')) return raw; // already absolute from root
-                              const clean = raw.startsWith('/') ? raw.slice(1) : raw;
-                              if (clean.startsWith('storage/')) return `/${clean}`;
-                              return `/storage/${clean}`;
+                              
+                              // If it's already a full URL, use it
+                              if (imageUrl.startsWith('http')) {
+                                return imageUrl;
+                              }
+                              
+                              // If it starts with storage/, use it as is
+                              if (imageUrl.startsWith('storage/')) {
+                                return `/${imageUrl}`;
+                              }
+                              
+                              // Otherwise, prepend /storage/
+                              return `/storage/${imageUrl}`;
                             })()}
                             alt={product.name || 'Product Image'}
                             className="w-full h-32 object-cover rounded-lg"

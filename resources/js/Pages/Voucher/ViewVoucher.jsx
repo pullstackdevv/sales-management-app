@@ -52,13 +52,9 @@ const ViewVoucher = ({ voucherId }) => {
 
     const getVoucherValue = (voucher) => {
         if (voucher.type === 'percentage') {
-            return `${Math.floor(voucher.value)}%`;
+            return `${voucher.value}%`;
         }
-        if (voucher.type === 'fixed') {
-            return formatRupiah(voucher.value);
-        }
-        // For free_sample, show free product name
-        return voucher.free_product_name || 'Produk Gratis';
+        return formatRupiah(voucher.value);
     };
 
     const getUsagePercentage = (voucher) => {
@@ -113,7 +109,7 @@ const ViewVoucher = ({ voucherId }) => {
                     </div>
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={() => router.visit(`/cms/voucher/edit/${voucher.id}`)}
+                            onClick={() => router.visit(`/voucher/edit/${voucher.id}`)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                             <Icon icon="solar:pen-outline" className="w-4 h-4" />
@@ -146,15 +142,13 @@ const ViewVoucher = ({ voucherId }) => {
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                         voucher.type === 'percentage' 
                             ? 'bg-blue-100 text-blue-800' 
-                            : voucher.type === 'fixed'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-green-100 text-green-800'
+                            : 'bg-purple-100 text-purple-800'
                     }`}>
                         <Icon 
-                            icon={voucher.type === 'percentage' ? "solar:percent-outline" : voucher.type === 'fixed' ? "solar:dollar-outline" : "solar:gift-outline"} 
+                            icon={voucher.type === 'percentage' ? "solar:percent-outline" : "solar:dollar-outline"} 
                             className="w-4 h-4 mr-1" 
                         />
-                        {voucher.type === 'percentage' ? 'Persentase' : voucher.type === 'fixed' ? 'Nominal Tetap' : 'Free Sample'}
+                        {voucher.type === 'percentage' ? 'Persentase' : 'Nominal Tetap'}
                     </span>
                 </div>
 
@@ -205,21 +199,16 @@ const ViewVoucher = ({ voucherId }) => {
                         {/* Discount Information */}
                         <div className="bg-white rounded-lg shadow-sm border p-6">
                             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                                {voucher.type === 'free_sample' ? 'Informasi Bonus' : 'Informasi Diskon'}
+                                Informasi Diskon
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        {voucher.type === 'free_sample' ? 'Produk Gratis' : 'Nilai Diskon'}
+                                        Nilai Diskon
                                     </label>
                                     <p className="text-2xl font-bold text-green-600">
                                         {getVoucherValue(voucher)}
                                     </p>
-                                    {voucher.type === 'free_sample' && (
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Tidak mengurangi total harga (diskon Rp 0)
-                                        </p>
-                                    )}
                                 </div>
                                 
                                 <div>
@@ -323,7 +312,7 @@ const ViewVoucher = ({ voucherId }) => {
                             
                             <div className="space-y-3">
                                 <button
-                                    onClick={() => router.visit(`/cms/voucher/edit/${voucher.id}`)}
+                                    onClick={() => router.visit(`/voucher/edit/${voucher.id}`)}
                                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                 >
                                     <Icon icon="solar:pen-outline" className="w-4 h-4" />

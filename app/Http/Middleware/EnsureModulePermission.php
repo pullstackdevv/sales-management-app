@@ -74,13 +74,9 @@ class EnsureModulePermission
             'stock-opname'   => 'stock',
             'voucher'        => 'vouchers',
             'vouchers'       => 'vouchers',
-            'promotion'      => 'promotions',
-            'promotions'     => 'promotions',
             'expense'        => 'expenses',
-            'expenses'       => 'expenses',
             'report'         => 'reports',
             'reports'        => 'reports',
-            'analyzer'       => 'reports',
             'settings'       => 'settings',
         ];
 
@@ -92,16 +88,14 @@ class EnsureModulePermission
      */
     protected function userHasPermission($user, string $permission): bool
     {
-        // Owner has all permissions
-        if (method_exists($user, 'hasRole') && $user->hasRole('owner')) {
+        // Admin shortcut if available
+        if (method_exists($user, 'hasRole') && $user->hasRole('admin')) {
             return true;
         }
 
-        // Check permission using HasRoles trait method
         if (method_exists($user, 'hasPermission')) {
             return (bool) $user->hasPermission($permission);
         }
-        
         if (method_exists($user, 'hasAnyPermission')) {
             return (bool) $user->hasAnyPermission([$permission]);
         }

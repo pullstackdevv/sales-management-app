@@ -19,9 +19,9 @@ export default function EditOrder() {
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
         status: 'pending',
+        payment_status: 'pending',
         payment_bank_id: '',
-        courier: '',
-        service_type: ''
+        courier: ''
     });
 
     const [orderItems, setOrderItems] = useState([]);
@@ -31,13 +31,9 @@ export default function EditOrder() {
     const [paymentBanks, setPaymentBanks] = useState([]);
     const [couriers, setCouriers] = useState([]);
     const [origins, setOrigins] = useState([]);
-    const [courierRates, setCourierRates] = useState([]);
-    const [selectedRateIndex, setSelectedRateIndex] = useState(null);
-    const [loadingShipping, setLoadingShipping] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
     const [originalOrder, setOriginalOrder] = useState(null);
-    const [isShippingCostManuallyEdited, setIsShippingCostManuallyEdited] = useState(false);
     
     // Loading states
     const [loading, setLoading] = useState({
@@ -59,17 +55,6 @@ export default function EditOrder() {
     
     // Error states
     const [errors, setErrors] = useState({});
-    const [cancelling, setCancelling] = useState(false);
-
-    const formatRupiah = (num) => {
-        if (!num || num === 0) return '';
-        return Math.floor(num).toLocaleString('id-ID');
-    };
-
-    const parseRupiah = (str) => {
-        if (!str) return 0;
-        return parseInt(str.toString().replace(/\./g, '')) || 0;
-    };
 
     // Fetch existing order data
     const fetchOrder = async () => {
@@ -83,7 +68,6 @@ export default function EditOrder() {
             const paymentBankId = (order.payments && order.payments[0] && order.payments[0].payment_bank_id) ? order.payments[0].payment_bank_id.toString() : '';
             console.log('🏦 [EditOrder] Setting payment_bank_id from order:', paymentBankId, 'Order payments:', order.payments);
             console.log('📊 [EditOrder] Setting sales_channel_id from order:', order.sales_channel_id, 'Sales channel:', order.sales_channel);
-            console.log('📊 [EditOrder] Sales channel code:', order.sales_channel?.code);
             
             setFormData({
                 customer_id: order.customer_id,
@@ -93,10 +77,9 @@ export default function EditOrder() {
                 notes: order.notes || '',
                 order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
                 status: order.status || 'pending',
+                payment_status: order.payment_status || 'pending',
                 payment_bank_id: paymentBankId,
-                courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : '',
-                service_type: (order.shipping && order.shipping.service_type) ? order.shipping.service_type : '',
-                origin_setting_id: order.origin_setting_id ? String(order.origin_setting_id) : ''
+                courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : ''
             });
             
             // Set order items with complete variant details
@@ -277,22 +260,24 @@ export default function EditOrder() {
         );
 
         if (existingItemIndex >= 0) {
+            // Check stock before updating quantity
             const currentItem = orderItems[existingItemIndex];
-            const additionalAvailable = currentItem.variant_stock || 0;
-            if (additionalAvailable <= 0) {
+            if (currentItem.quantity >= variant.stock) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Stok Tidak Mencukupi',
-                    text: `Tidak ada stok tambahan tersedia untuk ${variant.name || variant.variant_label}`,
+                    text: `Stok maksimal untuk ${variant.name || variant.variant_label} adalah ${variant.stock}`,
                     confirmButtonText: 'OK'
                 });
                 return;
             }
+            
+            // Update quantity if item already exists
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
-            updatedItems[existingItemIndex].variant_stock = additionalAvailable - 1;
             setOrderItems(updatedItems);
         } else {
+            // Check if variant has stock before adding
             if (variant.stock <= 0) {
                 Swal.fire({
                     icon: 'warning',
@@ -302,6 +287,8 @@ export default function EditOrder() {
                 });
                 return;
             }
+            
+            // Add new item with complete variant details
             const newItem = {
                 product_variant_id: variant.id,
                 product_name: product.name,
@@ -310,7 +297,7 @@ export default function EditOrder() {
                 variant_name: variant.name || variant.variant_label,
                 variant_sku: variant.sku,
                 variant_weight: variant.weight,
-                variant_stock: Math.max(0, (variant.stock || 0) - 1),
+                variant_stock: variant.stock,
                 quantity: 1,
                 price: variant.price
             };
@@ -325,153 +312,6 @@ export default function EditOrder() {
 
     const calculateTotal = () => {
         return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0);
-    };
-
-    const calculateTotalWeight = () => {
-        if (!orderItems || orderItems.length === 0) return 0;
-        return orderItems.reduce((sum, item) => {
-            const w = item.variant_weight ?? item.weight ?? 1;
-            const q = item.quantity || 1;
-            return sum + ((typeof w === 'number' ? w : parseFloat(w) || 1) * q);
-        }, 0);
-    };
-
-    const getRoundedWeight = (totalWeight, rate) => {
-        const name = rate?.courier?.name?.toLowerCase() || rate?.courier_name?.toLowerCase() || '';
-        if (name.includes('tiki')) {
-            if (totalWeight <= 1.5) return 1;
-            return Math.ceil(totalWeight);
-        }
-        return Math.ceil(totalWeight);
-    };
-
-    const selectDefaultRateIndex = (rates, preferService = null) => {
-        if (!rates || rates.length === 0) return null;
-        const tw = calculateTotalWeight();
-        if (preferService) {
-            const idxPrefer = rates.findIndex(r => {
-                const code = r?.service?.type || r?.service_type || '';
-                const name = r?.service?.name || '';
-                const target = (preferService || '').toString().toUpperCase();
-                return code.toString().toUpperCase() === target || name.toString().toUpperCase() === target;
-            });
-            if (idxPrefer >= 0) return idxPrefer;
-        }
-        let bestIdx = 0;
-        let bestCost = Infinity;
-        for (let i = 0; i < rates.length; i++) {
-            const r = rates[i];
-            const pricing = r.pricing || {};
-            const availability = r.availability || {};
-            const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
-            const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
-            const w = getRoundedWeight(tw, r);
-            const effW = Math.max(w, minW);
-            if (maxW && effW > maxW) continue;
-            if (availability.is_available === false) continue;
-            const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
-            const bp = pricing.base_price ?? r.base_price ?? 0;
-            const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
-            const cost = pricingType === 'flat' ? bp : bp + (Math.max(0, effW - minW) * ppk);
-            if (cost < bestCost) {
-                bestCost = cost;
-                bestIdx = i;
-            }
-        }
-        return bestIdx;
-    };
-
-    const calculateShippingCostFromRate = (rates, district, indexOverride = null) => {
-        if (!rates || rates.length === 0) {
-            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
-            return;
-        }
-        const tw = calculateTotalWeight();
-        const idx = typeof indexOverride === 'number' ? indexOverride : (typeof selectedRateIndex === 'number' ? selectedRateIndex : 0);
-        const r = rates[idx];
-        if (!r) {
-            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
-            return;
-        }
-        const pricing = r.pricing || {};
-        const availability = r.availability || {};
-        const minW = typeof pricing.min_weight === 'number' && pricing.min_weight > 0 ? pricing.min_weight : 1;
-        const maxW = typeof pricing.max_weight === 'number' && pricing.max_weight > 0 ? pricing.max_weight : null;
-        const rounded = getRoundedWeight(tw, r);
-        const effW = Math.max(rounded, minW);
-        if (maxW && effW > maxW) {
-            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
-            return;
-        }
-        if (availability.is_available === false) {
-            setFormData(prev => ({ ...prev, shipping_cost: 0 }));
-            return;
-        }
-        const ppk = pricing.price_per_kg ?? r.price_per_kg ?? 0;
-        const bp = pricing.base_price ?? r.base_price ?? 0;
-        const pricingType = pricing.pricing_type || r.pricing_type || 'per_kg';
-        const extra = Math.max(0, effW - minW);
-        const cost = pricingType === 'flat' ? bp : bp + (extra * ppk);
-        setFormData(prev => ({ ...prev, shipping_cost: cost }));
-    };
-
-    const fetchCourierRatesForManual = async () => {
-        if (!selectedCustomer && !originalOrder?.customer && !originalOrder?.address) return;
-        const addressId = parseInt(formData.address_id);
-        const baseCustomer = selectedCustomer || originalOrder?.customer || null;
-        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
-        const dest = selectedAddress || originalOrder?.address || baseCustomer;
-        const district = dest?.district || '';
-        const city = dest?.city || '';
-        const province = dest?.province || '';
-        setLoadingShipping(true);
-        try {
-            const params = new URLSearchParams();
-            params.append('page', '1');
-            params.append('per_page', '50');
-            params.append('sort_by', 'base_price');
-            params.append('sort_order', 'asc');
-            if (district) params.append('district', district);
-            if (city) params.append('city', city);
-            if (province) params.append('province', province);
-            params.append('courier_name', 'TIKI');
-            const res = await axios.get(`/api/courier-rates?${params.toString()}`);
-            const rates = res.data?.data?.rates || [];
-            const allowed = ['ECO','REG','ONS'];
-            const filtered = (rates || []).filter(r => {
-                const code = r?.service?.type || r?.service_type || r?.service?.name || '';
-                const normalized = code.toString().toUpperCase();
-                return allowed.some(k => normalized.includes(k));
-            });
-            setCourierRates(filtered);
-            const prefer = originalOrder?.shipping?.service_type || null;
-            let defIdx = selectDefaultRateIndex(filtered, prefer);
-            if (defIdx === null && filtered.length > 0) defIdx = 0;
-            setSelectedRateIndex(defIdx);
-            const svc = typeof defIdx === 'number' ? filtered[defIdx] : null;
-            const svcName = svc?.service?.name || svc?.service_type || '';
-            setFormData(prev => ({ ...prev, service_type: svcName }));
-            calculateShippingCostFromRate(filtered, district, defIdx);
-            setIsShippingCostManuallyEdited(false);
-        } catch (e) {
-            setCourierRates([]);
-            setSelectedRateIndex(null);
-        } finally {
-            setLoadingShipping(false);
-        }
-    };
-
-    const handleServiceSelect = (index) => {
-        const idx = parseInt(index);
-        setSelectedRateIndex(idx);
-        const svc = courierRates[idx];
-        setFormData(prev => ({ ...prev, service_type: (svc?.service?.name || svc?.service_type || '') }));
-        const addressId = parseInt(formData.address_id);
-        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
-        const dest = selectedAddress || selectedCustomer || originalOrder?.customer || null;
-        const district = dest?.district || '';
-        calculateShippingCostFromRate(courierRates, district, idx);
-        setIsShippingCostManuallyEdited(false);
     };
 
     // Handle form submission
@@ -514,10 +354,9 @@ export default function EditOrder() {
                 shipping_cost: formData.shipping_cost,
                 notes: formData.notes,
                 status: formData.status,
+                payment_status: formData.payment_status,
                 payment_bank_id: formData.payment_bank_id || null,
-                courier_id: formData.courier || null,
-                courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,
-                service_type: formData.service_type || null
+                courier_id: formData.courier || null
             };
             
             console.log('EditOrder - Sending data:', {
@@ -607,106 +446,6 @@ export default function EditOrder() {
         return () => clearTimeout(timer);
     }, [searchTerms.product]);
 
-    useEffect(() => {
-        if (!formData.courier) return;
-        const c = couriers.find(x => String(x.id) === String(formData.courier));
-        const name = c?.name?.toLowerCase() || '';
-        if (name.includes('tiki')) {
-            fetchCourierRatesForManual();
-        } else {
-            setCourierRates([]);
-            setSelectedRateIndex(null);
-            setFormData(prev => ({ ...prev, service_type: '' }));
-        }
-    }, [formData.courier, formData.address_id, formData.origin_setting_id, couriers]);
-
-    useEffect(() => {
-        const c = couriers.find(x => String(x.id) === String(formData.courier));
-        const name = c?.name?.toLowerCase() || '';
-        if (!name.includes('tiki')) return;
-        if (typeof selectedRateIndex !== 'number' || !courierRates[selectedRateIndex]) return;
-        const addressId = parseInt(formData.address_id);
-        const selectedAddress = addressId ? customerAddresses.find(a => a.id === addressId) : null;
-        const dest = selectedAddress || selectedCustomer || originalOrder?.customer || null;
-        const district = dest?.district || '';
-        calculateShippingCostFromRate(courierRates, district, selectedRateIndex);
-    }, [orderItems]);
-
-    useEffect(() => {
-        if (origins && origins.length > 0 && !formData.origin_setting_id) {
-            const defaultOrigin = origins[0];
-            setFormData(prev => ({ ...prev, origin_setting_id: String(defaultOrigin.id) }));
-        }
-    }, [origins]);
-
-    useEffect(() => {
-        const name = originalOrder?.shipping?.courier?.name?.toLowerCase() || '';
-        if (name.includes('tiki')) {
-            fetchCourierRatesForManual();
-        }
-    }, [originalOrder]);
-
-    const isWebOrder = () => {
-        // Consider web order if sales_channel code is WEBSITE or order has payment_url
-        return originalOrder?.sales_channel?.code === 'WEBSITE' || !!originalOrder?.payment_url;
-    };
-
-    const handleCancelWebOrder = async () => {
-        if (!originalOrder) return;
-        if (!isWebOrder()) return;
-        if (originalOrder.payment_status === 'paid' || originalOrder.status === 'cancelled') return;
-
-        const result = await Swal.fire({
-            title: 'Batalkan Web Order?',
-            text: 'Order web yang belum dibayar akan dibatalkan. Lanjutkan?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Ya, batalkan',
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#d33',
-        });
-
-        if (!result.isConfirmed) return;
-
-        try {
-            setCancelling(true);
-            const response = await axios.post(`/api/orders/${orderId}/update-status`, {
-                status: 'cancelled',
-            });
-
-            if (response.data?.status === 'success') {
-                await Swal.fire({
-                    icon: 'success',
-                    title: 'Berhasil',
-                    text: 'Web order berhasil dibatalkan.',
-                    timer: 2000,
-                    showConfirmButton: false,
-                });
-                // Redirect back to orders list
-                router.visit('/cms/order/data', {
-                    preserveState: false,
-                    preserveScroll: false,
-                });
-            } else {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal',
-                    text: response.data?.message || 'Gagal membatalkan web order.',
-                });
-            }
-        } catch (error) {
-            console.error('Error cancelling web order:', error);
-            const message = error.response?.data?.message || 'Terjadi kesalahan saat membatalkan web order.';
-            await Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: message,
-            });
-        } finally {
-            setCancelling(false);
-        }
-    };
-
     if (loading.order) {
         return (
             <DashboardLayout>
@@ -719,64 +458,23 @@ export default function EditOrder() {
             </DashboardLayout>
         );
     }
-console.log(formData)
+
     return (
         <DashboardLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => window.history.back()}
-                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            <Icon icon="solar:arrow-left-outline" className="w-5 h-5" />
-                        </button>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Edit Order #{originalOrder?.order_number || orderId}</h1>
-                            <p className="text-gray-600 mt-1">
-                                Edit order yang sudah ada
-                            </p>
-                        </div>
-                    </div>
-                    
-                    {/* Sales Channel & Source Badge + Web Order Actions */}
-                    <div className="flex items-center gap-3">
-                        {originalOrder?.sales_channel && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-                                <p className="text-sm font-semibold text-blue-900">{originalOrder.sales_channel.name}</p>
-                                <p className="text-xs text-blue-500 mt-1">Code: {originalOrder.sales_channel.code}</p>
-                            </div>
-                        )}
-                        
-                        {originalOrder?.sales_channel?.code && originalOrder.sales_channel.code === 'WEBSITE' ? (
-                            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 max-w-xs">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
-                                    <p className="text-xs text-red-600 font-medium">Website Resmi</p>
-                                </div>
-                                <p className="text-xs text-red-700">Hanya bisa update status order</p>
-                            </div>
-                        ) : originalOrder?.sales_channel ? (
-                            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
-                                    <p className="text-xs text-green-600 font-medium">Dapat Diedit</p>
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {/* Cancel Web Order button - only for web orders that are not paid and not cancelled */}
-                        {isWebOrder() && originalOrder?.payment_status !== 'paid' && originalOrder?.status !== 'cancelled' && (
-                            <button
-                                onClick={handleCancelWebOrder}
-                                disabled={cancelling}
-                                className="ml-2 inline-flex items-center gap-2 px-4 py-2 border border-red-500 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
-                            >
-                                <Icon icon="mdi:cancel" className="w-4 h-4" />
-                                <span>{cancelling ? 'Membatalkan...' : 'Batalkan Web Order'}</span>
-                            </button>
-                        )}
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => window.history.back()}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                        <Icon icon="solar:arrow-left-outline" className="w-5 h-5" />
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Edit Order #{originalOrder?.order_number || orderId}</h1>
+                        <p className="text-gray-600 mt-1">
+                            Edit order yang sudah ada
+                        </p>
                     </div>
                 </div>
 
@@ -802,10 +500,9 @@ console.log(formData)
                                             setCustomerAddresses([]);
                                         }
                                     }}
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
                                     className={`w-full px-3 py-2 border rounded-lg ${
                                         errors.customer_id ? 'border-red-500' : 'border-gray-300'
-                                    } ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                                    }`}
                                 />
                                 {loading.customers && (
                                     <div className="absolute right-3 top-3">
@@ -845,8 +542,8 @@ console.log(formData)
                                 onChange={(e) => setFormData(prev => ({ ...prev, address_id: e.target.value }))}
                                 className={`w-full px-3 py-2 border rounded-lg ${
                                     errors.address_id ? 'border-red-500' : 'border-gray-300'
-                                } ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
-                                disabled={!selectedCustomer || customerAddresses.length === 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE')}
+                                }`}
+                                disabled={!selectedCustomer || customerAddresses.length === 0}
                             >
                                 <option value="">Pilih alamat pengiriman</option>
                                 {customerAddresses.map((address) => (
@@ -873,10 +570,10 @@ console.log(formData)
                                     Pengiriman Dari
                                 </label>
                                 <select 
-                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                     value={formData.origin_setting_id}
                                     onChange={(e) => setFormData(prev => ({ ...prev, origin_setting_id: e.target.value }))}
-                                    disabled={loading.origins || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE')}
+                                    disabled={loading.origins}
                                 >
                                     <option value="">Pilih Pengiriman Dari</option>
                                     {origins.map(origin => (
@@ -895,8 +592,7 @@ console.log(formData)
                                     type="date"
                                     value={formData.order_date}
                                     onChange={(e) => setFormData(prev => ({ ...prev, order_date: e.target.value }))}
-                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                 />
                             </div>
 
@@ -909,8 +605,7 @@ console.log(formData)
                                     onChange={(e) => setFormData(prev => ({ ...prev, sales_channel_id: e.target.value }))}
                                     className={`w-full px-3 py-2 border rounded-lg ${
                                         errors.sales_channel_id ? 'border-red-500' : 'border-gray-300'
-                                    } ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
+                                    }`}
                                 >
                                     <option value="">Pilih sales channel</option>
                                     {salesChannels.map((channel) => (
@@ -928,94 +623,95 @@ console.log(formData)
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Ongkos Kirim</label>
-                                {formData.courier && (couriers.find(c => String(c.id) === String(formData.courier))?.name || '').toLowerCase().includes('tiki') ? (
-                                  <div className="space-y-2">
-                                    <div>
-                                      <label className="block text-xs text-gray-600 mb-1">Service</label>
-                                      <select
-                                        value={typeof selectedRateIndex === 'number' ? selectedRateIndex : ''}
-                                        onChange={(e) => handleServiceSelect(e.target.value)}
-                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
-                                        disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
-                                      >
-                                        <option value="">Pilih layanan</option>
-                                        {courierRates.map((rate, idx) => (
-                                          <option key={rate.id || idx} value={idx}>
-                                            {(rate?.service?.name || rate?.service_type || 'Layanan')} - Rp {(function(){
-                                              const p = rate.pricing || {};
-                                              const minW = typeof p.min_weight === 'number' && p.min_weight > 0 ? p.min_weight : 1;
-                                              const totalW = calculateTotalWeight();
-                                              const effW = Math.max(getRoundedWeight(totalW, rate), minW);
-                                              const pricePerKg = p.price_per_kg ?? rate.price_per_kg ?? 0;
-                                              const basePrice = p.base_price ?? rate.base_price ?? 0;
-                                              const pricingType = p.pricing_type || rate.pricing_type || 'per_kg';
-                                              const extra = Math.max(0, effW - minW);
-                                              const cost = pricingType === 'flat' ? basePrice : basePrice + (extra * pricePerKg);
-                                              return Number(cost).toLocaleString('id-ID');
-                                            })()}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="text"
-                                        value={formatRupiah(formData.shipping_cost)}
-                                        disabled
-                                        className="flex-1 px-3 py-2 border rounded-lg border-gray-300 bg-gray-100"
-                                      />
-                                    </div>
-                                    {typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.delivery?.estimated_days && (
-                                      <p className="text-xs text-gray-500">ETA {courierRates[selectedRateIndex].delivery.estimated_days} hari</p>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div>
-                                    <div className="flex gap-2">
-                                      <input
-                                        type="text"
-                                        placeholder="0"
-                                        value={formatRupiah(formData.shipping_cost)}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseRupiah(e.target.value) }))}
-                                        className={`flex-1 px-3 py-2 border rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'border-gray-300 bg-gray-100' : (isShippingCostManuallyEdited ? 'border-blue-300 bg-blue-50' : 'border-gray-300')}`}
-                                        disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
-                                      />
-                                    </div>
-                                    {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' && (
-                                      <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
-                                    )}
-                                  </div>
-                                )}
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Ongkos Kirim
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="0"
+                                    value={formData.shipping_cost}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, shipping_cost: parseInt(e.target.value) || 0 }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Kurir
                                 </label>
-                                {/* Courier Select */}
                                 <select
                                     value={formData.courier}
                                     onChange={(e) => setFormData(prev => ({ ...prev, courier: e.target.value }))}
-                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE' ? 'bg-gray-100' : ''}`}
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE'}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                                 >
                                     <option value="">Pilih kurir</option>
                                     {couriers.map((courier) => (
                                     <option key={courier.id} value={courier.id}>
-                                        {courier.name}
+                                        {courier.name} - {courier.description}
                                         </option>
                                     ))}
                                 </select>
-
                                 {loading.couriers && (
                                     <p className="text-gray-500 text-xs mt-1">Memuat data kurir...</p>
                                 )}
-                                {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
-                                    <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Status Pembayaran
+                                </label>
+                                <select
+                                    value={formData.payment_status}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_status: e.target.value, payment_bank_id: e.target.value === 'pending' ? '' : prev.payment_bank_id }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Bank Pembayaran
+                                </label>
+                                <select
+                                    value={formData.payment_bank_id}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                    disabled={formData.payment_status !== 'paid'}
+                                >
+                                    <option value="">Pilih bank</option>
+                                    {(() => {
+                                        console.log('🏦 [EditOrder] All payment banks:', paymentBanks);
+                                        const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
+                                        console.log('🏦 [EditOrder] Active banks:', activeBanks);
+                                        return activeBanks.map((bank) => (
+                                            <option key={bank.id} value={bank.id}>
+                                                {bank.bank_name} - {bank.account_name}
+                                            </option>
+                                        ));
+                                    })()}
+                                </select>
+                                {loading.paymentBanks && (
+                                    <p className="text-gray-500 text-xs mt-1">Memuat data bank...</p>
+                                )}
+                                {formData.payment_status !== 'paid' && (
+                                    <p className="text-gray-500 text-xs mt-1">Bank pembayaran hanya diperlukan untuk status 'paid'</p>
                                 )}
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Catatan
+                                </label>
+                                <textarea
+                                    rows="3"
+                                    placeholder="Catatan untuk order ini..."
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -1023,11 +719,6 @@ console.log(formData)
                     <div className="xl:col-span-2 space-y-6">
                         {/* Product Search */}
                         <div className="bg-white p-4 rounded-lg border">
-                            {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
-                                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                    <p className="text-xs text-red-700">Produk tidak dapat diubah untuk order dari website resmi</p>
-                                </div>
-                            )}
                             <div className="relative">
                                 <input
                                     type="text"
@@ -1035,7 +726,6 @@ console.log(formData)
                                     value={searchTerms.product}
                                     onChange={(e) => setSearchTerms(prev => ({ ...prev, product: e.target.value }))}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
                                 />
                                 {loading.products && (
                                     <div className="absolute right-3 top-3">
@@ -1074,7 +764,7 @@ console.log(formData)
                                                             <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
-                                                                disabled={variant.stock <= 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
+                                                                disabled={variant.stock <= 0}
                                                                 className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 disabled:bg-gray-300"
                                                             >
                                                                 {variant.stock <= 0 ? 'Habis' : 'Tambah'}
@@ -1122,12 +812,10 @@ console.log(formData)
                                                             const updatedItems = [...orderItems];
                                                             if (updatedItems[index].quantity > 1) {
                                                                 updatedItems[index].quantity -= 1;
-                                                                updatedItems[index].variant_stock = (updatedItems[index].variant_stock || 0) + 1;
                                                                 setOrderItems(updatedItems);
                                                             }
                                                         }}
-                                                        disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
-                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50"
                                                     >
                                                         <span className="text-lg font-bold">−</span>
                                                     </button>
@@ -1138,21 +826,21 @@ console.log(formData)
                                                         onClick={() => {
                                                             const updatedItems = [...orderItems];
                                                             const currentItem = updatedItems[index];
-                                                            const additionalAvailable = currentItem.variant_stock || 0;
-                                                            if (additionalAvailable > 0) {
+                                                            const maxStock = currentItem.variant_stock || 0;
+                                                            
+                                                            if (currentItem.quantity < maxStock) {
                                                                 updatedItems[index].quantity += 1;
-                                                                updatedItems[index].variant_stock = additionalAvailable - 1;
                                                                 setOrderItems(updatedItems);
                                                             } else {
                                                                 Swal.fire({
                                                                     icon: 'warning',
                                                                     title: 'Stok Tidak Mencukupi',
-                                                                    text: `Tidak ada stok tambahan tersedia untuk ${currentItem.variant_name}`,
+                                                                    text: `Stok maksimal untuk ${currentItem.variant_name} adalah ${maxStock}`,
                                                                     confirmButtonText: 'OK'
                                                                 });
                                                             }
                                                         }}
-                                                        disabled={(item.variant_stock || 0) <= 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
+                                                        disabled={item.quantity >= (item.variant_stock || 0)}
                                                         className="w-8 h-8 flex items-center justify-center border rounded hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                                                     >
                                                         <span className="text-lg font-bold">+</span>
@@ -1175,8 +863,7 @@ console.log(formData)
                                                             timer: 1500
                                                         });
                                                     }}
-                                                    disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
-                                                    className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="text-red-500 hover:text-red-700 p-1"
                                                 >
                                                     <Icon icon="solar:trash-bin-minimalistic-outline" className="w-4 h-4" />
                                                 </button>
@@ -1209,50 +896,6 @@ console.log(formData)
                                 <span>TOTAL</span>
                                 <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
-                        </div>
-
-                        {/* Bank Pembayaran */}
-                        <div className="bg-white p-4 rounded-lg border">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Bank Pembayaran
-                            </label>
-                            <select 
-                                value={formData.payment_bank_id}
-                                onChange={(e) => setFormData(prev => ({ ...prev, payment_bank_id: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
-                            >
-                                <option value="">Pilih bank</option>
-                                {(() => {
-                                    const activeBanks = Array.isArray(paymentBanks) ? paymentBanks.filter(bank => bank.is_active) : [];
-                                    return activeBanks.map((bank) => (
-                                        <option key={bank.id} value={bank.id}>
-                                            {bank.bank_name} - {bank.account_number} ({bank.account_name})
-                                        </option>
-                                    ));
-                                })()}
-                            </select>
-                            {loading.paymentBanks && (
-                                <p className="text-gray-500 text-xs mt-1">Memuat payment banks...</p>
-                            )}
-                        </div>
-
-                        {/* Catatan */}
-                        <div className="bg-white p-4 rounded-lg border">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Catatan
-                            </label>
-                            <textarea
-                                rows="3"
-                                placeholder="Catatan untuk order ini..."
-                                value={formData.notes}
-                                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                disabled={originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website'}
-                            />
-                            {originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website' && (
-                                <p className="text-red-500 text-xs mt-1">Field ini tidak dapat diedit untuk order dari website resmi</p>
-                            )}
                         </div>
 
                         {/* Order Status */}
@@ -1306,7 +949,7 @@ console.log(formData)
                             <button 
                                 type="button"
                                 onClick={handleSubmit}
-                                disabled={loading.submitting || orderItems.length === 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'WEBSITE')}
+                                disabled={loading.submitting || orderItems.length === 0}
                                 className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {loading.submitting && (

@@ -13,7 +13,6 @@ const EditVoucher = ({ voucherId }) => {
         handleSubmit,
         watch,
         setValue,
-        setError,
         formState: { errors },
         reset,
     } = useForm();
@@ -21,16 +20,6 @@ const EditVoucher = ({ voucherId }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     const voucherType = watch("type", "percentage");
-
-    const formatRibuan = (num) => {
-        if (!num || num === 0) return '';
-        return Math.floor(num).toLocaleString('id-ID');
-    };
-
-    const parseRibuan = (str) => {
-        if (!str) return 0;
-        return parseInt(str.toString().replace(/\./g, '')) || 0;
-    };
 
     // Load voucher data
     useEffect(() => {
@@ -48,20 +37,16 @@ const EditVoucher = ({ voucherId }) => {
                 setValue('minimum_amount', voucher.minimum_amount);
                 setValue('maximum_discount', voucher.maximum_discount);
                 setValue('usage_limit', voucher.usage_limit);
-                // Format tanggal untuk input type="date" (YYYY-MM-DD) tanpa pergeseran timezone
+                // Format tanggal untuk input type="date" (YYYY-MM-DD)
                 const formatDateForInput = (dateString) => {
                     if (!dateString) return '';
-                    const d = new Date(dateString);
-                    const y = d.getFullYear();
-                    const m = String(d.getMonth() + 1).padStart(2, '0');
-                    const day = String(d.getDate()).padStart(2, '0');
-                    return `${y}-${m}-${day}`;
+                    const date = new Date(dateString);
+                    return date.toISOString().split('T')[0];
                 };
                 
                 setValue('valid_from', formatDateForInput(voucher.start_date));
                 setValue('valid_until', formatDateForInput(voucher.end_date));
                 setValue('is_active', voucher.is_active);
-                setValue('free_product_name', voucher.free_product_name);
                 
                 setIsLoading(false);
             } catch (error) {
@@ -72,7 +57,7 @@ const EditVoucher = ({ voucherId }) => {
                     icon: 'error',
                     confirmButtonColor: '#ef4444'
                 });
-                router.visit('/cms/voucher/data');
+                router.visit('/cms/cms/voucher/data');
             }
         };
 
@@ -113,42 +98,15 @@ const EditVoucher = ({ voucherId }) => {
             }
         } catch (error) {
             console.error('Error updating voucher:', error);
-
-            const data = error?.response?.data;
-            let errorMessage = 'Gagal memperbarui voucher. Silakan cek kembali informasi yang dimasukkan.';
-
-            if (Array.isArray(data?.errors)) {
-                const messages = data.errors.map((e) => (typeof e === 'string' ? e : e?.message)).filter(Boolean);
-                if (messages.length > 0) {
-                    errorMessage = messages.join(', ');
-                }
-                data.errors.forEach((e) => {
-                    const field = e?.field || (typeof e?.message === 'string' && e.message.toLowerCase().includes('usage limit') ? 'usage_limit' : null);
-                    const msg = typeof e?.message === 'string' ? e.message : (e?.tag || 'Error');
-                    if (field) {
-                        setError(field, { type: 'server', message: msg });
-                    }
-                });
-            } else if (data?.errors && typeof data.errors === 'object') {
-                const apiErrors = data.errors;
-                const joined = Object.values(apiErrors).flat().map((x) => (typeof x === 'string' ? x : String(x))).filter(Boolean).join(', ');
-                if (joined) errorMessage = joined;
-                Object.entries(apiErrors).forEach(([field, msgs]) => {
-                    const msg = Array.isArray(msgs) ? String(msgs[0]) : String(msgs);
-                    setError(field, { type: 'server', message: msg });
-                });
-            } else if (typeof data?.message === 'string') {
-                errorMessage = data.message;
-            } else if (Array.isArray(data?.message)) {
-                errorMessage = data.message.map(String).join(', ');
-            } else if (data?.message && typeof data.message === 'object') {
-                errorMessage = Object.values(data.message).flat().map(String).join(', ');
-            } else if (typeof data === 'string') {
-                errorMessage = data;
-            } else if (error?.message) {
-                errorMessage = error.message;
+            
+            let errorMessage = 'Gagal memperbarui voucher';
+            if (error.response?.data?.errors) {
+                const errors = error.response.data.errors;
+                errorMessage = Object.values(errors).flat().join(', ');
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
             }
-
+            
             await Swal.fire({
                 title: 'Error!',
                 text: errorMessage,
@@ -299,9 +257,6 @@ const EditVoucher = ({ voucherId }) => {
                                         <option value="">Pilih tipe voucher</option>
                                         <option value="percentage">Persentase (%)</option>
                                         <option value="fixed">Nominal Tetap (Rp)</option>
-                                        <option value="shipping">Potongan Ongkir</option>
-                                        <option value="free_sample">Free Sample (Bonus Produk)</option>
-                                        <option value="shipping_free_sample">Potongan Ongkir + Free Sample</option>
                                     </select>
                                     {errors.type && (
                                         <p className="text-red-500 text-sm mt-1">
@@ -310,71 +265,51 @@ const EditVoucher = ({ voucherId }) => {
                                     )}
                                 </div>
 
-                                {voucherType !== "free_sample" && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            {voucherType === "shipping" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
-                                        </label>
-                                        <div className="relative">
-                                            {(voucherType === "fixed" || voucherType === "shipping") && (
-                                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                                    Rp
-                                                </span>
-                                            )}
-                                            {voucherType === "percentage" && (
-                                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                                    %
-                                                </span>
-                                            )}
-                                            {voucherType === 'percentage' ? (
-                                                <input
-                                                    type="text"
-                                                    value={formatRibuan(watch('value'))}
-                                                    onChange={(e) => setValue('value', parseRibuan(e.target.value), { shouldValidate: true })}
-                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8`}
-                                                    placeholder="10"
-                                                />
-                                            ) : (
-                                                <input
-                                                    type="text"
-                                                    value={formatRibuan(watch('value'))}
-                                                    onChange={(e) => setValue('value', parseRibuan(e.target.value), { shouldValidate: true })}
-                                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-8`}
-                                                    placeholder="50000"
-                                                />
-                                            )}
-                                        </div>
-                                        {errors.value && (
-                                            <p className="text-red-500 text-sm mt-1">
-                                                {errors.value.message}
-                                            </p>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Nilai Diskon *
+                                    </label>
+                                    <div className="relative">
+                                        {voucherType === "fixed" && (
+                                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                                                Rp
+                                            </span>
                                         )}
-                                    </div>
-                                )}
-
-                                {(voucherType === "free_sample" || voucherType === "shipping_free_sample") && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Nama Produk Gratis *
-                                        </label>
+                                        {voucherType === "percentage" && (
+                                            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                                                %
+                                            </span>
+                                        )}
                                         <input
-                                            type="text"
-                                            {...register("free_product_name", {
-                                                required: (voucherType === "free_sample" || voucherType === "shipping_free_sample") ? "Nama produk gratis harus diisi" : false,
+                                            type="number"
+                                            {...register("value", {
+                                                required: "Nilai diskon harus diisi",
+                                                min: {
+                                                    value: 1,
+                                                    message: "Nilai harus lebih dari 0",
+                                                },
+                                                max:
+                                                    voucherType === "percentage"
+                                                        ? {
+                                                              value: 100,
+                                                              message: "Persentase maksimal 100%",
+                                                          }
+                                                        : undefined,
                                             })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            placeholder="Contoh: Sample Parfum 5ml"
+                                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                                voucherType === "fixed" ? "pl-8" : "pr-8"
+                                            }`}
+                                            placeholder={
+                                                voucherType === "percentage" ? "10" : "50000"
+                                            }
                                         />
-                                        {errors.free_product_name && (
-                                            <p className="text-red-500 text-sm mt-1">
-                                                {errors.free_product_name.message}
-                                            </p>
-                                        )}
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Produk bonus yang akan diberikan (tidak mengurangi harga)
-                                        </p>
                                     </div>
-                                )}
+                                    {errors.value && (
+                                        <p className="text-red-500 text-sm mt-1">
+                                            {errors.value.message}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -389,15 +324,14 @@ const EditVoucher = ({ voucherId }) => {
                                         Minimal Pembelian (Rp) *
                                     </label>
                                     <input
-                                        type="text"
-                                        value={formatRibuan(watch('minimum_amount'))}
-                                        // {...register('minimum_amount', {
-                                        //     // required: "Minimal pembelian harus diisi",
-                                        //     min: { value: 0, message: "Minimal pembelian tidak boleh negatif" },
-                                        //     setValueAs: (v) => parseRibuan(v)
-                                        // })}
-                                        
-                                        onChange={(e) => setValue('minimum_amount', parseRibuan(e.target.value), { shouldValidate: true })}
+                                        type="number"
+                                        {...register("minimum_amount", {
+                                            required: "Minimal pembelian harus diisi",
+                                            min: {
+                                                value: 0,
+                                                message: "Minimal pembelian tidak boleh negatif",
+                                            },
+                                        })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="100000"
                                     />
@@ -414,13 +348,13 @@ const EditVoucher = ({ voucherId }) => {
                                             Maksimal Diskon (Rp)
                                         </label>
                                         <input
-                                            type="text"
-                                            value={formatRibuan(watch('maximum_discount'))}
-                                            // {...register('maximum_discount', {
-                                            //     min: { value: 0, message: "Maksimal diskon tidak boleh negatif" },
-                                            //     setValueAs: (v) => parseRibuan(v)
-                                            // })}
-                                            onChange={(e) => setValue('maximum_discount', parseRibuan(e.target.value), { shouldValidate: true })}
+                                            type="number"
+                                            {...register("maximum_discount", {
+                                                min: {
+                                                    value: 0,
+                                                    message: "Maksimal diskon tidak boleh negatif",
+                                                },
+                                            })}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             placeholder="500000"
                                         />
@@ -440,14 +374,14 @@ const EditVoucher = ({ voucherId }) => {
                                         Batas Penggunaan *
                                     </label>
                                     <input
-                                        type="text"
-                                        value={formatRibuan(watch('usage_limit'))}
-                                        {...register('usage_limit', {
+                                        type="number"
+                                        {...register("usage_limit", {
                                             required: "Batas penggunaan harus diisi",
-                                            min: { value: 1, message: "Batas penggunaan minimal 1" },
-                                            setValueAs: (v) => parseRibuan(v)
+                                            min: {
+                                                value: 1,
+                                                message: "Batas penggunaan minimal 1",
+                                            },
                                         })}
-                                        onChange={(e) => setValue('usage_limit', Math.max(1, parseRibuan(e.target.value)), { shouldValidate: true })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         placeholder="100"
                                     />

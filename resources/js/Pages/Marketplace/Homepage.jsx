@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Link } from '@inertiajs/react';
-import {
+import { 
     Search,
     Filter,
     Grid,
@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { productsAPI } from '@/api/products';
-import axios from 'axios';
 // Removed cart functionality from homepage cards
 
 const Homepage = () => {
@@ -23,74 +22,37 @@ const Homepage = () => {
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
-        per_page: 200,
+        per_page: 1000, // Set high value to fetch all products
         total: 0,
     });
-    const [bannerUrls, setBannerUrls] = useState([]);
-    const [tags, setTags] = useState([]);
-    const [tagProducts, setTagProducts] = useState({});
-    const [tagLoading, setTagLoading] = useState(false);
-    const [selectedTag, setSelectedTag] = useState(null);
-    const [tagHasAnyProducts, setTagHasAnyProducts] = useState({});
     // Removed: addToCart integration on homepage cards
 
     // Derive categories from loaded products (fallback to string/slug if available)
     const categories = useMemo(() => {
         const map = new Map();
-        map.set('', { id: '', name: 'Semua' });
+        // Always include "all"
+        map.set('all', { id: 'all', name: 'Semua' });
+
         products.forEach((p) => {
-            if (Array.isArray(p.categories)) {
-                p.categories.forEach((c) => {
-                    const id = c.id;
-                    const name = c.name;
-                    if (id != null && name && !map.has(id)) {
-                        map.set(id, { id, name });
-                    }
-                });
-            } else {
-                const catObj = p.category || p.product_category || null;
-                let id = null;
-                let name = null;
-                if (catObj && typeof catObj === 'object') {
-                    id = catObj.id || catObj.slug || catObj.name || null;
-                    name = catObj.name || catObj.slug || null;
-                } else if (typeof catObj === 'string') {
-                    id = catObj;
-                    name = catObj;
-                }
-                if (id && name && !map.has(id)) {
-                    map.set(id, { id, name });
-                }
+            // Support various possible shapes from API
+            // e.g. p.category is string | { name, slug } | { name }
+            const catObj = p.category || p.product_category || null;
+            let id = null;
+            let name = null;
+            if (catObj && typeof catObj === 'object') {
+                id = catObj.slug || catObj.name || null;
+                name = catObj.name || catObj.slug || null;
+            } else if (typeof catObj === 'string') {
+                id = catObj;
+                name = catObj;
+            }
+            if (id && name && !map.has(id)) {
+                map.set(id, { id, name });
             }
         });
+
         return Array.from(map.values());
     }, [products]);
-
-    const visibleTags = useMemo(() => {
-        const filtered = (Array.isArray(tags) ? tags : []).filter((t) => !!tagHasAnyProducts[t.id]);
-        const getOrderIndex = (name) => {
-            const n = (name || '').toLowerCase();
-            const compact = n.replace(/\s+/g, ' ').trim();
-            if (compact.includes('new arrival')) return 0;
-            if (compact.includes('best seller') || compact.includes('customer favorites')) return 1;
-            if (compact.includes('promo') || compact.includes('diskon')) return 2;
-            return 999;
-        };
-        return filtered.sort((a, b) => {
-            const pa = getOrderIndex(a.name);
-            const pb = getOrderIndex(b.name);
-            if (pa !== pb) return pa - pb;
-            return (a.name || '').localeCompare(b.name || '');
-        });
-    }, [tags, tagHasAnyProducts]);
-
-    const tagsToRender = useMemo(() => {
-        if (selectedTag) {
-            return (Array.isArray(tags) ? tags : [])
-                .filter((t) => t.id === selectedTag && !!tagHasAnyProducts[t.id]);
-        }
-        return (Array.isArray(tags) ? tags : []).filter((t) => !!tagHasAnyProducts[t.id]);
-    }, [tags, tagHasAnyProducts, selectedTag]);
 
     const fetchProducts = useCallback(async (page = 1) => {
         try {
@@ -99,11 +61,10 @@ const Homepage = () => {
                 page,
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
-                ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
-                ...(selectedTag ? { tag_ids: [selectedTag] } : {}),
+                category: selectedCategory || undefined,
                 sort: sortBy,
             };
-
+            
             const response = await productsAPI.getProducts(params);
             const payload = response?.data || {};
             setProducts(payload.data || []);
@@ -120,7 +81,7 @@ const Homepage = () => {
         } finally {
             setLoading(false);
         }
-    }, [selectedTag]);
+    }, []);
 
     // Debounced search effect
     useEffect(() => {
@@ -129,17 +90,17 @@ const Homepage = () => {
                 page: 1,
                 per_page: pagination.per_page,
                 search: searchQuery || undefined,
-                ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+                category: selectedCategory || undefined,
                 sort: sortBy,
             };
-
+            
             const fetchData = async () => {
                 try {
                     setSearchLoading(true);
                     const response = await productsAPI.getProducts(params);
                     const payload = response?.data || {};
                     const productsData = payload.data || [];
-
+                    
                     // Debug log for price issues
                     console.log('Search fetch - Products received:', productsData.length);
                     if (productsData.length > 0) {
@@ -152,7 +113,7 @@ const Homepage = () => {
                             selling_price: productsData[0].selling_price
                         });
                     }
-
+                    
                     setProducts(productsData);
                     setPagination(prev => ({
                         ...prev,
@@ -168,7 +129,7 @@ const Homepage = () => {
                     setSearchLoading(false);
                 }
             };
-
+            
             fetchData();
         }, 500); // 500ms delay
 
@@ -181,10 +142,10 @@ const Homepage = () => {
             page: 1,
             per_page: pagination.per_page,
             search: searchQuery || undefined,
-            ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+            category: selectedCategory || undefined,
             sort: sortBy,
         };
-
+        
         const fetchData = async () => {
             try {
                 setLoading(true);
@@ -205,20 +166,23 @@ const Homepage = () => {
                 setLoading(false);
             }
         };
-
+        
         fetchData();
     }, [selectedCategory, sortBy]);
 
-    // Effect for pagination - fetch on any current_page change
+    // Effect for pagination - Disabled when showing all products
     useEffect(() => {
+        // Skip pagination effect when per_page is set to show all products
+        if (pagination.per_page >= 1000) return;
+        
         const params = {
             page: pagination.current_page,
             per_page: pagination.per_page,
             search: searchQuery || undefined,
-            ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
+            category: selectedCategory || undefined,
             sort: sortBy,
         };
-
+        
         const fetchData = async () => {
             try {
                 setLoading(true);
@@ -239,8 +203,10 @@ const Homepage = () => {
                 setLoading(false);
             }
         };
-
-        fetchData();
+        
+        if (pagination.current_page > 1) {
+            fetchData();
+        }
     }, [pagination.current_page]);
 
     // Initial load
@@ -252,14 +218,14 @@ const Homepage = () => {
             category: selectedCategory || undefined,
             sort: sortBy,
         };
-
+        
         const fetchData = async () => {
             try {
                 setLoading(true);
                 const response = await productsAPI.getProducts(params);
                 const payload = response?.data || {};
                 const productsData = payload.data || [];
-
+                
                 // Debug log for initial load
                 console.log('Initial load - Products received:', productsData.length);
                 if (productsData.length > 0) {
@@ -272,7 +238,7 @@ const Homepage = () => {
                         selling_price: productsData[0].selling_price
                     });
                 }
-
+                
                 setProducts(productsData);
                 setPagination(prev => ({
                     ...prev,
@@ -288,132 +254,9 @@ const Homepage = () => {
                 setLoading(false);
             }
         };
-
+        
         fetchData();
-        const loadSettings = async () => {
-            try {
-                const res = await axios.get('/api/banners');
-                if (res.data?.success) setBannerUrls((res.data.data || []).map(b => b.image_url));
-            } catch (e) {
-                console.error(e);
-            }
-        };
-        loadSettings();
-        const loadTags = async () => {
-            try {
-                setTagLoading(true);
-                const res = await axios.get('/api/tags', { params: { per_page: 100, is_active: 1 } });
-                const list = res.data?.data?.data || [];
-                setTags(list);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setTagLoading(false);
-            }
-        };
-        loadTags();
     }, []);
-
-    useEffect(() => {
-        if (!Array.isArray(tags) || tags.length === 0) {
-            setTagProducts({});
-            setTagHasAnyProducts({});
-            return;
-        }
-        let cancelled = false;
-        const checkExistence = async () => {
-            try {
-                setTagLoading(true);
-                const baseParams = {
-                    page: 1,
-                    per_page: 1,
-                    search: searchQuery || undefined,
-                    ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
-                    sort: sortBy,
-                };
-                const results = {};
-                const ids = tags.map(t => t.id);
-                const limit = 5;
-                let idx = 0;
-                while (idx < ids.length) {
-                    const slice = ids.slice(idx, idx + limit);
-                    const promises = slice.map(async (id) => {
-                        const resp = await productsAPI.getProducts({ ...baseParams, tag_ids: [id] });
-                        const payload = resp?.data || {};
-                        const items = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.data?.data) ? payload.data.data : []);
-                        const filtered = items.filter((p) => matchesSelectedCategory(p));
-                        results[id] = filtered.length > 0;
-                    });
-                    await Promise.all(promises);
-                    idx += limit;
-                    if (cancelled) break;
-                }
-                if (!cancelled) setTagHasAnyProducts(results);
-            } catch (e) {
-                if (!cancelled) console.error(e);
-            } finally {
-                if (!cancelled) setTagLoading(false);
-            }
-        };
-        checkExistence();
-        return () => { cancelled = true; };
-    }, [tags, selectedCategory, searchQuery, sortBy]);
-
-    useEffect(() => {
-        if (!Array.isArray(tagsToRender) || tagsToRender.length === 0) {
-            return;
-        }
-        let cancelled = false;
-        const loadVisibleTags = async () => {
-            try {
-                const baseParams = {
-                    page: 1,
-                    per_page: 200,
-                    search: searchQuery || undefined,
-                    ...(selectedCategory !== '' && typeof selectedCategory === 'number' ? { category_ids: [selectedCategory] } : { category: selectedCategory || undefined }),
-                    sort: sortBy,
-                };
-                const map = { ...tagProducts };
-                const limit = 3;
-                let idx = 0;
-                const vis = tagsToRender.map(t => t.id);
-                while (idx < vis.length) {
-                    const slice = vis.slice(idx, idx + limit);
-                    const promises = slice.map(async (id) => {
-                        if (Array.isArray(map[id]) && map[id].length > 0) return;
-                        const resp = await productsAPI.getProducts({ ...baseParams, tag_ids: [id] });
-                        const payload = resp?.data || {};
-                        const items = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload.data?.data) ? payload.data.data : []);
-                        map[id] = items.filter((p) => matchesSelectedCategory(p));
-                    });
-                    await Promise.all(promises);
-                    idx += limit;
-                    if (cancelled) break;
-                }
-                if (!cancelled) setTagProducts(map);
-            } catch (e) {
-                if (!cancelled) console.error(e);
-            }
-        };
-        loadVisibleTags();
-        return () => { cancelled = true; };
-    }, [tagsToRender, selectedCategory, searchQuery, sortBy]);
-
-    const matchesSelectedCategory = useCallback((product) => {
-        if (selectedCategory === '' || selectedCategory == null) return true;
-        const catIds = Array.isArray(product.categories) ? product.categories.map((c) => c.id) : [];
-        const catNames = Array.isArray(product.categories) ? product.categories.map((c) => c.name) : [];
-        const primaryId = product.category_id ?? (product.product_category?.id ?? null);
-        const primaryName = product.category ?? (product.product_category?.name ?? null);
-        if (typeof selectedCategory === 'number') {
-            return catIds.includes(selectedCategory) || primaryId === selectedCategory;
-        }
-        return catNames.includes(selectedCategory) || primaryName === selectedCategory;
-    }, [selectedCategory]);
-
-    useEffect(() => {
-        setTagProducts({});
-    }, [selectedCategory, searchQuery]);
 
 
     // Robust price extraction function to handle various price field formats
@@ -426,7 +269,7 @@ const Homepage = () => {
         // Try different price fields in order of preference
         const priceFields = [
             product.price,
-            product.base_price,
+            product.base_price, 
             product.min_price,
             product.selling_price,
             product.regular_price
@@ -436,7 +279,7 @@ const Homepage = () => {
             if (priceField !== null && priceField !== undefined && priceField !== '') {
                 // Convert to number if it's a string
                 const numPrice = typeof priceField === 'string' ? parseFloat(priceField) : priceField;
-
+                
                 // Validate that it's a positive number
                 if (!isNaN(numPrice) && numPrice > 0) {
                     return numPrice;
@@ -454,7 +297,7 @@ const Homepage = () => {
             selling_price: product.selling_price,
             regular_price: product.regular_price
         });
-
+        
         return 0;
     }, []);
 
@@ -467,15 +310,15 @@ const Homepage = () => {
     const formatPrice = useCallback((price) => {
         // Ensure price is a valid number
         const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-
+        
         if (isNaN(numPrice) || numPrice < 0) {
             return 'Harga tidak tersedia';
         }
-
+        
         if (numPrice === 0) {
             return 'Hubungi untuk harga';
         }
-
+        
         return currencyFormatter.format(numPrice);
     }, [currencyFormatter]);
 
@@ -494,166 +337,67 @@ const Homepage = () => {
         setPagination(prev => ({ ...prev, current_page: 1 }));
     };
 
-    const applyTagFilter = (tagId) => {
-        setSelectedTag(tagId ?? null);
-        setPagination(prev => ({ ...prev, current_page: 1 }));
-    };
-
-    const untaggedProducts = useMemo(() => {
-        if (!Array.isArray(products)) return [];
-        return products.filter((p) => !Array.isArray(p.tags) || p.tags.length === 0);
-    }, [products]);
-
     // Client-side sorting as fallback
     const sortedProducts = useMemo(() => {
         if (!products || products.length === 0) return [];
-
+        
         const sorted = [...products];
-        const hasProductStock = (product) => {
-            if (Array.isArray(product.variants) && product.variants.length > 0) {
-                return product.variants.some(v => (v.stock ?? 0) > 0);
-            }
-            return ((product.stock ?? 0) > 0);
-        };
-
+        
         switch (sortBy) {
             case 'name':
-                sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-                break;
+                return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             case 'price_asc':
-                sorted.sort((a, b) => {
+                return sorted.sort((a, b) => {
                     const priceA = getProductPrice(a);
                     const priceB = getProductPrice(b);
                     return priceA - priceB;
                 });
-                break;
             case 'price_desc':
-                sorted.sort((a, b) => {
+                return sorted.sort((a, b) => {
                     const priceA = getProductPrice(a);
                     const priceB = getProductPrice(b);
                     return priceB - priceA;
                 });
-                break;
             case 'stock':
-                sorted.sort((a, b) => {
+                return sorted.sort((a, b) => {
                     const stockA = a.stock || 0;
                     const stockB = b.stock || 0;
                     return stockB - stockA;
                 });
-                break;
             default:
-                break;
+                return sorted;
         }
-        const inStock = sorted.filter(p => hasProductStock(p));
-        const outStock = sorted.filter(p => !hasProductStock(p));
-        return [...inStock, ...outStock];
     }, [products, sortBy]);
 
     const setCurrentPage = (page) => {
         setPagination(prev => ({ ...prev, current_page: page }));
     };
 
-    // Helper to calculate variant price info (min price, has discount, etc)
-    const getVariantPriceInfo = useCallback((product) => {
-        if (!product.variants || product.variants.length === 0) {
-            return null;
-        }
-
-        let minPrice = Infinity;
-        let minOriginalPrice = Infinity;
-        let hasDiscount = false;
-
-        product.variants.forEach(variant => {
-            const vPrice = typeof variant.price === 'string' ? parseFloat(variant.price) : variant.price;
-            const vDiscount = typeof variant.discount_price === 'string' ? parseFloat(variant.discount_price) : variant.discount_price;
-
-            const effectivePrice = (vDiscount && vDiscount > 0 && vDiscount < vPrice) ? vDiscount : vPrice;
-
-            if (effectivePrice < minPrice) {
-                minPrice = effectivePrice;
-            }
-            if (vPrice < minOriginalPrice) {
-                minOriginalPrice = vPrice;
-            }
-            if (vDiscount && vDiscount > 0 && vDiscount < vPrice) {
-                hasDiscount = true;
-            }
-        });
-
-        if (!isFinite(minPrice)) return null;
-
-        return {
-            minPrice,
-            minOriginalPrice,
-            hasDiscount: hasDiscount || (isFinite(minOriginalPrice) && minPrice < minOriginalPrice)
-        };
-    }, []);
-
 
     const ProductCard = memo(({ product }) => {
-        const variantInfo = getVariantPriceInfo(product);
-        const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
-        const hasStock = (Array.isArray(product.variants) && product.variants.length > 0)
-            ? product.variants.some(v => (v.stock ?? 0) > 0)
-            : ((product.stock ?? 0) > 0);
-
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-lg border border-gray-100 hover:border-blue-200 transition-all duration-300 overflow-hidden h-full flex flex-col">
-                    {/* Image Container - Square ratio */}
-                    <div
-                        className="relative overflow-hidden bg-gray-100"
-                        style={{ aspectRatio: '1 / 1', maxWidth: 800, maxHeight: 800 }}
-                    >
-                        <img
-                            src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'}
+                    {/* Image Container - Fixed height */}
+                    <div className="relative overflow-hidden bg-gray-100 h-40 sm:h-44">
+                        <img 
+                            src={product?.image ? (product.image.startsWith('http') ? product.image : `/storage/${product.image}`) : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'} 
                             alt={product.name}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300"></div>
-                        {!hasStock && (
-                            <div className="absolute top-2 left-2 text-white text-xs px-2 py-1 rounded-full font-medium bg-red-600">
-                                Stok Habis
-                            </div>
-                        )}
-                        {variantInfo?.hasDiscount && (
-                            <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                                Diskon
-                            </div>
-                        )}
                     </div>
-
+                    
                     {/* Content Container */}
                     <div className="p-2.5 sm:p-3 flex flex-col flex-grow">
                         {/* Product Name */}
                         <h3 className="text-xs sm:text-xs font-medium text-gray-900 mb-1.5 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors flex-grow">{product.name}</h3>
-                        {/* Categories */}
-                        {Array.isArray(product.categories) && product.categories.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-1">
-                                {product.categories.map((c) => (
-                                    <span key={c.id} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
-                                        {c.name}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-
+                        
                         {/* Price */}
-                        <div className="flex flex-col gap-0.5 ">
-                            {variantInfo?.hasDiscount ? (
-                                <>
-                                    <span className="text-xs text-gray-400 line-through">
-                                        {formatPrice(variantInfo.minOriginalPrice)}
-                                    </span>
-                                    <span className="text-sm sm:text-sm font-bold text-green-600">
-                                        {formatPrice(displayPrice)}
-                                    </span>
-                                </>
-                            ) : (
-                                <span className="text-sm sm:text-sm font-bold text-gray-900">
-                                    {formatPrice(displayPrice)}
-                                </span>
-                            )}
+                        <div className="flex items-end gap-1">
+                            <span className="text-sm sm:text-sm font-bold text-gray-900">
+                                {formatPrice(getProductPrice(product))}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -662,12 +406,6 @@ const Homepage = () => {
     });
 
     const ProductListItem = memo(({ product }) => {
-        const variantInfo = getVariantPriceInfo(product);
-        const displayPrice = variantInfo ? variantInfo.minPrice : getProductPrice(product);
-        const hasStock = (Array.isArray(product.variants) && product.variants.length > 0)
-            ? product.variants.some(v => (v.stock ?? 0) > 0)
-            : ((product.stock ?? 0) > 0);
-
         return (
             <Link href={`/products/${product.id}`} className="block group">
                 <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden">
@@ -679,45 +417,15 @@ const Homepage = () => {
                                 className="w-24 h-24 sm:w-20 sm:h-20 object-cover transition-transform duration-300 group-hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg"></div>
-                            {!hasStock && (
-                                <div className="absolute top-1 left-1 text-white text-xs px-2 py-0.5 rounded font-medium bg-red-600">
-                                    Stok Habis
-                                </div>
-                            )}
-                            {variantInfo?.hasDiscount && (
-                                <div className="absolute top-1 right-1 bg-green-500 text-white text-xs px-2 py-0.5 rounded font-medium">
-                                    Diskon
-                                </div>
-                            )}
                         </div>
                         <div className="flex-1 min-w-0">
                             <h3 className="text-base sm:text-sm font-medium text-gray-900 mb-2 sm:mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
                                 {product.name}
                             </h3>
-                            {Array.isArray(product.categories) && product.categories.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mb-1">
-                                    {product.categories.map((c) => (
-                                        <span key={c.id} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
-                                            {c.name}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-                            <div className="flex items-center gap-2">
-                                {variantInfo?.hasDiscount ? (
-                                    <>
-                                        <span className="text-sm text-gray-400 line-through">
-                                            {formatPrice(variantInfo.minOriginalPrice)}
-                                        </span>
-                                        <span className="text-lg font-semibold text-green-600">
-                                            {formatPrice(displayPrice)}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                        {formatPrice(displayPrice)}
-                                    </span>
-                                )}
+                            <div className="flex items-center justify-between">
+                                <span className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                    {formatPrice(getProductPrice(product))}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -742,7 +450,7 @@ const Homepage = () => {
                 <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                     <div className="text-center">
                         <p className="text-red-500 text-lg mb-4">{error}</p>
-                        <button
+                        <button 
                             onClick={fetchProducts}
                             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                         >
@@ -756,32 +464,25 @@ const Homepage = () => {
 
     return (
         <MarketplaceLayout>
-            {bannerUrls?.length > 0 ? (
-                <div className="bg-white">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 ">
-                        <BannerRotator bannerUrls={bannerUrls} />
+            {/* Hero Section */}
+            <div className="bg-gray-50 border-b border-gray-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
+                    <div className="text-center">
+                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-900 mb-3 sm:mb-4">
+                            Koleksi Produk Terbaik
+                        </h1>
+                        <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
+                            Temukan produk berkualitas dengan harga terbaik
+                        </p>
                     </div>
                 </div>
-            ) : (
-                <div className="bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
-                        <div className="text-center">
-                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-light text-gray-900 mb-3 sm:mb-4">
-                                Koleksi Produk Terbaik
-                            </h1>
-                            <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
-                                Temukan produk berkualitas dengan harga terbaik
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
+            </div>
 
             {/* Search and Filters */}
-            <div className="sticky top-14 sm:top-16 z-50 bg-white/95 backdrop-blur border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-45 sm:py-4">
+            <div className="bg-white border-b border-gray-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
                     {/* Search Bar */}
-                    <div className='mt-2 mb-4'>
+                    <div className="mb-6">
                         <div className="max-w-lg mx-auto relative">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input
@@ -799,44 +500,44 @@ const Homepage = () => {
                             )}
                         </div>
                     </div>
-                </div>
-            </div>
-            {/* Categories Filter */}
-            {categories.length > 1 && (
-                <div className="bg-white pt-4">
-                    <div className="flex flex-nowrap overflow-x-auto sm:overflow-x-visible scroll-smooth snap-x snap-mandatory gap-2 sm:gap-3 sm:flex-wrap sm:justify-center px-4 max-w-[90vw] sm:max-w-none mx-auto overflow-hidden">
-                        <button
-                            onClick={() => handleCategoryChange('')}
-                            className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === ''
-                                ? 'bg-gray-900 text-white border-gray-900'
-                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
-                                }`}
-                        >
-                            Semua
-                        </button>
-                        {categories.slice(1).map((cat) => (
-                            <button
-                                key={cat.id}
-                                onClick={() => handleCategoryChange(cat.id)}
-                                className={`flex-none snap-start min-w-fit px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${selectedCategory === cat.id
-                                    ? 'bg-gray-900 text-white border-gray-900'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
-                                    }`}
-                            >
-                                {cat.name}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
 
-            {/* Filters and Controls (non-sticky) */}
-            <div className="bg-white border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <div className="bg-white rounded-lg border border-gray-100 p-3 sm:p-4">
-                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center">
+                    {/* Categories Filter */}
+                    {categories.length > 1 && (
+                        <div className="mb-6">
+                            <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+                                <button
+                                    onClick={() => handleCategoryChange('')}
+                                    className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${
+                                        selectedCategory === ''
+                                            ? 'bg-gray-900 text-white border-gray-900'
+                                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                                    }`}
+                                >
+                                    Semua
+                                </button>
+                                {categories.slice(1).map((cat) => (
+                                    <button
+                                        key={cat.id}
+                                        onClick={() => handleCategoryChange(cat.id)}
+                                        className={`px-4 py-2 sm:px-3 sm:py-1 text-base sm:text-sm rounded-full border transition-colors ${
+                                            selectedCategory === cat.id
+                                                ? 'bg-gray-900 text-white border-gray-900'
+                                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                                        }`}
+                                    >
+                                        {cat.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filters and Controls */}
+                    <div className="bg-white rounded-lg border border-gray-100 p-4 sm:p-4">
+                        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                            {/* Sort */}
                             <div className="flex items-center gap-3 w-full sm:w-auto">
-                                <label className="hidden sm:block text-base sm:text-sm text-gray-600 whitespace-nowrap">Urutkan:</label>
+                                <label className="text-base sm:text-sm text-gray-600 whitespace-nowrap">Urutkan:</label>
                                 <select
                                     value={sortBy}
                                     onChange={(e) => handleSortChange(e.target.value)}
@@ -849,38 +550,25 @@ const Homepage = () => {
                                 </select>
                             </div>
 
-                            {visibleTags.length > 0 && !searchQuery && !searchLoading && (
-                                <div className="w-full sm:w-auto flex flex-nowrap sm:flex-wrap overflow-x-auto scroll-smooth snap-x snap-mandatory gap-2 max-w-[90vw] sm:max-w-none">
-                                    <button
-                                        onClick={() => applyTagFilter(null)}
-                                        className={`px-3 py-1 text-sm rounded-md border ${selectedTag == null ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
-                                    >Semua Produk</button>
-                                    {visibleTags.map((t) => (
-                                        <button
-                                            key={`chip-${t.id}`}
-                                            onClick={() => applyTagFilter(t.id)}
-                                            className={`px-3 py-1 text-sm rounded-md border ${selectedTag === t.id ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
-                                        >{t.name}</button>
-                                    ))}
-                                </div>
-                            )}
-
-                            <div className="hidden sm:flex border border-gray-300 rounded-md overflow-hidden sm:ml-auto">
+                            {/* View Toggle */}
+                            <div className="flex border border-gray-300 rounded-md overflow-hidden">
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-3 sm:p-2 ${viewMode === 'grid'
-                                        ? 'bg-gray-900 text-white'
-                                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                                        }`}
+                                    className={`p-3 sm:p-2 ${
+                                        viewMode === 'grid'
+                                            ? 'bg-gray-900 text-white'
+                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                    }`}
                                 >
                                     <Grid className="h-5 w-5 sm:h-4 sm:w-4" />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('list')}
-                                    className={`p-3 sm:p-2 ${viewMode === 'list'
-                                        ? 'bg-gray-900 text-white'
-                                        : 'bg-white text-gray-600 hover:bg-gray-50'
-                                        }`}
+                                    className={`p-3 sm:p-2 ${
+                                        viewMode === 'list'
+                                            ? 'bg-gray-900 text-white'
+                                            : 'bg-white text-gray-600 hover:bg-gray-50'
+                                    }`}
                                 >
                                     <List className="h-5 w-5 sm:h-4 sm:w-4" />
                                 </button>
@@ -889,50 +577,19 @@ const Homepage = () => {
                     </div>
                 </div>
             </div>
+
             {/* Products Section */}
             <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {tagsToRender.length > 0 && !searchQuery && !searchLoading && (
-                        <div className="space-y-10 mb-10">
-                            {tagsToRender.map((tag) => {
-                                const list = (Array.isArray(tagProducts[tag.id]) ? tagProducts[tag.id] : []).filter((p) => matchesSelectedCategory(p));
-                                if (!list || list.length === 0) return null;
-                                return (
-                                    <div key={tag.id}>
-                                        <div className="mb-4">
-                                            <h2 className="text-xl sm:text-lg font-semibold text-gray-900">
-                                                {tag.name}
-                                            </h2>
-                                            <span className="text-sm text-gray-500">{tag.description}</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 gap-4 sm:gap-6">
-                                            {list.map((p) => (
-                                                <ProductCard key={`tag-${tag.id}-prod-${p.id}`} product={p} />
-                                            ))}
-                                            {tagLoading && Array.from({ length: 5 }).map((_, i) => (
-                                                <div key={`skeleton-${tag.id}-${i}`} className="bg-white rounded-lg shadow-sm border border-gray-100 h-full animate-pulse">
-                                                    <div className="bg-gray-200" style={{ aspectRatio: '1 / 1' }}></div>
-                                                    <div className="p-3 space-y-2">
-                                                        <div className="h-4 bg-gray-200 rounded"></div>
-                                                        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    {selectedTag != null ? null : loading ? (
+                    {loading ? (
                         <div className="flex justify-center items-center py-12">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
                         </div>
                     ) : (
                         <>
                             {/* Results Info */}
-                            <div className="mb-6 flex items-center" id="results-info">
-                                <p className="text-base sm:text-sm text-gray-600 px-2 sm:px-0 mr-7">
+                            <div className="mb-6">
+                                <p className="text-base sm:text-sm text-gray-600 px-2 sm:px-0">
                                     Menampilkan {sortedProducts.length} produk
                                     {selectedCategory && ` dalam kategori "${categories.find(c => c.id === selectedCategory)?.name}"`}
                                     {searchQuery && ` untuk "${searchQuery}"`}
@@ -940,37 +597,28 @@ const Homepage = () => {
                             </div>
 
                             {/* Products Grid/List */}
-                            {selectedTag != null ? null : (
-                                (visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null ? untaggedProducts : sortedProducts).length === 0
-                            ) ? (
+                            {sortedProducts.length === 0 ? (
                                 <div className="text-center py-12 px-4">
                                     <Filter className="mx-auto h-16 w-16 sm:h-12 sm:w-12 text-gray-300 mb-4" />
                                     <h3 className="text-xl sm:text-lg font-medium text-gray-900 mb-2">Tidak ada produk ditemukan</h3>
                                     <p className="text-base sm:text-sm text-gray-500">Coba ubah kata kunci pencarian atau filter</p>
                                 </div>
                             ) : (
-                                <>
-                                    {(visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null) && (
-                                        <div className="mb-4">
-                                            {/* <h2 className="text-xl sm:text-lg font-semibold text-gray-900">Produk Tanpa Tag</h2> */}
-                                        </div>
-                                    )}
-                                    <div className={
+                                <div className={
+                                    viewMode === 'grid'
+                                        ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6"
+                                        : "space-y-4"
+                                }>
+                                    {sortedProducts.map((product) => (
                                         viewMode === 'grid'
-                                            ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6"
-                                            : "space-y-4"
-                                    }>
-                                        {(visibleTags.length > 0 && !searchQuery && !searchLoading && selectedTag == null ? untaggedProducts : sortedProducts).map((product) => (
-                                            viewMode === 'grid'
-                                                ? <ProductCard key={product.id} product={product} />
-                                                : <ProductListItem key={product.id} product={product} />
-                                        ))}
-                                    </div>
-                                </>
+                                            ? <ProductCard key={product.id} product={product} />
+                                            : <ProductListItem key={product.id} product={product} />
+                                    ))}
+                                </div>
                             )}
 
                             {/* Pagination - Hidden when showing all products */}
-                            {selectedTag != null ? null : (pagination.last_page > 1 && pagination.per_page < 1000) && (
+                            {pagination.last_page > 1 && pagination.per_page < 1000 && (
                                 <div className="flex justify-center items-center space-x-4 mt-12">
                                     <button
                                         onClick={() => {
@@ -1004,93 +652,6 @@ const Homepage = () => {
                 </div>
             </div>
         </MarketplaceLayout>
-    );
-};
-
-const BannerRotator = ({ bannerUrls }) => {
-    const [index, setIndex] = useState(0);
-    const [nextIndex, setNextIndex] = useState(null);
-    const [isTransitioning, setIsTransitioning] = useState(false);
-
-    useEffect(() => {
-        setIndex(0);
-    }, [bannerUrls]);
-
-    useEffect(() => {
-        if (!bannerUrls || bannerUrls.length <= 1) return;
-        const t = setTimeout(() => {
-            startTransition((index + 1) % bannerUrls.length);
-        }, 10000);
-        return () => clearTimeout(t);
-    }, [index, bannerUrls]);
-
-    const startTransition = (target) => {
-        if (target === index) return;
-        setNextIndex(target);
-        setIsTransitioning(true);
-        setTimeout(() => {
-            setIndex(target);
-            setIsTransitioning(false);
-            setNextIndex(null);
-        }, 700);
-    };
-
-    const prev = () => startTransition((index - 1 + bannerUrls.length) % bannerUrls.length);
-    const next = () => startTransition((index + 1) % bannerUrls.length);
-
-    if (!bannerUrls || bannerUrls.length === 0) return null;
-
-    return (
-        <div className="relative group">
-            <div className="relative overflow-hidden rounded-xl shadow-lg h-[120px] lg:h-[250px]">
-                <img
-                    key={`current-${index}`}
-                    src={bannerUrls[index]}
-                    alt={`Banner ${index + 1}`}
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
-                />
-                {isTransitioning && nextIndex !== null && (
-                    <img
-                        key={`next-${nextIndex}`}
-                        src={bannerUrls[nextIndex]}
-                        alt={`Banner ${nextIndex + 1}`}
-                        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 opacity-100"
-                    />
-                )}
-            </div>
-            {bannerUrls.length > 1 && (
-                <>
-                    <button
-                        onClick={prev}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-2 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                        aria-label="Previous banner"
-                    >
-                        <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <button
-                        onClick={next}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white p-2 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                        aria-label="Next banner"
-                    >
-                        <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                    <div className="flex justify-center gap-2 mt-3">
-                        {bannerUrls.map((_, i) => (
-                            <button
-                                key={i}
-                                onClick={() => startTransition(i)}
-                                className={`w-2 h-2 rounded-full ${i === index ? 'bg-gray-800' : 'bg-gray-300'}`}
-                                aria-label={`Go to banner ${i + 1}`}
-                            />
-                        ))}
-                    </div>
-                </>
-            )}
-        </div>
     );
 };
 

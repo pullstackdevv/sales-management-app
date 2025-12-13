@@ -23,16 +23,6 @@ export default function StockOpnameEdit({ stockOpname }) {
   });
   const [searchTerm, setSearchTerm] = useState('');
 
-  const formatRibuan = (num) => {
-    if (!num || num === 0) return '';
-    return Math.floor(num).toLocaleString('id-ID');
-  };
-
-  const parseRibuan = (str) => {
-    if (!str) return 0;
-    return parseInt(str.toString().replace(/\./g, '')) || 0;
-  };
-
   // Load existing stock opname details
   useEffect(() => {
     if (stockOpname) {
@@ -99,13 +89,9 @@ export default function StockOpnameEdit({ stockOpname }) {
   const updateRow = (id, field, value) => {
     setRows(rows.map(row => {
       if (row.id === id) {
-        const updatedRow = { ...row };
+        const updatedRow = { ...row, [field]: value };
         if (field === 'physical_stock') {
-          const valNum = typeof value === 'string' ? parseRibuan(value) : (Number(value) || 0);
-          updatedRow.physical_stock = valNum;
-          updatedRow.difference = valNum - updatedRow.system_stock;
-        } else {
-          updatedRow[field] = value;
+          updatedRow.difference = value - row.system_stock;
         }
         return updatedRow;
       }
@@ -353,16 +339,16 @@ export default function StockOpnameEdit({ stockOpname }) {
                         <span className="text-sm">{row.variant_name || '-'}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm">{formatRibuan(row.system_stock)}</span>
+                        <span className="text-sm">{row.system_stock}</span>
                       </td>
                       <td className="px-4 py-3">
                         <input
-                          type="text"
-                          value={formatRibuan(row.physical_stock)}
-                          onChange={(e) => updateRow(row.id, 'physical_stock', e.target.value)}
-                          className="w-24 border px-2 py-1 rounded text-sm"
+                          type="number"
+                          value={row.physical_stock}
+                          onChange={(e) => updateRow(row.id, 'physical_stock', parseInt(e.target.value) || 0)}
+                          className="w-20 border px-2 py-1 rounded text-sm"
+                          min="0"
                           disabled={stockOpname?.status === 'finalized'}
-                          placeholder="0"
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -370,7 +356,7 @@ export default function StockOpnameEdit({ stockOpname }) {
                           row.difference > 0 ? 'text-green-600' : 
                           row.difference < 0 ? 'text-red-600' : 'text-gray-600'
                         }`}>
-                          {row.difference > 0 ? '+' : ''}{formatRibuan(row.difference)}
+                          {row.difference > 0 ? '+' : ''}{row.difference}
                         </span>
                       </td>
                       {stockOpname?.status !== 'finalized' && (

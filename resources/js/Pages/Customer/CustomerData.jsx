@@ -4,10 +4,8 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import api from "@/api/axios";
 import { showSuccess, showError, showConfirm } from '@/utils/sweetalert';
-import { useAuth } from "../../contexts/AuthContext";
 
 export default function CustomerData() {
-    const { hasPermission } = useAuth();
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
@@ -83,10 +81,6 @@ export default function CustomerData() {
         window.location.href = `/cms/customer/edit/${customerId}`;
     };
 
-    const handleRowClick = (customerId) => {
-        window.location.href = `/cms/customer/detail/${customerId}`;
-    };
-
     const handleDelete = async (customer) => {
         const confirmed = await showConfirm(
             'Hapus Customer',
@@ -144,17 +138,21 @@ export default function CustomerData() {
                     </div>
 
                     <div className="flex gap-2">
-                        {hasPermission('customers.create') && (
-                            <Link href="/cms/customer/add">
-                                <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
-                                    <Icon
-                                        icon="material-symbols:add"
-                                        className="text-lg"
-                                    />
-                                    Tambah Customer
-                                </button>
-                            </Link>
-                        )}
+                        <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
+                            Download Excel
+                        </button>
+                        <button className="text-sm border px-3 py-1 rounded-md hover:bg-gray-100">
+                            Filter
+                        </button>
+                        <Link href={"/cms/customer/add"}>
+                            <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1">
+                                <Icon
+                                    icon="material-symbols:add"
+                                    className="text-lg"
+                                />
+                                Tambah Customer
+                            </button>
+                        </Link>
                     </div>
                 </div>
 
@@ -182,20 +180,18 @@ export default function CustomerData() {
                             (a) => a.is_default
                         );
                         const addressDisplay = defaultAddress
-                            ? `${defaultAddress.address_detail}, ${defaultAddress.district}, ${defaultAddress.city}, ${defaultAddress.province}${defaultAddress.postal_code ? ` - ${defaultAddress.postal_code}` : ''}`
+                            ? `${defaultAddress.address_detail}, ${defaultAddress.district}, ${defaultAddress.city}, ${defaultAddress.province} - ${defaultAddress.postal_code}`
                             : "-";
                         
                         const addressCount = customer.addresses?.length || 0;
 
                         const phoneNumber = customer.phone?.replace(/^0/, "62");
                         const waLink = `https://wa.me/${phoneNumber}`;
-                        const isClickable = hasPermission('customers.view');
 
                         return (
                             <div
                                 key={customer.id}
-                                className={`grid grid-cols-12 items-center px-4 py-3 text-sm hover:bg-gray-50 ${isClickable ? 'cursor-pointer' : ''}`}
-                                onClick={isClickable ? () => handleRowClick(customer.id) : undefined}
+                                className="grid grid-cols-12 items-center px-4 py-3 text-sm"
                             >
                                 <div className="col-span-2 flex items-center gap-3">
                                     <div
@@ -224,7 +220,6 @@ export default function CustomerData() {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="hover:underline"
-                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         {customer.phone}
                                     </a>
@@ -240,33 +235,29 @@ export default function CustomerData() {
                                 </div>
 
                                 <div className="col-span-2 flex gap-2 justify-end text-lg text-gray-500">
-                                    {hasPermission('customers.view') && addressCount > 0 && (
+                                    {addressCount > 0 && (
                                         <button 
                                             className="hover:text-green-600"
-                                            onClick={(e) => { e.stopPropagation(); handleViewAddresses(customer); }}
+                                            onClick={() => handleViewAddresses(customer)}
                                             title="Lihat Alamat"
                                         >
                                             <Icon icon="mdi:map-marker-multiple" />
                                         </button>
                                     )}
-                                    {hasPermission('customers.edit') && (
-                                        <button 
-                                            className="hover:text-blue-600"
-                                            onClick={(e) => { e.stopPropagation(); handleEdit(customer.id); }}
-                                            title="Edit Customer"
-                                        >
-                                            <Icon icon="mdi:pencil-outline" />
-                                        </button>
-                                    )}
-                                    {hasPermission('customers.delete') && (
-                                        <button 
-                                            className="hover:text-red-600"
-                                            onClick={(e) => { e.stopPropagation(); handleDelete(customer); }}
-                                            title="Hapus Customer"
-                                        >
-                                            <Icon icon="mdi:trash-outline" />
-                                        </button>
-                                    )}
+                                    <button 
+                                        className="hover:text-blue-600"
+                                        onClick={() => handleEdit(customer.id)}
+                                        title="Edit Customer"
+                                    >
+                                        <Icon icon="mdi:pencil-outline" />
+                                    </button>
+                                    <button 
+                                        className="hover:text-red-600"
+                                        onClick={() => handleDelete(customer)}
+                                        title="Hapus Customer"
+                                    >
+                                        <Icon icon="mdi:trash-outline" />
+                                    </button>
                                 </div>
                             </div>
                         );
@@ -376,11 +367,6 @@ export default function CustomerData() {
                                                     Default
                                                 </span>
                                             )}
-                                            {address.is_dropship && (
-                                                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
-                                                    Dropship
-                                                </span>
-                                            )}
                                         </div>
                                     </div>
 
@@ -389,9 +375,8 @@ export default function CustomerData() {
                                             <strong>Penerima:</strong> {address.recipient_name}
                                         </div>
                                         <div>
-                                            <strong>Telepon Penerima:</strong> {address.recipient_phone || address.phone}
+                                            <strong>Telepon:</strong> {address.phone}
                                         </div>
-                                        
                                         <div>
                                             <strong>Alamat:</strong> {address.address_detail}
                                         </div>

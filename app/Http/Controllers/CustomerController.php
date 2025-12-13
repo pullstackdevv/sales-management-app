@@ -24,9 +24,9 @@ class CustomerController extends Controller
         //             ->orWhere('phone', 'like', "%{$search}%")
         //             ->orWhere('email', 'like', "%{$search}%");
         //     })
-            $customers = Customer::with(['addresses'])
+        $customers = Customer::with(['addresses'])
             ->withCount(['addresses'])
-            ->when($request->search, function($query, $search) {
+            ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
@@ -128,7 +128,7 @@ class CustomerController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'Server Error: ' . $e->getMessage(),
@@ -143,7 +143,7 @@ class CustomerController extends Controller
             'status' => 'success',
             'data' => $customer->load([
                 'addresses',
-                'orders' => function($q) {
+                'orders' => function ($q) {
                     $q->with(['items', 'payments', 'shipping'])
                         ->latest();
                 }
@@ -194,7 +194,7 @@ class CustomerController extends Controller
             'addresses.*.is_default' => 'boolean',
             'addresses.*.is_dropship' => 'boolean'
         ], [
-            'phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
+            'addresses.*.recipient_phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
         ]);
 
         try {
@@ -209,7 +209,7 @@ class CustomerController extends Controller
             if (isset($validated['addresses']) && !empty($validated['addresses'])) {
                 // Delete existing addresses
                 $customer->addresses()->delete();
-                
+
                 // Create new addresses
                 foreach ($validated['addresses'] as $index => $addressData) {
                     $customer->addresses()->create([
@@ -255,14 +255,18 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        // Allow soft delete even if customer has orders to preserve relations
+        // if ($customer->orders()->exists()) {
+        //     throw ValidationException::withMessages([
+        //         'customer' => ['Cannot delete customer that has orders.']
+        //     ]);
+        // }
 
         try {
             DB::beginTransaction();
 
-            // Soft delete all addresses to keep order relations intact
+            // Delete all addresses
             $customer->addresses()->delete();
-            
+
             // Delete the customer
             $customer->update(['deleted_by' => Auth::id()]);
             $customer->delete();
@@ -336,7 +340,7 @@ class CustomerController extends Controller
 
             // Find the address
             $address = $customer->addresses()->findOrFail($addressId);
-            
+
             // Check if this is the only address
             $addressCount = $customer->addresses()->count();
             if ($addressCount <= 1) {
@@ -351,7 +355,7 @@ class CustomerController extends Controller
                 $newDefaultAddress = $customer->addresses()
                     ->where('id', '!=', $addressId)
                     ->first();
-                
+
                 if ($newDefaultAddress) {
                     $newDefaultAddress->update(['is_default' => true]);
                 }
@@ -367,10 +371,9 @@ class CustomerController extends Controller
                 'message' => 'Alamat berhasil dihapus',
                 'data' => $customer->addresses()->orderBy('is_default', 'desc')->orderBy('created_at', 'asc')->get()
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
                 return response()->json([
                     'status' => 'error',

@@ -301,7 +301,7 @@ export default function ProductDetail() {
             setCustomers([]);
             return;
         }
-        
+
         setOrderLoading(prev => ({ ...prev, customers: true }));
         try {
             const response = await axios.post('/api/customers/guest-lookup', { search: search.trim() });

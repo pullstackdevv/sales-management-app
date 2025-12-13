@@ -15,7 +15,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [customers, setCustomers] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
-    
+
     // Verification states
     const [showVerification, setShowVerification] = useState(false);
     const [verificationMethod, setVerificationMethod] = useState('phone');
@@ -92,7 +92,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         if (!showCustomerForm) {
             fetchOrders();
         }
-        
+
     }, [searchQuery, statusFilter, currentPage, showCustomerForm]);
 
     const getStatusBadge = (status) => {
@@ -281,7 +281,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         setVerificationError('');
         setPendingCustomer(null);
     };
-// console.log(orders)
+    // console.log(orders)
     // Show customer data form if needed
     if (showCustomerForm) {
         return (
@@ -317,7 +317,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         autoFocus
                                     />
-                                    
+
                                     {/* Customer Search Results Dropdown */}
                                     {searchTerm && customers.length > 0 && (
                                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -345,13 +345,13 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                             ))}
                                         </div>
                                     )}
-                                    
+
                                     {searchLoading && (
                                         <div className="absolute right-3 top-10 text-gray-400">
                                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                                         </div>
                                     )}
-                                    
+
                                     {searchTerm && !searchLoading && customers.length === 0 && searchTerm.length >= 2 && (
                                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
                                             Tidak ada customer ditemukan
@@ -370,7 +370,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
                                     <h3 className="text-lg font-semibold mb-4">Verifikasi Data Customer</h3>
-                                    
+
                                     <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                                         <p className="text-sm text-gray-600 mb-1">Customer Ditemukan:</p>
                                         <p className="font-medium text-gray-900">{pendingCustomer.name || pendingCustomer.full_name}</p>
@@ -398,11 +398,10 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                     setVerificationMethod('phone');
                                                     setVerificationError('');
                                                 }}
-                                                className={`px-4 py-2 rounded-lg border-2 transition-colors ${
-                                                    verificationMethod === 'phone'
-                                                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
-                                                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                                                }`}
+                                                className={`px-4 py-2 rounded-lg border-2 transition-colors ${verificationMethod === 'phone'
+                                                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                                                    : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                                                    }`}
                                             >
                                                 <Phone className="w-4 h-4 inline-block mr-2" />
                                                 HP
@@ -413,11 +412,10 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                     setVerificationMethod('email');
                                                     setVerificationError('');
                                                 }}
-                                                className={`px-4 py-2 rounded-lg border-2 transition-colors ${
-                                                    verificationMethod === 'email'
-                                                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
-                                                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
-                                                }`}
+                                                className={`px-4 py-2 rounded-lg border-2 transition-colors ${verificationMethod === 'email'
+                                                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                                                    : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                                                    }`}
                                                 disabled={!pendingCustomer.email}
                                             >
                                                 <Mail className="w-4 h-4 inline-block mr-2" />
@@ -445,9 +443,8 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                     handleCancelVerification();
                                                 }
                                             }}
-                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                                verificationError ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${verificationError ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             placeholder={verificationMethod === 'phone' ? '08123456789' : 'email@example.com'}
                                             autoFocus
                                         />
@@ -584,9 +581,9 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                             {order.items && order.items.slice(0, 2).map((item, index) => (
                                                 <div key={index} className="flex items-center gap-4">
                                                     <img
-                                                        src={item.product_variant?.product?.image 
-                                                            ? (item.product_variant.product.image.startsWith('http') 
-                                                                ? item.product_variant.product.image 
+                                                        src={item.product_variant?.product?.image
+                                                            ? (item.product_variant.product.image.startsWith('http')
+                                                                ? item.product_variant.product.image
                                                                 : `/storage/${item.product_variant.product.image}`)
                                                             : 'https://png.pngtree.com/png-vector/20221125/ourmid/pngtree-no-image-available-icon-flatvector-illustration-blank-avatar-modern-vector-png-image_40962406.jpg'
                                                         }
@@ -663,7 +660,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                             <p className="flex justify-between mt-1 text-xs">
                                                                 <span className="text-gray-600 text-sm">Cek Resi</span>
                                                                 <a href={`https://tiki.id/id/track/${order.shipping.tracking_number}`} target="_blank" rel="noopener noreferrer" className="font-mono text-sm text-blue-600 hover:text-blue-800 flex ">
-                                                                  <ExternalLink className="w-4 h-4" /> <span className='ml-1'>{order.shipping.tracking_number}</span> 
+                                                                    <ExternalLink className="w-4 h-4" /> <span className='ml-1'>{order.shipping.tracking_number}</span>
                                                                 </a>
                                                             </p>
                                                         )}

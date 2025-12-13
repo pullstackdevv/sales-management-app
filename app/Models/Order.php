@@ -53,7 +53,7 @@ class Order extends Model
 
     public function address()
     {
-        return $this->belongsTo(CustomerAddress::class, 'address_id');
+        return $this->belongsTo(CustomerAddress::class, 'address_id')->withTrashed();
     }
 
     public function user()

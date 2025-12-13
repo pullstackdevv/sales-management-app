@@ -272,9 +272,10 @@ const PrintMultipleInvoices = () => {
                     {inv.shipping_address ? (
                       <>
                         {inv.shipping_address.address_detail}<br />
-                        {inv.shipping_address.city}, {inv.shipping_address.province} {inv.shipping_address.postal_code}<br />
-                        {inv.shipping_address.district && `${inv.shipping_address.district}`}<br />
-                        {inv.shipping_address.phone && `${inv.shipping_address.phone}`}
+                        {inv.shipping_address.district && `${inv.shipping_address.district}`} ,
+                        {inv.shipping_address.city}, {inv.shipping_address.province}
+                        , {inv.shipping_address.postal_code}
+                        {inv.shipping_address.phone && ` (${inv.shipping_address.phone})`}
                       </>
                     ) : (
                       <>Alamat tidak tersedia</>

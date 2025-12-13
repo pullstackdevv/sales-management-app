@@ -436,26 +436,26 @@ console.log(invoiceData)
                     <div className="border-2 border-black">
                         {/* Header Row */}
                         <div className="grid grid-cols-3 border-b-2 border-black">
-                            <div className="border-r-2 border-black p-4 font-bold text-lg">
+                            <div className="border-r-2 border-black p-4 font-bold text-xl">
                                 {invoiceData?.courier_name || 'KURIR'}
                             </div>
-                            <div className="border-r-2 border-black p-4 font-bold text-lg text-center">
+                            <div className="border-r-2 border-black p-4 font-bold text-xl text-center">
                                 {(invoiceData?.service_type || 'SERVICE').toString().toUpperCase()}
                             </div>
-                            <div className="p-4 font-bold text-lg text-center">
+                            <div className="p-4 font-bold text-xl text-center">
                                 {invoiceData?.total_weight ? `${invoiceData.total_weight}kg` : '0.5kg'}
                             </div>
                         </div>
 
                         {/* Order Number Row */}
                         <div className="border-b-2 border-black p-4">
-                            <div className="font-bold">No Pesanan: {invoiceData?.invoice_number || orderId}</div>
+                            <div className="text-xl font-bold">No Pesanan: {invoiceData?.invoice_number || orderId}</div>
                         </div>
 
                         {/* Pengirim Row */}
                         {printSettings.showCompanyInfo && (
                             <div className="border-b-2 border-black p-4">
-                                <div className="font-bold">
+                                <div className="text-xl font-bold">
                                     Pengirim: {invoiceData?.shipping_address?.is_dropship
                                         ? `${invoiceData?.customer?.name || 'Customer'} - ${invoiceData?.customer?.phone || '083867000077'}`
                                         : `${invoiceData?.company?.name || 'SALEPARFUM'} - ${invoiceData?.company?.phone || '083867000077'}`}
@@ -466,7 +466,7 @@ console.log(invoiceData)
                         {/* Kepada Row */}
                         {printSettings.showCustomerInfo && (
                             <div className="border-b-2 border-black p-4">
-                                <div className="font-bold">
+                                <div className="text-xl font-bold">
                                     Kepada: {invoiceData?.shipping_address?.recipient_name || 'Customer'} ({invoiceData?.shipping_address?.phone || '-'})
                                 </div>
                             </div>
@@ -475,8 +475,8 @@ console.log(invoiceData)
                         {/* Alamat Row */}
                         {(printSettings.showCustomerInfo || printSettings.showShippingInfo) && (
                             <div className="border-b-2 border-black p-4">
-                                <div className="font-bold mb-2">Alamat:</div>
-                                <div className="text-sm leading-relaxed">
+                                <div className="text-xl font-bold mb-2">Alamat:</div>
+                                <div className="text-lg base leading-relaxed">
                                      {invoiceData?.shipping_address ? (
                                          <>
                                              {invoiceData.shipping_address.address_detail}<br/>
@@ -496,8 +496,8 @@ console.log(invoiceData)
                         {/* Paket Row */}
                         {printSettings.showOrderDetails && (
                             <div className="border-b-2 border-black p-4">
-                                <div className="font-bold mb-2">Paket:</div>
-                                <div className="text-sm">
+                                <div className="text-xl font-bold mb-2">Paket:</div>
+                                <div className="text-lg">
                                     {invoiceData?.items?.map((item, index) => (
                                         <div key={index} className="mb-1">
                                             • {item.product_name} {item.description && `- ${item.description}`} (Qty: {item.quantity})
@@ -512,8 +512,8 @@ console.log(invoiceData)
                         {/* Voucher Note Row */}
                         {(invoiceData?.voucher || (invoiceData?.discount_amount || 0) > 0) && (
                             <div className="border-b-2 border-black p-4">
-                                <div className="font-bold mb-2">Catatan Voucher:</div>
-                                <div className="text-sm">
+                                <div className="text-xl font-bold mb-2">Catatan Voucher:</div>
+                                <div className="text-lg">
                                     {invoiceData?.voucher
                                         ? `Voucher ${invoiceData.voucher.code} • ${invoiceData.voucher.type.toUpperCase()} • Nilai: ${Number(invoiceData.voucher.value).toLocaleString('id-ID')}`
                                         : `Diskon: Rp ${Number(Math.round(invoiceData.discount_amount || 0)).toLocaleString('id-ID')}`}
@@ -524,7 +524,7 @@ console.log(invoiceData)
                         {/* Total Row */}
                         {printSettings.showTotal && (
                             <div className="p-4">
-                                <div className="font-bold text-lg">
+                                <div className="font-bold text-xl">
                                      Total: Rp{Number(Math.round(invoiceData?.total_amount || 0)).toLocaleString('id-ID')}
                                  </div>
                             </div>
@@ -535,10 +535,10 @@ console.log(invoiceData)
 
                     {/* Notes */}
                     {printSettings.showNotes && invoiceData?.notes && (
-                        <div className="mb-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">Catatan:</h3>
+                        <div className="mb-6 mt-2">
+                            <h3 className="text-xl font-semibold text-gray-800 mb-3">Catatan:</h3>
                             <div className="bg-gray-50 p-4 rounded">
-                                <p className="text-gray-700">{invoiceData.notes}</p>
+                                <p className="text-gray-700 text-lg">{invoiceData.notes}</p>
                             </div>
                         </div>
                     )}
@@ -547,8 +547,8 @@ console.log(invoiceData)
                     {printSettings.showFooter && (
                         <div className="border-t-2 border-gray-300 pt-6 mt-8">
                             <div className="text-center text-gray-600">
-                                <p>Terima kasih atas kepercayaan Anda!</p>
-                                <p className="text-sm mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID')}</p>
+                                <p className="text-xl">Terima kasih atas kepercayaan Anda!</p>
+                                <p className="text-lg mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID')}</p>
                             </div>
                         </div>
                     )}

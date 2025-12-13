@@ -20,6 +20,7 @@ class ProductSeeder extends Seeder
             'slug' => 'fashion',
             'description' => 'Pakaian dan fashion items',
             'is_active' => true,
+            'created_by' => 1,
         ]);
 
         $footwearCategory = ProductCategory::firstOrCreate([
@@ -27,6 +28,7 @@ class ProductSeeder extends Seeder
             'slug' => 'footwear',
             'description' => 'Sepatu dan alas kaki',
             'is_active' => true,
+            'created_by' => 1,
         ]);
 
         $accessoriesCategory = ProductCategory::firstOrCreate([
@@ -34,6 +36,7 @@ class ProductSeeder extends Seeder
             'slug' => 'accessories',
             'description' => 'Aksesoris dan pelengkap',
             'is_active' => true,
+            'created_by' => 1,
         ]);
 
         $products = [
@@ -106,6 +109,7 @@ class ProductSeeder extends Seeder
                             'weight' => 0.2, // 200 grams for t-shirt
                             'stock' => rand(5, 15),
                             'is_active' => true,
+                            'created_by' => 1,
                         ]);
                         $variantIndex++;
                     }
@@ -124,6 +128,7 @@ class ProductSeeder extends Seeder
                         'weight' => 0.5, // 500 grams for jeans
                         'stock' => rand(3, 8),
                         'is_active' => true,
+                        'created_by' => 1,
                     ]);
                     $variantIndex++;
                 }
@@ -141,6 +146,7 @@ class ProductSeeder extends Seeder
                         'weight' => 0.8, // 800 grams for sneakers
                         'stock' => rand(2, 6),
                         'is_active' => true,
+                        'created_by' => 1,
                     ]);
                     $variantIndex++;
                 }
@@ -155,6 +161,7 @@ class ProductSeeder extends Seeder
                     'weight' => 0.3,
                     'stock' => rand(10, 20),
                     'is_active' => true,
+                    'created_by' => 1,
                 ]);
             }
         }

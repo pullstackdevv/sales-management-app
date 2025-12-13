@@ -5,8 +5,10 @@ import { Button } from "flowbite-react";
 import api from "@/api/axios";
 import * as AuthAPI from "@/api/auth";
 import Swal from "sweetalert2";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function UserSettings() {
+  const { hasPermission } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,7 +32,6 @@ export default function UserSettings() {
   useEffect(() => {
     fetchUsers();
     fetchRoles();
-    fetchRoleDescriptions();
   }, []);
 
   const resetForm = () => {
@@ -58,7 +59,7 @@ export default function UserSettings() {
       email: user.email,
       password: '',
       password_confirmation: '',
-      role_id: user.role?.name || user.role_id || '',
+      role_id: user.roles?.[0]?.name || user.role_id || '',
       is_active: user.is_active
     });
     setSelectedUser(user);
@@ -112,19 +113,37 @@ export default function UserSettings() {
       
       if (err.response?.status === 422) {
         // Validation errors
-        const errors = Object.values(err.response.data.errors).flat();
-        setFormError(errors.join(', '));
+        const errors = err.response.data.errors;
+        const errorMessages = Object.entries(errors).map(([field, messages]) => {
+          return `<strong>${field}:</strong> ${messages.join(', ')}`;
+        }).join('<br>');
+        
+        Swal.fire({
+          icon: 'error',
+          title: 'Validasi Gagal',
+          html: errorMessages,
+          confirmButtonText: 'OK'
+        });
       } else if (err.response?.status === 401) {
-        setFormError('Sesi Anda telah berakhir. Silakan login kembali.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Sesi Berakhir',
+          text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+          timer: 2000,
+          showConfirmButton: false
+        });
         setTimeout(() => window.location.href = '/login', 2000);
       } else if (err.response?.status === 403) {
-        setFormError('Anda tidak memiliki akses untuk membuat user.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Akses Ditolak',
+          text: 'Anda tidak memiliki akses untuk membuat user.'
+        });
       } else {
-        setFormError('Gagal membuat user. Silakan coba lagi.');
         Swal.fire({
           icon: 'error',
           title: 'Gagal!',
-          text: 'Gagal membuat user'
+          text: err.response?.data?.message || 'Gagal membuat user. Silakan coba lagi.'
         });
       }
     } finally {
@@ -162,19 +181,37 @@ export default function UserSettings() {
       
       if (err.response?.status === 422) {
         // Validation errors
-        const errors = Object.values(err.response.data.errors).flat();
-        setFormError(errors.join(', '));
+        const errors = err.response.data.errors;
+        const errorMessages = Object.entries(errors).map(([field, messages]) => {
+          return `<strong>${field}:</strong> ${messages.join(', ')}`;
+        }).join('<br>');
+        
+        Swal.fire({
+          icon: 'error',
+          title: 'Validasi Gagal',
+          html: errorMessages,
+          confirmButtonText: 'OK'
+        });
       } else if (err.response?.status === 401) {
-        setFormError('Sesi Anda telah berakhir. Silakan login kembali.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Sesi Berakhir',
+          text: 'Sesi Anda telah berakhir. Silakan login kembali.',
+          timer: 2000,
+          showConfirmButton: false
+        });
         setTimeout(() => window.location.href = '/login', 2000);
       } else if (err.response?.status === 403) {
-        setFormError('Anda tidak memiliki akses untuk memperbarui user.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Akses Ditolak',
+          text: 'Anda tidak memiliki akses untuk memperbarui user.'
+        });
       } else {
-        setFormError('Gagal memperbarui user. Silakan coba lagi.');
         Swal.fire({
           icon: 'error',
           title: 'Gagal!',
-          text: 'Gagal memperbarui user'
+          text: err.response?.data?.message || 'Gagal memperbarui user. Silakan coba lagi.'
         });
       }
     } finally {
@@ -282,23 +319,24 @@ export default function UserSettings() {
       const response = await api.get("/roles");
       if (response.data.status === 'success') {
         const rolesData = response.data.data.data || response.data.data;
-        setRoles(Array.isArray(rolesData) ? rolesData : []);
+        const rolesArray = Array.isArray(rolesData) ? rolesData : [];
+        setRoles(rolesArray);
+        
+        // Build role descriptions from roles data
+        const descriptions = {};
+        rolesArray.forEach(role => {
+          descriptions[role.name] = {
+            description: role.description,
+            permissions: role.permissions || []
+          };
+        });
+        setRoleDescriptions(descriptions);
       }
     } catch (err) {
       console.error('Error fetching roles:', err);
     }
   };
 
-  const fetchRoleDescriptions = async () => {
-    try {
-      const response = await api.get("/users/role-permissions");
-      if (response.data.status === 'success') {
-        setRoleDescriptions(response.data.data || {});
-      }
-    } catch (err) {
-      console.error('Error fetching role descriptions:', err);
-    }
-  };
 
 
   
@@ -318,7 +356,7 @@ export default function UserSettings() {
       key: "role", 
       label: "Role",
       render: (row) => {
-        const roleName = row.role?.name || 'Unknown';
+        const roleName = row.roles?.[0]?.name || 'Unknown';
         return <span className="capitalize">{roleName}</span>;
       }
     },
@@ -328,20 +366,24 @@ export default function UserSettings() {
       label: "Aksi",
       render: (row) => (
         <div className="flex gap-2">
-          <button
-            onClick={() => openEditModal(row)}
-            className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Edit User"
-          >
-            <Icon icon="mdi:pencil" className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => deleteUser(row)}
-            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-            title="Hapus User"
-          >
-            <Icon icon="mdi:trash-can-outline" className="w-4 h-4" />
-          </button>
+          {hasPermission('users.edit') && (
+            <button
+              onClick={() => openEditModal(row)}
+              className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Edit User"
+            >
+              <Icon icon="mdi:pencil" className="w-4 h-4" />
+            </button>
+          )}
+          {hasPermission('users.delete') && (
+            <button
+              onClick={() => deleteUser(row)}
+              className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+              title="Hapus User"
+            >
+              <Icon icon="mdi:trash-can-outline" className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -355,13 +397,15 @@ export default function UserSettings() {
           <h2 className="text-2xl font-bold text-gray-900">Pengaturan User</h2>
           <p className="text-gray-600 mt-1">Kelola data pengguna dan permission</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
-          Tambah User
-        </button>
+        {hasPermission('users.create') && (
+          <button
+            onClick={openCreateModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Icon icon="solar:add-circle-outline" className="w-5 h-5" />
+            Tambah User
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -504,22 +548,36 @@ export default function UserSettings() {
                     value={formData.password}
                     onChange={handleInputChange}
                     required={modalType === 'create'}
+                    minLength={8}
                     placeholder="Masukkan password"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    <Icon icon="solar:info-circle-outline" className="inline mr-1" width={14} />
+                    Minimal 8 karakter
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Konfirmasi Password *</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Konfirmasi Password {modalType === 'create' ? '*' : ''}
+                  </label>
                   <input
                     type="password"
                     name="password_confirmation"
                     value={formData.password_confirmation}
                     onChange={handleInputChange}
                     required={modalType === 'create' || formData.password}
+                    minLength={8}
                     placeholder="Konfirmasi password"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                  {formData.password && formData.password_confirmation && formData.password !== formData.password_confirmation && (
+                    <p className="text-xs text-red-500 mt-1">
+                      <Icon icon="solar:danger-circle-outline" className="inline mr-1" width={14} />
+                      Password tidak cocok
+                    </p>
+                  )}
                 </div>
 
                 <div>

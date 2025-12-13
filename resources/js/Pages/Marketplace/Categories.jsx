@@ -63,6 +63,9 @@ export default function Categories() {
     };
 
     const ProductCard = ({ product }) => {
+        const hasStock = (Array.isArray(product.variants) && product.variants.length > 0)
+            ? product.variants.some(v => (v.stock ?? 0) > 0)
+            : ((product.stock ?? 0) > 0);
         return (
         <Link href={`/products/${product.id}`} className="block group">
             <div className="bg-white rounded-lg shadow-sm hover:shadow-lg border border-gray-100 hover:border-blue-200 transition-all duration-300 overflow-hidden h-full flex flex-col">
@@ -74,6 +77,11 @@ export default function Categories() {
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-300"></div>
+                    {!hasStock && (
+                        <div className="absolute top-2 left-2 text-white text-xs px-2 py-1 rounded-full font-medium bg-red-600">
+                            Stok Habis
+                        </div>
+                    )}
                 </div>
                 
                 {/* Content Container */}
@@ -93,6 +101,9 @@ export default function Categories() {
     ); };
 
     const ProductListItem = ({ product }) => {
+        const hasStock = (Array.isArray(product.variants) && product.variants.length > 0)
+            ? product.variants.some(v => (v.stock ?? 0) > 0)
+            : ((product.stock ?? 0) > 0);
         return (
         <Link href={`/products/${product.id}`} className="block group">
             <div className="bg-white rounded-lg shadow-sm hover:shadow-md border border-gray-100 hover:border-gray-200 transition-all duration-300 overflow-hidden">
@@ -104,6 +115,11 @@ export default function Categories() {
                             className="w-24 h-24 sm:w-20 sm:h-20 object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg"></div>
+                        {!hasStock && (
+                            <div className="absolute top-1 left-1 text-white text-xs px-2 py-0.5 rounded font-medium bg-red-600">
+                                Stok Habis
+                            </div>
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="text-base sm:text-sm font-medium text-gray-900 mb-2 sm:mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
@@ -221,7 +237,7 @@ export default function Categories() {
                                     <p className="text-base sm:text-sm text-gray-500">Coba ubah kata kunci pencarian atau filter</p>
                                 </div>
                             ) : (
-                                <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6" : "space-y-4"}>
+                                <div className={viewMode === 'grid' ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6" : "space-y-4"}>
                                     {products.map((product) => (
                                         viewMode === 'grid'
                                             ? <ProductCard key={product.id} product={product} />

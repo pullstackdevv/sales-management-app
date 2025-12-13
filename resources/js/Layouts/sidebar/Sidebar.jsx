@@ -31,7 +31,7 @@ const SidebarLayout = ({ isOpen, onClose, onOpen }) => {
                     <div className="flex-1 overflow-y-auto pt-20 px-4 pb-4">
                         <div className="space-y-2">
                             {SidebarContent.map((item) => (
-                                <PermissionGuard key={item.id} permission={item.permission}>
+                                <PermissionGuard key={item.id} permission={item.permission} role={item.role} roles={item.roles}>
                                     <div>
                                         {/* Render menu utama */}
                                         {!item.children ? (
@@ -60,10 +60,11 @@ const SidebarLayout = ({ isOpen, onClose, onOpen }) => {
                                                     openDropdowns[item.id] ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                                                 }`}>
                                                     {item.children.map((child) => (
-                                                        <NavItems
-                                                            item={child}
-                                                            key={child.id}
-                                                        />
+                                                        <PermissionGuard key={child.id} permission={child.permission} role={child.role} roles={child.roles}>
+                                                            <NavItems
+                                                                item={child}
+                                                            />
+                                                        </PermissionGuard>
                                                     ))}
                                                 </div>
                                             </div>

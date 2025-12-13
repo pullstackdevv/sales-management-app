@@ -13,9 +13,17 @@ class Shipping extends Model
     protected $fillable = [
         'order_id',
         'courier_id',
+        'courier_rate_id',
         'tracking_number',
+        'weight',
         'shipped_at',
         'delivered_at',
+        'status',
+        'dimensions',
+        'notes',
+        'service_type',
+        'created_by',
+        'updated_by'
     ];
 
     protected $casts = [
@@ -32,5 +40,20 @@ class Shipping extends Model
     public function courier()
     {
         return $this->belongsTo(Courier::class);
+    }
+
+    public function courierRate()
+    {
+        return $this->belongsTo(CourierRate::class);
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function getServiceTypeAttribute($value)
+    {
+        return $value ?? $this->courierRate?->service_type;
     }
 }

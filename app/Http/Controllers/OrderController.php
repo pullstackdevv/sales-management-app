@@ -11,6 +11,7 @@ use App\Models\OrderPayment;
 use App\Models\Shipping;
 use App\Models\StockMovement;
 use App\Enums\StockMovementType;
+use App\Enums\PaymentStatus;
 use App\Http\Requests\Order\StoreRequest;
 use App\Http\Requests\Order\UpdateRequest;
 use Illuminate\Http\Request;
@@ -22,18 +23,28 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use App\Helpers\NotificationHelper;
 
 class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $orders = Order::with(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
+        if (!Auth::user()->hasPermission('orders.view')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to view orders.'
+            ], 403);
+        }
+        $orders = Order::with(['customer', 'address', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'processedBy', 'salesChannel'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('order_number', 'like', "%{$search}%")
                         ->orWhereHas('customer', function ($q) use ($search) {
                             $q->where('name', 'like', "%{$search}%")
                                 ->orWhere('phone', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('items', function ($q) use ($search) {
+                            $q->where('product_name_snapshot', 'like', "%{$search}%");
                         });
                 });
             })
@@ -49,6 +60,40 @@ class OrderController extends Controller
                     $query->whereNotNull('payment_url');
                 }
             })
+            ->when($request->start_date || $request->end_date, function ($query) use ($request) {
+                try {
+                    $start = $request->start_date ? \Carbon\Carbon::parse($request->start_date)->startOfDay() : null;
+                    $end = $request->end_date ? \Carbon\Carbon::parse($request->end_date)->endOfDay() : null;
+
+                    if ($start && $end) {
+                        $query->where(function ($q) use ($start, $end) {
+                            $q->whereBetween('ordered_at', [$start, $end])
+                              ->orWhere(function ($qq) use ($start, $end) {
+                                  $qq->whereNull('ordered_at')
+                                     ->whereBetween('created_at', [$start, $end]);
+                              });
+                        });
+                    } elseif ($start) {
+                        $query->where(function ($q) use ($start) {
+                            $q->where('ordered_at', '>=', $start)
+                              ->orWhere(function ($qq) use ($start) {
+                                  $qq->whereNull('ordered_at')
+                                     ->where('created_at', '>=', $start);
+                              });
+                        });
+                    } elseif ($end) {
+                        $query->where(function ($q) use ($end) {
+                            $q->where('ordered_at', '<=', $end)
+                              ->orWhere(function ($qq) use ($end) {
+                                  $qq->whereNull('ordered_at')
+                                     ->where('created_at', '<=', $end);
+                              });
+                        });
+                    }
+                } catch (\Exception $e) {
+                    // Ignore invalid date formats and skip filtering
+                }
+            })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
                 $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
             }, function ($query) {
@@ -56,14 +101,85 @@ class OrderController extends Controller
             })
             ->paginate($request->per_page ?? 10);
 
+        // Add formatted WIB date field for frontend display
+        $orders->getCollection()->transform(function ($order) {
+            // Prefer ordered_at if available, fallback to created_at
+            $timestamp = $order->ordered_at ?? $order->created_at;
+
+            if ($timestamp) {
+                // Use Indonesian locale and Asia/Jakarta timezone
+                $formatted = $timestamp
+                    ->timezone('Asia/Jakarta')
+                    ->locale('id')
+                    ->translatedFormat('l, d M Y, H.i');
+
+                $order->date = $formatted . ' WIB';
+            } else {
+                $order->date = null;
+            }
+
+            return $order;
+        });
+
         return response()->json([
             'status' => 'success',
             'data' => $orders
         ]);
     }
 
+    /**
+     * Get order histories for a specific customer.
+     */
+    public function histories(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'search' => 'nullable|string',
+            'status' => 'nullable|string',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        $orders = Order::with([
+                'customer',
+                'address',
+                'shipping.courier',
+                'items.productVariant.product',
+                'payments.paymentBank',
+                'voucher',
+                'createdBy',
+                'salesChannel'
+            ])
+            ->where('customer_id', $validated['customer_id'])
+            ->when($validated['search'] ?? null, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('order_number', 'like', "%{$search}%")
+                        ->orWhereHas('items', function ($q) use ($search) {
+                            $q->where('product_name_snapshot', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($validated['status'] ?? null, function ($query, $status) {
+                $query->where('status', $status);
+            })
+            ->latest()
+            ->paginate($validated['per_page'] ?? 10);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $orders,
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.create')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to create orders.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'address_id' => 'required|exists:customer_addresses,id',
@@ -75,12 +191,15 @@ class OrderController extends Controller
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'required|numeric|min:0',
             'notes' => 'nullable|string|max:255',
-            'status' => 'nullable|in:pending,paid,shipped,cancelled',
+            'status' => 'nullable|in:pending,processing,paid,shipped,delivered,cancelled',
             'courier_id' => 'nullable|exists:couriers,id',
+            'courier_rate_id' => 'nullable|exists:courier_rates,id',
+            'service_type' => 'nullable|string|max:100',
             'payment_bank_id' => 'nullable|exists:payment_banks,id',
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
-            'proof_image' => 'nullable|string'
+            'proof_image' => 'nullable|string',
+            'is_dropship' => 'nullable|boolean'
         ]);
 
         try {
@@ -89,10 +208,14 @@ class OrderController extends Controller
             // Generate order number
             $orderNumber = 'ORD-' . date('Ymd') . '-' . str_pad(Order::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT);
 
-            // Calculate subtotal
-            $subtotal = collect($validated['items'])->sum(function ($item) {
-                return $item['quantity'] * $item['price'];
-            });
+            // Calculate subtotal with discount_price if available
+            $subtotal = 0;
+            foreach ($validated['items'] as $item) {
+                $variant = ProductVariant::findOrFail($item['product_variant_id']);
+                // Use discount_price if available, otherwise use provided price
+                $price = $variant->discount_price ?? $item['price'];
+                $subtotal += $item['quantity'] * $price;
+            }
 
             // Calculate total before discount
             $totalBeforeDiscount = $subtotal + $validated['shipping_cost'];
@@ -106,18 +229,23 @@ class OrderController extends Controller
                     'voucher_id' => $validated['voucher_id'],
                     'voucher_found' => $voucher ? true : false,
                     'voucher_code' => $voucher ? $voucher->code : null,
+                    'voucher_type' => $voucher ? $voucher->type : null,
                     'total_before_discount' => $totalBeforeDiscount,
+                    'shipping_cost' => $validated['shipping_cost'],
                     'can_be_used' => $voucher ? $voucher->canBeUsed($totalBeforeDiscount) : false
                 ]);
                 
                 if ($voucher && $voucher->canBeUsed($totalBeforeDiscount)) {
-                    $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount);
+                    // Pass shipping_cost to calculateDiscount for shipping vouchers
+                    $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount, $validated['shipping_cost']);
                     
                     Log::info('OrderController - Voucher discount calculated', [
                         'voucher_code' => $voucher->code,
+                        'voucher_type' => $voucher->type,
                         'discount_amount' => $discountAmount,
                         'discount_type' => $voucher->type,
-                        'discount_value' => $voucher->value
+                        'discount_value' => $voucher->value,
+                        'shipping_cost' => $validated['shipping_cost']
                     ]);
                 }
             } else {
@@ -148,7 +276,9 @@ class OrderController extends Controller
                 'shipping_cost' => $validated['shipping_cost'],
                 'status' => $validated['status'] ?? 'pending',
                 'payment_status' => $validated['payment_status'] ?? 'pending',
-                'ordered_at' => now()
+                'ordered_at' => now(),
+                'notes' => $validated['notes'] ?? null,
+                'is_dropship' => (bool)($validated['is_dropship'] ?? false)
             ]);
 
             // Create order items and update stock
@@ -161,14 +291,18 @@ class OrderController extends Controller
                     ]);
                 }
 
+                // Use discount_price if available, otherwise use provided price
+                $price = $variant->discount_price ?? $item['price'];
+                $subtotal = $item['quantity'] * $price;
+
                 $order->items()->create([
                     'product_variant_id' => $item['product_variant_id'],
                     'product_name_snapshot' => $variant->product->name,
                     'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
-                    'price' => $item['price'],
+                    'price' => $price,
                     'base_price' => $variant->product->base_price,
-                    'subtotal' => $item['quantity'] * $item['price']
+                    'subtotal' => $subtotal
                 ]);
 
                 // Update stock
@@ -179,41 +313,38 @@ class OrderController extends Controller
                     $item['product_variant_id'],
                     StockMovementType::OUT,
                     $item['quantity'],
-                    "Order #{$order->id} - {$order->customer->name}"
+                    "Order #{$order->order_number} - {$order->customer->name}",
+                    $order->id
                 );
             }
 
-            // Create payment record if payment data is provided
-            if (isset($validated['payment_bank_id']) && ($validated['payment_status'] ?? 'pending') === 'paid') {
+            // Create payment record if payment bank is provided (manual payment)
+            if (!empty($validated['payment_bank_id'])) {
                 $order->payments()->create([
                     'payment_bank_id' => $validated['payment_bank_id'],
                     'amount_paid' => $validated['amount_paid'] ?? $totalPrice,
                     'paid_at' => now(),
                     'proof_image' => $validated['proof_image'] ?? '',
-                    'verified_by' => null, // Will be set when admin verifies
+                    'verified_by' => null,
                     'verified_at' => null
                 ]);
-                
-                // Update order status and payment status when payment is made
-                $order->update([
-                    'status' => 'paid',
-                    'payment_status' => 'paid'
-                ]);
-            } else {
-                // Remove payment record if payment_bank_id is not provided or payment_status is not paid
-                $order->payments()->delete();
-                
-                // Update order status back to pending if no payment
-                $order->update([
-                    'status' => 'pending',
-                    'payment_status' => 'pending'
-                ]);
+                // Only set order as paid if request indicates paid
+                if (($validated['payment_status'] ?? 'pending') === 'paid') {
+                    $order->update([
+                        'status' => 'paid',
+                        'payment_status' => 'paid'
+                    ]);
+                }
             }
 
             // Create shipping record if courier is provided
             if (isset($validated['courier_id'])) {
                 $order->shipping()->create([
                     'courier_id' => $validated['courier_id'],
+                    'courier_rate_id' => $validated['courier_rate_id'] ?? null,
+                    'service_type' => $validated['service_type'] ?? null,
+                    'status' => 'pending',
+                    'weight' => $order->items->sum(function($i){ return ($i->productVariant->weight ?? 0) * $i->quantity; }),
                     'tracking_number' => '', // Will be filled when shipped
                     'shipped_at' => now()
                 ]);
@@ -223,6 +354,17 @@ class OrderController extends Controller
             // Vouchers are only handled in web orders with payment gateway
 
             DB::commit();
+
+            // Create notification for new order
+            NotificationHelper::newOrder($order->load('customer'));
+            
+            // Check and create low stock notifications
+            foreach ($validated['items'] as $item) {
+                $variant = ProductVariant::find($item['product_variant_id']);
+                if ($variant && $variant->stock < 2) {
+                    NotificationHelper::lowStock($variant, $variant->product);
+                }
+            }
 
             return response()->json([
                 'status' => 'success',
@@ -239,12 +381,20 @@ class OrderController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $order->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
+            'data' => $order->load(['customer', 'address', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel', 'voucher'])
         ]);
     }
 
     public function update(Request $request, Order $order): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.edit')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to edit orders.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'address_id' => 'sometimes|required|exists:customer_addresses,id',
             'sales_channel_id' => 'nullable|exists:sales_channels,id',
@@ -253,27 +403,33 @@ class OrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'sometimes|required|numeric|min:0',
-            'status' => 'sometimes|required|in:pending,paid,shipped,cancelled',
+            'status' => 'sometimes|required|in:pending,processing,paid,shipped,delivered,cancelled',
             'courier_id' => 'nullable|exists:couriers,id',
+            'courier_rate_id' => 'nullable|exists:courier_rates,id',
+            'service_type' => 'nullable|string|max:100',
             'payment_bank_id' => 'nullable|exists:payment_banks,id',
             'payment_status' => 'nullable|in:pending,paid',
             'amount_paid' => 'nullable|numeric|min:0',
-            'proof_image' => 'nullable|string'
+            'proof_image' => 'nullable|string',
+            'printed_at' => 'nullable|date',
+            'is_dropship' => 'nullable|boolean',
+            'notes' => 'nullable|string|max:255'
         ]);
 
-        // Batasi edit order berdasarkan status dan payment gateway
-        if ($order->payments()->exists()) {
-            // Jika order memiliki payment gateway, hanya izinkan update status ke shipped/delivered
-            if (in_array($order->status, ['paid', 'pending', 'cancelled'])) {
+        // Batasi edit order khusus untuk order dengan payment gateway (memiliki payment_url)
+        if (!is_null($order->payment_url)) {
+            if (isset($validated['status'])) {
+                $status = $validated['status'];
+                $canCancel = ($status === 'cancelled') && ($order->status === 'pending');
                 $allowedStatusUpdates = ['shipped', 'delivered'];
-                if (isset($validated['status']) && !in_array($validated['status'], $allowedStatusUpdates)) {
+                $allowed = in_array($status, $allowedStatusUpdates) || $canCancel;
+                if (!$allowed) {
                     throw ValidationException::withMessages([
                         'status' => ['Orders with payment gateway can only be updated to shipped or delivered status.']
                     ]);
                 }
-                // Hanya izinkan update status, tidak boleh edit field lain
-                $validated = array_intersect_key($validated, array_flip(['status']));
             }
+            $validated = array_intersect_key($validated, array_flip(['status']));
         }
 
         try {
@@ -292,63 +448,133 @@ class OrderController extends Controller
                 $order->update(['sales_channel_id' => $validated['sales_channel_id']]);
             }
 
+            // Update is_dropship if provided
+            if (array_key_exists('is_dropship', $validated)) {
+                $order->update(['is_dropship' => (bool)$validated['is_dropship']]);
+            }
+
             // Update items if provided
             if (isset($validated['items'])) {
-                // Delete existing items and restore stock
-                foreach ($order->items as $item) {
-                    $variant = $item->productVariant;
-                    $variant->increment('stock', $item->quantity);
-                    
-                    // Record stock movement for item removal
-                    $this->recordStockMovement(
-                        $item->product_variant_id,
-                        StockMovementType::IN,
-                        $item->quantity,
-                        "Order #{$order->id} items updated - Stock returned"
-                    );
-                    
-                    $item->delete();
-                }
+                // Short-circuit: if items are identical (same variants, qty, price), skip stock operations
+                $existingItemsSnapshot = $order->items()->get(['product_variant_id','quantity','price'])->map(function($i){
+                    return [
+                        'product_variant_id' => (int)$i->product_variant_id,
+                        'quantity' => (int)$i->quantity,
+                        'price' => (float)$i->price,
+                    ];
+                })->sortBy('product_variant_id')->values()->toArray();
+                $incomingItemsSnapshot = collect($validated['items'])->map(function($i){
+                    return [
+                        'product_variant_id' => (int)$i['product_variant_id'],
+                        'quantity' => (int)$i['quantity'],
+                        'price' => (float)$i['price'],
+                    ];
+                })->sortBy('product_variant_id')->values()->toArray();
 
-                // Calculate new subtotal
-                $subtotal = collect($validated['items'])->sum(function ($item) {
-                    return $item['quantity'] * $item['price'];
-                });
+                if ($existingItemsSnapshot === $incomingItemsSnapshot) {
+                    // Still update subtotals in case of rounding changes, but do not touch stock
+                    foreach ($order->items as $item) {
+                        $match = collect($validated['items'])->firstWhere('product_variant_id', $item->product_variant_id);
+                        if ($match) {
+                            $item->update([
+                                'price' => (float)$match['price'],
+                                'subtotal' => (int)$match['quantity'] * (float)$match['price'],
+                            ]);
+                        }
+                    }
+                    $calculatedSubtotal = $order->items()->sum(DB::raw('quantity * price'));
+                } else {
+                $existingItems = $order->items()->get()->keyBy('product_variant_id');
+                $incomingItems = collect($validated['items'])->keyBy('product_variant_id');
 
-                // Create new items and update stock
-                foreach ($validated['items'] as $item) {
-                    $variant = ProductVariant::findOrFail($item['product_variant_id']);
-
-                    if ($variant->stock < $item['quantity']) {
-                        throw ValidationException::withMessages([
-                            'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, diminta: {$item['quantity']}"]
-                        ]);
+                // Handle removals and decreases
+                foreach ($existingItems as $pvId => $oldItem) {
+                    $variant = $oldItem->productVariant;
+                    if (!$incomingItems->has($pvId)) {
+                        // Item removed: return full quantity
+                        $variant->increment('stock', $oldItem->quantity);
+                        $this->recordStockMovement(
+                            $pvId,
+                            StockMovementType::IN,
+                            $oldItem->quantity,
+                            "Order #{$order->order_number} item removed - Stock returned",
+                            $order->id
+                        );
+                        $oldItem->delete();
+                        continue;
                     }
 
-                    $order->items()->create([
-                        'product_variant_id' => $item['product_variant_id'],
-                        'product_name_snapshot' => $variant->product->name,
-                        'variant_label' => $variant->variant_label,
-                        'quantity' => $item['quantity'],
-                        'price' => $item['price'],
-                        'base_price' => $variant->product->base_price,
-                        'subtotal' => $item['quantity'] * $item['price']
+                    $newItem = $incomingItems->get($pvId);
+                    $delta = (int)$newItem['quantity'] - (int)$oldItem->quantity;
+                    // Update price/subtotal regardless of delta
+                    $oldItem->update([
+                        'price' => $newItem['price'],
+                        'subtotal' => (int)$newItem['quantity'] * (float)$newItem['price']
                     ]);
 
-                    // Update stock
-                    $variant->decrement('stock', $item['quantity']);
-                    
-                    // Record stock movement
+                    if ($delta > 0) {
+                        // Quantity increased: decrease stock by delta and record OUT
+                        if ($variant->stock < $delta) {
+                            throw ValidationException::withMessages([
+                                'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, tambahan diminta: {$delta}"]
+                            ]);
+                        }
+                        $variant->decrement('stock', $delta);
+                        $this->recordStockMovement(
+                            $pvId,
+                            StockMovementType::OUT,
+                            $delta,
+                            "Order #{$order->order_number} qty increased",
+                            $order->id
+                        );
+                        $oldItem->update(['quantity' => (int)$newItem['quantity']]);
+                    } elseif ($delta < 0) {
+                        // Quantity decreased: return stock by -delta and record IN
+                        $variant->increment('stock', -$delta);
+                        $this->recordStockMovement(
+                            $pvId,
+                            StockMovementType::IN,
+                            -$delta,
+                            "Order #{$order->order_number} qty decreased - Stock returned",
+                            $order->id
+                        );
+                        $oldItem->update(['quantity' => (int)$newItem['quantity']]);
+                    }
+                    // If delta == 0: no stock movement
+                }
+
+                // Handle additions
+                foreach ($incomingItems as $pvId => $newItem) {
+                    if ($existingItems->has($pvId)) continue;
+                    $variant = ProductVariant::findOrFail($pvId);
+                    if ($variant->stock < (int)$newItem['quantity']) {
+                        throw ValidationException::withMessages([
+                            'items' => ["Stok tidak mencukupi untuk produk {$variant->product->name} - {$variant->variant_label}. Stok tersedia: {$variant->stock}, diminta: {$newItem['quantity']}"]
+                        ]);
+                    }
+                    $order->items()->create([
+                        'product_variant_id' => $pvId,
+                        'product_name_snapshot' => $variant->product->name,
+                        'variant_label' => $variant->variant_label,
+                        'quantity' => (int)$newItem['quantity'],
+                        'price' => (float)$newItem['price'],
+                        'base_price' => $variant->product->base_price,
+                        'subtotal' => (int)$newItem['quantity'] * (float)$newItem['price']
+                    ]);
+                    $variant->decrement('stock', (int)$newItem['quantity']);
                     $this->recordStockMovement(
-                        $item['product_variant_id'],
+                        $pvId,
                         StockMovementType::OUT,
-                        $item['quantity'],
-                        "Order #{$order->id} updated - {$order->customer->name}"
+                        (int)$newItem['quantity'],
+                        "Order #{$order->order_number} item added",
+                        $order->id
                     );
                 }
 
-                // Store subtotal for later total calculation (as variable, not database field)
+                // Recalculate subtotal from current items after updates
+                $subtotal = $order->items()->sum(DB::raw('quantity * price'));
                 $calculatedSubtotal = $subtotal;
+                }
             }
 
             // Update shipping cost if provided
@@ -370,10 +596,46 @@ class OrderController extends Controller
             // Update status if provided
             if (isset($validated['status'])) {
                 $order->update(['status' => $validated['status']]);
+
+                // Sync payment_status for manual orders (no payment_url)
+                if (is_null($order->payment_url)) {
+                    if ($validated['status'] === 'paid') {
+                        $order->update(['payment_status' => PaymentStatus::PAID]);
+                    } elseif ($validated['status'] === 'cancelled') {
+                        $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                    }
+                }
+
+                if (!is_null($order->payment_url) && $validated['status'] === 'cancelled') {
+                    $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                }
+
+                // Restore stock when status set to cancelled via update (manual flow)
+                if ($validated['status'] === 'cancelled') {
+                    $alreadyRestocked = StockMovement::where('order_id', $order->id)
+                        ->where('type', StockMovementType::IN)
+                        ->where('note', 'like', "Cancel Order #{$order->order_number}%")
+                        ->exists();
+                    if (!$alreadyRestocked) {
+                        foreach ($order->items as $item) {
+                            $variant = $item->productVariant;
+                            $variant->increment('stock', $item->quantity);
+                            $actorId = Auth::id() ?? $order->user_id ?? ($variant->created_by ?? null);
+                            StockMovement::create([
+                                'product_variant_id' => $item->product_variant_id,
+                                'order_id' => $order->id,
+                                'type' => StockMovementType::IN,
+                                'quantity' => $item->quantity,
+                                'note' => "Cancel Order #{$order->order_number} - Manual",
+                                'created_by' => $actorId
+                            ]);
+                        }
+                    }
+                }
             }
 
-            // Update or create payment record if payment data is provided
-            if (isset($validated['payment_bank_id']) && ($validated['payment_status'] ?? 'pending') === 'paid') {
+            // Update or create payment record if payment bank is provided (manual payment)
+            if (!empty($validated['payment_bank_id'])) {
                 $order->payments()->updateOrCreate(
                     ['order_id' => $order->id],
                     [
@@ -385,12 +647,12 @@ class OrderController extends Controller
                         'verified_at' => null
                     ]
                 );
-                
-                // Update order status and payment status when payment is made
-                $order->update([
-                    'status' => 'paid',
-                    'payment_status' => 'paid'
-                ]);
+                if (($validated['payment_status'] ?? 'pending') === 'paid') {
+                    $order->update([
+                        'status' => 'paid',
+                        'payment_status' => 'paid'
+                    ]);
+                }
             }
 
             // Update or create shipping record if courier is provided
@@ -399,10 +661,24 @@ class OrderController extends Controller
                     ['order_id' => $order->id],
                     [
                         'courier_id' => $validated['courier_id'],
+                        'courier_rate_id' => $validated['courier_rate_id'] ?? $order->shipping->courier_rate_id ?? null,
+                        'service_type' => $validated['service_type'] ?? $order->shipping->service_type ?? null,
+                        'status' => $order->shipping->status ?? 'pending',
+                        'weight' => $order->items->sum(function($i){ return ($i->productVariant->weight ?? 0) * $i->quantity; }),
                         'tracking_number' => $order->shipping->tracking_number ?? '',
                         'shipped_at' => $order->shipping->shipped_at ?? now()
                     ]
                 );
+            }
+
+            // Update printed_at if provided
+            if (isset($validated['printed_at'])) {
+                $order->update(['printed_at' => $validated['printed_at']]);
+            }
+
+            // Update notes if provided (manual orders only)
+            if (isset($validated['notes']) && is_null($order->payment_url)) {
+                $order->update(['notes' => $validated['notes']]);
             }
 
             // Update timestamp
@@ -413,7 +689,7 @@ class OrderController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order updated successfully',
-                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
+                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'shipping.courierRate', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'salesChannel'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -423,6 +699,14 @@ class OrderController extends Controller
 
     public function destroy(Order $order): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.delete')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to delete orders.'
+            ], 403);
+        }
+
         if ($order->status !== 'pending') {
             throw ValidationException::withMessages([
                 'order' => ['Can only delete pending orders.']
@@ -462,8 +746,16 @@ class OrderController extends Controller
 
     public function updateStatus(Request $request, Order $order): JsonResponse
     {
+        // Check permission
+        if (!Auth::user()->hasPermission('orders.update_status')) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized. You do not have permission to update order status.'
+            ], 403);
+        }
+
         $validated = $request->validate([
-            'status' => 'required|in:pending,paid,shipped,delivered,cancelled'
+            'status' => 'required|in:pending,processing,paid,shipped,delivered,cancelled'
         ]);
 
         if ($order->status === $validated['status']) {
@@ -472,10 +764,14 @@ class OrderController extends Controller
             ]);
         }
 
-        // Validasi: status cancelled hanya bisa diterapkan pada order manual input
-        if ($validated['status'] === 'cancelled' && !is_null($order->payment_url)) {
+        // Validasi: batalkan web order hanya saat status saat ini pending
+        if (
+            $validated['status'] === 'cancelled'
+            && !is_null($order->payment_url)
+            && $order->status !== 'pending'
+        ) {
             throw ValidationException::withMessages([
-                'status' => ['Status dibatalkan hanya dapat diterapkan pada order manual input.']
+                'status' => ['Web order hanya dapat dibatalkan saat status pending.']
             ]);
         }
 
@@ -484,8 +780,30 @@ class OrderController extends Controller
 
             $order->update([
                 'status' => $validated['status'],
-                'updated_by' => Auth::id()
+                'updated_by' => Auth::id(),
+                'processed_by' => $validated['status'] === 'processing' ? Auth::id() : $order->processed_by
             ]);
+
+            // When status is paid for manual orders, sync payment_status to paid
+            if ($validated['status'] === 'paid' && is_null($order->payment_url)) {
+                $order->update([
+                    'payment_status' => PaymentStatus::PAID
+                ]);
+            }
+
+            // When status is cancelled for manual orders, sync payment_status to cancelled
+            if ($validated['status'] === 'cancelled' && is_null($order->payment_url)) {
+                $order->update([
+                    'payment_status' => PaymentStatus::CANCELLED
+                ]);
+            }
+
+            // When status is cancelled for web orders, sync payment_status to cancelled
+            if ($validated['status'] === 'cancelled' && !is_null($order->payment_url)) {
+                $order->update([
+                    'payment_status' => PaymentStatus::CANCELLED
+                ]);
+            }
 
             // If order is cancelled, restore stock
             if ($validated['status'] === 'cancelled') {
@@ -498,7 +816,7 @@ class OrderController extends Controller
                         $item->product_variant_id,
                         StockMovementType::IN,
                         $item->quantity,
-                        "Order #{$order->id} cancelled - Stock returned"
+                        "Order #{$order->order_number} cancelled - Stock returned"
                     );
                 }
             }
@@ -508,7 +826,7 @@ class OrderController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order status updated successfully',
-                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy'])
+                'data' => $order->fresh()->load(['customer', 'shipping.courier', 'items.productVariant.product', 'payments.paymentBank', 'createdBy', 'processedBy'])
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -519,10 +837,11 @@ class OrderController extends Controller
     /**
      * Record stock movement for order operations
      */
-    private function recordStockMovement($productVariantId, $type, $quantity, $note)
+    private function recordStockMovement($productVariantId, $type, $quantity, $note, $orderId = null)
     {
         StockMovement::create([
             'product_variant_id' => $productVariantId,
+            'order_id' => $orderId,
             'type' => $type,
             'quantity' => $quantity,
             'note' => $note,
@@ -757,7 +1076,7 @@ class OrderController extends Controller
                         'name' => $shipping->courier->name
                     ],
                     'tracking_number' => $shipping->tracking_number,
-                    'shipped_at' => $shipping->shipped_at->toISOString()
+                    'shipped_at' => $shipping->shipped_at->setTimezone(config('app.timezone'))->toIso8601String()
                 ],
                 'order' => [
                     'id' => $order->id,

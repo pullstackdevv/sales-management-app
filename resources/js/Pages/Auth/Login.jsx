@@ -5,11 +5,12 @@ import { AuthAPI } from '@/api'
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { imageAsset } from '@/utils/asset';
+import FullLogo from '@/Layouts/shared/logo/FullLogo';
 
 // Logo Component
-const Logo = () => (
-  <img src={imageAsset('logos/mystock.png')} alt="logo" className="block w-60 mx-auto mb-6" />
-);
+// const Logo = () => (
+//   <img src={imageAsset('logos/logo.png')} alt="logo" className="block w-60 mx-auto mb-6" />
+// );
 
 export default function LoginForm() {
   const {
@@ -51,7 +52,9 @@ export default function LoginForm() {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
           {/* Logo */}
-          <Logo />
+          <div className='flex justify-center'>
+            <FullLogo />
+          </div>
 
           {/* Title */}
           <div className="text-center mb-8">
@@ -60,8 +63,8 @@ export default function LoginForm() {
           </div>
           {message && (
             <div className={`mb-6 p-4 rounded-lg text-center font-medium ${messageStatus === 'success'
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-red-50 text-red-700 border border-red-200'
+              ? 'bg-green-50 text-green-700 border border-green-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
               }`}>
               <Icon
                 icon={messageStatus === 'success' ? 'fluent:checkmark-circle-16-filled' : 'fluent:error-circle-16-filled'}

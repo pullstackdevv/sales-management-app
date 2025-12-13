@@ -15,6 +15,7 @@ export default function StockAdjustmentModal({
     quantity: '',
     notes: ''
   });
+  const disabledByNoId = !variant?.id;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,6 +25,15 @@ export default function StockAdjustmentModal({
         icon: 'error',
         title: 'Error',
         text: 'Jumlah harus lebih dari 0'
+      });
+      return;
+    }
+
+    if (disabledByNoId) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Varian belum tersimpan',
+        text: 'Simpan produk terlebih dahulu sebelum menyesuaikan stok.'
       });
       return;
     }
@@ -116,6 +126,11 @@ export default function StockAdjustmentModal({
             <p className="text-xs text-gray-600">
               Stok saat ini: <span className="font-semibold">{variant.stock}</span>
             </p>
+            {disabledByNoId && (
+              <div className="mt-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1">
+                Varian ini belum tersimpan. Simpan produk terlebih dahulu agar penyesuaian stok dapat dilakukan.
+              </div>
+            )}
           </div>
         )}
 

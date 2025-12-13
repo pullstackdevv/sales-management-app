@@ -33,6 +33,8 @@ export const useCart = () => {
                 variant_id: it.variant_id ?? it.id,
                 quantity: Number(it.quantity ?? 1),
                 selected: typeof it.selected === 'boolean' ? it.selected : true,
+                discount_price: typeof it.discount_price !== 'undefined' && it.discount_price !== null ? Number(it.discount_price) : null,
+                weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
             }));
 
             setCartItems(mapped);
@@ -60,6 +62,8 @@ export const useCart = () => {
                 variant_id: it.variant_id ?? it.id,
                 quantity: it.quantity,
                 selected: typeof it.selected === 'boolean' ? it.selected : true,
+                discount_price: typeof it.discount_price !== 'undefined' && it.discount_price !== null ? Number(it.discount_price) : null,
+                weight: typeof it.weight !== 'undefined' && it.weight !== null ? Number(it.weight) : null,
             }));
             sessionStorage.setItem('cart', JSON.stringify(payload));
             
@@ -88,6 +92,8 @@ export const useCart = () => {
             variant_id: variantId,
             quantity: Number(quantity) || 1,
             selected: true,
+            discount_price: selectedVariant?.discount_price || null,
+            weight: (selectedVariant?.weight ?? product?.weight ?? null)
         };
 
         const currentItems = loadCart();
@@ -113,10 +119,42 @@ export const useCart = () => {
     const removeFromCart = useCallback((itemId) => {
         const currentItems = loadCart();
         const updatedItems = currentItems.filter(item => item.id !== itemId);
-        
-        setCartItems(updatedItems);
-        saveCart(updatedItems);
-        
+
+        // Bersihkan legacy checkout_data jika perlu
+        try {
+            const rawLegacy = sessionStorage.getItem('checkout_data');
+            if (rawLegacy) {
+                let data = null;
+                try { data = JSON.parse(rawLegacy); } catch {}
+
+                if (Array.isArray(data)) {
+                    const next = data.filter(it => (it.variant_id ?? it.id) !== itemId);
+                    if (next.length > 0) sessionStorage.setItem('checkout_data', JSON.stringify(next));
+                    else sessionStorage.removeItem('checkout_data');
+                } else if (Array.isArray(data?.items)) {
+                    const nextItems = data.items.filter(it => (it.variant_id ?? it.id) !== itemId);
+                    if (nextItems.length > 0) sessionStorage.setItem('checkout_data', JSON.stringify({ ...data, items: nextItems }));
+                    else sessionStorage.removeItem('checkout_data');
+                } else if (data?.product) {
+                    const vid = data.product?.variant_id ?? data.product?.id;
+                    if (vid === itemId) sessionStorage.removeItem('checkout_data');
+                }
+            }
+        } catch {}
+
+        // Jika kosong, hapus semua sesi terkait keranjang
+        if (updatedItems.length === 0) {
+            setCartItems([]);
+            setCartCount(0);
+            sessionStorage.removeItem('cart');
+            // 'checkout_data' dibersihkan di atas, jaga-jaga hapus lagi
+            sessionStorage.removeItem('checkout_data');
+            window.dispatchEvent(new CustomEvent('cartUpdated', { detail: { items: [], count: 0 } }));
+        } else {
+            setCartItems(updatedItems);
+            saveCart(updatedItems);
+        }
+
         return updatedItems;
     }, [loadCart, saveCart]);
 

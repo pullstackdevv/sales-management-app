@@ -13,6 +13,7 @@ use App\Http\Controllers\OrderPaymentController;
 use App\Http\Controllers\PaymentBankController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductVariantController;
+use App\Http\Controllers\ProductCategoryController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesChannelController;
@@ -24,14 +25,20 @@ use App\Http\Controllers\StockOpnameController;
 use App\Http\Controllers\StockOpnameDetailController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\WebOrderController;
 use App\Http\Controllers\XenditController;
 use App\Http\Controllers\MidtransController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\WilayahController;
 use App\Http\Controllers\ProductSettingController;
 use App\Http\Controllers\OriginSettingController;
+use App\Http\Controllers\GeneralSettingController;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\BannerController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\TagController;
 
 
 
@@ -69,6 +76,12 @@ Route::prefix('courier-rates')->group(function () {
     Route::get('/{id}', [CourierRateController::class, 'show']);
 });
 
+// Public general settings
+Route::get('general-settings/public', [GeneralSettingController::class, 'publicSettings']);
+
+// Public banners
+Route::get('banners', [BannerController::class, 'index']);
+
 // Dashboard, Analyzer, and Reports routes (using token authentication)
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index']);
@@ -76,6 +89,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('reports')->group(function () {
         Route::get('/', [ReportController::class, 'index']);
         Route::get('sales', [ReportController::class, 'sales']);
+        Route::get('sales/daily', [ReportController::class, 'salesDaily']);
+        Route::get('profit', [ReportController::class, 'profit']);
+        Route::get('bank-transactions', [ReportController::class, 'bankTransactions']);
+        Route::get('courier-data', [ReportController::class, 'courierData']);
         Route::get('stock', [ReportController::class, 'stock']);
         Route::get('user-performance', [ReportController::class, 'userPerformance']);
         Route::get('payments', [ReportController::class, 'payments']);
@@ -85,14 +102,33 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Product routes
 Route::get('products/storefront', [ProductController::class, 'storefront']);
+// Specific product utility routes (declare before resource to avoid conflicts)
+Route::get('products/import-template', [ProductController::class, 'importTemplate']);
+Route::post('products/import', [ProductController::class, 'import']);
+Route::get('products/import-status/{jobId}', [ProductController::class, 'importStatus']);
+Route::get('products/active-imports', [ProductController::class, 'activeImports']);
 // product
 Route::apiResource('products', ProductController::class);
 Route::apiResource('products.variants', ProductVariantController::class);
-// Customer routes
-Route::apiResource('customers', CustomerController::class);
-Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+// Product Category routes
+Route::apiResource('product-categories', ProductCategoryController::class);
+// Guest customer endpoints (secure - validates ownership via email/phone)
+Route::post('customers/guest-lookup', [CustomerController::class, 'guestLookup']);
+Route::post('customers/guest-verify', [CustomerController::class, 'guestVerify']);
+Route::post('customers/guest-store', [CustomerController::class, 'guestStore']);
+Route::put('customers/guest-update/{customer}', [CustomerController::class, 'guestUpdate']);
+Route::post('customers/{customer}/guest-delete-address/{address}', [CustomerController::class, 'guestDeleteAddress']);
+
+// Public customer routes (for guest checkout - create customer and manage addresses)
+Route::post('customers', [CustomerController::class, 'store']);
 Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
-Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
+Route::post('customers/{customer}/addresses', [CustomerController::class, 'addAddress']);
+Route::put('customers/{customer}/addresses/{address}', [CustomerController::class, 'updateAddress']);
+Route::delete('customers/{customer}/addresses/{address}', [CustomerController::class, 'deleteAddress']);
+Route::put('customers/{customer}', [CustomerController::class, 'update']);
+// Tags routes
+Route::apiResource('tags', TagController::class);
+Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);
 
 // Other authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -106,6 +142,12 @@ Route::middleware('auth:sanctum')->group(function () {
             ->json(Auth::user());
     });
 
+    // Customer routes (protected - sensitive data, full CRUD for admin)
+    // Route::apiResource('customers', CustomerController::class);
+    // Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+    // Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
+    // Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
+
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::post('users/{user}/change-password', [UserController::class, 'changePassword']);
@@ -116,13 +158,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('roles/permissions', [RoleController::class, 'getPermissions']);
     Route::put('roles/{roleName}', [RoleController::class, 'update']);
 
-    // Customer address routes
-    Route::get('customers/{customer}/addresses', [AddressController::class, 'index']);
-    Route::post('customers/{customer}/addresses', [AddressController::class, 'store']);
-    Route::put('customers/{customer}/addresses/{address}', [AddressController::class, 'update']);
-    Route::delete('customers/{customer}/addresses/{address}', [AddressController::class, 'destroy']);
-    Route::post('customers/{customer}/addresses/{address}/set-default', [AddressController::class, 'setDefault']);
-
+    // Permission routes
+    Route::get('permissions', [RoleController::class, 'getAllPermissions']);
 
     // Stock movement routes
     Route::apiResource('stock-movements', StockMovementController::class);
@@ -149,6 +186,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Order routes
     Route::apiResource('orders', OrderController::class);
+    Route::get('order-histories', [OrderController::class, 'histories']);
     Route::post('orders/{order}/update-status', [OrderController::class, 'updateStatus']);
     Route::put('orders/{order}/shipping', [OrderController::class, 'updateShipping']);
     Route::get('orders/{order}/generate-shipping-label', [OrderController::class, 'generateShippingLabel']);
@@ -166,11 +204,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('orders.payments', OrderPaymentController::class);
     Route::apiResource('orders.items', OrderItemController::class);
 
-    // Voucher routes
+    // Voucher routes (admin-only)
     Route::apiResource('vouchers', VoucherController::class);
     Route::post('vouchers/{voucher}/toggle-status', [VoucherController::class, 'toggleStatus']);
-    Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
-    Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
+
+    // Promotion routes
+    Route::apiResource('promotions', PromotionController::class);
+    Route::post('promotions/{promotion}/toggle-status', [PromotionController::class, 'toggleStatus']);
+    Route::post('promotions/{promotion}/toggle-storefront', [PromotionController::class, 'toggleStorefront']);
 
     // Expense routes
     Route::apiResource('expenses', ExpenseController::class);
@@ -181,28 +222,54 @@ Route::middleware('auth:sanctum')->group(function () {
     // Settings routes
     Route::apiResource('product-settings', ProductSettingController::class);
     Route::apiResource('origin-settings', OriginSettingController::class);
+    Route::get('general-settings', [GeneralSettingController::class, 'index']);
+    Route::post('general-settings/upsert', [GeneralSettingController::class, 'upsert']);
+    Route::delete('general-settings/{settingName}', [GeneralSettingController::class, 'destroy']);
+
+    // Banner routes (admin)
+    Route::apiResource('banners', BannerController::class)->except(['index', 'show']);
+    Route::post('banners/reorder', [BannerController::class, 'reorder']);
+
+    // Promotions reorder (admin)
+    Route::post('promotions/reorder', [PromotionController::class, 'reorder']);
 
     // Other authenticated routes remain here
+
+    // Notification routes
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'getNotifications']);
+        Route::post('/mark-read/{notificationId}', [NotificationController::class, 'markAsRead']);
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+        Route::post('/generate-low-stock', [NotificationController::class, 'generateLowStockNotifications']);
+    });
 
     // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
     });
+
+    // Product tags sync
+    Route::post('products/{product}/tags/sync', [ProductController::class, 'syncTags']);
 });
+
+// Public voucher routes (for checkout)
+Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
+Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
 
 // Payment Gateway Routes (public access for webhooks and order payment)
 Route::prefix('payment')->name('payment.')->group(function () {
-    // Web Order Payment Routes (can be used by guests)
-    Route::post('/create/{orderNumber}', [WebOrderController::class, 'createPayment'])->name('web.create');
-    Route::get('/status/{orderNumber}', [WebOrderController::class, 'checkPaymentStatus'])->name('web.status');
+    // Unified Payment Routes (supports both Xendit and Midtrans based on config)
+    Route::post('/create/{orderNumber}', [PaymentController::class, 'createPayment'])->name('create');
+    Route::get('/status/{orderNumber}', [PaymentController::class, 'checkPaymentStatus'])->name('status');
+    Route::post('/webhook', [PaymentController::class, 'handleWebhook'])->name('webhook');
 
-    // Xendit specific routes
+    // Xendit specific routes (legacy support)
     Route::prefix('xendit')->name('xendit.')->group(function () {
         Route::post('/webhook', [XenditController::class, 'handleWebhook'])->name('webhook');
         Route::get('/status/{orderNumber}', [XenditController::class, 'checkPaymentStatus'])->name('status');
     });
 
-    // Midtrans specific routes (existing routes from web.php can be moved here if needed)
+    // Midtrans specific routes (legacy support)
     Route::prefix('midtrans')->name('midtrans.')->group(function () {
         Route::post('/webhook', [MidtransController::class, 'handleNotification'])->name('webhook');
         Route::get('/status/{orderNumber}', [MidtransController::class, 'checkPaymentStatus'])->name('status');

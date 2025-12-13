@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PaymentStatus;
+use App\Enums\StockMovementType;
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
+use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Midtrans\Notification;
+use Midtrans\Notification as MidtransNotification;
 use Midtrans\Snap;
 use Midtrans\Transaction;
+use App\Helpers\NotificationHelper;
 
 class MidtransController extends Controller
 {
@@ -162,13 +166,26 @@ class MidtransController extends Controller
     public function handleNotification(Request $request)
     {
         try {
-            // Create notification instance
-            $notification = new Notification();
+            DB::beginTransaction();
+            Log::info('Midtrans legacy webhook raw content', [
+                'content' => $request->getContent(),
+                'headers' => $request->headers->all()
+            ]);
+            $payload = json_decode($request->getContent(), true);
+            if (!is_array($payload) || empty($payload)) {
+                $payload = $request->all();
+            }
 
-            $orderNumber = $notification->order_id;
-            $transactionStatus = $notification->transaction_status;
-            $fraudStatus = $notification->fraud_status ?? null;
-            $paymentType = $notification->payment_type;
+            $orderNumber = $payload['order_id'] ?? null;
+            $transactionStatus = $payload['transaction_status'] ?? null;
+            $fraudStatus = $payload['fraud_status'] ?? null;
+            $paymentType = $payload['payment_type'] ?? null;
+
+            if (!$orderNumber || !$transactionStatus) {
+                Log::error('Invalid Midtrans notification payload', $payload);
+
+                return response()->json(['status' => 'error', 'message' => 'Invalid payload'], 200);
+            }
 
             Log::info('Midtrans notification received', [
                 'order_id' => $orderNumber,
@@ -177,30 +194,46 @@ class MidtransController extends Controller
                 'payment_type' => $paymentType,
             ]);
 
-            // Find order
             $order = Order::where('order_number', $orderNumber)->first();
 
             if (!$order) {
                 Log::error('Order not found for notification: ' . $orderNumber);
-                return response()->json(['status' => 'error', 'message' => 'Order not found'], 404);
+
+                return response()->json(['status' => 'error', 'message' => 'Order not found'], 200);
             }
 
-            // Determine payment status based on transaction status
             $paymentStatus = $this->mapTransactionStatus($transactionStatus, $fraudStatus);
+            $previousStatus = $order->status;
 
-            // Update order payment status
-            $order->update([
-                'payment_status' => $paymentStatus,
-            ]);
+            $order->update(['payment_status' => $paymentStatus->value]);
 
-            // Update order status based on payment status
             if ($paymentStatus === PaymentStatus::PAID) {
                 $order->update(['status' => 'paid']);
-                
-                // Update voucher used count if voucher was used
                 WebOrderController::updateVoucherUsedCount($order->id);
+                
+                // Create payment received notification
+                NotificationHelper::paymentReceived($order->load(['customer', 'address']));
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
                 $order->update(['status' => 'cancelled']);
+                if ($previousStatus !== 'cancelled') {
+                    foreach ($order->items as $item) {
+                        $variant = $item->productVariant;
+                        $variant->increment('stock', $item->quantity);
+                        StockMovement::create([
+                            'product_variant_id' => $item->product_variant_id,
+                            'order_id' => $order->id,
+                            'type' => StockMovementType::IN,
+                            'quantity' => $item->quantity,
+                            'note' => "Order #{$order->order_number} cancelled - Stock returned",
+                            'created_by' => $variant->created_by ?? $order->user_id ?? 1,
+                        ]);
+                    }
+                    
+                    // Create expired notification
+                    if ($paymentStatus === PaymentStatus::EXPIRED) {
+                        NotificationHelper::orderExpired($order->load(['customer', 'address']));
+                    }
+                }
             }
 
             Log::info('Order payment status updated', [
@@ -209,11 +242,14 @@ class MidtransController extends Controller
                 'order_status' => $order->status,
             ]);
 
-            return response()->json(['status' => 'success']);
+            DB::commit();
+            return response()->json(['status' => 'success'], 200);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Midtrans notification handling failed: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 200);
         }
     }
 
@@ -223,6 +259,7 @@ class MidtransController extends Controller
     public function checkPaymentStatus($orderNumber)
     {
         try {
+            DB::beginTransaction();
             $order = Order::where('order_number', $orderNumber)->first();
 
             if (!$order) {
@@ -243,32 +280,62 @@ class MidtransController extends Controller
             $statusArray = $status;
 
             // Map to our payment status
-            $paymentStatus = $this->mapTransactionStatus($transactionStatus, $fraudStatus);
+            $paymentStatusFromGateway = $this->mapTransactionStatus($transactionStatus, $fraudStatus);
 
-            // Update order if status changed
-            if ($order->payment_status !== $paymentStatus) {
-                $order->update(['payment_status' => $paymentStatus]);
+            $currentOrder = $order->fresh();
+            $currentStatus = $currentOrder->payment_status;
 
-                // Update order status based on payment status
-                if ($paymentStatus === PaymentStatus::PAID) {
-                    $order->update(['status' => 'paid']);
-                    
-                    // Update voucher used count if voucher was used
-                    WebOrderController::updateVoucherUsedCount($order->id);
-                } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
-                    $order->update(['status' => 'cancelled']);
+            $shouldUpdate = false;
+            if ($currentStatus !== $paymentStatusFromGateway) {
+                if (in_array($paymentStatusFromGateway, [PaymentStatus::PAID, PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
+                    $shouldUpdate = true;
+                } elseif ($currentStatus === PaymentStatus::PENDING && $paymentStatusFromGateway === PaymentStatus::PENDING) {
+                    $shouldUpdate = false;
                 }
             }
 
+            if ($shouldUpdate) {
+                $previousStatus = $order->status;
+                $order->update(['payment_status' => $paymentStatusFromGateway->value]);
+
+                if ($paymentStatusFromGateway === PaymentStatus::PAID) {
+                    $order->update(['status' => 'paid']);
+                    WebOrderController::updateVoucherUsedCount($order->id);
+                    
+                    // Create payment received notification
+                    NotificationHelper::paymentReceived($order->load(['customer', 'address']));
+                } elseif (in_array($paymentStatusFromGateway, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
+                    $order->update(['status' => 'cancelled']);
+                    if ($previousStatus !== 'cancelled') {
+                        foreach ($order->items as $item) {
+                            $variant = $item->productVariant;
+                            $variant->increment('stock', $item->quantity);
+                            StockMovement::create([
+                                'product_variant_id' => $item->product_variant_id,
+                                'order_id' => $order->id,
+                                'type' => StockMovementType::IN,
+                                'quantity' => $item->quantity,
+                                'note' => "Order #{$order->order_number} cancelled - Stock returned",
+                                'created_by' => $variant->created_by ?? $order->user_id ?? 1,
+                            ]);
+                        }
+                    }
+                }
+
+                $currentOrder = $order->fresh();
+            }
+
+            DB::commit();
             return ResponseFormatter::success(
                  'Payment status retrieved successfully',
                  [
-                     'order' => $order->fresh(),
+                     'order' => $currentOrder,
                      'midtrans_status' => $statusArray,
                  ]
              );
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Payment status check failed: ' . $e->getMessage());
             return ResponseFormatter::error(
                 'Failed to check payment status',

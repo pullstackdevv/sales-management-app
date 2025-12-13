@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { usePage } from "@inertiajs/react";
 import FullLogo from "../shared/logo/FullLogo";
 import ChangePasswordModal from "../../components/ChangePasswordModal";
+import NotificationDropdown from "./NotificationDropdown";
 
 const Header = ({ onHamburgerClick, isSidebarOpen }) => {
   const [isSticky, setIsSticky] = useState(false);
@@ -35,7 +36,7 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
       <header className={`sticky top-0 z-50 shadow-sm ${isSticky ? "bg-white" : "bg-white"}`}>
         <Navbar fluid className="py-3 px-4 lg:px-6">
           {/* Left - Logo & Hamburger */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 max-h-10">
             {/* Hamburger Menu Button */}
             <button 
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors" 
@@ -63,8 +64,9 @@ const Header = ({ onHamburgerClick, isSidebarOpen }) => {
 
           {/* Right - Actions */}
           <div className="flex items-center gap-4 ml-auto">
-
-
+            
+            {/* Notifications */}
+            <NotificationDropdown />
 
             {/* Avatar & Dropdown */}
             <div className="relative">

@@ -3,8 +3,11 @@ import DashboardLayout from '../../Layouts/DashboardLayout';
 import { useState, useEffect } from 'react';
 import api from '@/api/axios';
 import { Link } from '@inertiajs/react';
+import { useAuth } from '../../contexts/AuthContext';
+import Swal from 'sweetalert2';
 
 export default function Order() {
+  const { hasPermission } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('Semua Order');
@@ -13,30 +16,23 @@ export default function Order() {
   const [searchBy, setSearchBy] = useState('Order ID');
   const [pagination, setPagination] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [dateQuick, setDateQuick] = useState('Semua');
+  const [paymentBanks, setPaymentBanks] = useState([]);
 
   useEffect(() => {
+    // Initial fetch when component mounts
     fetchOrders();
-    
-    // Add event listener for page visibility change to refresh data
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // Page became visible, refresh data
-        fetchOrders(currentPage);
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Cleanup event listener
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    fetchPaymentBanksOnce();
   }, []);
   
   useEffect(() => {
     setCurrentPage(1);
     fetchOrders(1);
-  }, [activeFilter, sourceFilter, searchTerm]);
+  }, [activeFilter, sourceFilter, searchTerm, startDate, endDate]);
   
   useEffect(() => {
     fetchOrders(currentPage);
@@ -53,6 +49,12 @@ export default function Order() {
       if (searchTerm) {
         params.append('search', searchTerm);
       }
+      if (startDate) {
+        params.append('start_date', startDate);
+      }
+      if (endDate) {
+        params.append('end_date', endDate);
+      }
       
       // Map filter to API status
       const statusMap = {
@@ -64,6 +66,7 @@ export default function Order() {
         'Dibatalkan': 'cancelled'
       };
       
+      // For non-default filters, filter by status using statusMap (including "Diproses" => processing)
       if (activeFilter !== 'Semua Order' && statusMap[activeFilter]) {
         params.append('status', statusMap[activeFilter]);
       }
@@ -78,6 +81,7 @@ export default function Order() {
       const response = await api.get(url);
       const responseData = response.data.data;
       const ordersData = responseData.data || [];
+      // console.log(ordersData)
       
       // Set pagination data
       setPagination({
@@ -108,16 +112,18 @@ export default function Order() {
         return {
           id: order.id,
           number: order.order_number,
-          channel: order.sales_channel?.name || 'Website',
-          date: formatDate(order.ordered_at),
+          channel: order.sales_channel?.name || 'Website Resmi',
+          date: order.date, // Use pre-formatted WIB date from backend
           ordered_at: order.ordered_at, // Add raw date for PaymentHistoryModal
           customer: order.customer?.name || 'N/A',
-          admin: 'Admin', // Default admin name
+          recipient_name: order.address?.recipient_name || order.customer?.name || 'N/A',
+          admin: (order.processed_by?.name) || (order.createdBy?.name) || '—',
           status: getStatusLabel(order.status),
           raw_status: order.status, // Add raw status for timeline logic
           total: parseFloat(order.total_price),
           bank: bankInfo,
           courier: order.shipping?.courier?.name || 'N/A',
+          service_type: order.shipping?.service_type || order.shipping?.courier?.service_type || '',
           resi: order.shipping?.tracking_number || '',
           products: order.items?.map(item => 
             `${item.product_name_snapshot} ${item.variant_label} (${item.quantity}x)`
@@ -125,11 +131,14 @@ export default function Order() {
           // Add fields needed for order source detection
           payment_url: order.payment_url,
           payment_status: order.payment_status, // Add payment status for display
-          sales_channel: order.sales_channel?.name || 'Website',
+          sales_channel: order.sales_channel?.code || 'WEBSITE',
           // Add shipping object with ID for update operations
           shipping: order.shipping,
+          is_dropship: order.address?.is_dropship,
           // Add payment bank details for detailed display
-          payment_bank: paymentBank
+          payment_bank: paymentBank,
+          // Add printed_at for print status tracking
+          printed_at: order.printed_at
         };
       });
       
@@ -138,6 +147,67 @@ export default function Order() {
       console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPaymentBanksOnce = async () => {
+    try {
+      const response = await api.get('/payment-banks');
+      const banksData = response.data?.data?.data || response.data?.data || [];
+      const activeBanks = Array.isArray(banksData) ? banksData.filter(b => b.is_active) : [];
+      setPaymentBanks(activeBanks);
+    } catch (e) {
+      setPaymentBanks([]);
+    }
+  };
+
+  const applyQuickRange = (range) => {
+    setDateQuick(range);
+    const today = new Date();
+    const toISO = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    if (range === 'Semua') {
+      setStartDate('');
+      setEndDate('');
+      return;
+    }
+    if (range === 'Hari Ini') {
+      const iso = toISO(today);
+      setStartDate(iso);
+      setEndDate(iso);
+      return;
+    }
+    if (range === '7 Hari') {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      setStartDate(toISO(start));
+      setEndDate(toISO(today));
+      return;
+    }
+    if (range === '30 Hari') {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      setStartDate(toISO(start));
+      setEndDate(toISO(today));
+      return;
+    }
+  };
+
+  const handleDateChange = (which, value) => {
+    if (which === 'start') {
+      setStartDate(value);
+      if (endDate && value && value > endDate) {
+        setEndDate(value);
+      }
+    } else {
+      setEndDate(value);
+      if (startDate && value && value < startDate) {
+        setStartDate(value);
+      }
     }
   };
 
@@ -166,51 +236,121 @@ export default function Order() {
     return statusMap[status] || status;
   };
 
+  // Handle checkbox selection
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrders(prev => {
+      if (prev.includes(orderId)) {
+        return prev.filter(id => id !== orderId);
+      } else {
+        return [...prev, orderId];
+      }
+    });
+  };
+
+  // Handle select all
+  const handleSelectAll = () => {
+    const paidOrders = orders.filter(order => order.raw_status === 'paid');
+    if (selectedOrders.length === paidOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(paidOrders.map(order => order.id));
+    }
+  };
+
+  // Handle print and update status to processing
+  const handlePrintOrders = async () => {
+    if (selectedOrders.length === 0) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Tidak ada order dipilih',
+        text: 'Silakan pilih minimal satu order yang sudah dibayar terlebih dahulu.',
+        timer: 2000,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    try {
+      setIsPrinting(true);
+
+      // Open print window with selected orders (multi-invoice page)
+      const printUrl = `/cms/order/print-multiple?orders=${selectedOrders.join(',')}`;
+      window.open(printUrl, '_blank');
+
+      // Clear selection and refresh list (status & printed_at handled in print page)
+      setSelectedOrders([]);
+      await fetchOrders(currentPage);
+    } catch (error) {
+      console.error('Error opening print window:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal!',
+        text: 'Tidak dapat membuka halaman cetak multiple.'
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6">
         <div className="text-xl font-semibold mb-4">Order</div>
 
-        <div className="flex flex-wrap gap-2 mb-6">
-          {[
-            'Semua Order',
-            'Belum Bayar',
-            'Dibayar',
-            'Diproses',
-            'Dikirim',
-            'Diterima',
-            'Dibatalkan',
-          ].map((label, idx) => (
-            <button
-              key={idx}
-              onClick={() => setActiveFilter(label)}
-              className={`text-sm px-3 py-1 border rounded-md transition-colors ${
-                activeFilter === label
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <select
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Status"
+          >
+            <option value="Semua Order">Semua Order</option>
+            <option value="Belum Bayar">Belum Bayar</option>
+            <option value="Dibayar">Dibayar</option>
+            <option value="Diproses">Diproses</option>
+            <option value="Dikirim">Dikirim</option>
+            {/* <option value="Diterima">Diterima</option> */}
+            <option value="Dibatalkan">Dibatalkan</option>
+          </select>
 
-        {/* Source Filter */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className="text-sm font-medium text-gray-700 self-center">Filter Sumber:</span>
-          {['Semua Sumber', 'Manual', 'Web Order'].map((source) => (
-            <button
-              key={source}
-              onClick={() => setSourceFilter(source)}
-              className={`text-sm px-3 py-1 rounded-md border transition-colors ${
-                sourceFilter === source
-                  ? 'bg-green-600 text-white border-green-600'
-                  : 'border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              {source}
-            </button>
-          ))}
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Sumber"
+          >
+            <option value="Semua Sumber">Semua Sumber</option>
+            <option value="Manual">Manual</option>
+            <option value="Web Order">Web Order</option>
+          </select>
+
+          <select
+            value={dateQuick}
+            onChange={(e) => applyQuickRange(e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Rentang Cepat"
+          >
+            <option value="Semua">Semua</option>
+            <option value="Hari Ini">Hari Ini</option>
+            <option value="7 Hari">7 Hari</option>
+            <option value="30 Hari">30 Hari</option>
+          </select>
+
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => handleDateChange('start', e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Dari"
+          />
+          <span className="text-xs text-gray-500">–</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => handleDateChange('end', e.target.value)}
+            className="border text-sm px-3 py-2 rounded-md"
+            aria-label="Sampai"
+          />
         </div>
 
         <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
@@ -223,6 +363,7 @@ export default function Order() {
               <option value="Order ID">Order ID</option>
               <option value="Customer">Customer</option>
               <option value="Phone">Phone</option>
+              <option value="Product">Product Name</option>
             </select>
             <input
               type="text"
@@ -233,14 +374,49 @@ export default function Order() {
             />
           </div>
           <div className="flex gap-2">
-            <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Filter</button>
-            <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
-            <Link
-              href={route('cms.orders.create')}
-              className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Tambah Order
-            </Link>
+            {/* {hasPermission('orders.export') && (
+              <button className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100">Download</button>
+            )} */}
+          
+            {/* Bulk print controls */}
+            <div className="flex items-center gap-2 ml-2">
+              <label className="inline-flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300"
+                  checked={selectedOrders.length > 0 && selectedOrders.length === orders.filter(o => o.raw_status === 'paid').length}
+                  onChange={handleSelectAll}
+                />
+                <span>Pilih semua yang sudah Dibayar</span>
+              </label>
+              <button
+                type="button"
+                onClick={handlePrintOrders}
+                disabled={isPrinting}
+                className={`text-xs px-3 py-2 rounded-md border flex items-center gap-1 ${
+                  isPrinting
+                    ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100 opacity-70'
+                    : 'border-yellow-900 text-yellow-900 hover:bg-yellow-300'
+                }`}
+              >
+                {isPrinting ? (
+                  <span>Mencetak...</span>
+                ) : (
+                  <>
+                    <span>Print Multiple</span>
+                    <span className="text-[10px] text-gray-500">({selectedOrders.length})</span>
+                  </>
+                )}
+              </button>
+                {hasPermission('orders.create') && (
+              <Link
+                href={route('cms.orders.create')}
+                className="text-sm px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Tambah Order
+              </Link>
+            )}
+            </div>
           </div>
         </div>
 
@@ -256,7 +432,15 @@ export default function Order() {
         ) : (
           <>
             {orders.map((order, idx) => (
-              <OrderCard key={idx} order={order} onOrderUpdate={() => fetchOrders(currentPage)} />
+              <OrderCard
+                key={idx}
+                order={order}
+                paymentBanks={paymentBanks}
+                onOrderUpdate={() => fetchOrders(currentPage)}
+                showCheckbox={order.raw_status === 'paid'}
+                isSelected={selectedOrders.includes(order.id)}
+                onSelect={handleSelectOrder}
+              />
             ))}
             
             {/* Pagination */}

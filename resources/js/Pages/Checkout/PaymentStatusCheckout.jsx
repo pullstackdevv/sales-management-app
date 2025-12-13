@@ -15,7 +15,8 @@ export default function PaymentStatusCheckout({ orderNumber }) {
     try {
       if (showRefreshing) setRefreshing(true);
       
-      const response = await api.get(`/payment/xendit/status/${orderNumber}`);
+      // Use unified payment status endpoint (supports both Xendit and Midtrans)
+      const response = await api.get(`/payment/status/${orderNumber}`);
 
       if (response.data.status === 'success') {
         setPaymentData(response.data);
@@ -213,10 +214,20 @@ export default function PaymentStatusCheckout({ orderNumber }) {
                   </span>
                 </div>
                 
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Status Xendit</span>
-                  <span className="font-medium">{paymentData.xendit_status}</span>
-                </div>
+                {/* Display gateway-specific status */}
+                {paymentData.xendit_status && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status Xendit</span>
+                    <span className="font-medium">{paymentData.xendit_status}</span>
+                  </div>
+                )}
+                
+                {paymentData.midtrans_status && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status Midtrans</span>
+                    <span className="font-medium capitalize">{paymentData.midtrans_status}</span>
+                  </div>
+                )}
                 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tanggal Pesanan</span>

@@ -197,7 +197,7 @@ const PrintMultipleInvoices = () => {
       </div>
     );
   }
-
+  const itemsFontClassFor = (count) => (count <= 3 ? 'text-lg' : count <= 6 ? 'text-base' : count <= 10 ? 'text-sm' : 'text-xs');
   return (
     <>
       <Head title="Print Multiple Invoices" />
@@ -285,7 +285,7 @@ const PrintMultipleInvoices = () => {
 
                 <div className="border-b-2 border-black p-4">
                   <div className="font-bold text-xl mb-2">Paket:</div>
-                  <div className="text-lg">
+                  <div className={itemsFontClassFor(inv.items?.length ?? 1)}>
                     {inv.items?.map((item, idx) => (
                       <div key={idx} className="mb-1">
                         • {item.product_name} {item.description && `- ${item.description}`} (Qty: {item.quantity})
@@ -320,12 +320,12 @@ const PrintMultipleInvoices = () => {
                   </div>
                 )}
               </div>
-               <div className="pt-6 mt-4 ">
-                  <div className="text-center text-gray-600">
-                    <p className="text-xl">Terima kasih atas kepercayaan Anda!</p>
-                    <p className="text-lg mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                  </div>
+              <div className="pt-6 mt-4 ">
+                <div className="text-center text-gray-600">
+                  <p className="text-xl">Terima kasih atas kepercayaan Anda!</p>
+                  <p className="text-lg mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
                 </div>
+              </div>
             </div>
           ))}
         </div>

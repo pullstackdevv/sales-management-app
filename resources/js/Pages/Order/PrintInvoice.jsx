@@ -239,6 +239,8 @@ const PrintInvoice = () => {
         );
     }
     console.log(invoiceData)
+    const itemsCount = invoiceData?.items?.length ?? 1;
+    const itemsFontClass = itemsCount <= 2 ? 'text-lg' : itemsCount <= 5 ? 'text-base' : itemsCount <= 8 ? 'text-sm' : 'text-xs';
     return (
         <>
             <Head title={`Invoice - Order #${orderId}`} />
@@ -479,11 +481,11 @@ const PrintInvoice = () => {
                                 <div className="text-lg base leading-relaxed">
                                     {invoiceData?.shipping_address ? (
                                         <>
-                                            {inv.shipping_address.address_detail}<br />
-                                            {inv.shipping_address.district && `${inv.shipping_address.district}`} ,
-                                            {inv.shipping_address.city}, {inv.shipping_address.province}
-                                            , {inv.shipping_address.postal_code}
-                                            {inv.shipping_address.phone && ` (${inv.shipping_address.phone})`}
+                                            {invoiceData.shipping_address.address_detail}<br />
+                                            {invoiceData.shipping_address.district && `${invoiceData.shipping_address.district}`} ,
+                                            {invoiceData.shipping_address.city}, {invoiceData.shipping_address.province}
+                                            , {invoiceData.shipping_address.postal_code}
+                                            {invoiceData.shipping_address.phone && ` (${invoiceData.shipping_address.phone})`}
                                         </>
                                     ) : (
                                         <>
@@ -498,7 +500,7 @@ const PrintInvoice = () => {
                         {printSettings.showOrderDetails && (
                             <div className="border-b-2 border-black p-4">
                                 <div className="text-xl font-bold mb-2">Paket:</div>
-                                <div className="text-lg">
+                                <div className={itemsFontClass}>
                                     {invoiceData?.items?.map((item, index) => (
                                         <div key={index} className="mb-1">
                                             • {item.product_name} {item.description && `- ${item.description}`} (Qty: {item.quantity})

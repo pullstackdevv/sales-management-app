@@ -112,10 +112,20 @@ Route::apiResource('products', ProductController::class);
 Route::apiResource('products.variants', ProductVariantController::class);
 // Product Category routes
 Route::apiResource('product-categories', ProductCategoryController::class);
-Route::apiResource('customers', CustomerController::class);
-Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+// Guest customer endpoints (secure - validates ownership via email/phone)
+Route::post('customers/guest-lookup', [CustomerController::class, 'guestLookup']);
+Route::post('customers/guest-verify', [CustomerController::class, 'guestVerify']);
+Route::post('customers/guest-store', [CustomerController::class, 'guestStore']);
+Route::put('customers/guest-update/{customer}', [CustomerController::class, 'guestUpdate']);
+Route::post('customers/{customer}/guest-delete-address/{address}', [CustomerController::class, 'guestDeleteAddress']);
+
+// Public customer routes (for guest checkout - create customer and manage addresses)
+Route::post('customers', [CustomerController::class, 'store']);
 Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
-Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
+Route::post('customers/{customer}/addresses', [CustomerController::class, 'addAddress']);
+Route::put('customers/{customer}/addresses/{address}', [CustomerController::class, 'updateAddress']);
+Route::delete('customers/{customer}/addresses/{address}', [CustomerController::class, 'deleteAddress']);
+Route::put('customers/{customer}', [CustomerController::class, 'update']);
 // Tags routes
 Route::apiResource('tags', TagController::class);
 Route::get('promotions-active', [PromotionController::class, 'getActivePromotions']);

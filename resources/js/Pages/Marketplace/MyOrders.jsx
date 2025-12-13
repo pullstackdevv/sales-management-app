@@ -193,7 +193,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         }
     };
 
-
+    // Search customers by name (using guest-lookup endpoint - returns masked data)
     const searchCustomers = async (query) => {
         if (!query || query.trim().length < 2) {
             setCustomers([]);
@@ -202,14 +202,12 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
 
         setSearchLoading(true);
         try {
-            const response = await api.get('/customers', {
-                params: {
-                    search: query,
-                    per_page: 10
-                }
-            });
+            const response = await api.post('/customers/guest-lookup', { search: query.trim() });
+            
             if (response.data.status === 'success') {
-                setCustomers(response.data.data.data || []);
+                setCustomers(response.data.data || []);
+            } else {
+                setCustomers([]);
             }
         } catch (error) {
             console.error('Error searching customers:', error);
@@ -230,7 +228,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
         setSearchTerm(customer.name || customer.full_name);
     };
 
-    const handleVerification = () => {
+    const handleVerification = async () => {
         setVerificationError('');
 
         if (!verificationInput.trim()) {
@@ -238,54 +236,43 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
             return;
         }
 
-        // Normalize phone numbers for comparison
-        const normalizePhone = (phone) => {
-            return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+62/, '0').replace(/^62/, '0');
-        };
+        try {
+            // Call guest-verify endpoint to verify customer ownership
+            const response = await api.post('/customers/guest-verify', {
+                customer_id: pendingCustomer.id,
+                verification_type: verificationMethod,
+                verification_value: verificationInput.trim()
+            });
 
-        if (verificationMethod === 'phone') {
-            const customerPhone = normalizePhone(pendingCustomer.phone || '');
-            const inputPhone = normalizePhone(verificationInput);
+            if (response.data.status === 'success' && response.data.data) {
+                const verifiedCustomer = response.data.data;
 
-            if (customerPhone !== inputPhone) {
-                setVerificationError('Nomor HP tidak sesuai dengan data customer');
-                return;
+                // Verified, save to session with full customer data
+                checkoutSession.updateStep('customer', {
+                    phone: verifiedCustomer.phone,
+                    email: verifiedCustomer.email,
+                    customer_id: verifiedCustomer.id
+                });
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil!',
+                    text: 'Data berhasil diverifikasi',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+
+                setShowVerification(false);
+                setShowCustomerForm(false);
+                
+                // Reload page to fetch orders
+                router.reload();
             }
-        } else {
-            const customerEmail = (pendingCustomer.email || '').toLowerCase().trim();
-            const inputEmail = verificationInput.toLowerCase().trim();
-
-            if (!customerEmail) {
-                setVerificationError('Customer ini tidak memiliki email terdaftar');
-                return;
-            }
-
-            if (customerEmail !== inputEmail) {
-                setVerificationError('Email tidak sesuai dengan data customer');
-                return;
-            }
+        } catch (error) {
+            console.error('Verification error:', error);
+            const errorMessage = error.response?.data?.message || 'Verifikasi gagal';
+            setVerificationError(errorMessage);
         }
-
-        // Verified, save to session
-        checkoutSession.updateStep('customer', {
-            phone: pendingCustomer.phone,
-            email: pendingCustomer.email,
-            customer_id: pendingCustomer.id
-        });
-
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil!',
-            text: 'Data berhasil diverifikasi',
-            showConfirmButton: false,
-            timer: 1500
-        });
-
-        setShowVerification(false);
-        setShowCustomerForm(false);
-
-        // Reload page to fetch orders
-        router.reload();
     };
 
     const handleCancelVerification = () => {

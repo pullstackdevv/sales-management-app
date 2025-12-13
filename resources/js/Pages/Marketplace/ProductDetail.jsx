@@ -295,20 +295,22 @@ export default function ProductDetail() {
         }
     };
 
-    // Fetch customers using guest-lookup (search by email or phone)
+    // Fetch customers using guest-lookup (search by name - returns masked data)
     const fetchCustomers = async (search = '') => {
-        if (!search || search.trim().length < 3) {
+        if (!search || search.trim().length < 2) {
             setCustomers([]);
             return;
         }
 
         setOrderLoading(prev => ({ ...prev, customers: true }));
         try {
-            const response = await axios.get('/api/customers', {
-                params: { search, per_page: 50 }
-            });
-            setCustomers(response.data.data.data || []);
-
+            const response = await axios.post('/api/customers/guest-lookup', { search: search.trim() });
+            
+            if (response.data.status === 'success') {
+                setCustomers(response.data.data || []);
+            } else {
+                setCustomers([]);
+            }
         } catch (error) {
             console.error('Error fetching customers:', error);
             setCustomers([]);

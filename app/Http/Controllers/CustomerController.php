@@ -331,6 +331,110 @@ class CustomerController extends Controller
     }
 
     /**
+     * Add new address to customer
+     */
+    public function addAddress(Request $request, Customer $customer): JsonResponse
+    {
+        $validated = $request->validate([
+            'label' => 'required|string|max:50',
+            'recipient_name' => 'required|string|max:100',
+            'recipient_phone' => 'required|string|max:20',
+            'address_detail' => 'required|string',
+            'province' => 'required|string|max:100',
+            'city' => 'required|string|max:100',
+            'district' => 'required|string|max:100',
+            'postal_code' => 'required|string|max:10',
+            'is_default' => 'boolean',
+            'is_dropship' => 'boolean',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // If this is set as default, unset other defaults
+            if (!empty($validated['is_default']) && $validated['is_default']) {
+                $customer->addresses()->update(['is_default' => false]);
+            }
+
+            // If this is the first address, make it default
+            $isFirstAddress = $customer->addresses()->count() === 0;
+            if ($isFirstAddress) {
+                $validated['is_default'] = true;
+            }
+
+            $address = $customer->addresses()->create($validated);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Alamat berhasil ditambahkan',
+                'data' => $customer->addresses()->orderBy('is_default', 'desc')->orderBy('created_at', 'asc')->get()
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menambahkan alamat: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update customer address
+     */
+    public function updateAddress(Request $request, Customer $customer, $addressId): JsonResponse
+    {
+        $validated = $request->validate([
+            'label' => 'sometimes|string|max:50',
+            'recipient_name' => 'sometimes|string|max:100',
+            'recipient_phone' => 'sometimes|string|max:20',
+            'address_detail' => 'sometimes|string',
+            'province' => 'sometimes|string|max:100',
+            'city' => 'sometimes|string|max:100',
+            'district' => 'sometimes|string|max:100',
+            'postal_code' => 'sometimes|string|max:10',
+            'is_default' => 'boolean',
+            'is_dropship' => 'boolean',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $address = $customer->addresses()->findOrFail($addressId);
+
+            // If this is set as default, unset other defaults
+            if (!empty($validated['is_default']) && $validated['is_default']) {
+                $customer->addresses()->where('id', '!=', $addressId)->update(['is_default' => false]);
+            }
+
+            $address->update($validated);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Alamat berhasil diperbarui',
+                'data' => $customer->addresses()->orderBy('is_default', 'desc')->orderBy('created_at', 'asc')->get()
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Alamat tidak ditemukan'
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal memperbarui alamat: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Delete specific customer address
      */
     public function deleteAddress(Customer $customer, $addressId): JsonResponse

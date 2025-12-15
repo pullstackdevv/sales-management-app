@@ -1279,6 +1279,7 @@ const CustomerDataCheckout = () => {
           customer_id: createdCustomer.id,
           name: createdCustomer.name,
           email: createdCustomer.email,
+          phone: createdCustomer.phone,
           whatsapp: createdCustomer.phone,
           address_id: primaryAddress?.id || null,
           address: primaryAddress?.address_detail || '',
@@ -1287,7 +1288,7 @@ const CustomerDataCheckout = () => {
           province: primaryAddress?.province || '',
           postal_code: primaryAddress?.postal_code || '',
           recipient_name: primaryAddress?.recipient_name || createdCustomer.name,
-          recipient_phone: primaryAddress?.phone || createdCustomer.phone,
+          recipient_phone: (primaryAddress?.recipient_phone || primaryAddress?.phone || createdCustomer.phone),
           addresses: createdCustomer.addresses
         };
       } else {

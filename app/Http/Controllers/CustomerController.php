@@ -180,7 +180,7 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        $validated = $request->validate([
+        $rules = [
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|nullable|string|email|max:255|unique:customers,email,' . $customer->id . ',id,deleted_at,NULL',
             'phone' => 'sometimes|required|string|max:20|unique:customers,phone,' . $customer->id . ',id,deleted_at,NULL',
@@ -199,7 +199,11 @@ class CustomerController extends Controller
             'addresses.*.address_detail' => 'required_with:addresses|string',
             'addresses.*.is_default' => 'boolean',
             'addresses.*.is_dropship' => 'boolean'
-        ], [
+        ];
+        if ($request->header('X-Manual-Order') === '1' && $request->input('phone') === '085000000000') {
+            $rules['phone'] = 'sometimes|required|string|max:20';
+        }
+        $validated = $request->validate($rules, [
             'addresses.*.recipient_phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
         ]);
 
@@ -510,6 +514,16 @@ class CustomerController extends Controller
         ]);
 
         $search = $validated['search'];
+        $normalizedSearch = preg_replace('/[^0-9]/', '', $search);
+        if (preg_match('/^62/', $normalizedSearch)) {
+            $normalizedSearch = preg_replace('/^62/', '0', $normalizedSearch);
+        }
+        if ($normalizedSearch === '085000000000') {
+            return response()->json([
+                'status' => 'success',
+                'data' => []
+            ]);
+        }
 
         $customers = Customer::where(function($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -517,6 +531,13 @@ class CustomerController extends Controller
             })
             ->limit(10)
             ->get(['id', 'name', 'phone', 'email']);
+
+        // Exclude specific phone (085000000000) from marketplace search results
+        $customers = $customers->reject(function($customer) {
+            $digits = preg_replace('/[^0-9]/', '', (string) $customer->phone);
+            $normalized = preg_replace('/^62/', '0', $digits);
+            return $normalized === '085000000000';
+        })->values();
 
         // Return customers with masked phone/email for privacy
         $maskedCustomers = $customers->map(function($customer) {

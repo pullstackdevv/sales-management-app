@@ -381,7 +381,9 @@ export default function AddCustomer() {
                 : {})
             };
             console.log(customerData);
-            const response = await api.post('/customers', customerData);
+            const isExemptPhone = (formData.phone || '').replace(/\s/g, '') === '085000000000';
+            const config = isExemptPhone ? { headers: { 'X-Manual-Order': '1' } } : undefined;
+            const response = await api.post('/customers', customerData, config);
             
             if (response.data.status === 'success') {
                 await Swal.fire({

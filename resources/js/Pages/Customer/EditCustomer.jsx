@@ -398,7 +398,9 @@ export default function EditCustomer({ customerId }) {
                  }))
             };
             
-            const response = await api.put(`/customers/${customerId}`, customerData);
+            const isExemptPhone = (formData.phone || '').replace(/\s/g, '') === '085000000000';
+            const config = isExemptPhone ? { headers: { 'X-Manual-Order': '1' } } : undefined;
+            const response = await api.put(`/customers/${customerId}`, customerData, config);
             
             if (response.data.status === 'success') {
                 await Swal.fire({

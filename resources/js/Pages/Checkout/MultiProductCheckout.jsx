@@ -119,10 +119,18 @@ const MultiProductCheckout = () => {
       totalWeight: calculateTotalWeight()
     };
     
-    // Format data untuk disimpan ke session (compatible with existing system)
+    // Format data untuk disimpan ke session dan bawa informasi ringkasan
+    const existing = checkoutSession.get() || {};
     const productData = {
-      product: combinedProduct
+      product: combinedProduct,
+      products: products,
+      subtotal: subtotal,
+      total: subtotal,
+      shipping_cost: existing.shipping_cost ?? 0,
     };
+    if (existing.customer) {
+      productData.customer = existing.customer;
+    }
     
     const success = checkoutSession.save(productData);
     

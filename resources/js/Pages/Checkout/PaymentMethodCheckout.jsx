@@ -390,12 +390,11 @@ const PaymentMethodCheckout = () => {
 
       // Check if this is from MultiProductCheckout
       if (checkoutData.product.multiProducts && Array.isArray(checkoutData.product.multiProducts)) {
-        // Multi-product checkout from MultiProductCheckout
         items = checkoutData.product.multiProducts.map(product => ({
-          product_variant_id: product.variant_id || product.product_id, // Use variant_id if available, otherwise product_id
+          product_variant_id: product.variant_id,
           quantity: parseInt(product.quantity) || 1,
           price: product.price
-        }));
+        })).filter(p => !!p.product_variant_id);
       } else if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
         // Multiple variants selected (single product with multiple variants)
         items = Object.values(checkoutData.product.selectedVariants).map(({ variant, quantity }) => ({
@@ -411,16 +410,27 @@ const PaymentMethodCheckout = () => {
           price: checkoutData.product.variant.price
         }];
       } else {
-        // No variant (base product)
-        items = [{
-          product_variant_id: checkoutData.product.id,
-          quantity: parseInt(checkoutData.product.quantity) || 1,
-          price: checkoutData.product.price
-        }];
+        setSubmitting(false);
+        Swal.fire({
+          icon: 'warning',
+          title: 'Varian Produk Diperlukan',
+          text: 'Silakan pilih varian produk sebelum melanjutkan ke pembayaran.',
+          confirmButtonColor: '#3b82f6'
+        });
+        return;
       }
 
-      // Debug: Log the final items array
-      console.log('Final items array:', items);
+      const hasInvalid = items.some(i => !i.product_variant_id || Number.isNaN(Number(i.product_variant_id)));
+      if (hasInvalid || items.length === 0) {
+        setSubmitting(false);
+        Swal.fire({
+          icon: 'error',
+          title: 'Produk Tidak Valid',
+          text: 'Terjadi kesalahan pada data produk. Pastikan setiap produk memiliki varian yang benar.',
+          confirmButtonColor: '#3b82f6'
+        });
+        return;
+      }
 
       const addressId = checkoutData.customer.address_id;
       const addresses = checkoutData.customer.addresses || [];

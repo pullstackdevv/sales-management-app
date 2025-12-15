@@ -13,6 +13,7 @@ import {
 import useCart from "@/hooks/useCart";
 import { productsAPI } from "@/api/products";
 import axios from "axios";
+import checkoutSession from "@/utils/checkoutSession";
 
 // Cart item row component, memoized to avoid unnecessary re-renders
 const CartItem = memo(function CartItem({ item, onToggleSelect, onUpdateQuantity, onRemove, onProceed, formatPrice }) {
@@ -505,7 +506,12 @@ export default function Cart() {
                                             };
 
                                             try {
-                                                sessionStorage.setItem('checkout_data', JSON.stringify(checkoutData));
+                                                const existing = checkoutSession.get() || {};
+                                                const payload = { ...checkoutData };
+                                                if (existing.customer) {
+                                                    payload.customer = existing.customer;
+                                                }
+                                                checkoutSession.save(payload);
                                                 window.location.href = '/checkout/multi-product';
                                             } catch (error) {
                                                 console.error('Failed to save checkout data:', error);

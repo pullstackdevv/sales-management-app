@@ -54,7 +54,7 @@ class CustomerController extends Controller
         }
 
         try {
-            $validated = $request->validate([
+            $rules = [
                 'name' => 'required|string|max:255',
                 'email' => 'nullable|string|email|max:255|unique:customers,email,NULL,id,deleted_at,NULL',
                 'phone' => 'required|string|max:20|unique:customers,phone,NULL,id,deleted_at,NULL',
@@ -72,7 +72,13 @@ class CustomerController extends Controller
                 'addresses.*.address_detail' => 'required|string',
                 'addresses.*.is_default' => 'boolean',
                 'addresses.*.is_dropship' => 'boolean'
-            ], [
+            ];
+
+            if ($request->header('X-Manual-Order') === '1' && $request->input('phone') === '085000000000') {
+                $rules['phone'] = 'required|string|max:20';
+            }
+
+            $validated = $request->validate($rules, [
                 'addresses.required' => 'Alamat pengiriman wajib diisi',
                 'addresses.*.label.required' => 'Label alamat wajib diisi',
                 'addresses.*.recipient_name.required' => 'Nama penerima wajib diisi',

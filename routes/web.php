@@ -346,6 +346,10 @@ Route::get('/profile', function () {
 Route::post('/order/create', [WebOrderController::class, 'createOrder'])->name('marketplace.order.create');
 Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->name('marketplace.order.show');
 
+// Checkout customer session (server-side)
+Route::post('/checkout/session/customer', [WebOrderController::class, 'setCheckoutCustomerSession'])->name('checkout.session.customer');
+Route::post('/checkout/session/clear', [WebOrderController::class, 'clearCheckoutCustomerSession'])->name('checkout.session.clear');
+
 // Track Orders (public - for all customers)
 Route::get('/track-orders', [WebOrderController::class, 'trackOrdersPage'])->name('marketplace.track-orders');
 Route::post('/track-orders/search', [WebOrderController::class, 'searchTrackOrders'])->name('marketplace.track-orders.search');

@@ -134,7 +134,8 @@ export default function AddOrder() {
 
     const submitNewCustomer = async () => {
         if (!validateNewCustomer()) return;
-        const payload = {
+        const isExemptPhone = (newCustomer.phone || '').replace(/\s/g, '') === '085000000000';
+        const basePayload = {
             name: newCustomer.full_name,
             email: newCustomer.email || null,
             phone: newCustomer.phone,
@@ -154,51 +155,49 @@ export default function AddOrder() {
                 is_default: true
             }]
         };
+        const handleSuccess = (cust) => {
+            setCustomers(prev => [cust, ...prev]);
+            setSelectedCustomer(cust);
+            setFormData(prev => ({ ...prev, customer_id: cust.id }));
+            const addrs = cust.addresses || [];
+            setCustomerAddresses(addrs);
+            const def = addrs.find(a => a.is_default) || addrs[0];
+            if (def) setFormData(prev => ({ ...prev, address_id: def.id }));
+            setSearchTerms(prev => ({ ...prev, customer: cust.name }));
+            setAddCustomerModalOpen(false);
+            setNewCustomer({ full_name: "", email: "", phone: "", line_id: "", other_contact: "", category: "Pelanggan" });
+            setNewAddress({ label: "Rumah", recipient_name: "", recipient_phone: "", is_dropship: false, province: "", city: "", district: "", postal_code: "", address_detail: "", is_default: true });
+            setCityQuery("");
+            setCityResults([]);
+            setShowCityDropdown(false);
+            setNewCustErrors({});
+        };
         try {
-            const res = await api.post('/customers', payload);
+            const config = isExemptPhone ? { headers: { 'X-Manual-Order': '1' } } : undefined;
+            const res = await api.post('/customers', basePayload, config);
             if (res.data.status === 'success') {
-                const cust = res.data.data;
-                setCustomers(prev => [cust, ...prev]);
-                setSelectedCustomer(cust);
-                setFormData(prev => ({ ...prev, customer_id: cust.id }));
-                const addrs = cust.addresses || [];
-                setCustomerAddresses(addrs);
-                const def = addrs.find(a => a.is_default) || addrs[0];
-                if (def) setFormData(prev => ({ ...prev, address_id: def.id }));
-                setSearchTerms(prev => ({ ...prev, customer: cust.name }));
-                setAddCustomerModalOpen(false);
-                setNewCustomer({ full_name: "", email: "", phone: "", line_id: "", other_contact: "", category: "Pelanggan" });
-                setNewAddress({ label: "Rumah", recipient_name: "", recipient_phone: "", is_dropship: false, province: "", city: "", district: "", postal_code: "", address_detail: "", is_default: true });
-                setCityQuery("");
-                setCityResults([]);
-                setShowCityDropdown(false);
-                setNewCustErrors({});
+                handleSuccess(res.data.data);
                 Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Customer baru ditambahkan', timer: 1500, showConfirmButton: false });
             }
         } catch (error) {
+            
             let msg = 'Gagal menambahkan customer';
-
             if (error.response?.data?.errors) {
-                // Always copy ALL server-side errors into state
                 setNewCustErrors(error.response.data.errors);
-
-                // Build a user-friendly summary from the first error we find
                 const firstKey = Object.keys(error.response.data.errors)[0];
                 const firstMsg = error.response.data.errors[firstKey][0];
-
                 if (firstKey === 'email' && /sudah.*terdaftar|has.*already.*been.*taken/i.test(firstMsg)) {
                     msg = 'Email sudah terdaftar, silakan gunakan email lain';
                 } else if (firstKey === 'phone' && /sudah.*terdaftar/i.test(firstMsg)) {
                     msg = 'Nomor telepon sudah terdaftar, gunakan nomor lain';
                 } else {
-                    msg = firstMsg; // show the actual server message
+                    msg = firstMsg;
                 }
             } else if (error.response?.data?.message) {
                 msg = error.response.data.message;
             } else {
                 msg = 'Mohon periksa data yang dimasukkan';
             }
-
             Swal.fire({ icon: 'error', title: 'Error', text: msg });
         }
     };

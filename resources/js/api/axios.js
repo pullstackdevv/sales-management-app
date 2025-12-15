@@ -28,11 +28,12 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-           // Token expired or invalid
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user_data');
-      // Redirect to login page
-      window.location.href = '/login';
+      const path = window.location.pathname || '';
+      if (path.startsWith('/cms')) {
+        window.location.href = '/cms/login';
+      }
     }
     return Promise.reject(error);
   }

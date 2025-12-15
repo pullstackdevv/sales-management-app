@@ -586,4 +586,37 @@ class WebOrderController extends Controller
             );
         }
     }
+
+    public function setCheckoutCustomerSession(Request $request)
+    {
+        $validated = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:30',
+            'email' => 'nullable|email',
+            'customer_id' => 'nullable|exists:customers,id',
+            'address_id' => 'nullable|exists:customer_addresses,id',
+        ]);
+
+        if ($validated->fails()) {
+            return ResponseFormatter::error('Validation Error', $validated->errors(), 422);
+        }
+
+        $payload = [
+            'name' => $request->name,
+            'phone' => $request->phone,
+            'email' => $request->email,
+            'customer_id' => $request->customer_id,
+            'address_id' => $request->address_id,
+        ];
+
+        $request->session()->put('checkout.customer', $payload);
+
+        return ResponseFormatter::success('Checkout customer session set', $payload);
+    }
+
+    public function clearCheckoutCustomerSession(Request $request)
+    {
+        $request->session()->forget('checkout.customer');
+        return ResponseFormatter::success('Checkout customer session cleared', []);
+    }
 }

@@ -142,11 +142,9 @@ Route::middleware('auth:sanctum')->group(function () {
             ->json(Auth::user());
     });
 
-    // Customer routes (protected - sensitive data, full CRUD for admin)
-    Route::apiResource('customers', CustomerController::class);
+    // Customer routes (protected - sensitive data, admin-only; exclude store/update to keep public endpoints working)
+    Route::apiResource('customers', CustomerController::class)->except(['store', 'update']);
     Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
-    Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
-    Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
 
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);

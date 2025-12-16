@@ -313,7 +313,10 @@ class ReportController extends Controller
 
         $netSales = $grossItemValue - $discountsTotal;
         $grossProfit = $netSales - $modalItemValue;
-        $operationalCost = 0.0;
+        $operationalCost = (float) DB::table('expenses')
+            ->whereBetween('expense_date', [$startDate, $endDate])
+            ->whereNull('deleted_at')
+            ->sum(DB::raw('COALESCE(total_amount, 0)'));
         $netProfit = $grossProfit - $operationalCost;
         $otherFees = 0.0;
 

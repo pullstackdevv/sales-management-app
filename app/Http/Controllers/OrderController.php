@@ -301,7 +301,7 @@ class OrderController extends Controller
                     'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
                     'price' => $price,
-                    'base_price' => $variant->product->base_price,
+                    'base_price' => $variant->base_price,
                     'subtotal' => $subtotal
                 ]);
 
@@ -558,7 +558,7 @@ class OrderController extends Controller
                         'variant_label' => $variant->variant_label,
                         'quantity' => (int)$newItem['quantity'],
                         'price' => (float)$newItem['price'],
-                        'base_price' => $variant->product->base_price,
+                        'base_price' => $variant->base_price,
                         'subtotal' => (int)$newItem['quantity'] * (float)$newItem['price']
                     ]);
                     $variant->decrement('stock', (int)$newItem['quantity']);

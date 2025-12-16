@@ -20,8 +20,16 @@ class AnalyzerController extends Controller
     {
         try {
             // Get date range from request or default to current month
-            $startDate = $request->get('start_date', Carbon::now()->startOfMonth());
-            $endDate = $request->get('end_date', Carbon::now()->endOfMonth());
+            $startDateInput = $request->get('start_date');
+            $endDateInput = $request->get('end_date');
+
+            if ($startDateInput || $endDateInput) {
+                $startDate = $startDateInput ? Carbon::parse($startDateInput)->startOfDay() : Carbon::now()->startOfMonth();
+                $endDate = $endDateInput ? Carbon::parse($endDateInput)->endOfDay() : Carbon::now()->endOfMonth();
+            } else {
+                $startDate = Carbon::now()->startOfMonth();
+                $endDate = Carbon::now()->endOfMonth();
+            }
             
             // Summary data
             $totalSales = Order::whereBetween('created_at', [$startDate, $endDate])
@@ -45,7 +53,7 @@ class AnalyzerController extends Controller
                 ->whereIn('orders.status', ['paid', 'shipped'])
                 ->groupBy('products.id', 'products.name')
                 ->orderBy('total_sold', 'desc')
-                ->limit(3)
+                ->limit(5)
                 ->get()
                 ->map(function ($item) {
                     return [
@@ -53,7 +61,7 @@ class AnalyzerController extends Controller
                         'value' => number_format($item->total_sold)
                     ];
                 });
-            
+
             // Best customers by total purchase amount
             $bestCustomers = Order::select(
                     'customers.name',
@@ -64,12 +72,70 @@ class AnalyzerController extends Controller
                 ->whereIn('orders.status', ['paid', 'shipped'])
                 ->groupBy('customers.id', 'customers.name')
                 ->orderBy('total_purchase', 'desc')
-                ->limit(3)
+                ->limit(5)
                 ->get()
                 ->map(function ($item) {
                     return [
                         'name' => $item->name,
                         'value' => number_format($item->total_purchase)
+                    ];
+                });
+
+            // Top customer locations by order count (city, province)
+            $topLocations = Order::select(
+                    DB::raw("CONCAT(customer_addresses.city, ', ', customer_addresses.province) as location"),
+                    DB::raw('COUNT(orders.id) as total_orders')
+                )
+                ->leftJoin('customer_addresses', 'orders.address_id', '=', 'customer_addresses.id')
+                ->whereBetween('orders.created_at', [$startDate, $endDate])
+                ->whereIn('orders.status', ['paid', 'shipped'])
+                ->whereNotNull('orders.address_id')
+                ->groupBy('customer_addresses.city', 'customer_addresses.province')
+                ->orderBy('total_orders', 'desc')
+                ->limit(5)
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'name' => $item->location,
+                        'value' => number_format($item->total_orders)
+                    ];
+                });
+
+            // Top sales channels by revenue
+            $topChannels = Order::select(
+                    'sales_channels.name',
+                    DB::raw('SUM(orders.total_price) as total_revenue')
+                )
+                ->join('sales_channels', 'orders.sales_channel_id', '=', 'sales_channels.id')
+                ->whereBetween('orders.created_at', [$startDate, $endDate])
+                ->whereIn('orders.status', ['paid', 'shipped'])
+                ->groupBy('sales_channels.id', 'sales_channels.name')
+                ->orderBy('total_revenue', 'desc')
+                ->limit(5)
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'name' => $item->name,
+                        'value' => 'Rp ' . number_format($item->total_revenue, 0, ',', '.')
+                    ];
+                });
+
+            // Top admins by revenue generated
+            $topAdmins = Order::select(
+                    'users.name',
+                    DB::raw('SUM(orders.total_price) as total_revenue')
+                )
+                ->join('users', 'orders.user_id', '=', 'users.id')
+                ->whereBetween('orders.created_at', [$startDate, $endDate])
+                ->whereIn('orders.status', ['paid', 'shipped'])
+                ->groupBy('users.id', 'users.name')
+                ->orderBy('total_revenue', 'desc')
+                ->limit(5)
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'name' => $item->name,
+                        'value' => 'Rp ' . number_format($item->total_revenue, 0, ',', '.')
                     ];
                 });
             
@@ -101,6 +167,9 @@ class AnalyzerController extends Controller
                     'summary' => $summary,
                     'bestSellers' => $bestSellers,
                     'bestCustomers' => $bestCustomers,
+                    'topLocations' => $topLocations,
+                    'topChannels' => $topChannels,
+                    'topAdmins' => $topAdmins,
                     'chartData' => $chartData
                 ]
             ]);

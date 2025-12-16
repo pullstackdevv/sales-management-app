@@ -160,14 +160,15 @@ const SidebarContent = [
                 permission: "reports.courier",
                 role: "owner",
             },
+            {
+                name: "Analytics",
+                icon: "solar:chart-line-duotone",
+                id: uniqueId(),
+                url: "/cms/analyzer",
+                permission: "reports.analyzer",
+                role: "owner",
+            },
         ],
-    },
-    {
-        name: "Analyzer",
-        icon: "solar:cpu-outline",
-        id: uniqueId(),
-        url: "/cms/analyzer",
-        permission: "reports.analyzer",
     },
     {
         name: "Setting",

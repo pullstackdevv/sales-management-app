@@ -35,6 +35,23 @@ export default function AddOrder() {
     const [origins, setOrigins] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customerAddresses, setCustomerAddresses] = useState([]);
+    const [recipientSame, setRecipientSame] = useState(true);
+    const [dropship, setDropship] = useState({
+        label: "Dropship",
+        recipient_name: "",
+        recipient_phone: "",
+        province: "",
+        city: "",
+        district: "",
+        postal_code: "",
+        address_detail: "",
+        is_dropship: true
+    });
+    const [dropErrors, setDropErrors] = useState({});
+    const [dropCityQuery, setDropCityQuery] = useState("");
+    const [dropCityResults, setDropCityResults] = useState([]);
+    const [searchingDropCity, setSearchingDropCity] = useState(false);
+    const [showDropCityDropdown, setShowDropCityDropdown] = useState(false);
     const [isShippingCostManuallyEdited, setIsShippingCostManuallyEdited] = useState(false);
     const formatRibuan = (num) => {
         if (!num || num === 0) return '';
@@ -247,6 +264,136 @@ export default function AddOrder() {
         setShowCityDropdown(false);
         setCityResults([]);
         setNewCustErrors(prev => ({ ...prev, city: null, district: null, province: null }));
+    };
+
+    const normalizePhone = (p) => {
+        const digits = (p || "").replace(/[^0-9]/g, "");
+        return digits.replace(/^62/, "0");
+    };
+
+    const validateDropshipAddress = () => {
+        const e = {};
+        if (!dropship.recipient_name.trim()) e.recipient_name = "Wajib";
+        if (!dropship.recipient_phone.trim()) e.recipient_phone = "Wajib";
+        if (!dropship.district.trim() || !dropship.city.trim() || !dropship.province.trim()) {
+            e.city = "Pilih kecamatan dari dropdown";
+            e.district = "Pilih kecamatan dari dropdown";
+            e.province = "Pilih kecamatan dari dropdown";
+        }
+        if (!dropship.address_detail.trim()) e.address_detail = "Wajib";
+        if (dropship.postal_code.trim() && !/^\d{5}$/.test(dropship.postal_code.trim())) e.postal_code = "Kode pos harus 5 digit";
+        setDropErrors(e);
+        return Object.keys(e).length === 0;
+    };
+
+    const searchDropCity = async (query) => {
+        if (query.length < 2) {
+            setDropCityResults([]);
+            setShowDropCityDropdown(false);
+            return;
+        }
+        setSearchingDropCity(true);
+        try {
+            const response = await api.get('/wilayah/search-regencies', { params: { q: query } });
+            if (response.data.status === 'success') {
+                const onlyDistricts = (response.data.data || []).filter((item) => !!item.district_name);
+                setDropCityResults(onlyDistricts);
+                setShowDropCityDropdown(true);
+            } else {
+                setDropCityResults([]);
+                setShowDropCityDropdown(false);
+            }
+        } catch (error) {
+            setDropCityResults([]);
+            setShowDropCityDropdown(false);
+        } finally {
+            setSearchingDropCity(false);
+        }
+    };
+
+    const handleDropCitySearch = (value) => {
+        setDropCityQuery(value);
+        setDropship(prev => ({ ...prev, district: '', city: '', province: '' }));
+        setDropErrors(prev => ({ ...prev, city: null, district: null, province: null }));
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = setTimeout(() => {
+            searchDropCity(value);
+        }, 300);
+    };
+
+    const selectDropCity = (c) => {
+        setDropCityQuery(c.name);
+        setDropship(prev => ({ ...prev, district: c.district_name || '', city: c.regency_name, province: c.province_name }));
+        setShowDropCityDropdown(false);
+        setDropCityResults([]);
+        setDropErrors(prev => ({ ...prev, city: null, district: null, province: null }));
+    };
+
+    const checkCustomerPhoneExists = async (phone) => {
+        try {
+            const res = await axios.get('/api/customers', { params: { search: phone, per_page: 5 } });
+            const list = res.data?.data?.data || [];
+            const n = normalizePhone(phone);
+            return list.some(c => normalizePhone(c.phone) === n);
+        } catch (e) {
+            return false;
+        }
+    };
+
+    const saveDropshipAddress = async () => {
+        if (!selectedCustomer) return;
+        if (!validateDropshipAddress()) return;
+        const payload = {
+            label: dropship.label || 'Dropship',
+            recipient_name: dropship.recipient_name,
+            recipient_phone: dropship.recipient_phone,
+            address_detail: dropship.address_detail,
+            province: dropship.province,
+            city: dropship.city,
+            district: dropship.district,
+            postal_code: dropship.postal_code,
+            is_default: false,
+            is_dropship: true
+        };
+        let warnText = '';
+        const exists = await checkCustomerPhoneExists(dropship.recipient_phone);
+        if (exists) warnText = 'Nomor HP penerima terdaftar sebagai customer.';
+        try {
+            const response = await api.post(`/customers/${selectedCustomer.id}/addresses`, payload);
+            if (response.data.status === 'success') {
+                const addrs = response.data.data || [];
+                setCustomerAddresses(addrs);
+                const created = addrs[addrs.length - 1];
+                if (created?.id) {
+                    setFormData(prev => ({ ...prev, address_id: created.id }));
+                }
+                setDropship({
+                    label: "Dropship",
+                    recipient_name: "",
+                    recipient_phone: "",
+                    province: "",
+                    city: "",
+                    district: "",
+                    postal_code: "",
+                    address_detail: "",
+                    is_dropship: true
+                });
+                setDropCityQuery("");
+                setDropCityResults([]);
+                setShowDropCityDropdown(false);
+                setDropErrors({});
+                Swal.fire({ icon: 'success', title: 'Alamat dropship disimpan', text: warnText || undefined, timer: 1500, showConfirmButton: false });
+            }
+        } catch (error) {
+            let msg = error.response?.data?.message || 'Gagal menyimpan alamat';
+            if (error.response?.data?.errors) {
+                const errs = error.response.data.errors;
+                const firstKey = Object.keys(errs)[0];
+                const firstMsg = Array.isArray(errs[firstKey]) ? errs[firstKey][0] : (errs[firstKey] || msg);
+                msg = firstMsg || msg;
+            }
+            Swal.fire({ icon: 'error', title: 'Error', text: msg });
+        }
     };
 
     useEffect(() => {
@@ -841,11 +988,29 @@ export default function AddOrder() {
                             )}
                         </div>
 
-                        {/* Customer Address */}
                         <div className="bg-white p-4 rounded-lg border">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Alamat Pengiriman
                             </label>
+                            <div className="flex items-center gap-3 mb-3">
+                                <label className="text-sm text-gray-700">Penerima sama dengan pemesan</label>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const v = !recipientSame;
+                                        setRecipientSame(v);
+                                        if (v) {
+                                            const def = customerAddresses.find(a => a.is_default) || customerAddresses[0];
+                                            setFormData(prev => ({ ...prev, address_id: def ? def.id : '' }));
+                                        } else {
+                                            setFormData(prev => ({ ...prev, address_id: '' }));
+                                        }
+                                    }}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full ${recipientSame ? 'bg-blue-600' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${recipientSame ? 'translate-x-5' : 'translate-x-1'}`}></span>
+                                </button>
+                            </div>
                             <select
                                 value={formData.address_id}
                                 onChange={(e) => setFormData(prev => ({ ...prev, address_id: e.target.value }))}
@@ -869,6 +1034,47 @@ export default function AddOrder() {
                             )}
                             {errors.address_id && (
                                 <p className="text-red-500 text-xs mt-1">{errors.address_id}</p>
+                            )}
+                            {!recipientSame && selectedCustomer && (
+                                <div className="mt-4 space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <input type="text" className={`w-full px-3 py-2 border rounded ${dropErrors.label ? 'border-red-500' : 'border-gray-300'}`} placeholder="Label Alamat" value={dropship.label} onChange={(e)=>setDropship(prev=>({...prev,label:e.target.value}))} />
+                                        </div>
+                                        <div>
+                                            <input type="text" className={`w-full px-3 py-2 border rounded ${dropErrors.recipient_name ? 'border-red-500' : 'border-gray-300'}`} placeholder="Nama Penerima" value={dropship.recipient_name} onChange={(e)=>setDropship(prev=>({...prev,recipient_name:e.target.value}))} />
+                                        </div>
+                                        <div>
+                                            <input type="text" className={`w-full px-3 py-2 border rounded ${dropErrors.recipient_phone ? 'border-red-500' : 'border-gray-300'}`} placeholder="No. HP Penerima" value={dropship.recipient_phone} onChange={(e)=>setDropship(prev=>({...prev,recipient_phone:e.target.value}))} />
+                                        </div>
+                                        <div className="city-search-container relative">
+                                            <input type="text" className={`w-full px-3 py-2 border rounded ${dropErrors.city || dropErrors.district || dropErrors.province ? 'border-red-500' : 'border-gray-300'}`} placeholder="Ketik nama kecamatan" value={dropCityQuery} onChange={(e)=>handleDropCitySearch(e.target.value)} />
+                                            {showDropCityDropdown && (
+                                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                    {searchingDropCity ? (
+                                                        <div className="p-2 text-sm text-gray-500">Mencari...</div>
+                                                    ) : (
+                                                        dropCityResults.map((c)=> (
+                                                            <div key={`${c.district_code}-${c.regency_code}`} onClick={()=>selectDropCity(c)} className="p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
+                                                                <div className="text-sm font-medium">{c.district_name}</div>
+                                                                <div className="text-xs text-gray-500">{c.regency_name}, {c.province_name}</div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <input type="text" className={`w-full px-3 py-2 border rounded ${dropErrors.postal_code ? 'border-red-500' : 'border-gray-300'}`} placeholder="Kode Pos" value={dropship.postal_code} onChange={(e)=>setDropship(prev=>({...prev,postal_code:e.target.value}))} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <textarea className={`w-full px-3 py-2 border rounded ${dropErrors.address_detail ? 'border-red-500' : 'border-gray-300'}`} rows={3} placeholder="Alamat Lengkap" value={dropship.address_detail} onChange={(e)=>setDropship(prev=>({...prev,address_detail:e.target.value}))}></textarea>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <button type="button" onClick={saveDropshipAddress} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Simpan alamat dropship</button>
+                                    </div>
+                                </div>
                             )}
                         </div>
 

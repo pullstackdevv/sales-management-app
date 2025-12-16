@@ -353,7 +353,7 @@ class CustomerController extends Controller
             'province' => 'required|string|max:100',
             'city' => 'required|string|max:100',
             'district' => 'required|string|max:100',
-            'postal_code' => 'required|string|max:10',
+            'postal_code' => 'nullable|string|max:10',
             'is_default' => 'boolean',
             'is_dropship' => 'boolean',
         ]);
@@ -372,7 +372,13 @@ class CustomerController extends Controller
                 $validated['is_default'] = true;
             }
 
-            $address = $customer->addresses()->create($validated);
+            // Map recipient_phone -> phone column in DB
+            $data = $validated;
+            if (isset($data['recipient_phone'])) {
+                $data['phone'] = $data['recipient_phone'];
+                unset($data['recipient_phone']);
+            }
+            $address = $customer->addresses()->create($data);
 
             DB::commit();
 
@@ -418,7 +424,13 @@ class CustomerController extends Controller
                 $customer->addresses()->where('id', '!=', $addressId)->update(['is_default' => false]);
             }
 
-            $address->update($validated);
+            // Map recipient_phone -> phone column in DB on update
+            $data = $validated;
+            if (isset($data['recipient_phone'])) {
+                $data['phone'] = $data['recipient_phone'];
+                unset($data['recipient_phone']);
+            }
+            $address->update($data);
 
             DB::commit();
 

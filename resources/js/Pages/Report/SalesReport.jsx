@@ -12,8 +12,7 @@ const SalesReport = () => {
     });
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
-    const [startDate, setStartDate] = React.useState('');
-    const [endDate, setEndDate] = React.useState('');
+    
 
     const [dailyReport, setDailyReport] = React.useState({
         categories: [],
@@ -179,28 +178,40 @@ const SalesReport = () => {
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800">Laporan Penjualan</h1>
-                    <p className="text-sm text-gray-600 mt-1">Grafik penjualan berdasarkan periode</p>
+                    <p className="text-sm text-gray-600 mt-1">Filter terpusat untuk kartu ringkasan dan grafik harian</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <input 
-                        type="date" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    <input
+                        type="month"
+                        value={dailyMonth}
+                        onChange={(e) => setDailyMonth(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    />
+                    <button
+                        onClick={() => fetchDailySalesData({ month: dailyMonth })}
+                        className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors duration-200"
+                    >
+                        Tampilkan Bulan
+                    </button>
+                    <input
+                        type="date"
+                        value={dailyStartDate}
+                        onChange={(e) => setDailyStartDate(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                         placeholder="Tanggal Mulai"
                     />
-                    <input 
-                        type="date" 
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                    <input
+                        type="date"
+                        value={dailyEndDate}
+                        onChange={(e) => setDailyEndDate(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                         placeholder="Tanggal Akhir"
                     />
-                    <button 
-                        onClick={() => fetchSalesData(startDate, endDate)}
-                        className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600 transition-colors duration-200 flex items-center gap-2"
+                    <button
+                        onClick={() => fetchDailySalesData({ start_date: dailyStartDate, end_date: dailyEndDate })}
+                        className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors duration-200"
                     >
-                        <span>Cari Laporan</span>
+                        Terapkan Rentang
                     </button>
                 </div>
             </div>
@@ -219,97 +230,90 @@ const SalesReport = () => {
                 </div>
             )}
 
-            {/* Chart */}
             {!loading && !error && (
                 <>
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-                            <p className="text-sm text-gray-600 mb-1">Total Order</p>
-                            <p className="text-2xl font-bold text-gray-800">
-                                {reportData.summary.total_orders || 0}
-                            </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4 mb-6">
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Pendapatan</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.total_revenue || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                         </div>
-                        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-                            <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-                            <p className="text-2xl font-bold text-gray-800">
-                                Rp {(reportData.summary.total_revenue || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
-                            </p>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Total Penjualan</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.total_order_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                         </div>
-                        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
-                            <p className="text-sm text-gray-600 mb-1">Rata-rata per Bulan</p>
-                            <p className="text-2xl font-bold text-gray-800">
-                                Rp {(reportData.summary.average_monthly || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
-                            </p>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Penjualan Kotor</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.gross_sales || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Penjualan Bersih</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.net_sales || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Ongkos Kirim</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.shipping_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Diskon</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.discounts_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Biaya Tambahan Lainnya</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.other_fees || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Harga Pokok Penjualan (HPP)</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.hpp_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Laba Kotor</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.gross_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Biaya Operasional</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.operational_cost || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Laba Bersih</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.net_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Piutang</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.receivables_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Transaksi</p>
+                            <p className="text-2xl font-bold text-gray-800">{dailyReport.summary.total_orders || 0}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Item Terjual</p>
+                            <p className="text-2xl font-bold text-gray-800">{dailyReport.summary.total_items || 0}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Nilai Produk</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.product_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <p className="text-sm text-gray-600 mb-1">Nilai Modal</p>
+                            <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.modal_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                         </div>
                     </div>
 
-                    {/* Chart */}
                     <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold mb-4 text-gray-800">Grafik Penjualan</h2>
-                        <HighchartsReact
-                            highcharts={Highcharts}
-                            options={chartOptions}
-                        />
+                        <h2 className="text-lg font-semibold mb-4 text-gray-800">Grafik Penjualan Bulanan</h2>
+                        <HighchartsReact highcharts={Highcharts} options={chartOptions} />
                     </div>
 
                     <div className="mt-8">
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h2 className="text-lg font-semibold text-gray-800">Grafik Harian Penjualan</h2>
-                                <p className="text-sm text-gray-600 mt-1">Filter berdasarkan bulan atau rentang tanggal</p>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="month"
-                                    value={dailyMonth}
-                                    onChange={(e) => setDailyMonth(e.target.value)}
-                                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                                />
-                                <button
-                                    onClick={() => fetchDailySalesData({ month: dailyMonth })}
-                                    className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors duration-200"
-                                >
-                                    Tampilkan Bulan
-                                </button>
-                                <div className="flex items-center gap-2 ml-4">
-                                    <button
-                                        onClick={() => setDailyMetric('orders')}
-                                        className={`px-3 py-2 rounded text-sm ${dailyMetric === 'orders' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800'}`}
-                                    >Transaksi</button>
-                                    <button
-                                        onClick={() => setDailyMetric('items')}
-                                        className={`px-3 py-2 rounded text-sm ${dailyMetric === 'items' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800'}`}
-                                    >Item</button>
-                                    <button
-                                        onClick={() => setDailyMetric('revenue')}
-                                        className={`px-3 py-2 rounded text-sm ${dailyMetric === 'revenue' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800'}`}
-                                    >Revenue</button>
-                                </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setDailyMetric('orders')} className={`px-3 py-2 rounded text-sm ${dailyMetric === 'orders' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800'}`}>Transaksi</button>
+                                <button onClick={() => setDailyMetric('items')} className={`px-3 py-2 rounded text-sm ${dailyMetric === 'items' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800'}`}>Item</button>
+                                <button onClick={() => setDailyMetric('revenue')} className={`px-3 py-2 rounded text-sm ${dailyMetric === 'revenue' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800'}`}>Revenue</button>
                             </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 mb-4">
-                            <input
-                                type="date"
-                                value={dailyStartDate}
-                                onChange={(e) => setDailyStartDate(e.target.value)}
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                                placeholder="Tanggal Mulai"
-                            />
-                            <input
-                                type="date"
-                                value={dailyEndDate}
-                                onChange={(e) => setDailyEndDate(e.target.value)}
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                                placeholder="Tanggal Akhir"
-                            />
-                            <button
-                                onClick={() => fetchDailySalesData({ start_date: dailyStartDate, end_date: dailyEndDate })}
-                                className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors duration-200"
-                            >
-                                Cari Laporan Harian
-                            </button>
                         </div>
 
                         {dailyLoading && (

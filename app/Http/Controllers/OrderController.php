@@ -413,7 +413,8 @@ class OrderController extends Controller
             'proof_image' => 'nullable|string',
             'printed_at' => 'nullable|date',
             'is_dropship' => 'nullable|boolean',
-            'notes' => 'nullable|string|max:255'
+            'notes' => 'nullable|string|max:255',
+            'voucher_id' => 'nullable|exists:vouchers,id'
         ]);
 
         // Batasi edit order khusus untuk order dengan payment gateway (memiliki payment_url)
@@ -582,15 +583,35 @@ class OrderController extends Controller
                 $order->shipping_cost = $validated['shipping_cost'];
             }
             
-            // Calculate final total_price once at the end
+            // Calculate final total with voucher discount once at the end
             $finalSubtotal = $calculatedSubtotal ?? $order->items->sum(function($item) {
                 return $item->quantity * $item->price;
             });
-            
-            $finalTotal = $finalSubtotal + $order->shipping_cost;
-            
+
+            $totalBeforeDiscount = $finalSubtotal + $order->shipping_cost;
+            $discountAmount = 0;
+
+            // Allow updating voucher for manual orders
+            if (array_key_exists('voucher_id', $validated)) {
+                $order->voucher_id = $validated['voucher_id'];
+            }
+
+            if (!is_null($order->voucher_id)) {
+                $voucher = \App\Models\Voucher::find($order->voucher_id);
+                if (!$voucher || !$voucher->canBeUsed($totalBeforeDiscount)) {
+                    throw ValidationException::withMessages([
+                        'voucher_id' => ['Voucher tidak valid untuk total pesanan ini.']
+                    ]);
+                }
+                $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount, $order->shipping_cost);
+            }
+
+            $finalTotal = $totalBeforeDiscount - $discountAmount;
+
             $order->update([
-                'total_price' => $finalTotal
+                'total_price' => $finalTotal,
+                'discount_amount' => $discountAmount,
+                'voucher_id' => $order->voucher_id
             ]);
 
             // Update status if provided

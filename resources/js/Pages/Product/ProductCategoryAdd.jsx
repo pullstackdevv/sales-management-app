@@ -57,7 +57,7 @@ export default function ProductCategoryAdd() {
             <Head title="Tambah Kategori Produk" />
             
             <div className="min-h-screen bg-gray-50 p-6">
-                <div className="max-w-2xl mx-auto">
+                <div className="max-w-screen mx-auto">
                     {/* Header */}
                     <div className="mb-6">
                         <Link

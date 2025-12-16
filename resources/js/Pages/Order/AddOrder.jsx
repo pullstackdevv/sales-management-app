@@ -82,6 +82,24 @@ export default function AddOrder() {
     
     // Error states
     const [errors, setErrors] = useState({});
+    const [voucherCode, setVoucherCode] = useState('');
+    const [voucher, setVoucher] = useState(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
+    const [voucherLoading, setVoucherLoading] = useState(false);
+    const [voucherError, setVoucherError] = useState('');
+    const formatIDR = (num) => {
+        const n = Number(num || 0);
+        return n.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    };
+    const getVoucherLabel = (v) => {
+        const t = (v?.type || '').toString();
+        if (t === 'shipping') return 'Diskon Ongkir';
+        if (t === 'percentage') return 'Diskon Persentase';
+        if (t === 'fixed') return 'Diskon';
+        if (t === 'free_sample') return 'Gratis Sample';
+        if (t === 'shipping_free_sample') return 'Diskon Ongkir + Sample';
+        return 'Diskon';
+    };
     const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
     const [newCustomer, setNewCustomer] = useState({
         full_name: "",
@@ -547,6 +565,37 @@ export default function AddOrder() {
         }
     };
 
+    const validateVoucher = async () => {
+        setVoucherError('');
+        if (!voucherCode.trim()) return;
+        setVoucherLoading(true);
+        try {
+            const response = await axios.post('/api/vouchers/validate', {
+                code: voucherCode.trim(),
+                order_amount: calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0),
+                shipping_cost: parseFloat(formData.shipping_cost) || 0
+            });
+            if (response.data.status === 'success') {
+                const data = response.data.data || {};
+                setVoucher(data.voucher || null);
+                setDiscountAmount(data.discount_amount || 0);
+                Swal.fire({ icon: 'success', title: 'Voucher diterapkan', timer: 1200, showConfirmButton: false });
+            } else {
+                setVoucher(null);
+                setDiscountAmount(0);
+                setVoucherError(response.data.message || 'Voucher tidak valid');
+            }
+        } catch (error) {
+            setVoucher(null);
+            setDiscountAmount(0);
+            const msg = error.response?.data?.message || 'Voucher tidak valid';
+            setVoucherError(msg);
+            Swal.fire({ icon: 'error', title: 'Voucher gagal', text: msg });
+        } finally {
+            setVoucherLoading(false);
+        }
+    };
+
     const calculateTotalWeight = () => {
         if (!orderItems || orderItems.length === 0) return 0;
         return orderItems.reduce((sum, item) => {
@@ -768,7 +817,7 @@ export default function AddOrder() {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0);
+        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0) - (discountAmount || 0);
     };
 
     // Handle form submission
@@ -790,24 +839,25 @@ export default function AddOrder() {
             }
 
             // Prepare data for API
-            const orderData = {
-                customer_id: parseInt(formData.customer_id),
-                address_id: parseInt(formData.address_id),
-                sales_channel_id: parseInt(formData.sales_channel_id),
-                items: orderItems.map(item => ({
-                    product_variant_id: item.product_variant_id,
-                    quantity: item.quantity,
-                    price: item.price
-                })),
-                shipping_cost: formData.shipping_cost,
-                notes: formData.notes,
-                status: formData.status,
-                payment_status: formData.payment_status || (formData.status === 'paid' ? 'paid' : 'pending'),
-                payment_bank_id: formData.payment_bank_id || null,
-                courier_id: formData.courier || null,
-                courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,
-                service_type: formData.service_type || null
-            };
+                const orderData = {
+                    customer_id: parseInt(formData.customer_id),
+                    address_id: parseInt(formData.address_id),
+                    sales_channel_id: parseInt(formData.sales_channel_id),
+                    items: orderItems.map(item => ({
+                        product_variant_id: item.product_variant_id,
+                        quantity: item.quantity,
+                        price: item.price
+                    })),
+                    shipping_cost: formData.shipping_cost,
+                    notes: formData.notes,
+                    status: formData.status,
+                    payment_status: formData.payment_status || (formData.status === 'paid' ? 'paid' : 'pending'),
+                    payment_bank_id: formData.payment_bank_id || null,
+                    courier_id: formData.courier || null,
+                    courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,
+                    service_type: formData.service_type || null,
+                    voucher_id: voucher?.id || null
+                };
             
             console.log('AddOrder - Sending data:', {
                 courier_raw: formData.courier,
@@ -1290,7 +1340,7 @@ export default function AddOrder() {
                                                             <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                                            <span className="text-sm font-medium">Rp {formatIDR(variant.price)}</span>
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
                                                                 disabled={variant.stock <= 0}
@@ -1344,7 +1394,7 @@ export default function AddOrder() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm font-medium text-blue-600 mt-1">Rp {item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                                <p className="text-sm font-medium text-blue-600 mt-1">Rp {formatIDR(item.price)}</p>
                                             </div>
                                             
                                             <div className="flex items-center gap-3">
@@ -1423,6 +1473,52 @@ export default function AddOrder() {
                         {/* Summary */}
                         <div className="bg-white p-4 rounded-lg border space-y-4">
                             <h3 className="font-medium mb-4">Ringkasan Order</h3>
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-700">Kode Diskon</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={voucherCode}
+                                        onChange={(e) => setVoucherCode(e.target.value)}
+                                        placeholder="Masukkan kode voucher (opsional) misal : DISKON100"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={validateVoucher}
+                                        disabled={voucherLoading || !voucherCode.trim()}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-400"
+                                    >
+                                        {voucherLoading ? 'Memeriksa...' : 'Gunakan'}
+                                    </button>
+                                    {voucher && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setVoucher(null); setDiscountAmount(0); setVoucherCode(''); setVoucherError(''); }}
+                                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg"
+                                        >
+                                            Hapus
+                                        </button>
+                                    )}
+                                </div>
+                                {voucher && (
+                                    <div className="mt-2 border rounded-lg p-3 bg-green-50 text-sm">
+                                        <div className="flex items-start justify-between">
+                                            <div className="space-y-1">
+                                                <p className="font-semibold text-green-700">{voucher.code}</p>
+                                                <p className="text-green-600">- {getVoucherLabel(voucher)}</p>
+                                                <p className="font-medium text-orange-600 flex items-center gap-1"><span>🚚</span> Potongan Ongkir</p>
+                                                <p className="text-gray-700">{voucher.description || ''}</p>
+                                                <p className="text-green-700 font-semibold">Diskon: Rp {formatIDR(discountAmount)}</p>
+                                            </div>
+                                            <button type="button" onClick={() => { setVoucher(null); setDiscountAmount(0); setVoucherCode(''); setVoucherError(''); }} className="text-red-600">✕</button>
+                                        </div>
+                                    </div>
+                                )}
+                                {voucherError && (
+                                    <p className="text-red-500 text-xs mt-1">{voucherError}</p>
+                                )}
+                            </div>
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Subtotal ({orderItems.length} item)</span>
@@ -1433,6 +1529,13 @@ export default function AddOrder() {
                                 <span className="text-sm text-gray-700">Ongkos Kirim</span>
                                 <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
+
+                            {discountAmount > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-700">{getVoucherLabel(voucher)} {voucher?.code ? `(${voucher.code})` : ''}</span>
+                                    <span className="text-sm font-medium text-green-600">- Rp {formatIDR(discountAmount)}</span>
+                                </div>
+                            )}
                             
                             <div className="flex justify-between pt-4 border-t font-semibold text-lg">
                                 <span>TOTAL</span>

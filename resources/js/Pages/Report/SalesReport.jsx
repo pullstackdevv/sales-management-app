@@ -8,6 +8,7 @@ const SalesReport = () => {
     const [reportData, setReportData] = React.useState({
         categories: [],
         data: [],
+        orders: [],
         summary: {}
     });
     const [loading, setLoading] = React.useState(true);
@@ -54,6 +55,7 @@ const SalesReport = () => {
                 setReportData({
                     categories: data.labels,
                     data: data.data,
+                    orders: data.orders || [],
                     summary: data.summary
                 });
             } else {
@@ -118,8 +120,10 @@ const SalesReport = () => {
         },
         tooltip: {
             formatter: function() {
-                return '<b>' + this.x + '</b><br/>' +
-                    'Total: Rp ' + Highcharts.numberFormat(this.y, 0, ',', '.');
+                const idx = this.point.index;
+                const orders = (reportData.orders || [])[idx] || 0;
+                return 'Transaksi: ' + Highcharts.numberFormat(orders, 0, ',', '.') + '<br/><br/>' +
+                        'Total: Rp ' + Highcharts.numberFormat(this.y, 0, ',', '.');
             }
         },
         series: [{ 
@@ -175,6 +179,7 @@ const SalesReport = () => {
 
     return (
         <DashboardLayout>
+            <div className="max-w-screen mx-auto px-4 overflow-x-hidden">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800">Laporan Penjualan</h1>
@@ -188,7 +193,16 @@ const SalesReport = () => {
                         className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                     />
                     <button
-                        onClick={() => fetchDailySalesData({ month: dailyMonth })}
+                        onClick={() => {
+                            fetchDailySalesData({ month: dailyMonth });
+                            const [yearStr, monthStr] = dailyMonth.split('-');
+                            const year = parseInt(yearStr, 10);
+                            const month = parseInt(monthStr, 10);
+                            const daysInMonth = new Date(year, month, 0).getDate();
+                            const start_date = `${yearStr}-${monthStr.padStart(2, '0')}-01`;
+                            const end_date = `${yearStr}-${monthStr.padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+                            fetchSalesData(start_date, end_date);
+                        }}
                         className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors duration-200"
                     >
                         Tampilkan Bulan
@@ -208,7 +222,12 @@ const SalesReport = () => {
                         placeholder="Tanggal Akhir"
                     />
                     <button
-                        onClick={() => fetchDailySalesData({ start_date: dailyStartDate, end_date: dailyEndDate })}
+                        onClick={() => {
+                            fetchDailySalesData({ start_date: dailyStartDate, end_date: dailyEndDate });
+                            if (dailyStartDate && dailyEndDate) {
+                                fetchSalesData(dailyStartDate, dailyEndDate);
+                            }
+                        }}
                         className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors duration-200"
                     >
                         Terapkan Rentang
@@ -232,7 +251,7 @@ const SalesReport = () => {
 
             {!loading && !error && (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                         <div className="bg-white rounded-lg shadow p-4">
                             <p className="text-sm text-gray-600 mb-1">Pendapatan</p>
                             <p className="text-2xl font-bold text-gray-800">Rp {(dailyReport.summary.total_revenue || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
@@ -336,6 +355,7 @@ const SalesReport = () => {
                     </div>
                 </>
             )}
+            </div>
         </DashboardLayout>
     );
 }

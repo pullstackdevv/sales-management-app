@@ -106,6 +106,7 @@ export default function ProfitReport() {
 
     return (
         <DashboardLayout>
+            <div className="max-w-screen mx-auto px-4 overflow-x-hidden">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800">Laporan Keuntungan</h1>
@@ -178,6 +179,7 @@ export default function ProfitReport() {
                     </div>
                 </>
             )}
+            </div>
         </DashboardLayout>
     );
 }

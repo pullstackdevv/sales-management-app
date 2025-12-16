@@ -46,6 +46,24 @@ export default function MarketplaceLayout({ children }) {
         updateIcon('shortcut icon');
     }, [settings?.site_icon_url]);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            if (!window.Tawk_API) {
+                window.Tawk_API = {};
+                window.Tawk_LoadStart = new Date();
+            }
+            const existing = document.querySelector("script[src*='embed.tawk.to/693a796c2a271419893a1894/1jc66kkee']");
+            if (!existing) {
+                const s1 = document.createElement('script');
+                s1.async = true;
+                s1.src = 'https://embed.tawk.to/693a796c2a271419893a1894/1jc66kkee';
+                s1.charset = 'UTF-8';
+                s1.setAttribute('crossorigin','*');
+                document.body.appendChild(s1);
+            }
+        }
+    }, []);
+
     return (
         <AuthProvider>
             <div className="min-h-screen bg-gray-50">

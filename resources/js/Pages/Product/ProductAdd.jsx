@@ -21,6 +21,7 @@ export default function ProductAdd() {
         price: 0,
         base_price: 0,
         discount_price: 0,
+        marketplace_price: 0,
         weight: 0,
         stock: 0,
         is_active: true,
@@ -94,6 +95,7 @@ export default function ProductAdd() {
           price: 0,
           base_price: 0,
           discount_price: 0,
+          marketplace_price: 0,
           weight: 0,
           stock: 0,
           is_active: true,
@@ -156,6 +158,8 @@ export default function ProductAdd() {
       if (product.image) {
         formData.append('image', product.image);
       }
+
+      
       
       // Append variants data
       product.variants.forEach((variant, index) => {
@@ -164,6 +168,7 @@ export default function ProductAdd() {
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price);
         formData.append(`variants[${index}][discount_price]`, variant.discount_price || '');
+        formData.append(`variants[${index}][marketplace_price]`, variant.marketplace_price || '');
         const weightKg = variant.weight ? Number(variant.weight) / 1000 : 0;
         formData.append(`variants[${index}][weight]`, weightKg);
         const normalizedStock = (variant.stock === '' || variant.stock === null || variant.stock === undefined)
@@ -292,7 +297,7 @@ export default function ProductAdd() {
                     )}
                   </div>
 
-                    <div>
+                  <div>
                     <label className="block text-sm font-medium mb-1">Gambar Produk</label>
                     <input
                       type="file"
@@ -459,6 +464,24 @@ export default function ProductAdd() {
                             <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.discount_price`][0]}</p>
                           )}
                           <p className="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada diskon</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Harga Marketplace</label>
+                          <input
+                            type="text"
+                            className={`w-full border px-3 py-2 rounded-md text-sm ${
+                              errors[`variants.${index}.marketplace_price`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            placeholder="Masukkan harga marketplace (opsional)"
+                            value={formatRibuan(variant.marketplace_price)}
+                            onChange={(e) => updateVariant(index, 'marketplace_price', parseRibuan(e.target.value))}
+                            onFocus={() => { if (variant.marketplace_price === 0) updateVariant(index, 'marketplace_price', ''); }}
+                          />
+                          {errors[`variants.${index}.marketplace_price`] && (
+                            <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.marketplace_price`][0]}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">Opsional. Kosongkan jika tidak ada harga marketplace</p>
                         </div>
 
                         <div>

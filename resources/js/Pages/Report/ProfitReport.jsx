@@ -106,79 +106,86 @@ export default function ProfitReport() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-screen mx-auto px-4 overflow-x-hidden">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Laporan Keuntungan</h1>
-                    <p className="text-sm text-gray-600 mt-1">Grafik keuntungan berdasarkan periode</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <input 
-                        type="date" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                        placeholder="Tanggal Mulai"
-                    />
-                    <input 
-                        type="date" 
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                        placeholder="Tanggal Akhir"
-                    />
-                    <button 
-                        onClick={() => fetchProfitData(startDate, endDate)}
-                        className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-600 transition-colors duration-200 flex items-center gap-2"
-                    >
-                        <span>Cari Laporan</span>
-                    </button>
-                </div>
-            </div>
+            <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+                <div className="max-w-screen mx-auto">
+                    {/* Header */}
+                    <div className="mb-6">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Laporan Keuntungan</h1>
+                        <p className="text-sm text-gray-600 mt-1">Grafik keuntungan berdasarkan periode</p>
+                    </div>
 
-            {/* Loading State */}
-            {loading && (
-                <div className="flex justify-center items-center py-12">
-                    <div className="text-gray-600">Memuat data...</div>
-                </div>
-            )}
-
-            {/* Error State */}
-            {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
-                    {error}
-                </div>
-            )}
-
-            {/* Chart */}
-            {!loading && !error && (
-                <>
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-                            <p className="text-sm text-gray-600 mb-1">Total Profit</p>
-                            <p className="text-2xl font-bold text-gray-800">
-                                Rp {(reportData.summary.total_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
-                            </p>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-emerald-500">
-                            <p className="text-sm text-gray-600 mb-1">Rata-rata per Bulan</p>
-                            <p className="text-2xl font-bold text-gray-800">
-                                Rp {(reportData.summary.average_monthly || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
-                            </p>
+                    {/* Filter Section */}
+                    <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <input 
+                                type="date" 
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                placeholder="Tanggal Mulai"
+                            />
+                            <input 
+                                type="date" 
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                placeholder="Tanggal Akhir"
+                            />
+                            <button 
+                                onClick={() => fetchProfitData(startDate, endDate)}
+                                className="bg-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors duration-200 whitespace-nowrap"
+                            >
+                                Cari Laporan
+                            </button>
                         </div>
                     </div>
 
-                    {/* Chart */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold mb-4 text-gray-800">Grafik Keuntungan</h2>
-                        <HighchartsReact
-                            highcharts={Highcharts}
-                            options={chartOptions}
-                        />
-                    </div>
-                </>
-            )}
+                    {/* Loading State */}
+                    {loading && (
+                        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+                            <div className="text-gray-600">Memuat data...</div>
+                        </div>
+                    )}
+
+                    {/* Error State */}
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <p className="text-red-800 text-sm">{error}</p>
+                        </div>
+                    )}
+
+                    {/* Content */}
+                    {!loading && !error && (
+                        <>
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border-l-4 border-green-500">
+                                    <p className="text-sm text-gray-600 mb-1">Total Profit</p>
+                                    <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                                        Rp {(reportData.summary.total_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                                    </p>
+                                </div>
+                                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border-l-4 border-emerald-500">
+                                    <p className="text-sm text-gray-600 mb-1">Rata-rata per Bulan</p>
+                                    <p className="text-xl sm:text-2xl font-bold text-gray-900">
+                                        Rp {(reportData.summary.average_monthly || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Chart */}
+                            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                                <h2 className="text-lg font-semibold mb-4 text-gray-800">Grafik Keuntungan</h2>
+                                <div className="w-full overflow-x-auto">
+                                    <HighchartsReact
+                                        highcharts={Highcharts}
+                                        options={chartOptions}
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
         </DashboardLayout>
     );

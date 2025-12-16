@@ -16,6 +16,7 @@ export default function ProductEdit() {
     category_ids: [],
     description: "",
     image: "",
+    marketplace_price: 0,
     is_active: true,
     is_storefront: true,
     variants: []
@@ -115,6 +116,7 @@ export default function ProductEdit() {
         description: productData?.description || "",
         // keep existing image path so it can be previewed
         image: productData?.image || "",
+        marketplace_price: productData?.marketplace_price ?? 0,
         is_active: productData?.is_active ?? true,
         is_storefront: productData?.is_storefront ?? true,
         variants: (productData.variants || []).map(variant => ({
@@ -294,6 +296,8 @@ export default function ProductEdit() {
       if (product.image && typeof product.image !== 'string') {
         formData.append('image', product.image);
       }
+
+      
       
       // Append variants data
       product.variants.forEach((variant, index) => {
@@ -305,6 +309,7 @@ export default function ProductEdit() {
         formData.append(`variants[${index}][price]`, variant.price);
         formData.append(`variants[${index}][base_price]`, variant.base_price || 0);
         formData.append(`variants[${index}][discount_price]`, variant.discount_price || '');
+        formData.append(`variants[${index}][marketplace_price]`, variant.marketplace_price || '');
         const weightKg = (variant.weight === '' || variant.weight === null || variant.weight === undefined)
           ? 0
           : Number(variant.weight) / 1000;
@@ -408,9 +413,13 @@ export default function ProductEdit() {
                   </div>
 
                   <div>
+                    
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium mb-1">Kategori</label>
                     <div className={`border rounded-md p-3 ${errors.category_ids ? 'border-red-500' : 'border-gray-300'}`}>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {categories.map((cat) => (
                           <label key={cat.id} className="flex items-center gap-2 text-sm">
                             <input
@@ -680,6 +689,22 @@ export default function ProductEdit() {
                               <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.discount_price`][0]}</p>
                             )}
                             <p className="text-xs text-gray-500 mt-1">Kosongkan jika tidak ada diskon</p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Harga Marketplace</label>
+                            <input
+                              type="text"
+                              className={`w-full border px-3 py-2 rounded-md text-sm ${
+                                errors[`variants.${index}.marketplace_price`] ? 'border-red-500' : 'border-gray-300'
+                              }`}
+                              placeholder="Masukkan harga marketplace (opsional)"
+                              value={formatRibuan(variant.marketplace_price || 0)}
+                              onChange={(e) => updateVariant(index, 'marketplace_price', parseRibuan(e.target.value))}
+                            />
+                            {errors[`variants.${index}.marketplace_price`] && (
+                              <p className="text-red-500 text-xs mt-1">{errors[`variants.${index}.marketplace_price`][0]}</p>
+                            )}
                           </div>
 
                           <div>

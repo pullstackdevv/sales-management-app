@@ -460,6 +460,7 @@ export default function ProductData() {
                               <th className="px-3 py-2">SKU</th>
                               {canViewBasePrice && (<th className="px-3 py-2">Harga Modal</th>)}
                               <th className="px-3 py-2">Harga Jual</th>
+                              <th className="px-3 py-2">Harga Marketplace</th>
                               {canViewBasePrice && (<th className="px-3 py-2">Margin</th>)}
                               <th className="px-3 py-2">Stok</th>
                               <th className="px-3 py-2">Status</th>
@@ -500,6 +501,7 @@ export default function ProductData() {
                                     </td>
                                   )}
                                   <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>
+                                  <td className="px-3 py-2">{variant.marketplace_price ? formatCurrency(variant.marketplace_price) : '-'}</td>
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2">
                                       {variant.base_price > 0 ? (

@@ -425,12 +425,17 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <span>{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</span>
                                         <span>Rp{formatRupiah(orderData.shipping_cost)}</span>
                                     </div>
-                                    {orderData.voucher?.code && (
+                                    {orderData.voucher?.code ? (
                                         <div className="flex justify-between text-sm">
                                             <span>Voucher {orderData.voucher.code}</span>
                                             <span>{orderData.voucher.type === 'percentage' ? `${orderData.voucher.value}%` : `Rp${formatRupiah(orderData.voucher.value)}`}</span>
                                         </div>
-                                    )}
+                                    ) : orderData.discount_amount > 0 ? (
+                                        <div className="flex justify-between text-sm">
+                                            <span>Diskon Manual</span>
+                                            <span>- Rp{formatRupiah(orderData.discount_amount)}</span>
+                                        </div>
+                                    ) : null}
                                     <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                         <span>TOTAL</span>
                                         <span>Rp{formatRupiah(orderData.total_price)}</span>

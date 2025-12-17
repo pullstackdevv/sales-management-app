@@ -512,10 +512,12 @@ const PrintInvoice = () => {
                             </div>
                         )}
 
-                        {/* Voucher Note Row */}
+                        {/* Diskon/Voucher Row */}
                         {(invoiceData?.voucher || (invoiceData?.discount_amount || 0) > 0) && (
                             <div className="border-b-2 border-black p-4">
-                                <div className="text-xl font-bold mb-2">Catatan Voucher:</div>
+                                <div className="text-xl font-bold mb-2">
+                                    {invoiceData?.voucher ? 'Catatan Voucher' : 'Diskon Manual'}
+                                </div>
                                 <div className="text-lg">
                                     {invoiceData?.voucher
                                         ? `Voucher ${invoiceData.voucher.code} • ${invoiceData.voucher.type.toUpperCase()} • Nilai: ${Number(invoiceData.voucher.value).toLocaleString('id-ID')}`

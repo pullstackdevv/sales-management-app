@@ -17,7 +17,7 @@ class ReportController extends Controller
     {
         try {
             $user = auth()->user();
-            
+
             // Check if user has permission to view reports
             if (!$user->hasPermission('reports.view')) {
                 return ResponseFormatter::error('Unauthorized access', [], 403);
@@ -26,7 +26,7 @@ class ReportController extends Controller
             // Get date range from request or default to last 12 months
             $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date'))->startOfDay() : Carbon::now()->subMonths(12);
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date'))->endOfDay() : Carbon::now();
-            
+
             $data = [];
 
             // Only include data if user has specific permissions
@@ -47,7 +47,7 @@ class ReportController extends Controller
     {
         try {
             $user = auth()->user();
-            
+
             // Check if user has permission to view sales report
             if (!$user->hasPermission('reports.sales')) {
                 return ResponseFormatter::error('Unauthorized access to sales report', [], 403);
@@ -55,7 +55,7 @@ class ReportController extends Controller
 
             $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
-            
+
             $salesData = $this->getSalesChart($startDate, $endDate);
             return ResponseFormatter::success('Sales data retrieved successfully', $salesData);
         } catch (\Exception $e) {
@@ -88,31 +88,31 @@ class ReportController extends Controller
         }
     }
 
-    public function profit(Request $request)
-    {
-        try {
-            $user = auth()->user();
-            
-            // Check if user has permission to view profit report
-            if (!$user->hasPermission('reports.profit')) {
-                return ResponseFormatter::error('Unauthorized access to profit report', [], 403);
-            }
+    // public function profit(Request $request)
+    // {
+    //     try {
+    //         $user = auth()->user();
 
-            $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
-            $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
-            
-            $profitData = $this->getProfitChart($startDate, $endDate);
-            return ResponseFormatter::success('Profit data retrieved successfully', $profitData);
-        } catch (\Exception $e) {
-            return ResponseFormatter::error('Failed to retrieve profit data: ' . $e->getMessage(), [], 500);
-        }
-    }
+    //         // Check if user has permission to view profit report
+    //         if (!$user->hasPermission('reports.profit')) {
+    //             return ResponseFormatter::error('Unauthorized access to profit report', [], 403);
+    //         }
+
+    //         $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
+    //         $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
+
+    //         $profitData = $this->getProfitChart($startDate, $endDate);
+    //         return ResponseFormatter::success('Profit data retrieved successfully', $profitData);
+    //     } catch (\Exception $e) {
+    //         return ResponseFormatter::error('Failed to retrieve profit data: ' . $e->getMessage(), [], 500);
+    //     }
+    // }
 
     public function bankTransactions(Request $request)
     {
         try {
             $user = auth()->user();
-            
+
             // Check if user has permission to view bank transactions report
             if (!$user->hasPermission('reports.bank')) {
                 return ResponseFormatter::error('Unauthorized access to bank transactions report', [], 403);
@@ -120,7 +120,7 @@ class ReportController extends Controller
 
             $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
-            
+
             $bankData = $this->getBankTransactions($startDate, $endDate);
             return ResponseFormatter::success('Bank transactions data retrieved successfully', $bankData);
         } catch (\Exception $e) {
@@ -132,7 +132,7 @@ class ReportController extends Controller
     {
         try {
             $user = auth()->user();
-            
+
             // Check if user has permission to view courier data report
             if (!$user->hasPermission('reports.courier')) {
                 return ResponseFormatter::error('Unauthorized access to courier data report', [], 403);
@@ -140,14 +140,14 @@ class ReportController extends Controller
 
             $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
-            
+
             $courierData = $this->getCourierData($startDate, $endDate);
             return ResponseFormatter::success('Courier data retrieved successfully', $courierData);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve courier data: ' . $e->getMessage(), [], 500);
         }
     }
-    
+
     private function getSalesChart($startDate, $endDate)
     {
         $rangeStartDateStr = $startDate->copy()->toDateString();
@@ -166,8 +166,8 @@ class ReportController extends Controller
             ->where('payment_status', '!=', 'paid')
             ->where(function ($q) {
                 $q->whereNotIn('status', ['pending', 'cancelled'])
-                  ->orWhereNotNull('printed_at')
-                  ->orWhereNotNull('processed_by');
+                    ->orWhereNotNull('printed_at')
+                    ->orWhereNotNull('processed_by');
             })
             ->whereBetween(DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
             ->select(
@@ -204,6 +204,7 @@ class ReportController extends Controller
         $ordersMonthly = [];
 
         $ordersMonthlyRows = DB::table('orders')
+            ->whereIn('orders.status', ['paid', 'processing', 'shipped', 'delivered'])
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
             ->select(
                 DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
@@ -271,8 +272,8 @@ class ReportController extends Controller
             ->where('payment_status', '!=', 'paid')
             ->where(function ($q) {
                 $q->whereNotIn('status', ['pending', 'cancelled'])
-                  ->orWhereNotNull('printed_at')
-                  ->orWhereNotNull('processed_by');
+                    ->orWhereNotNull('printed_at')
+                    ->orWhereNotNull('processed_by');
             })
             ->whereBetween(DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
@@ -303,6 +304,7 @@ class ReportController extends Controller
 
         // Orders aggregated by order date (includes manual admin orders regardless of payment status)
         $ordersRows = DB::table('orders')
+            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
                 DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as order_date'),
@@ -316,6 +318,8 @@ class ReportController extends Controller
         // Items aggregated by order date
         $itemsRows = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
                 DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as order_date'),
@@ -350,6 +354,7 @@ class ReportController extends Controller
 
         // Summary metrics over the selected period (order date window)
         $ordersPeriodQuery = DB::table('orders')
+            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate]);
 
         $totalOrderAmount = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
@@ -357,27 +362,31 @@ class ReportController extends Controller
         $shippingTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.shipping_cost, 0)'));
         $receivablesTotal = (float) $ordersPeriodQuery->clone()
             ->where('orders.payment_status', '!=', 'paid')
-            ->where('orders.status', '!=', 'cancelled')
+            ->whereIn('orders.status', ['processing', 'delivered'])
             ->sum(DB::raw('COALESCE(orders.total_price, 0)'));
 
         $grossItemValue = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.price,0)'));
 
         $modalItemValue = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.base_price,0)'));
 
         $netSales = $grossItemValue - $discountsTotal;
-        $grossProfit = $netSales - $modalItemValue;
+        $grossProfit = $netSales - $modalItemValue; // ✅ BENAR - menggunakan Net Sales
         $operationalCost = (float) DB::table('expenses')
             ->whereBetween('expense_date', [$startDate, $endDate])
             ->whereNull('deleted_at')
             ->sum(DB::raw('COALESCE(total_amount, 0)'));
-        $netProfit = $grossProfit - $operationalCost;
-        $otherFees = 0.0;
+        $otherFees = (float) $shippingTotal;
+        $netProfit = $netSales - $modalItemValue - $operationalCost - $otherFees;
 
         return [
             'labels' => $labels,
@@ -405,50 +414,157 @@ class ReportController extends Controller
             ]
         ];
     }
-    
+
     private function getProfitChart($startDate, $endDate)
     {
-        // Calculate profit (revenue - shipping cost - product cost if available)
-        $profitData = Order::select(
-            DB::raw('YEAR(created_at) as year'),
-            DB::raw('MONTH(created_at) as month'),
-            DB::raw('SUM(total_price - COALESCE(shipping_cost, 0)) as gross_profit')
-        )
-        ->whereBetween('created_at', [$startDate, $endDate])
-        ->where('payment_status', 'paid')
-        ->groupBy('year', 'month')
-        ->orderBy('year', 'asc')
-        ->orderBy('month', 'asc')
-        ->get();
+        $rangeStartDateStr = $startDate->copy()->toDateString();
+        $effectiveEndDate = $endDate->copy();
+        if ((int)$endDate->day === 1) {
+            $effectiveEndDate = $endDate->copy()->subDay()->endOfDay();
+        }
+        $rangeEndDateStr = $effectiveEndDate->toDateString();
+
+        // PERBAIKAN: Gunakan logika yang sama dengan getDailySalesChart
+        // Hanya ambil order dengan status: paid, processing, delivered
+        $profitRows = DB::table('orders')
+            ->leftJoin('order_items', 'orders.id', '=', 'order_items.order_id')
+            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereNull('order_items.deleted_at')
+            ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
+            ->select(
+                DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
+                DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
+                // Gross Sales (Product Value)
+                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.price, 0)) as gross_sales'),
+                // HPP (Modal/Base Price)
+                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.base_price, 0)) as hpp'),
+                // Discount
+                DB::raw('SUM(COALESCE(orders.discount_amount, 0)) as discount'),
+                // Shipping Cost
+                DB::raw('SUM(COALESCE(orders.shipping_cost, 0)) as shipping_cost')
+            )
+            ->groupBy('year', 'month')
+            ->orderBy('year', 'asc')
+            ->orderBy('month', 'asc')
+            ->get();
+
+        // Get operational costs by month
+        $operationalCostRows = DB::table('expenses')
+            ->whereBetween('expense_date', [$startDate, $endDate])
+            ->whereNull('deleted_at')
+            ->select(
+                DB::raw('YEAR(expense_date) as year'),
+                DB::raw('MONTH(expense_date) as month'),
+                DB::raw('SUM(COALESCE(total_amount, 0)) as operational_cost')
+            )
+            ->groupBy('year', 'month')
+            ->orderBy('year', 'asc')
+            ->orderBy('month', 'asc')
+            ->get();
 
         $labels = [];
-        $data = [];
+        $grossProfitData = [];
+        $netProfitData = [];
 
-        // Fill in missing months with zero values
-        $current = $startDate->copy();
-        while ($current->lte($endDate)) {
-            $monthLabel = $current->format('M Y');
-            
-            $monthData = $profitData->first(function ($item) use ($current) {
-                return $item->year == $current->year && $item->month == $current->month;
+        // Helper to get totals for a given year/month
+        $getMonthTotals = function ($collection, $year, $month) {
+            $row = $collection->first(function ($item) use ($year, $month) {
+                return (int)$item->year === (int)$year && (int)$item->month === (int)$month;
             });
+            return [
+                'gross_sales' => $row ? (float) $row->gross_sales : 0.0,
+                'hpp' => $row ? (float) $row->hpp : 0.0,
+                'discount' => $row ? (float) $row->discount : 0.0,
+                'shipping_cost' => $row ? (float) $row->shipping_cost : 0.0,
+            ];
+        };
+
+        $getOperationalCost = function ($collection, $year, $month) {
+            $row = $collection->first(function ($item) use ($year, $month) {
+                return (int)$item->year === (int)$year && (int)$item->month === (int)$month;
+            });
+            return $row ? (float) $row->operational_cost : 0.0;
+        };
+
+        // Build month labels and profit data
+        $current = $startDate->copy()->startOfMonth();
+        $endMonth = $effectiveEndDate->copy()->endOfMonth();
+        
+        $totalGrossProfit = 0;
+        $totalNetProfit = 0;
+
+        while ($current->lte($endMonth)) {
+            $labels[] = $current->format('M Y');
+            $y = (int)$current->year;
+            $m = (int)$current->month;
             
-            $labels[] = $monthLabel;
-            $data[] = $monthData ? (float) $monthData->gross_profit : 0;
+            $data = $getMonthTotals($profitRows, $y, $m);
+            $opCost = $getOperationalCost($operationalCostRows, $y, $m);
+
+            $grossSales = $data['gross_sales'];
+            $hpp = $data['hpp'];
+            $discount = $data['discount'];
+            $shippingCost = $data['shipping_cost'];
+
+            // Perhitungan sesuai formula:
+            // Net Sales (Penjualan Bersih) = Gross Sales - Discount
+            $netSales = $grossSales - $discount;
             
+            // Laba Kotor = Net Sales - HPP
+            $labaKotor = $netSales - $hpp;
+            
+            // Laba Bersih = Laba Kotor - Biaya Operasional - Ongkos Kirim
+            $labaBersih = $labaKotor - $opCost - $shippingCost;
+
+            $grossProfitData[] = $labaKotor;
+            $netProfitData[] = $labaBersih;
+            
+            $totalGrossProfit += $labaKotor;
+            $totalNetProfit += $labaBersih;
+
             $current->addMonth();
         }
 
         return [
             'labels' => $labels,
-            'data' => $data,
+            'gross_profit' => $grossProfitData,
+            'net_profit' => $netProfitData,
             'summary' => [
-                'total_profit' => $profitData->sum('gross_profit'),
-                'average_monthly' => $profitData->count() > 0 ? $profitData->sum('gross_profit') / $profitData->count() : 0
+                'total_gross_profit' => $totalGrossProfit,
+                'total_net_profit' => $totalNetProfit,
+                'average_monthly_gross_profit' => count($labels) > 0 ? $totalGrossProfit / count($labels) : 0,
+                'average_monthly_net_profit' => count($labels) > 0 ? $totalNetProfit / count($labels) : 0
             ]
         ];
     }
-    
+
+    public function profit(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            
+            if (!$user->hasPermission('reports.profit')) {
+                return ResponseFormatter::error('Unauthorized access to profit report', [], 403);
+            }
+
+            $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
+            $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
+            
+            $profitData = $this->getProfitChart($startDate, $endDate);
+            
+            // Tambahkan penjelasan perhitungan
+            $profitData['calculation_explanation'] = [
+                'penjualan_bersih' => 'Nilai Produk (Gross Sales) - Diskon',
+                'laba_kotor' => 'Penjualan Bersih - HPP (Harga Pokok Penjualan)',
+                'laba_bersih' => 'Laba Kotor - Biaya Operasional - Ongkos Kirim'
+            ];
+            
+            return ResponseFormatter::success('Profit data retrieved successfully', $profitData);
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Failed to retrieve profit data: ' . $e->getMessage(), [], 500);
+        }
+    }
+
     private function getBankTransactions($startDate, $endDate)
     {
         // Get all payment banks
@@ -498,7 +614,7 @@ class ReportController extends Controller
             ]
         ];
     }
-    
+
     private function getCourierData($startDate, $endDate)
     {
         // Get all couriers

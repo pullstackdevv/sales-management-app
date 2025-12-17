@@ -190,6 +190,7 @@ class OrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'required|numeric|min:0',
+            'discount_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:255',
             'status' => 'nullable|in:pending,processing,paid,shipped,delivered,cancelled',
             'courier_id' => 'nullable|exists:couriers,id',
@@ -219,37 +220,10 @@ class OrderController extends Controller
 
             // Calculate total before discount
             $totalBeforeDiscount = $subtotal + $validated['shipping_cost'];
-
-            // Apply voucher discount if voucher_id is provided
-            $discountAmount = 0;
-            if (isset($validated['voucher_id'])) {
-                $voucher = \App\Models\Voucher::find($validated['voucher_id']);
-                
-                Log::info('OrderController - Voucher validation', [
-                    'voucher_id' => $validated['voucher_id'],
-                    'voucher_found' => $voucher ? true : false,
-                    'voucher_code' => $voucher ? $voucher->code : null,
-                    'voucher_type' => $voucher ? $voucher->type : null,
-                    'total_before_discount' => $totalBeforeDiscount,
-                    'shipping_cost' => $validated['shipping_cost'],
-                    'can_be_used' => $voucher ? $voucher->canBeUsed($totalBeforeDiscount) : false
-                ]);
-                
-                if ($voucher && $voucher->canBeUsed($totalBeforeDiscount)) {
-                    // Pass shipping_cost to calculateDiscount for shipping vouchers
-                    $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount, $validated['shipping_cost']);
-                    
-                    Log::info('OrderController - Voucher discount calculated', [
-                        'voucher_code' => $voucher->code,
-                        'voucher_type' => $voucher->type,
-                        'discount_amount' => $discountAmount,
-                        'discount_type' => $voucher->type,
-                        'discount_value' => $voucher->value,
-                        'shipping_cost' => $validated['shipping_cost']
-                    ]);
-                }
-            } else {
-                Log::info('OrderController - No voucher_id provided in request');
+            // Apply manual discount from request (ignore vouchers for manual orders)
+            $discountAmount = isset($validated['discount_amount']) ? max(0, (float)$validated['discount_amount']) : 0;
+            if ($discountAmount > $totalBeforeDiscount) {
+                $discountAmount = $totalBeforeDiscount;
             }
 
             // Calculate final total price after discount
@@ -270,7 +244,7 @@ class OrderController extends Controller
                 'address_id' => $validated['address_id'],
                 'user_id' => Auth::id(),
                 'sales_channel_id' => $validated['sales_channel_id'] ?? null,
-                'voucher_id' => $validated['voucher_id'] ?? null,
+                'voucher_id' => null,
                 'total_price' => $totalPrice,
                 'discount_amount' => $discountAmount,
                 'shipping_cost' => $validated['shipping_cost'],
@@ -414,7 +388,8 @@ class OrderController extends Controller
             'printed_at' => 'nullable|date',
             'is_dropship' => 'nullable|boolean',
             'notes' => 'nullable|string|max:255',
-            'voucher_id' => 'nullable|exists:vouchers,id'
+            'voucher_id' => 'nullable|exists:vouchers,id',
+            'discount_amount' => 'nullable|numeric|min:0'
         ]);
 
         // Batasi edit order khusus untuk order dengan payment gateway (memiliki payment_url)
@@ -589,21 +564,9 @@ class OrderController extends Controller
             });
 
             $totalBeforeDiscount = $finalSubtotal + $order->shipping_cost;
-            $discountAmount = 0;
-
-            // Allow updating voucher for manual orders
-            if (array_key_exists('voucher_id', $validated)) {
-                $order->voucher_id = $validated['voucher_id'];
-            }
-
-            if (!is_null($order->voucher_id)) {
-                $voucher = \App\Models\Voucher::find($order->voucher_id);
-                if (!$voucher || !$voucher->canBeUsed($totalBeforeDiscount)) {
-                    throw ValidationException::withMessages([
-                        'voucher_id' => ['Voucher tidak valid untuk total pesanan ini.']
-                    ]);
-                }
-                $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount, $order->shipping_cost);
+            $discountAmount = isset($validated['discount_amount']) ? max(0, (float)$validated['discount_amount']) : (float)$order->discount_amount;
+            if ($discountAmount > $totalBeforeDiscount) {
+                $discountAmount = $totalBeforeDiscount;
             }
 
             $finalTotal = $totalBeforeDiscount - $discountAmount;
@@ -611,7 +574,7 @@ class OrderController extends Controller
             $order->update([
                 'total_price' => $finalTotal,
                 'discount_amount' => $discountAmount,
-                'voucher_id' => $order->voucher_id
+                'voucher_id' => null
             ]);
 
             // Update status if provided

@@ -296,7 +296,7 @@ const PrintMultipleInvoices = () => {
 
                 {(inv.voucher || (inv.discount_amount || 0) > 0) && (
                   <div className="border-b-2 border-black p-4">
-                    <div className="font-bold text-xl mb-2">Catatan Voucher:</div>
+                    <div className="font-bold text-xl mb-2">{inv.voucher ? 'Catatan Voucher' : 'Diskon Manual'}</div>
                     <div className="text-lg">
                       {inv.voucher
                         ? `Voucher ${inv.voucher.code} • ${inv.voucher.type.toUpperCase()} • Nilai: ${Number(inv.voucher.value).toLocaleString('id-ID')}`

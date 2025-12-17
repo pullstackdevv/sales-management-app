@@ -16,6 +16,7 @@ export default function EditOrder() {
         sales_channel_id: '',
         origin_setting_id: '',
         shipping_cost: 0,
+        manual_discount: 0,
         notes: '',
         order_date: new Date().toISOString().split('T')[0],
         status: 'pending',
@@ -110,6 +111,7 @@ export default function EditOrder() {
                 address_id: order.address_id,
                 sales_channel_id: order.sales_channel_id ? order.sales_channel_id.toString() : '',
                 shipping_cost: parseFloat(order.shipping_cost) || 0,
+                manual_discount: parseFloat(order.discount_amount) || 0,
                 notes: order.notes || '',
                 order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
                 status: order.status || 'pending',
@@ -119,9 +121,9 @@ export default function EditOrder() {
                 origin_setting_id: order.origin_setting_id ? String(order.origin_setting_id) : ''
             });
 
-            setVoucher(order.voucher || null);
-            setVoucherCode(order.voucher?.code || '');
-            setDiscountAmount(parseFloat(order.discount_amount) || 0);
+            setVoucher(null);
+            setVoucherCode('');
+            setDiscountAmount(0);
             
             // Set order items with complete variant details
             setOrderItems(order.items?.map(item => ({
@@ -348,7 +350,7 @@ export default function EditOrder() {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0) - (discountAmount || 0);
+        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0) - (parseFloat(formData.manual_discount) || 0);
     };
 
     const calculateTotalWeight = () => {
@@ -568,13 +570,14 @@ export default function EditOrder() {
                     price: item.price
                 })),
                 shipping_cost: formData.shipping_cost,
+                discount_amount: formData.manual_discount,
                 notes: formData.notes,
                 status: formData.status,
                 payment_bank_id: formData.payment_bank_id || null,
                 courier_id: formData.courier || null,
                 courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,
                 service_type: formData.service_type || null,
-                voucher_id: voucher?.id || null
+                voucher_id: null
             };
             
             console.log('EditOrder - Sending data:', {
@@ -1046,6 +1049,22 @@ console.log(formData)
                                 )}
                             </div>
 
+                            {!isWebOrder() && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Diskon Manual (opsional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="0"
+                                  value={formatRupiah(formData.manual_discount)}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, manual_discount: parseRupiah(e.target.value) }))}
+                                  className={`w-full px-3 py-2 border rounded-lg ${errors.discount_amount ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.discount_amount && (
+                                  <p className="text-red-500 text-xs mt-1">{Array.isArray(errors.discount_amount) ? errors.discount_amount[0] : errors.discount_amount}</p>
+                                )}
+                              </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Kurir
@@ -1312,10 +1331,10 @@ console.log(formData)
                                 <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
 
-                            {discountAmount > 0 && (
+                            {(parseFloat(formData.manual_discount) || 0) > 0 && (
                                 <div className="flex justify-between">
-                                    <span className="text-sm text-gray-700">Diskon {voucher?.code ? `(${voucher.code})` : ''}</span>
-                                    <span className="text-sm font-medium text-green-600">- Rp {Number(discountAmount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                    <span className="text-sm text-gray-700">Diskon Manual</span>
+                                    <span className="text-sm font-medium text-green-600">- Rp {Number(formData.manual_discount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                 </div>
                             )}
                             

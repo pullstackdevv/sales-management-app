@@ -29,6 +29,9 @@ const CustomerDataCheckout = () => {
     province: '',
     city: '',
     district: '',
+    province_code: '',
+    regency_code: '',
+    district_code: '',
     postal_code: '',
     address_detail: ''
   });
@@ -61,6 +64,9 @@ const CustomerDataCheckout = () => {
     city: '',
     district: '',
     province: '',
+    province_code: '',
+    regency_code: '',
+    district_code: '',
     postal_code: '',
     is_default: false,
     is_dropship: false,
@@ -778,6 +784,9 @@ const CustomerDataCheckout = () => {
         city: newAddressData.city || 'Kota tidak diketahui',
         district: newAddressData.district || 'Kecamatan tidak diketahui',
         province: newAddressData.province || 'Provinsi tidak diketahui',
+        province_code: newAddressData.province_code || '',
+        regency_code: newAddressData.regency_code || '',
+        district_code: newAddressData.district_code || '',
         postal_code: newAddressData.postal_code || '',
         is_default: newAddressData.is_default,
         is_primary: newAddressData.is_default || false
@@ -1039,7 +1048,10 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: '',
       city: '',
-      province: ''
+      province: '',
+      district_code: '',
+      regency_code: '',
+      province_code: ''
     }));
 
     // Clear related errors
@@ -1068,7 +1080,10 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: location.district_name || '',
       city: location.regency_name,
-      province: location.province_name
+      province: location.province_name,
+      district_code: location.code || '',
+      regency_code: location.regency_code || '',
+      province_code: location.province_code || ''
     }));
 
     setShowLocationDropdown(false);
@@ -1085,7 +1100,10 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: '',
       city: '',
-      province: ''
+      province: '',
+      district_code: '',
+      regency_code: '',
+      province_code: ''
     }));
 
     // Clear related errors
@@ -1142,7 +1160,10 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: location.district_name || '',
       city: location.regency_name,
-      province: location.province_name
+      province: location.province_name,
+      district_code: location.code || '',
+      regency_code: location.regency_code || '',
+      province_code: location.province_code || ''
     }));
 
     setShowModalLocationDropdown(false);
@@ -1255,6 +1276,9 @@ const CustomerDataCheckout = () => {
             city: addressData.city || 'Kota tidak diketahui',
             district: addressData.district || 'Kecamatan tidak diketahui',
             province: addressData.province || 'Provinsi tidak diketahui',
+            province_code: addressData.province_code || '',
+            regency_code: addressData.regency_code || '',
+            district_code: addressData.district_code || '',
             postal_code: addressData.postal_code || null,
             recipient_name: addressData.recipient_name || formData.full_name,
             recipient_phone: addressData.recipient_phone || formData.phone,
@@ -1286,6 +1310,9 @@ const CustomerDataCheckout = () => {
           city: primaryAddress?.city || '',
           district: primaryAddress?.district || '',
           province: primaryAddress?.province || '',
+          province_code: primaryAddress?.province_code || addressData?.province_code || '',
+          regency_code: primaryAddress?.regency_code || addressData?.regency_code || '',
+          district_code: primaryAddress?.district_code || addressData?.district_code || '',
           postal_code: primaryAddress?.postal_code || '',
           recipient_name: primaryAddress?.recipient_name || createdCustomer.name,
           recipient_phone: (primaryAddress?.recipient_phone || primaryAddress?.phone || createdCustomer.phone),
@@ -1304,6 +1331,9 @@ const CustomerDataCheckout = () => {
           city: selectedAddress?.city || '',
           district: selectedAddress?.district || '',
           province: selectedAddress?.province || '',
+          province_code: selectedAddress?.province_code || '',
+          regency_code: selectedAddress?.regency_code || '',
+          district_code: selectedAddress?.district_code || '',
           postal_code: selectedAddress?.postal_code || '',
           recipient_name: selectedAddress?.recipient_name || selectedCustomer.name || '',
           recipient_phone: selectedAddress?.recipient_phone || selectedAddress?.phone || selectedCustomer.phone || '',

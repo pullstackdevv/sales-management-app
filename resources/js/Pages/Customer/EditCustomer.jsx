@@ -248,7 +248,7 @@ export default function EditCustomer({ customerId }) {
 
         setAddresses(prev => prev.map((addr, i) => (
             i === activeAddressIndex
-                ? { ...addr, district: "", city: "", province: "" }
+                ? { ...addr, district: "", city: "", province: "", district_code: "", regency_code: "", province_code: "" }
                 : addr
         )));
         setErrors(prev => ({
@@ -278,7 +278,10 @@ export default function EditCustomer({ customerId }) {
                 ...newAddresses[activeAddressIndex],
                 district: city.district_name || '',
                 city: city.regency_name,
-                province: city.province_name
+                province: city.province_name,
+                district_code: city.code || '',
+                regency_code: city.regency_code || '',
+                province_code: city.province_code || ''
             };
             return newAddresses;
         });
@@ -390,8 +393,11 @@ export default function EditCustomer({ customerId }) {
                      recipient_phone: addr.recipient_phone || formData.phone,
                     is_dropship: !!addr.is_dropship,
                      province: addr.province,
+                     province_code: addr.province_code || '',
                      city: addr.city,
+                     regency_code: addr.regency_code || '',
                      district: addr.district,
+                     district_code: addr.district_code || '',
                      postal_code: addr.postal_code,
                      address_detail: addr.address_detail,
                      is_default: addr.is_default

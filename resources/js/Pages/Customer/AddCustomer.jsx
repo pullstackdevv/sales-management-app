@@ -202,7 +202,7 @@ export default function AddCustomer() {
 
         setAddresses(prev => prev.map((addr, i) => (
             i === activeAddressIndex
-                ? { ...addr, district: "", city: "", province: "" }
+                ? { ...addr, district: "", city: "", province: "", district_code: "", regency_code: "", province_code: "" }
                 : addr
         )));
         setErrors(prev => ({
@@ -229,6 +229,9 @@ export default function AddCustomer() {
         handleAddressChange('district', city.district_name || '');
         handleAddressChange('city', city.regency_name);
         handleAddressChange('province', city.province_name);
+        handleAddressChange('district_code', city.code || '');
+        handleAddressChange('regency_code', city.regency_code || '');
+        handleAddressChange('province_code', city.province_code || '');
         setShowCityDropdown(false);
         setCityResults([]);
 
@@ -371,8 +374,11 @@ export default function AddCustomer() {
                     recipient_phone: address.recipient_phone || formData.phone,
                     is_dropship: !!address.is_dropship,
                     province: address.province,
+                    province_code: address.province_code || '',
                     city: address.city,
+                    regency_code: address.regency_code || '',
                     district: address.district,
+                    district_code: address.district_code || '',
                     postal_code: address.postal_code || null,
                     address_detail: address.address_detail,
                     is_default: address.is_default,

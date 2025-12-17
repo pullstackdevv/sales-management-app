@@ -36,6 +36,7 @@ export default function CourierRates() {
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedServiceType, setSelectedServiceType] = useState("");
   const [serviceTypes, setServiceTypes] = useState([]);
+  const [missingCodeFilter, setMissingCodeFilter] = useState('');
   
   // Debounced values for API calls
   const debouncedSearchTerm = useDebounce(searchTerm, DEBOUNCE_DELAY_MS);
@@ -122,6 +123,9 @@ export default function CourierRates() {
       }
       if (selectedServiceType) {
         params.append('service_type', selectedServiceType);
+      }
+      if (missingCodeFilter) {
+        params.append('missing_code', missingCodeFilter);
       }
       if (debouncedSearchTerm) {
         params.append('search', debouncedSearchTerm);
@@ -631,6 +635,22 @@ export default function CourierRates() {
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter Kode Wilayah
+                </label>
+                <select
+                  value={missingCodeFilter}
+                  onChange={(e) => setMissingCodeFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Semua</option>
+                  <option value="province">Tanpa Kode Provinsi</option>
+                  <option value="regency">Tanpa Kode Kota/Kab.</option>
+                  <option value="district">Tanpa Kode Kecamatan</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -645,9 +665,12 @@ export default function CourierRates() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Asal
-                    </th>
+                      </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tujuan
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Kode Wilayah
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Layanan
@@ -692,6 +715,20 @@ export default function CourierRates() {
                         <div className="text-sm text-gray-500">
                           {rate.destination?.province || ''}
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs text-gray-900">
+                          Prov: {rate.destination?.province_code || '-'}
+                        </div>
+                        <div className="text-xs text-gray-900">
+                          Kota/Kab: {rate.destination?.regency_code || '-'}
+                        </div>
+                        <div className="text-xs text-gray-900">
+                          Kec: {rate.destination?.district_code || '-'}
+                        </div>
+                        {(!rate.destination?.district_code) && (
+                          <span className="mt-1 inline-block px-2 py-0.5 text-xs rounded bg-red-100 text-red-700">Belum ada kode kecamatan</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">

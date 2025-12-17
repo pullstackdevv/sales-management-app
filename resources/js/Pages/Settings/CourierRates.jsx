@@ -225,14 +225,17 @@ export default function CourierRates() {
         },
       });
       
-      setImportJobId(response.data.job_id);
+      const jobId = response?.data?.data?.job_id;
+      setImportJobId(jobId);
       setShowImportModal(false);
       setImportFile(null);
       
       Swal.fire('Berhasil!', 'Import dimulai. Anda dapat memeriksa status import.', 'success');
       
       // Start checking import status
-      checkImportStatus(response.data.job_id);
+      if (jobId) {
+        checkImportStatus(jobId);
+      }
       
       // Set initial status as queued
       setImportStatus({ status: 'queued', message: 'Import telah dimulai dan sedang dalam antrian...' });
@@ -250,13 +253,14 @@ export default function CourierRates() {
   const checkImportStatus = async (jobId) => {
     try {
       const response = await api.get(API_ROUTES.courierRates.importStatus(jobId));
-      setImportStatus(response.data);
+      const status = response?.data?.data || {};
+      setImportStatus(status);
       
-      if (response.data.status === 'completed') {
+      if (status.status === 'completed') {
         setImportProgress(100);
         Swal.fire({
           title: 'Import Berhasil!',
-          text: response.data.message || 'Data tarif kurir berhasil diimport',
+          text: status.message || 'Data tarif kurir berhasil diimport',
           icon: 'success',
           confirmButtonText: 'OK'
         });
@@ -264,23 +268,23 @@ export default function CourierRates() {
         // Reset import states
         setImportJobId(null);
         setImportFile(null);
-      } else if (response.data.status === 'failed') {
+      } else if (status.status === 'failed') {
         Swal.fire({
           title: 'Import Gagal!',
-          text: response.data.message || 'Terjadi kesalahan saat import data',
+          text: status.message || 'Terjadi kesalahan saat import data',
           icon: 'error',
           confirmButtonText: 'OK'
         });
         // Reset import states
         setImportJobId(null);
         setImportFile(null);
-      } else if (response.data.status === 'processing') {
+      } else if (status.status === 'processing') {
         // Extract progress from message if available
-        const progressMatch = response.data.message?.match(/Progress: ([\d.]+)%/);
+        const progressMatch = status.message?.match(/Progress: ([\d.]+)%/);
         if (progressMatch) {
           setImportProgress(parseFloat(progressMatch[1]));
         }
-        setImportStatusMessage(response.data.message || 'Sedang memproses...');
+        setImportStatusMessage(status.message || 'Sedang memproses...');
         // Continue checking after 3 seconds
         setTimeout(() => checkImportStatus(jobId), 3000);
       }
@@ -326,7 +330,7 @@ export default function CourierRates() {
       interval = setInterval(async () => {
         try {
           const response = await api.get(API_ROUTES.courierRates.importStatus(importJobId));
-          const result = response.data;
+          const result = response?.data?.data || {};
           
           if (result.status === 'completed') {
             setImportStatus(result);
@@ -673,6 +677,9 @@ export default function CourierRates() {
                       Kode Wilayah
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Kecocokan
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Layanan
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -729,6 +736,17 @@ export default function CourierRates() {
                         {(!rate.destination?.district_code) && (
                           <span className="mt-1 inline-block px-2 py-0.5 text-xs rounded bg-red-100 text-red-700">Belum ada kode kecamatan</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            rate.destination?.district_code
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {rate.destination?.district_code ? "Sesuai" : "Belum"}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
@@ -940,6 +958,30 @@ export default function CourierRates() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {importJobId && importStatus?.status === 'processing' && (
+        <div className="fixed bottom-4 right-4 z-50 w-96 bg-white shadow-lg border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            <span className="text-sm font-semibold text-gray-800">Sedang mencocokkan data wilayah dan ongkir</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded h-2 mb-3">
+            <div className="bg-blue-600 h-2 rounded" style={{ width: `${Math.min(100, importProgress || 0)}%` }}></div>
+          </div>
+          {importStatusMessage && (
+            <div className="text-xs text-gray-700 mb-2">{importStatusMessage}</div>
+          )}
+          {Array.isArray(importStatus?.logs) && importStatus.logs.length > 0 && (
+            <div className="max-h-40 overflow-auto text-xs text-gray-600 space-y-1">
+              {importStatus.logs.slice(-10).reverse().map((log, idx) => (
+                <div key={idx} className="flex justify-between gap-2">
+                  <span className="text-gray-500">{new Date(log.time).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</span>
+                  <span className="text-gray-800">{log.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       </div>

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Collection;
 use Exception;
+use Database\Seeders\CourierRateWilayahCodesSeeder;
 
 class ImportCourierRatesJob implements ShouldQueue
 {
@@ -109,11 +110,7 @@ class ImportCourierRatesJob implements ShouldQueue
             // Get courier
             $courier = $this->getCourier();
             
-            // Clear existing rates if courier specified
-            if ($this->courierId) {
-                CourierRate::where('courier_id', $this->courierId)->delete();
-                Log::info("Cleared existing rates for courier ID: {$this->courierId}");
-            }
+            
             
             $imported = 0;
             $skipped = 0;
@@ -143,8 +140,10 @@ class ImportCourierRatesJob implements ShouldQueue
                 $progress = round((($imported + $skipped) / $totalRows) * 100, 2);
                 $this->updateJobStatus('processing', "Processed {$imported} records, skipped {$skipped}. Progress: {$progress}%");
             }
-            
-            // Complete job
+            $this->updateJobStatus('processing', 'Matching wilayah codes with courier rates...');
+            $seeder = new CourierRateWilayahCodesSeeder($this->courierId);
+            $seeder->run();
+            $this->updateJobStatus('processing', "Reconcile completed. Codes updated: {$seeder->updated}, Skipped: {$seeder->skipped}, Total: {$seeder->total}");
             $this->updateJobStatus('completed', "Import completed. Imported: {$imported}, Skipped: {$skipped}");
             
             Log::info("Courier rates import job completed: {$this->jobId}", [
@@ -240,15 +239,8 @@ class ImportCourierRatesJob implements ShouldQueue
                     ])->first();
 
                     if ($existing) {
-                        // Update existing record
-                        $existing->update([
-                            'base_price' => $rate,
-                            'estimated_days' => $sla,
-                            'is_available' => true,
-                            'price_per_kg' => $rate
-                        ]);
+                        $skipped++;
                     } else {
-                        // Create new record
                          CourierRate::create([
                              'courier_id' => $courier->id,
                              'origin_city' => 'Jakarta', // Default origin
@@ -262,9 +254,8 @@ class ImportCourierRatesJob implements ShouldQueue
                              'is_available' => true,
                              'etd_days' => $sla ? $sla . ' days' : '1-2 days'
                          ]);
+                        $imported++;
                     }
-                    
-                    $imported++;
                 } else {
                     $skipped++;
                 }
@@ -311,15 +302,26 @@ class ImportCourierRatesJob implements ShouldQueue
     
     private function updateJobStatus($status, $message)
     {
-        // Store job status in cache for tracking
+        $existing = cache()->get("import_job_{$this->jobId}") ?: [];
+        $logs = $existing['logs'] ?? [];
+        $logs[] = [
+            'time' => now()->toISOString(),
+            'status' => $status,
+            'message' => $message
+        ];
+        if (count($logs) > 100) {
+            $logs = array_slice($logs, -100);
+        }
+
         $jobData = [
             'id' => $this->jobId,
             'status' => $status,
             'message' => $message,
             'courier_id' => $this->courierId,
-            'updated_at' => now()->toISOString()
+            'updated_at' => now()->toISOString(),
+            'logs' => $logs
         ];
-        
+
         cache()->put("import_job_{$this->jobId}", $jobData, now()->addHours(24));
         
         // Remove from active jobs list when completed or failed

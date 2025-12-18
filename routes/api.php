@@ -244,7 +244,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
+        Route::put('/{id}/map-destination', [CourierRateController::class, 'mapDestination']);
     });
+
+    Route::post('wilayah/custom-upsert', [WilayahController::class, 'customUpsert']);
 
     // Product tags sync
     Route::post('products/{product}/tags/sync', [ProductController::class, 'syncTags']);

@@ -683,6 +683,73 @@ class CourierRateController extends Controller
         }
     }
 
+    public function mapDestination(Request $request, int $id): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'district_code' => 'required|string',
+                'regency_code' => 'nullable|string',
+                'province_code' => 'nullable|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $rate = CourierRate::with('courier')->findOrFail($id);
+
+            $districtCode = \App\Services\WilayahMatcher::canonicalDistrictCode($request->get('district_code'));
+            if (!$districtCode) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kode kecamatan tidak valid'
+                ], 422);
+            }
+
+            $district = \App\Models\Wilayah::where('kode', $districtCode)->first();
+            if (!$district) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kecamatan tidak ditemukan dalam referensi wilayah'
+                ], 404);
+            }
+
+            $regencyCode = $request->get('regency_code');
+            if (!$regencyCode) {
+                $regencyCode = substr($districtCode, 0, 5);
+            }
+
+            $provinceCode = $request->get('province_code');
+            if (!$provinceCode) {
+                $provinceCode = explode('.', $regencyCode)[0];
+            }
+
+            $rate->update([
+                'destination_province_code' => $provinceCode,
+                'destination_regency_code' => $regencyCode,
+                'destination_district_code' => $districtCode,
+            ]);
+
+            $rate = $rate->fresh('courier');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kode wilayah tujuan berhasil diperbarui',
+                'data' => $this->transformRate($rate)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperbarui kode wilayah tujuan',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Check import job status
      *

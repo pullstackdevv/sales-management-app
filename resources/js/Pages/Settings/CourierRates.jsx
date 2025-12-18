@@ -36,6 +36,11 @@ export default function CourierRates() {
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedServiceType, setSelectedServiceType] = useState("");
   const [serviceTypes, setServiceTypes] = useState([]);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mappingRate, setMappingRate] = useState(null);
+  const [wilayahQuery, setWilayahQuery] = useState('');
+  const [wilayahResults, setWilayahResults] = useState([]);
+  const [searchingWilayah, setSearchingWilayah] = useState(false);
 
   // Debounced values for API calls
   const debouncedSearchTerm = useDebounce(searchTerm, DEBOUNCE_DELAY_MS);
@@ -169,6 +174,66 @@ export default function CourierRates() {
       setServiceTypes(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching service types:', err);
+    }
+  };
+
+  const searchWilayah = useCallback(async (q) => {
+    if (!q || q.trim().length < 2) {
+      setWilayahResults([]);
+      return;
+    }
+    try {
+      setSearchingWilayah(true);
+      const params = new URLSearchParams();
+      params.append('q', q.trim());
+      const response = await api.get(`/wilayah/search-regencies?${params.toString()}`);
+      const data = response?.data?.data || [];
+      setWilayahResults(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setWilayahResults([]);
+    } finally {
+      setSearchingWilayah(false);
+    }
+  }, []);
+
+  const debouncedWilayahQuery = useDebounce(wilayahQuery, 500);
+
+  useEffect(() => {
+    searchWilayah(debouncedWilayahQuery);
+  }, [debouncedWilayahQuery, searchWilayah]);
+
+  const openMappingModal = (rate) => {
+    setMappingRate(rate);
+    setWilayahQuery(rate?.destination?.district || '');
+    setShowMapModal(true);
+  };
+
+  const applyMapping = async (selected) => {
+    try {
+      if (!mappingRate?.id) return;
+      const isDistrict = (selected?.type || '').toLowerCase() === 'kecamatan';
+      const districtCode = isDistrict ? selected?.code : null;
+      const regencyCode = isDistrict ? selected?.regency_code : (selected?.regency_code || selected?.code || null);
+      const provinceCode = selected?.province_code || null;
+      if (!districtCode) {
+        Swal.fire('Pilih Kecamatan', 'Silakan pilih entri bertipe Kecamatan.', 'warning');
+        return;
+      }
+      const url = API_ROUTES.courierRates.mapDestination(mappingRate.id);
+      const payload = { district_code: districtCode, regency_code: regencyCode, province_code: provinceCode };
+      const response = await api.put(url, payload);
+      if (response?.data?.success) {
+        setShowMapModal(false);
+        setMappingRate(null);
+        setWilayahQuery('');
+        setWilayahResults([]);
+        Swal.fire('Berhasil', 'Kode wilayah tujuan diperbarui.', 'success');
+        fetchRates();
+      } else {
+        Swal.fire('Gagal', response?.data?.message || 'Tidak dapat memperbarui kode wilayah', 'error');
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Terjadi kesalahan saat memperbarui kode wilayah', 'error');
     }
   };
 
@@ -755,6 +820,14 @@ export default function CourierRates() {
                           >
                             {rate.availability?.is_available ? "Tersedia" : "Tidak Tersedia"}
                           </span>
+                          {!rate.destination?.district_code && (
+                            <button
+                              onClick={() => openMappingModal(rate)}
+                              className="ml-3 text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Cocokkan
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -977,6 +1050,101 @@ export default function CourierRates() {
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     )}
                     {importLoading ? "Mengimport..." : "Import"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showMapModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Cocokkan Wilayah Tujuan</h3>
+                <button
+                  onClick={() => { setShowMapModal(false); setMappingRate(null); setWilayahQuery(''); setWilayahResults([]); }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <Icon icon="solar:close-circle-outline" className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div className="text-sm text-gray-700">
+                  <div>Tujuan saat ini:</div>
+                  <div className="mt-1">{mappingRate?.destination?.district || '-'}, {mappingRate?.destination?.city || '-'}, {mappingRate?.destination?.province || '-'}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cari Kecamatan</label>
+                  <input
+                    type="text"
+                    value={wilayahQuery}
+                    onChange={(e) => setWilayahQuery(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Masukkan nama kecamatan"
+                  />
+                </div>
+                <div className="max-h-64 overflow-y-auto border rounded">
+                  {searchingWilayah ? (
+                    <div className="p-3 text-sm text-gray-500">Mencari...</div>
+                  ) : (
+                    <ul>
+                  {wilayahResults.map((item, idx) => (
+                    <li key={idx} className="p-3 border-b hover:bg-gray-50 cursor-pointer" onClick={() => applyMapping(item)}>
+                      <div className="text-sm text-gray-900">{item.district_name || item.regency_name || item.name}</div>
+                      <div className="text-xs text-gray-600">{item.regency_name} • {item.province_name}</div>
+                      <div className="text-xs text-gray-400">Kode: {item.code} {item.district_name ? `(Kec.)` : `(Kab/Kota)`}</div>
+                    </li>
+                  ))}
+                  {wilayahResults.length === 0 && wilayahQuery.trim().length > 0 && (
+                    <li className="p-3 text-sm text-gray-500">
+                      <div className="mb-2">Tidak ada hasil</div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            if (!mappingRate?.destination) return;
+                            const payload = {
+                              province: mappingRate.destination.province,
+                              city: mappingRate.destination.city,
+                              district: mappingRate.destination.district,
+                            };
+                            const res = await api.post(API_ROUTES.wilayah.customUpsert, payload);
+                            const data = res?.data?.data;
+                            if (data?.district_code) {
+                              await applyMapping({
+                                type: 'Kecamatan',
+                                code: data.district_code,
+                                regency_code: data.regency_code,
+                                province_code: data.province_code,
+                                district_name: data.district_name,
+                                regency_name: data.regency_name,
+                                province_name: data.province_name,
+                              });
+                            } else {
+                              Swal.fire('Gagal', 'Tidak dapat membuat data wilayah baru', 'error');
+                            }
+                          } catch (err) {
+                            Swal.fire('Error', 'Terjadi kesalahan saat membuat data wilayah', 'error');
+                          }
+                        }}
+                        className="mt-2 px-3 py-2 text-xs rounded bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        Buat Wilayah dari Tujuan Ini
+                      </button>
+                    </li>
+                  )}
+                  {wilayahResults.length === 0 && wilayahQuery.trim().length === 0 && (
+                    <li className="p-3 text-sm text-gray-500">Masukkan kata kunci untuk mencari kecamatan</li>
+                  )}
+                </ul>
+              )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => { setShowMapModal(false); setMappingRate(null); setWilayahQuery(''); setWilayahResults([]); }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg"
+                  >
+                    Tutup
                   </button>
                 </div>
               </div>

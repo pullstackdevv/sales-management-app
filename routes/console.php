@@ -74,10 +74,20 @@ Artisan::command('audit:wilayah-ongkir {--export=xlsx} {--limit=0} {--path=}', f
                 [$provByName, $regByProv, $distByReg]
             );
             $matchedDistrictCode = $match['district']['kode'] ?? null;
-            $exists = $matchedDistrictCode ? true : Wilayah::kecamatan()
-                ->where('nama','like','%'.($r->destination_district ?? '').'%')
-                ->orWhere('nama','like','%'.$dn.'%')
-                ->exists();
+            if ($matchedDistrictCode) {
+                $exists = true;
+            } else {
+                $dnLower = mb_strtolower($dn);
+                $dnNoParen = preg_replace('/\([^\)]*\)/u', ' ', $dnLower);
+                $dnNoParen = preg_replace('/\s+/', ' ', trim($dnNoParen));
+                $dnNospace = str_replace(' ', '', $dnNoParen);
+
+                $exists = Wilayah::kecamatan()
+                    ->whereRaw('LOWER(nama) LIKE ?', ['%'.$dnLower.'%'])
+                    ->orWhereRaw('LOWER(nama) LIKE ?', ['%'.$dnNoParen.'%'])
+                    ->orWhereRaw('REPLACE(LOWER(nama), " ", "") LIKE ?', ['%'.$dnNospace.'%'])
+                    ->exists();
+            }
         }
         if (!$exists) {
             $ratesUnmapped[] = [

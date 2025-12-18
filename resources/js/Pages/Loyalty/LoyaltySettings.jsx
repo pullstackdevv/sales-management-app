@@ -3,8 +3,8 @@ import { Icon } from "@iconify/react";
 import { Link } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Button, TextInput, Label, ToggleSwitch, Spinner, Card } from "flowbite-react";
-import api from "../../lib/api";
-import toast from "react-hot-toast";
+import api from "../../api/axios";
+import Swal from "sweetalert2";
 
 function LoyaltySettings() {
     const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ function LoyaltySettings() {
             }
         } catch (error) {
             console.error("Error fetching loyalty settings:", error);
-            toast.error("Gagal memuat pengaturan loyalty");
+            Swal.fire("Error", "Gagal memuat pengaturan loyalty", "error");
         } finally {
             setLoading(false);
         }
@@ -50,10 +50,10 @@ function LoyaltySettings() {
         try {
             setSaving(true);
             await api.post("/loyalty/settings", { settings });
-            toast.success("Pengaturan loyalty berhasil disimpan");
+            Swal.fire("Berhasil", "Pengaturan loyalty berhasil disimpan", "success");
         } catch (error) {
             console.error("Error saving loyalty settings:", error);
-            toast.error("Gagal menyimpan pengaturan loyalty");
+            Swal.fire("Error", "Gagal menyimpan pengaturan loyalty", "error");
         } finally {
             setSaving(false);
         }

@@ -115,6 +115,26 @@ const SidebarContent = [
         permission: "customers.view",
     },
     {
+        name: "Loyalty & Rewards",
+        icon: "solar:medal-ribbons-star-outline",
+        id: uniqueId(),
+        permission: "settings.view",
+        children: [
+            {
+                name: "Pengaturan",
+                icon: "solar:settings-outline",
+                id: uniqueId(),
+                url: "/cms/loyalty/settings",
+            },
+            {
+                name: "Tier Membership",
+                icon: "solar:crown-outline",
+                id: uniqueId(),
+                url: "/cms/loyalty/tiers",
+            },
+        ],
+    },
+    {
         name: "Expense",
         icon: "solar:money-bag-outline",
         id: uniqueId(),

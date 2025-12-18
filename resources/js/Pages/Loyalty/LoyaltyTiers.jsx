@@ -13,8 +13,8 @@ import {
     Textarea,
     Badge,
 } from "flowbite-react";
-import api from "../../lib/api";
-import toast from "react-hot-toast";
+import api from "../../api/axios";
+import Swal from "sweetalert2";
 
 function LoyaltyTiers() {
     const [loading, setLoading] = useState(true);
@@ -63,7 +63,7 @@ function LoyaltyTiers() {
             setTiers(response.data.tiers || []);
         } catch (error) {
             console.error("Error fetching tiers:", error);
-            toast.error("Gagal memuat data tier");
+            Swal.fire("Error", "Gagal memuat data tier", "error");
         } finally {
             setLoading(false);
         }
@@ -114,11 +114,11 @@ function LoyaltyTiers() {
 
     const handleSubmit = async () => {
         if (!formData.name.trim()) {
-            toast.error("Nama tier harus diisi");
+            Swal.fire("Error", "Nama tier harus diisi", "error");
             return;
         }
         if (!formData.min_annual_spend) {
-            toast.error("Minimal belanja tahunan harus diisi");
+            Swal.fire("Error", "Minimal belanja tahunan harus diisi", "error");
             return;
         }
 
@@ -126,16 +126,16 @@ function LoyaltyTiers() {
             setSaving(true);
             if (editingTier) {
                 await api.put(`/loyalty/tiers/${editingTier.id}`, formData);
-                toast.success("Tier berhasil diperbarui");
+                Swal.fire("Berhasil", "Tier berhasil diperbarui", "success");
             } else {
                 await api.post("/loyalty/tiers", formData);
-                toast.success("Tier berhasil ditambahkan");
+                Swal.fire("Berhasil", "Tier berhasil ditambahkan", "success");
             }
             handleCloseModal();
             fetchTiers();
         } catch (error) {
             console.error("Error saving tier:", error);
-            toast.error(error.response?.data?.message || "Gagal menyimpan tier");
+            Swal.fire("Error", error.response?.data?.message || "Gagal menyimpan tier", "error");
         } finally {
             setSaving(false);
         }
@@ -144,11 +144,11 @@ function LoyaltyTiers() {
     const handleToggleStatus = async (tier) => {
         try {
             await api.post(`/loyalty/tiers/${tier.id}/toggle-status`);
-            toast.success(`Tier ${tier.is_active ? "dinonaktifkan" : "diaktifkan"}`);
+            Swal.fire("Berhasil", `Tier ${tier.is_active ? "dinonaktifkan" : "diaktifkan"}`, "success");
             fetchTiers();
         } catch (error) {
             console.error("Error toggling tier status:", error);
-            toast.error("Gagal mengubah status tier");
+            Swal.fire("Error", "Gagal mengubah status tier", "error");
         }
     };
 

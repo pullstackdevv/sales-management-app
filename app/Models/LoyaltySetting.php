@@ -45,14 +45,9 @@ class LoyaltySetting extends Model
         return (int) self::getValue('point_rate', 10000);
     }
 
-    public static function getRedeemValue(): int
+    public static function getMinRedeemAmount(): int
     {
-        return (int) self::getValue('redeem_value', 100);
-    }
-
-    public static function getMinRedeem(): int
-    {
-        return (int) self::getValue('min_redeem', 500);
+        return (int) self::getValue('min_redeem_amount', 50000);
     }
 
     public static function getMaxRedeemPercentage(): int
@@ -62,7 +57,12 @@ class LoyaltySetting extends Model
 
     public static function getRedeemOptions(): array
     {
-        $options = self::getValue('redeem_options', '500,1000,2000');
+        $options = self::getValue('redeem_options', '50000,100000,200000');
         return array_map('intval', explode(',', $options));
+    }
+
+    public static function isLoyaltyActive(): bool
+    {
+        return self::getValue('loyalty_active', '1') === '1';
     }
 }

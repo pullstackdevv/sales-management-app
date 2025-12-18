@@ -15,7 +15,6 @@ import {
 } from "flowbite-react";
 import api from "../../lib/api";
 import toast from "react-hot-toast";
-import Swal from "sweetalert2";
 
 function LoyaltyTiers() {
     const [loading, setLoading] = useState(true);
@@ -26,6 +25,7 @@ function LoyaltyTiers() {
     const [formData, setFormData] = useState({
         name: "",
         min_annual_spend: "",
+        max_annual_spend: "",
         multiplier: "1",
         color: "#ec4899",
         icon: "solar:medal-ribbons-star-outline",
@@ -75,6 +75,7 @@ function LoyaltyTiers() {
             setFormData({
                 name: tier.name || "",
                 min_annual_spend: tier.min_annual_spend || "",
+                max_annual_spend: tier.max_annual_spend || "",
                 multiplier: tier.multiplier || "1",
                 color: tier.color || "#ec4899",
                 icon: tier.icon || "solar:medal-ribbons-star-outline",
@@ -87,6 +88,7 @@ function LoyaltyTiers() {
             setFormData({
                 name: "",
                 min_annual_spend: "",
+                max_annual_spend: "",
                 multiplier: "1",
                 color: "#ec4899",
                 icon: "solar:medal-ribbons-star-outline",
@@ -113,6 +115,10 @@ function LoyaltyTiers() {
     const handleSubmit = async () => {
         if (!formData.name.trim()) {
             toast.error("Nama tier harus diisi");
+            return;
+        }
+        if (!formData.min_annual_spend) {
+            toast.error("Minimal belanja tahunan harus diisi");
             return;
         }
 
@@ -146,30 +152,6 @@ function LoyaltyTiers() {
         }
     };
 
-    const handleDelete = async (tier) => {
-        const result = await Swal.fire({
-            title: "Hapus Tier?",
-            text: `Apakah Anda yakin ingin menghapus tier "${tier.name}"?`,
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonColor: "#d33",
-            cancelButtonColor: "#3085d6",
-            confirmButtonText: "Ya, Hapus",
-            cancelButtonText: "Batal",
-        });
-
-        if (result.isConfirmed) {
-            try {
-                await api.delete(`/loyalty/tiers/${tier.id}`);
-                toast.success("Tier berhasil dihapus");
-                fetchTiers();
-            } catch (error) {
-                console.error("Error deleting tier:", error);
-                toast.error(error.response?.data?.message || "Gagal menghapus tier");
-            }
-        }
-    };
-
     const formatRupiah = (value) => {
         return new Intl.NumberFormat("id-ID", {
             style: "currency",
@@ -196,7 +178,7 @@ function LoyaltyTiers() {
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <Link
-                                href="/cms/settings/loyalty"
+                                href="/cms/loyalty/settings"
                                 className="text-gray-500 hover:text-gray-700"
                             >
                                 <Icon icon="solar:arrow-left-outline" width={20} />
@@ -204,7 +186,7 @@ function LoyaltyTiers() {
                             <h1 className="text-2xl font-bold">Tier Membership</h1>
                         </div>
                         <p className="text-gray-500">
-                            Kelola tier membership dan multiplier poin untuk customer
+                            Kelola tier membership berdasarkan belanja tahunan customer
                         </p>
                     </div>
                     <Button color="blue" onClick={() => handleOpenModal()}>
@@ -244,28 +226,21 @@ function LoyaltyTiers() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    <div className="flex gap-1">
-                                        <button
-                                            onClick={() => handleOpenModal(tier)}
-                                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                                        >
-                                            <Icon icon="solar:pen-outline" width={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(tier)}
-                                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                                        >
-                                            <Icon icon="solar:trash-bin-trash-outline" width={18} />
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={() => handleOpenModal(tier)}
+                                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                                    >
+                                        <Icon icon="solar:pen-outline" width={18} />
+                                    </button>
                                 </div>
 
                                 {/* Stats */}
                                 <div className="space-y-3">
                                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                                        <span className="text-gray-600">Min. Belanja Tahunan</span>
-                                        <span className="font-semibold">
+                                        <span className="text-gray-600">Threshold Belanja</span>
+                                        <span className="font-semibold text-sm">
                                             {formatRupiah(tier.min_annual_spend)}
+                                            {tier.max_annual_spend ? ` - ${formatRupiah(tier.max_annual_spend)}` : "+"}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
@@ -335,6 +310,21 @@ function LoyaltyTiers() {
                     )}
                 </div>
 
+                {/* Info Box */}
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                        <Icon icon="solar:info-circle-outline" width={24} className="text-amber-600 mt-0.5" />
+                        <div>
+                            <h3 className="font-medium text-amber-800">Catatan</h3>
+                            <ul className="text-sm text-amber-700 mt-1 list-disc list-inside space-y-1">
+                                <li>Tier tidak dapat dihapus, hanya bisa dinonaktifkan</li>
+                                <li>Customer akan otomatis naik tier berdasarkan total belanja tahunan</li>
+                                <li>Tier reset setiap tanggal 1 Januari</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Modal Add/Edit */}
                 <Modal show={showModal} onClose={handleCloseModal} size="lg">
                     <Modal.Header>
@@ -361,27 +351,42 @@ function LoyaltyTiers() {
                                         type="number"
                                         value={formData.min_annual_spend}
                                         onChange={(e) => handleChange("min_annual_spend", e.target.value)}
-                                        placeholder="1000000"
+                                        placeholder="0"
                                         className="mt-1"
                                     />
                                 </div>
                                 <div>
-                                    <Label htmlFor="multiplier" value="Multiplier Poin *" />
+                                    <Label htmlFor="max_annual_spend" value="Max. Belanja Tahunan (Rp)" />
                                     <TextInput
-                                        id="multiplier"
+                                        id="max_annual_spend"
                                         type="number"
-                                        step="0.1"
-                                        min="0.1"
-                                        max="10"
-                                        value={formData.multiplier}
-                                        onChange={(e) => handleChange("multiplier", e.target.value)}
-                                        placeholder="1.5"
+                                        value={formData.max_annual_spend}
+                                        onChange={(e) => handleChange("max_annual_spend", e.target.value)}
+                                        placeholder="Kosongkan jika unlimited"
                                         className="mt-1"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">
-                                        Contoh: 1.5 = poin dasar × 1.5
+                                        Kosongkan untuk tier tertinggi
                                     </p>
                                 </div>
+                            </div>
+
+                            <div>
+                                <Label htmlFor="multiplier" value="Multiplier Poin *" />
+                                <TextInput
+                                    id="multiplier"
+                                    type="number"
+                                    step="0.1"
+                                    min="0.1"
+                                    max="10"
+                                    value={formData.multiplier}
+                                    onChange={(e) => handleChange("multiplier", e.target.value)}
+                                    placeholder="1.5"
+                                    className="mt-1"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Contoh: 1.5 = poin dasar × 1.5
+                                </p>
                             </div>
 
                             <div>

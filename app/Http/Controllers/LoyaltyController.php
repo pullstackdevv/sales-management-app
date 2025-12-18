@@ -12,12 +12,12 @@ class LoyaltyController extends Controller
 {
     public function settingsPage()
     {
-        return Inertia::render('Settings/LoyaltySettings');
+        return Inertia::render('Loyalty/LoyaltySettings');
     }
 
     public function tierPage()
     {
-        return Inertia::render('Settings/LoyaltyTiers');
+        return Inertia::render('Loyalty/LoyaltyTiers');
     }
 
     public function getSettings()
@@ -31,15 +31,10 @@ class LoyaltyController extends Controller
                     'description' => 'Berapa rupiah untuk mendapatkan 1 poin',
                     'is_active' => $settings->get('point_rate')?->is_active ?? true,
                 ],
-                'redeem_value' => [
-                    'value' => $settings->get('redeem_value')?->value ?? '100',
-                    'description' => 'Nilai rupiah per 1 poin saat redeem',
-                    'is_active' => $settings->get('redeem_value')?->is_active ?? true,
-                ],
-                'min_redeem' => [
-                    'value' => $settings->get('min_redeem')?->value ?? '500',
-                    'description' => 'Minimal poin yang bisa di-redeem',
-                    'is_active' => $settings->get('min_redeem')?->is_active ?? true,
+                'min_redeem_amount' => [
+                    'value' => $settings->get('min_redeem_amount')?->value ?? '50000',
+                    'description' => 'Minimal nilai rupiah yang bisa di-redeem',
+                    'is_active' => $settings->get('min_redeem_amount')?->is_active ?? true,
                 ],
                 'max_redeem_percentage' => [
                     'value' => $settings->get('max_redeem_percentage')?->value ?? '20',
@@ -47,8 +42,8 @@ class LoyaltyController extends Controller
                     'is_active' => $settings->get('max_redeem_percentage')?->is_active ?? true,
                 ],
                 'redeem_options' => [
-                    'value' => $settings->get('redeem_options')?->value ?? '500,1000,2000',
-                    'description' => 'Pilihan jumlah poin untuk redeem (pisahkan dengan koma)',
+                    'value' => $settings->get('redeem_options')?->value ?? '50000,100000,200000',
+                    'description' => 'Pilihan nilai rupiah untuk redeem (pisahkan dengan koma)',
                     'is_active' => $settings->get('redeem_options')?->is_active ?? true,
                 ],
                 'loyalty_active' => [
@@ -112,6 +107,7 @@ class LoyaltyController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'min_annual_spend' => 'required|numeric|min:0',
+            'max_annual_spend' => 'nullable|numeric|min:0',
             'multiplier' => 'required|numeric|min:0.1|max:10',
             'color' => 'nullable|string|max:50',
             'icon' => 'nullable|string|max:100',
@@ -152,6 +148,7 @@ class LoyaltyController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'min_annual_spend' => 'required|numeric|min:0',
+            'max_annual_spend' => 'nullable|numeric|min:0',
             'multiplier' => 'required|numeric|min:0.1|max:10',
             'color' => 'nullable|string|max:50',
             'icon' => 'nullable|string|max:100',
@@ -181,17 +178,9 @@ class LoyaltyController extends Controller
 
     public function destroyTier(LoyaltyTier $tier)
     {
-        if ($tier->customerPoints()->count() > 0) {
-            return response()->json([
-                'message' => 'Tier tidak dapat dihapus karena masih digunakan oleh customer',
-            ], 422);
-        }
-
-        $tier->delete();
-
         return response()->json([
-            'message' => 'Tier berhasil dihapus',
-        ]);
+            'message' => 'Tier tidak dapat dihapus. Gunakan toggle status untuk menonaktifkan tier.',
+        ], 422);
     }
 
     public function toggleTierStatus(LoyaltyTier $tier)

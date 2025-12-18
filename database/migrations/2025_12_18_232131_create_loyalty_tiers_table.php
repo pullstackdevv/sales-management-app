@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug')->unique();
             $table->decimal('min_annual_spend', 15, 2)->default(0);
+            $table->decimal('max_annual_spend', 15, 2)->default(0);
             $table->decimal('multiplier', 5, 2)->default(1.00);
             $table->string('color')->nullable();
             $table->string('icon')->nullable();

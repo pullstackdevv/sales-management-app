@@ -11,10 +11,9 @@ function LoyaltySettings() {
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState({
         point_rate: { value: "10000", is_active: true },
-        redeem_value: { value: "100", is_active: true },
-        min_redeem: { value: "500", is_active: true },
+        min_redeem_amount: { value: "50000", is_active: true },
         max_redeem_percentage: { value: "20", is_active: true },
-        redeem_options: { value: "500,1000,2000", is_active: true },
+        redeem_options: { value: "50000,100000,200000", is_active: true },
         loyalty_active: { value: "1", is_active: true },
     });
 
@@ -90,7 +89,7 @@ function LoyaltySettings() {
                         </p>
                     </div>
                     <Link
-                        href="/cms/settings/loyalty-tiers"
+                        href="/cms/loyalty/tiers"
                         className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
                     >
                         <Icon icon="solar:medal-ribbons-star-outline" width={20} />
@@ -155,42 +154,27 @@ function LoyaltySettings() {
                     <Card>
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <Icon icon="solar:gift-outline" width={24} className="text-orange-600" />
-                            Pengaturan Redeem Points
+                            Pengaturan Redeem
                         </h2>
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="redeem_value" value="Nilai Redeem (Rupiah per 1 Poin)" />
+                                <Label htmlFor="min_redeem_amount" value="Minimal Nilai Redeem (Rupiah)" />
                                 <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-gray-500">1 Poin =</span>
                                     <span className="text-gray-500">Rp</span>
                                     <TextInput
-                                        id="redeem_value"
+                                        id="min_redeem_amount"
                                         type="number"
-                                        value={settings.redeem_value?.value || ""}
+                                        value={settings.min_redeem_amount?.value || ""}
                                         onChange={(e) =>
-                                            handleChange("redeem_value", "value", e.target.value)
+                                            handleChange("min_redeem_amount", "value", e.target.value)
                                         }
-                                        placeholder="100"
+                                        placeholder="50000"
                                         className="flex-1"
                                     />
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">
-                                    Contoh: 500 poin = {formatRupiah((settings.redeem_value?.value || 100) * 500)} diskon
+                                    Minimal akumulasi nilai rupiah dari poin untuk bisa di-redeem
                                 </p>
-                            </div>
-
-                            <div>
-                                <Label htmlFor="min_redeem" value="Minimal Poin untuk Redeem" />
-                                <TextInput
-                                    id="min_redeem"
-                                    type="number"
-                                    value={settings.min_redeem?.value || ""}
-                                    onChange={(e) =>
-                                        handleChange("min_redeem", "value", e.target.value)
-                                    }
-                                    placeholder="500"
-                                    className="mt-1"
-                                />
                             </div>
 
                             <div>
@@ -211,7 +195,7 @@ function LoyaltySettings() {
                                     <span className="text-gray-500">%</span>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">
-                                    Contoh: Maksimal {settings.max_redeem_percentage?.value || 20}% dari total belanja bisa dibayar dengan poin
+                                    Contoh: Maksimal {settings.max_redeem_percentage?.value || 20}% dari total belanja bisa dibayar dengan redeem poin
                                 </p>
                             </div>
                         </div>
@@ -225,7 +209,7 @@ function LoyaltySettings() {
                         </h2>
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="redeem_options" value="Pilihan Jumlah Poin untuk Redeem" />
+                                <Label htmlFor="redeem_options" value="Pilihan Nilai Rupiah untuk Redeem" />
                                 <TextInput
                                     id="redeem_options"
                                     type="text"
@@ -233,11 +217,11 @@ function LoyaltySettings() {
                                     onChange={(e) =>
                                         handleChange("redeem_options", "value", e.target.value)
                                     }
-                                    placeholder="500,1000,2000"
+                                    placeholder="50000,100000,200000"
                                     className="mt-1"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">
-                                    Pisahkan dengan koma. Contoh: 500,1000,2000
+                                    Pisahkan dengan koma. Contoh: 50000,100000,200000
                                 </p>
                             </div>
 
@@ -245,19 +229,20 @@ function LoyaltySettings() {
                             <div className="p-4 bg-gray-50 rounded-lg">
                                 <p className="text-sm font-medium mb-2">Preview Pilihan Redeem:</p>
                                 <div className="flex flex-wrap gap-2">
-                                    {(settings.redeem_options?.value || "500,1000,2000")
+                                    {(settings.redeem_options?.value || "50000,100000,200000")
                                         .split(",")
                                         .map((opt, idx) => {
-                                            const points = parseInt(opt.trim());
-                                            const discount = points * parseInt(settings.redeem_value?.value || 100);
+                                            const amount = parseInt(opt.trim());
+                                            const pointRate = parseInt(settings.point_rate?.value || 10000);
+                                            const pointsNeeded = Math.ceil(amount / pointRate);
                                             return (
                                                 <div
                                                     key={idx}
                                                     className="px-3 py-2 bg-white border rounded-lg text-sm"
                                                 >
-                                                    <span className="font-medium">{points} Poin</span>
+                                                    <span className="font-medium">{formatRupiah(amount)}</span>
                                                     <span className="text-gray-500 ml-2">
-                                                        = {formatRupiah(discount)}
+                                                        ({pointsNeeded} poin)
                                                     </span>
                                                 </div>
                                             );
@@ -279,7 +264,7 @@ function LoyaltySettings() {
                                 <li>Ongkir tidak dihitung untuk mendapatkan poin</li>
                                 <li>Produk yang sedang diskon tidak mendapatkan poin</li>
                                 <li>Poin dasar akan dikalikan dengan multiplier tier customer</li>
-                                <li>Kelola tier membership untuk mengatur multiplier poin</li>
+                                <li>Redeem menggunakan akumulasi nilai rupiah dari poin yang terkumpul</li>
                             </ul>
                         </div>
                     </div>

@@ -14,6 +14,7 @@ class LoyaltyTier extends Model
         'name',
         'slug',
         'min_annual_spend',
+        'max_annual_spend',
         'multiplier',
         'color',
         'icon',
@@ -26,6 +27,7 @@ class LoyaltyTier extends Model
 
     protected $casts = [
         'min_annual_spend' => 'decimal:2',
+        'max_annual_spend' => 'decimal:2',
         'multiplier' => 'decimal:2',
         'is_active' => 'boolean',
         'order' => 'integer',

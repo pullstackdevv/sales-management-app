@@ -10,24 +10,18 @@ class LoyaltySeeder extends Seeder
 {
     public function run(): void
     {
-        // Default Settings (placeholder values - can be configured by Owner)
+        // Default Settings
         $settings = [
             [
                 'key' => 'point_rate',
                 'value' => '10000',
-                'description' => 'Berapa rupiah untuk mendapatkan 1 poin',
+                'description' => 'Berapa rupiah untuk mendapatkan 1 poin (default: Rp 10.000 = 1 poin)',
                 'is_active' => true,
             ],
             [
-                'key' => 'redeem_value',
-                'value' => '100',
-                'description' => 'Nilai rupiah per 1 poin saat redeem',
-                'is_active' => true,
-            ],
-            [
-                'key' => 'min_redeem',
-                'value' => '500',
-                'description' => 'Minimal poin yang bisa di-redeem',
+                'key' => 'min_redeem_amount',
+                'value' => '50000',
+                'description' => 'Minimal nilai rupiah yang bisa di-redeem',
                 'is_active' => true,
             ],
             [
@@ -38,8 +32,8 @@ class LoyaltySeeder extends Seeder
             ],
             [
                 'key' => 'redeem_options',
-                'value' => '500,1000,2000',
-                'description' => 'Pilihan jumlah poin untuk redeem (pisahkan dengan koma)',
+                'value' => '50000,100000,200000',
+                'description' => 'Pilihan nilai rupiah untuk redeem (pisahkan dengan koma)',
                 'is_active' => true,
             ],
             [
@@ -57,12 +51,16 @@ class LoyaltySeeder extends Seeder
             );
         }
 
-        // Default Tiers (placeholder values - can be configured by Owner)
+        // Default Tiers (threshold belanja tahunan)
+        // Pretty Pink: Rp 0 - 1.5jt
+        // Pretty Gold: Rp 1.5jt - ? (placeholder, owner bisa edit)
+        // Pretty Luxe: Rp ? + (placeholder, owner bisa edit)
         $tiers = [
             [
                 'name' => 'Pretty Pink',
                 'slug' => 'pretty-pink',
                 'min_annual_spend' => 0,
+                'max_annual_spend' => 1500000, // Rp 1.500.000
                 'multiplier' => 1.00,
                 'color' => '#ec4899',
                 'icon' => 'solar:heart-outline',
@@ -73,7 +71,8 @@ class LoyaltySeeder extends Seeder
             [
                 'name' => 'Pretty Gold',
                 'slug' => 'pretty-gold',
-                'min_annual_spend' => 1000000, // Placeholder: Rp 1.000.000
+                'min_annual_spend' => 1500001, // Rp 1.500.001
+                'max_annual_spend' => 5000000, // Placeholder: Rp 5.000.000
                 'multiplier' => 1.50,
                 'color' => '#f59e0b',
                 'icon' => 'solar:star-outline',
@@ -84,7 +83,8 @@ class LoyaltySeeder extends Seeder
             [
                 'name' => 'Pretty Luxe',
                 'slug' => 'pretty-luxe',
-                'min_annual_spend' => 5000000, // Placeholder: Rp 5.000.000
+                'min_annual_spend' => 5000001, // Placeholder: Rp 5.000.001
+                'max_annual_spend' => null, // Unlimited (tier tertinggi)
                 'multiplier' => 2.00,
                 'color' => '#8b5cf6',
                 'icon' => 'solar:crown-outline',
@@ -102,6 +102,6 @@ class LoyaltySeeder extends Seeder
         }
 
         $this->command->info('Loyalty settings and tiers seeded successfully!');
-        $this->command->info('Note: These are placeholder values. Configure actual values via CMS Settings > Loyalty.');
+        $this->command->info('Note: Tier thresholds are placeholders. Configure via CMS > Loyalty & Rewards.');
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\LoyaltyController;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
@@ -227,9 +228,9 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Settings/index', ['activeMenu' => 'api']);
         })->name('settings.api');
 
-        // Loyalty Settings
-        Route::get('/settings/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'settingsPage'])->name('settings.loyalty');
-        Route::get('/settings/loyalty-tiers', [\App\Http\Controllers\LoyaltyController::class, 'tierPage'])->name('settings.loyalty-tiers');
+        // Loyalty & Rewards (Menu Terpisah)
+        Route::get('/loyalty/settings', [LoyaltyController::class, 'settingsPage'])->name('loyalty.settings');
+        Route::get('/loyalty/tiers', [LoyaltyController::class, 'tierPage'])->name('loyalty.tiers');
 
         // User management routes
         Route::get('/settings/users/create', function () {

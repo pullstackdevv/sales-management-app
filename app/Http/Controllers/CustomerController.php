@@ -151,15 +151,45 @@ class CustomerController extends Controller
 
     public function show(Customer $customer): JsonResponse
     {
+        $customerData = $customer->load([
+            'addresses',
+            'orders' => function ($q) {
+                $q->with(['items', 'payments', 'shipping'])
+                    ->latest();
+            },
+            'loyaltyPoints.tier'
+        ]);
+
+        // Add loyalty points info
+        $loyaltyInfo = null;
+        if ($customer->loyaltyPoints) {
+            $progress = $customer->loyaltyPoints->getProgressToNextTier();
+            $loyaltyInfo = [
+                'current_points' => $customer->loyaltyPoints->current_points,
+                'lifetime_points' => $customer->loyaltyPoints->lifetime_points,
+                'annual_spend' => $customer->loyaltyPoints->annual_spend,
+                'annual_spend_year' => $customer->loyaltyPoints->annual_spend_year,
+                'tier' => $customer->loyaltyPoints->tier ? [
+                    'id' => $customer->loyaltyPoints->tier->id,
+                    'name' => $customer->loyaltyPoints->tier->name,
+                    'slug' => $customer->loyaltyPoints->tier->slug,
+                    'multiplier' => $customer->loyaltyPoints->tier->multiplier,
+                    'color' => $customer->loyaltyPoints->tier->color,
+                    'icon' => $customer->loyaltyPoints->tier->icon,
+                ] : null,
+                'next_tier' => $progress['next_tier'] ? [
+                    'name' => $progress['next_tier']->name,
+                    'min_annual_spend' => $progress['next_tier']->min_annual_spend,
+                    'remaining' => $progress['remaining'],
+                    'percentage' => $progress['percentage'],
+                ] : null,
+            ];
+        }
+
         return response()->json([
             'status' => 'success',
-            'data' => $customer->load([
-                'addresses',
-                'orders' => function ($q) {
-                    $q->with(['items', 'payments', 'shipping'])
-                        ->latest();
-                }
-            ])
+            'data' => $customerData,
+            'loyalty' => $loyaltyInfo
         ]);
     }
 

@@ -39,6 +39,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\BannerController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TagController;
+use App\Http\Controllers\LoyaltyController;
+use App\Http\Controllers\PointController;
 
 
 
@@ -248,11 +250,40 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Product tags sync
     Route::post('products/{product}/tags/sync', [ProductController::class, 'syncTags']);
+
+    // Loyalty routes (admin)
+    Route::prefix('loyalty')->group(function () {
+        Route::get('/settings', [LoyaltyController::class, 'getSettings']);
+        Route::post('/settings', [LoyaltyController::class, 'updateSettings']);
+        Route::get('/tiers', [LoyaltyController::class, 'getTiers']);
+        Route::post('/tiers', [LoyaltyController::class, 'storeTier']);
+        Route::get('/tiers/{tier}', [LoyaltyController::class, 'showTier']);
+        Route::put('/tiers/{tier}', [LoyaltyController::class, 'updateTier']);
+        Route::delete('/tiers/{tier}', [LoyaltyController::class, 'destroyTier']);
+        Route::post('/tiers/{tier}/toggle-status', [LoyaltyController::class, 'toggleTierStatus']);
+        Route::get('/summary', [PointController::class, 'getPointsSummary']);
+        Route::get('/customer-points', [PointController::class, 'getAllCustomerPoints']);
+    });
+
+    // Customer points routes (admin)
+    Route::prefix('customers/{customer}/points')->group(function () {
+        Route::get('/', [PointController::class, 'getCustomerPoints']);
+        Route::get('/history', [PointController::class, 'getCustomerHistory']);
+        Route::post('/adjust', [PointController::class, 'adjustPoints']);
+    });
 });
 
 // Public voucher routes (for checkout)
 Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
 Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
+
+// Public loyalty routes (for storefront)
+Route::prefix('loyalty')->group(function () {
+    Route::get('/tiers/active', [LoyaltyController::class, 'getActiveTiers']);
+    Route::get('/redeem-options', [PointController::class, 'getRedeemOptions']);
+    Route::post('/calculate-earn', [PointController::class, 'calculateEarnPoints']);
+    Route::post('/calculate-redeem', [PointController::class, 'calculateRedeemValue']);
+});
 
 // Payment Gateway Routes (public access for webhooks and order payment)
 Route::prefix('payment')->name('payment.')->group(function () {

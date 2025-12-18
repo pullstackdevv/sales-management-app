@@ -227,6 +227,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Settings/index', ['activeMenu' => 'api']);
         })->name('settings.api');
 
+        // Loyalty Settings
+        Route::get('/settings/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'settingsPage'])->name('settings.loyalty');
+        Route::get('/settings/loyalty-tiers', [\App\Http\Controllers\LoyaltyController::class, 'tierPage'])->name('settings.loyalty-tiers');
+
         // User management routes
         Route::get('/settings/users/create', function () {
             return Inertia::render('Settings/AddEditUser', ['mode' => 'create']);

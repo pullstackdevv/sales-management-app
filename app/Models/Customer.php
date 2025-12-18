@@ -42,4 +42,29 @@ class Customer extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+
+    public function loyaltyPoints()
+    {
+        return $this->hasOne(CustomerPoint::class);
+    }
+
+    public function pointTransactions()
+    {
+        return $this->hasMany(PointTransaction::class);
+    }
+
+    public function getLoyaltyPoint(): CustomerPoint
+    {
+        return CustomerPoint::getOrCreate($this->id);
+    }
+
+    public function getCurrentTier(): ?LoyaltyTier
+    {
+        return $this->getLoyaltyPoint()->tier;
+    }
+
+    public function getCurrentPoints(): int
+    {
+        return $this->getLoyaltyPoint()->current_points;
+    }
 }

@@ -21,6 +21,9 @@ class CourierRate extends Model
         'origin_district',
         'destination_province',
         'destination_district',
+        'destination_province_code',
+        'destination_regency_code',
+        'destination_district_code',
         'base_price',
         'min_weight',
         'max_weight',
@@ -46,5 +49,60 @@ class CourierRate extends Model
     public function courier()
     {
         return $this->belongsTo(Courier::class);
+    }
+    public function destinationProvince()
+    {
+        return $this->belongsTo(Wilayah::class, 'destination_province_code', 'kode');
+    }
+
+    /**
+     * Relationship ke wilayah kabupaten/kota
+     */
+    public function destinationRegency()
+    {
+        return $this->belongsTo(Wilayah::class, 'destination_regency_code', 'kode');
+    }
+
+    /**
+     * Relationship ke wilayah kecamatan
+     */
+    public function destinationDistrict()
+    {
+        return $this->belongsTo(Wilayah::class, 'destination_district_code', 'kode');
+    }
+
+    /**
+     * Scope untuk rate yang sudah ter-mapping dengan ID wilayah
+     */
+    public function scopeMapped($query)
+    {
+        return $query->whereNotNull('destination_district_code');
+    }
+
+    /**
+     * Scope untuk rate yang belum ter-mapping
+     */
+    public function scopeUnmapped($query)
+    {
+        return $query->whereNull('destination_district_code');
+    }
+
+    /**
+     * Check apakah rate ini sudah ter-mapping dengan sempurna
+     */
+    public function isMapped(): bool
+    {
+        return !is_null($this->destination_district_code);
+    }
+
+    /**
+     * Get match quality/method
+     */
+    public function getMatchQuality(): string
+    {
+        if (is_null($this->destination_district_code)) {
+            return 'not_matched';
+        }
+        return 'matched';
     }
 }

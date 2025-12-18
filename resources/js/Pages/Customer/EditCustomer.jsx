@@ -9,7 +9,7 @@ export default function EditCustomer({ customerId }) {
     const [loading, setLoading] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
     const [searchingCity, setSearchingCity] = useState(false);
-    
+
     // Form data state
     const [formData, setFormData] = useState({
         full_name: "",
@@ -19,7 +19,7 @@ export default function EditCustomer({ customerId }) {
         other_contact: "",
         category: "Pelanggan"
     });
-    
+
     // Address states
     const [addresses, setAddresses] = useState([{
         label: "Rumah",
@@ -34,16 +34,16 @@ export default function EditCustomer({ customerId }) {
         is_default: true
     }]);
     const [activeAddressIndex, setActiveAddressIndex] = useState(0);
-    
+
     // City search states
     const [cityQuery, setCityQuery] = useState("");
     const [cityResults, setCityResults] = useState([]);
     const [showCityDropdown, setShowCityDropdown] = useState(false);
     const [cachedRegencies, setCachedRegencies] = useState([]);
-    
+
     // Validation errors
     const [errors, setErrors] = useState({});
-    
+
     // Load customer data
     useEffect(() => {
         const loadCustomer = async () => {
@@ -51,7 +51,7 @@ export default function EditCustomer({ customerId }) {
                 const response = await api.get(`/customers/${customerId}`);
                 if (response.data.status === 'success') {
                     const customerData = response.data.data;
-                    
+
                     // Set form data
                     setFormData({
                         full_name: customerData.name || "",
@@ -61,7 +61,7 @@ export default function EditCustomer({ customerId }) {
                         other_contact: customerData.other_contact || "",
                         category: customerData.category || "Pelanggan"
                     });
-                    
+
                     // Set address data if exists
                     if (customerData.addresses && customerData.addresses.length > 0) {
                         const mappedAddresses = customerData.addresses.map(address => ({
@@ -78,7 +78,7 @@ export default function EditCustomer({ customerId }) {
                             is_default: address.is_default || false
                         }));
                         setAddresses(mappedAddresses);
-                        
+
                         // Set active address to default or first address
                         const defaultIndex = mappedAddresses.findIndex(addr => addr.is_default);
                         setActiveAddressIndex(defaultIndex >= 0 ? defaultIndex : 0);
@@ -97,12 +97,12 @@ export default function EditCustomer({ customerId }) {
                 setLoadingData(false);
             }
         };
-        
+
         if (customerId) {
             loadCustomer();
         }
     }, [customerId]);
-    
+
     // Handle input changes
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -126,7 +126,7 @@ export default function EditCustomer({ customerId }) {
             )));
         }
     };
-    
+
     // Handle address changes
     const handleAddressChange = (field, value) => {
         setAddresses(prev => {
@@ -164,17 +164,17 @@ export default function EditCustomer({ customerId }) {
             alert('Minimal harus ada satu alamat');
             return;
         }
-        
+
         const addressToRemove = addresses[index];
         const newAddresses = addresses.filter((_, i) => i !== index);
-        
+
         // If removing default address, set first address as default
         if (addressToRemove.is_default && newAddresses.length > 0) {
             newAddresses[0].is_default = true;
         }
-        
+
         setAddresses(newAddresses);
-        
+
         // Adjust active address index
         if (activeAddressIndex >= newAddresses.length) {
             setActiveAddressIndex(newAddresses.length - 1);
@@ -184,39 +184,39 @@ export default function EditCustomer({ customerId }) {
     };
 
     const setDefaultAddress = (index) => {
-        setAddresses(prev => 
+        setAddresses(prev =>
             prev.map((addr, i) => ({
                 ...addr,
                 is_default: i === index
             }))
         );
     };
-    
+
     // Load all regencies on component mount
-     useEffect(() => {
-         const loadAllRegencies = async () => {
-             if (cachedRegencies.length > 0) return; // Already loaded
-             
-             try {
-                 const response = await api.get('/wilayah/regencies');
-                 
-                 if (response.data.status === 'success') {
-                     setCachedRegencies(response.data.data);
-                 } else {
-                     console.error('Error loading regencies:', response.data.message);
-                 }
-             } catch (error) {
-                 console.error('Error loading regencies:', error);
-             }
-         };
-         
-         loadAllRegencies();
-     }, [cachedRegencies.length]);
-     
-     // Debounced city search
+    useEffect(() => {
+        const loadAllRegencies = async () => {
+            if (cachedRegencies.length > 0) return; // Already loaded
+
+            try {
+                const response = await api.get('/wilayah/regencies');
+
+                if (response.data.status === 'success') {
+                    setCachedRegencies(response.data.data);
+                } else {
+                    console.error('Error loading regencies:', response.data.message);
+                }
+            } catch (error) {
+                console.error('Error loading regencies:', error);
+            }
+        };
+
+        loadAllRegencies();
+    }, [cachedRegencies.length]);
+
+    // Debounced city search
     const searchTimeoutRef = useRef(null);
     const abortControllerRef = useRef(null);
-    
+
     const debouncedCitySearch = useCallback(async (query) => {
         if (query.length < 2) {
             setCityResults([]);
@@ -240,7 +240,7 @@ export default function EditCustomer({ customerId }) {
             setSearchingCity(false);
         }
     }, []);
-    
+
     // City search with debouncing
     const handleCitySearch = (e) => {
         const query = e.target.value;
@@ -248,7 +248,7 @@ export default function EditCustomer({ customerId }) {
 
         setAddresses(prev => prev.map((addr, i) => (
             i === activeAddressIndex
-                ? { ...addr, district: "", city: "", province: "", district_code: "", regency_code: "", province_code: "" }
+                ? { ...addr, district: "", city: "", province: "" }
                 : addr
         )));
         setErrors(prev => ({
@@ -257,18 +257,18 @@ export default function EditCustomer({ customerId }) {
             [`district_${activeAddressIndex}`]: null,
             [`province_${activeAddressIndex}`]: null
         }));
-        
+
         // Clear previous timeout
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
-        
+
         // Set new timeout for debouncing
         searchTimeoutRef.current = setTimeout(() => {
             debouncedCitySearch(query);
         }, 300); // 300ms delay
     };
-    
+
     // Select city from dropdown
     const selectCity = (city) => {
         setCityQuery(city.name);
@@ -279,15 +279,12 @@ export default function EditCustomer({ customerId }) {
                 district: city.district_name || '',
                 city: city.regency_name,
                 province: city.province_name,
-                district_code: city.code || '',
-                regency_code: city.regency_code || '',
-                province_code: city.province_code || ''
             };
             return newAddresses;
         });
         setShowCityDropdown(false);
         setCityResults([]);
-        
+
         setErrors(prev => ({
             ...prev,
             [`city_${activeAddressIndex}`]: null,
@@ -295,7 +292,7 @@ export default function EditCustomer({ customerId }) {
             [`province_${activeAddressIndex}`]: null
         }));
     };
-    
+
     // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -303,26 +300,26 @@ export default function EditCustomer({ customerId }) {
                 setShowCityDropdown(false);
             }
         };
-        
+
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-    
+
     // Form validation
     const validateForm = () => {
         const newErrors = {};
-        
+
         // Required fields validation
         if (!formData.full_name.trim()) {
             newErrors.full_name = 'Nama lengkap wajib diisi';
         }
-        
+
         if (!formData.phone.trim()) {
             newErrors.phone = 'Nomor telepon wajib diisi';
         } else if (!/^08[0-9]{8,11}$/.test(formData.phone)) {
             newErrors.phone = 'Format nomor telepon tidak valid (contoh: 081234567890)';
         }
-        
+
         // Validate all addresses
         let hasAddressErrors = false;
         addresses.forEach((address, index) => {
@@ -333,39 +330,39 @@ export default function EditCustomer({ customerId }) {
                 if (index === activeAddressIndex) newErrors.city = 'Silakan cari dan pilih kecamatan dari dropdown';
                 hasAddressErrors = true;
             }
-            
+
             if (address.postal_code.trim() && !/^[0-9]{5}$/.test(address.postal_code)) {
                 newErrors[`postal_code_${index}`] = 'Kode pos harus 5 digit angka';
                 if (index === activeAddressIndex) newErrors.postal_code = 'Kode pos harus 5 digit angka';
                 hasAddressErrors = true;
             }
-            
+
             if (!address.address_detail.trim()) {
                 newErrors[`address_detail_${index}`] = 'Alamat lengkap wajib diisi';
                 if (index === activeAddressIndex) newErrors.address_detail = 'Alamat lengkap wajib diisi';
                 hasAddressErrors = true;
             }
         });
-        
+
         // Ensure at least one address is set as default
         const hasDefaultAddress = addresses.some(addr => addr.is_default);
         if (!hasDefaultAddress && addresses.length > 0) {
             addresses[0].is_default = true;
         }
-        
+
         // Email validation (optional but must be valid if provided)
         if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
             newErrors.email = 'Format email tidak valid';
         }
-        
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
-    
+
     // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!validateForm()) {
             Swal.fire({
                 icon: 'error',
@@ -375,9 +372,9 @@ export default function EditCustomer({ customerId }) {
             });
             return;
         }
-        
+
         setLoading(true);
-        
+
         try {
             const customerData = {
                 name: formData.full_name,
@@ -387,27 +384,24 @@ export default function EditCustomer({ customerId }) {
                 other_contact: formData.other_contact || null,
                 category: formData.category,
                 addresses: addresses.map(addr => ({
-                     id: addr.id || null,
-                     label: addr.label,
-                     recipient_name: addr.recipient_name || formData.full_name,
-                     recipient_phone: addr.recipient_phone || formData.phone,
+                    id: addr.id || null,
+                    label: addr.label,
+                    recipient_name: addr.recipient_name || formData.full_name,
+                    recipient_phone: addr.recipient_phone || formData.phone,
                     is_dropship: !!addr.is_dropship,
-                     province: addr.province,
-                     province_code: addr.province_code || '',
-                     city: addr.city,
-                     regency_code: addr.regency_code || '',
-                     district: addr.district,
-                     district_code: addr.district_code || '',
-                     postal_code: addr.postal_code,
-                     address_detail: addr.address_detail,
-                     is_default: addr.is_default
-                 }))
+                    province: addr.province,
+                    city: addr.city,
+                    district: addr.district,
+                    postal_code: addr.postal_code,
+                    address_detail: addr.address_detail,
+                    is_default: addr.is_default
+                }))
             };
-            
+
             const isExemptPhone = (formData.phone || '').replace(/\s/g, '') === '085000000000';
             const config = isExemptPhone ? { headers: { 'X-Manual-Order': '1' } } : undefined;
             const response = await api.put(`/customers/${customerId}`, customerData, config);
-            
+
             if (response.data.status === 'success') {
                 await Swal.fire({
                     icon: 'success',
@@ -415,7 +409,7 @@ export default function EditCustomer({ customerId }) {
                     text: 'Customer berhasil diperbarui',
                     confirmButtonColor: '#3B82F6'
                 });
-                
+
                 // Redirect to customer list
                 window.location.href = '/cms/customer/data';
             } else {
@@ -423,14 +417,14 @@ export default function EditCustomer({ customerId }) {
             }
         } catch (error) {
             console.error('Error updating customer:', error);
-            
+
             let errorMessage = 'Terjadi kesalahan saat memperbarui customer';
-            
+
             // Check errors array first for specific messages
-             if (error.response?.data?.errors) {
+            if (error.response?.data?.errors) {
                 // Handle specific error format from API
                 const apiErrors = error.response.data.errors;
-                
+
                 if (Array.isArray(apiErrors)) {
                     // Handle array format errors
                     const specificError = apiErrors.find(err => err.message);
@@ -443,10 +437,10 @@ export default function EditCustomer({ customerId }) {
                     // Handle object format validation errors
                     setErrors(apiErrors);
                     errorMessage = apiErrors.phone?.[0] || 'Mohon periksa kembali data yang Anda masukkan';
-                 }
-             } else if (error.response?.data?.message) {
-                 errorMessage = error.response.data.message;
-             }
+                }
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            }
 
             Swal.fire({
                 icon: 'error',
@@ -500,9 +494,8 @@ export default function EditCustomer({ customerId }) {
                                             Kategori Customer <span className="text-red-500">*</span>
                                         </label>
                                         <select
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                                errors.category ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.category ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={formData.category}
                                             onChange={(e) => handleInputChange('category', e.target.value)}
                                         >
@@ -514,55 +507,53 @@ export default function EditCustomer({ customerId }) {
                                             <p className="text-red-500 text-xs mt-1">{errors.category}</p>
                                         )}
                                     </div>
-                                    
+
                                     <div>
                                         <label className="text-sm font-medium">
                                             Nama Lengkap <span className="text-red-500">*</span>
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                                errors.full_name ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.full_name ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={formData.full_name}
-                                             onChange={(e) => {
-                                                 handleInputChange('full_name', e.target.value);
-                                                 setAddresses(prev => {
-                                                     const newAddresses = [...prev];
-                                                     newAddresses[activeAddressIndex] = {
-                                                         ...newAddresses[activeAddressIndex],
-                                                         recipient_name: e.target.value
-                                                     };
-                                                     return newAddresses;
-                                                 });
-                                             }}
+                                            onChange={(e) => {
+                                                handleInputChange('full_name', e.target.value);
+                                                setAddresses(prev => {
+                                                    const newAddresses = [...prev];
+                                                    newAddresses[activeAddressIndex] = {
+                                                        ...newAddresses[activeAddressIndex],
+                                                        recipient_name: e.target.value
+                                                    };
+                                                    return newAddresses;
+                                                });
+                                            }}
                                             placeholder="Masukkan nama lengkap"
                                         />
                                         {errors.full_name && (
-                                             <p className="text-red-500 text-xs mt-1">{errors.full_name}</p>
-                                         )}
+                                            <p className="text-red-500 text-xs mt-1">{errors.full_name}</p>
+                                        )}
                                     </div>
 
                                     <div className="relative">
                                         <label className="text-sm font-medium">
                                             No. HP / Telepon <span className="text-red-500">*</span>
                                         </label>
-                                        <input 
+                                        <input
                                             type="tel"
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                                errors.phone ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.phone ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={formData.phone}
                                             onChange={(e) => {
                                                 handleInputChange('phone', e.target.value);
                                                 setAddresses(prev => {
-                                                     const newAddresses = [...prev];
-                                                     newAddresses[activeAddressIndex] = {
-                                                         ...newAddresses[activeAddressIndex],
-                                                         recipient_phone: e.target.value
-                                                     };
-                                                     return newAddresses;
-                                                 });
+                                                    const newAddresses = [...prev];
+                                                    newAddresses[activeAddressIndex] = {
+                                                        ...newAddresses[activeAddressIndex],
+                                                        recipient_phone: e.target.value
+                                                    };
+                                                    return newAddresses;
+                                                });
                                             }}
                                             placeholder="08xxxxxxxxxx"
                                         />
@@ -575,11 +566,10 @@ export default function EditCustomer({ customerId }) {
                                         <label className="text-sm font-medium">
                                             Email
                                         </label>
-                                        <input 
+                                        <input
                                             type="email"
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                                errors.email ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.email ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={formData.email}
                                             onChange={(e) => handleInputChange('email', e.target.value)}
                                             placeholder="customer@email.com"
@@ -593,7 +583,7 @@ export default function EditCustomer({ customerId }) {
                                         <label className="text-sm font-medium">
                                             Line ID
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
                                             value={formData.line_id}
@@ -606,7 +596,7 @@ export default function EditCustomer({ customerId }) {
                                         <label className="text-sm font-medium">
                                             Other Contact
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
                                             value={formData.other_contact}
@@ -641,11 +631,10 @@ export default function EditCustomer({ customerId }) {
                                                 key={index}
                                                 type="button"
                                                 onClick={() => setActiveAddressIndex(index)}
-                                                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-200 ${
-                                                    activeAddressIndex === index
+                                                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-200 ${activeAddressIndex === index
                                                         ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-700'
                                                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                                }`}
+                                                    }`}
                                             >
                                                 {address.label}
                                                 {address.is_default && (
@@ -711,7 +700,7 @@ export default function EditCustomer({ customerId }) {
                                             type="text"
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                             value={addresses[activeAddressIndex]?.recipient_phone || ''}
-                                        onChange={(e) => handleAddressChange('recipient_phone', e.target.value)}
+                                            onChange={(e) => handleAddressChange('recipient_phone', e.target.value)}
                                             placeholder="08xxxxxxxxxx"
                                         />
                                     </div>
@@ -726,7 +715,7 @@ export default function EditCustomer({ customerId }) {
                                     />
                                     <span className="text-sm">Pesanan dropship</span>
                                 </div>
-                                
+
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -738,13 +727,12 @@ export default function EditCustomer({ customerId }) {
                                         <div className="relative">
                                             <input
                                                 type="text"
-                                                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                                    errors.city
+                                                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.city
                                                         ? 'border-red-500'
                                                         : (addresses[activeAddressIndex]?.district && addresses[activeAddressIndex]?.city)
                                                             ? 'border-green-500 bg-green-50'
                                                             : 'border-gray-300'
-                                                }`}
+                                                    }`}
                                                 placeholder="Ketik nama kecamatan..."
                                                 value={cityQuery}
                                                 onChange={handleCitySearch}
@@ -816,16 +804,15 @@ export default function EditCustomer({ customerId }) {
                                             <p className="text-red-500 text-xs mt-1">{errors.city}</p>
                                         )}
                                     </div>
-                                    
+
                                     <div>
                                         <label className="text-sm font-medium">
                                             Kode Pos (opsional)
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                                errors.postal_code ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.postal_code ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={addresses[activeAddressIndex]?.postal_code || ''}
                                             onChange={(e) => handleAddressChange('postal_code', e.target.value)}
                                             placeholder="Masukkan kode pos"
@@ -839,10 +826,9 @@ export default function EditCustomer({ customerId }) {
                                         <label className="text-sm font-medium">
                                             Alamat Lengkap <span className="text-red-500">*</span>
                                         </label>
-                                        <textarea 
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm min-h-[80px] ${
-                                                errors.address_detail ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                        <textarea
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm min-h-[80px] ${errors.address_detail ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={addresses[activeAddressIndex]?.address_detail || ''}
                                             onChange={(e) => handleAddressChange('address_detail', e.target.value)}
                                             placeholder="Masukkan alamat lengkap (nama jalan, nomor rumah, RT/RW, dll)"
@@ -856,7 +842,7 @@ export default function EditCustomer({ customerId }) {
                         </form>
 
                         <div className="mt-6 flex gap-3">
-                            <button 
+                            <button
                                 type="submit"
                                 onClick={handleSubmit}
                                 disabled={loading}
@@ -867,7 +853,7 @@ export default function EditCustomer({ customerId }) {
                                 )}
                                 {loading ? 'Menyimpan...' : 'Perbarui Customer'}
                             </button>
-                            <button 
+                            <button
                                 type="button"
                                 onClick={() => window.history.back()}
                                 className="px-5 py-2 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
@@ -894,7 +880,7 @@ export default function EditCustomer({ customerId }) {
                                 resi melekat pada customer dropship tersebut.
                             </p>
                         </div>
-                        
+
                         <div className="bg-blue-50 p-4 rounded-lg text-sm">
                             <div className="flex items-center gap-2 mb-2">
                                 <Icon icon="mdi:information" className="text-blue-600" />

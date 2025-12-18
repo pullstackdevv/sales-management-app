@@ -67,9 +67,14 @@ Artisan::command('audit:wilayah-ongkir {--export=xlsx} {--limit=0} {--path=}', f
         $existsByCode = $canon ? Wilayah::where('kode', $canon)->exists() : false;
         $exists = $existsByCode;
         if (!$existsByCode) {
-            // Try resolve via matcher
-            [$pCode, $rCode, $dCode] = WilayahMatcher::matchCodes($r->destination_province, $r->destination_city, $r->destination_district, [$provByName, $regByProv, $distByReg]);
-            $exists = $dCode ? true : Wilayah::kecamatan()
+            $match = WilayahMatcher::matchCodes(
+                $r->destination_province,
+                $r->destination_city,
+                $r->destination_district,
+                [$provByName, $regByProv, $distByReg]
+            );
+            $matchedDistrictCode = $match['district']['kode'] ?? null;
+            $exists = $matchedDistrictCode ? true : Wilayah::kecamatan()
                 ->where('nama','like','%'.($r->destination_district ?? '').'%')
                 ->orWhere('nama','like','%'.$dn.'%')
                 ->exists();

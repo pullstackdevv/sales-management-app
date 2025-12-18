@@ -36,16 +36,15 @@ export default function CourierRates() {
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedServiceType, setSelectedServiceType] = useState("");
   const [serviceTypes, setServiceTypes] = useState([]);
-  const [missingCodeFilter, setMissingCodeFilter] = useState('');
-  
+
   // Debounced values for API calls
   const debouncedSearchTerm = useDebounce(searchTerm, DEBOUNCE_DELAY_MS);
   const debouncedSelectedProvince = useDebounce(selectedProvince, DEBOUNCE_DELAY_MS);
   const debouncedSelectedCity = useDebounce(selectedCity, DEBOUNCE_DELAY_MS);
   const debouncedSelectedDistrict = useDebounce(selectedDistrict, DEBOUNCE_DELAY_MS);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState(null);
-  const [importLoading, setImportLoading] = useState(false);
+  // const [showImportModal, setShowImportModal] = useState(false);
+  // const [importFile, setImportFile] = useState(null);
+  // const [importLoading, setImportLoading] = useState(false);
   const [importJobId, setImportJobId] = useState(null);
   const [importStatus, setImportStatus] = useState(null);
   const [importProgress, setImportProgress] = useState(0);
@@ -60,11 +59,16 @@ export default function CourierRates() {
     to: 0
   });
   const [currentPage, setCurrentPage] = useState(1);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [remapExisting, setRemapExisting] = useState(true);
+
 
   // Get courier ID from URL params
   const urlParams = new URLSearchParams(window.location.search);
   const courierIdFromUrl = urlParams.get('courier_id');
-  
+
   // Check for active imports on page load
   const checkActiveImports = async () => {
     try {
@@ -73,15 +77,15 @@ export default function CourierRates() {
       if (courierIdFromUrl) {
         params.append('courier_id', courierIdFromUrl);
       }
-      
+
       const response = await api.get(`${API_ROUTES.courierRates.activeImports || '/api/courier-rates/active-imports'}?${params.toString()}`);
-      
+
       if (response.data.success && response.data.data && response.data.data.active_imports && response.data.data.active_imports.length > 0) {
         const activeImport = response.data.data.active_imports[0]; // Get the most recent active import
         // Set both importJobId and a backup activeImportId for refresh functionality
         setImportJobId(activeImport.id);
-        setImportStatus({...activeImport, activeImportId: activeImport.id});
-        
+        setImportStatus({ ...activeImport, activeImportId: activeImport.id });
+
         if (activeImport.status === 'processing') {
           // Extract progress if available
           const progressMatch = activeImport.message?.match(/Progress: ([\d.]+)%/);
@@ -98,7 +102,7 @@ export default function CourierRates() {
       setCheckingActiveImports(false);
     }
   };
-  
+
   // Find TIKI courier ID
   const tikiCourier = couriers.find(courier => courier.name.toLowerCase().includes('tiki'));
   const tikiCourierId = tikiCourier?.id || null;
@@ -108,7 +112,7 @@ export default function CourierRates() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      
+
       if (selectedCourier || courierIdFromUrl) {
         params.append('courier_id', selectedCourier || courierIdFromUrl);
       }
@@ -124,21 +128,18 @@ export default function CourierRates() {
       if (selectedServiceType) {
         params.append('service_type', selectedServiceType);
       }
-      if (missingCodeFilter) {
-        params.append('missing_code', missingCodeFilter);
-      }
       if (debouncedSearchTerm) {
         params.append('search', debouncedSearchTerm);
       }
-      
+
       // Add pagination parameters
       params.append('page', currentPage);
       params.append('per_page', 15);
-      
+
       const response = await api.get(`${API_ROUTES.courierRates.index}?${params.toString()}`);
       const ratesData = response.data.data?.rates || response.data.data?.data || response.data.data || [];
       const paginationData = response.data.data?.pagination || {};
-      
+
       setRates(Array.isArray(ratesData) ? ratesData : []);
       setPagination(paginationData);
       setError(null);
@@ -179,14 +180,14 @@ export default function CourierRates() {
       'application/vnd.ms-excel', // .xls
       'text/csv', // .csv
     ];
-    
+
     if (!allowedTypes.includes(file.type)) {
       return {
         valid: false,
         message: 'File harus berformat Excel (.xlsx, .xls) atau CSV (.csv)'
       };
     }
-    
+
     // Check file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
@@ -195,7 +196,7 @@ export default function CourierRates() {
         message: 'Ukuran file tidak boleh lebih dari 10MB'
       };
     }
-    
+
     return { valid: true };
   };
 
@@ -218,25 +219,27 @@ export default function CourierRates() {
       setImportLoading(true);
       const formData = new FormData();
       formData.append('file', importFile);
-      
+      formData.append("remap_existing", remapExisting ? 1 : 0);
+
       const response = await api.post(API_ROUTES.courierRates.import, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      
+
       const jobId = response?.data?.data?.job_id;
       setImportJobId(jobId);
       setShowImportModal(false);
       setImportFile(null);
-      
+      setRemapExisting(true);
+
       Swal.fire('Berhasil!', 'Import dimulai. Anda dapat memeriksa status import.', 'success');
-      
+
       // Start checking import status
       if (jobId) {
         checkImportStatus(jobId);
       }
-      
+
       // Set initial status as queued
       setImportStatus({ status: 'queued', message: 'Import telah dimulai dan sedang dalam antrian...' });
       setImportProgress(0);
@@ -255,7 +258,7 @@ export default function CourierRates() {
       const response = await api.get(API_ROUTES.courierRates.importStatus(jobId));
       const status = response?.data?.data || {};
       setImportStatus(status);
-      
+
       if (status.status === 'completed') {
         setImportProgress(100);
         Swal.fire({
@@ -331,7 +334,7 @@ export default function CourierRates() {
         try {
           const response = await api.get(API_ROUTES.courierRates.importStatus(importJobId));
           const result = response?.data?.data || {};
-          
+
           if (result.status === 'completed') {
             setImportStatus(result);
             setImportProgress(100);
@@ -377,7 +380,7 @@ export default function CourierRates() {
         }
       }, 2000); // Check every 2 seconds
     }
-    
+
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -424,65 +427,8 @@ export default function CourierRates() {
             <h2 className="text-2xl font-bold text-gray-900">Tarif Courier</h2>
             <p className="text-gray-600 mt-1">Kelola tarif pengiriman untuk setiap courier</p>
           </div>
-        <div className="flex gap-2">
-          {(importJobId || importStatus?.activeImportId || importStatus?.id) && importStatus?.status === 'processing' && (
-            <button
-              onClick={() => {
-                const jobId = importJobId || importStatus.activeImportId || importStatus.id;
-                if (jobId) {
-                  checkImportStatus(jobId);
-                } else {
-                  console.error('No job ID available for status check');
-                  Swal.fire('Error!', 'Tidak dapat memeriksa status import: ID job tidak ditemukan', 'error');
-                }
-              }}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-              title="Refresh status import"
-            >
-              <Icon icon="solar:refresh-outline" className="w-5 h-5" />
-              Cek Status
-            </button>
-          )}
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-            disabled={importStatus?.status === 'processing'}
-            title={importStatus?.status === 'processing' ? 'Import sedang berjalan' : 'Import file tarif baru'}
-          >
-            <Icon icon="solar:upload-outline" className="w-5 h-5" />
-            Import Tarif
-          </button>
-        </div>
-      </div>
-
-      {/* Import Status */}
-      {(importStatus || checkingActiveImports) && (
-        <div className={`p-4 rounded-lg border ${
-          checkingActiveImports ? 'bg-blue-50 border-blue-200 text-blue-700' :
-          importStatus?.status === 'completed' ? 'bg-green-50 border-green-200 text-green-700' :
-          importStatus?.status === 'failed' ? 'bg-red-50 border-red-200 text-red-700' :
-          'bg-yellow-50 border-yellow-200 text-yellow-700'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Icon 
-                icon={
-                  checkingActiveImports ? 'solar:refresh-outline' :
-                  importStatus?.status === 'completed' ? 'solar:check-circle-outline' :
-                  importStatus?.status === 'failed' ? 'solar:close-circle-outline' :
-                  'solar:clock-circle-outline'
-                } 
-                className={`w-5 h-5 ${
-                  (importStatus?.status === 'processing' || checkingActiveImports) ? 'animate-spin' : ''
-                }`}
-              />
-              <span className="font-medium">
-                {checkingActiveImports ? 'Memeriksa import yang sedang berjalan...' :
-                 `Status Import: ${importStatus?.status === 'completed' ? 'Selesai' :
-                                  importStatus?.status === 'failed' ? 'Gagal' : 'Sedang Diproses'}`}
-              </span>
-            </div>
-            {importStatus && importStatus.status !== 'completed' && importStatus.status !== 'failed' && (
+          <div className="flex gap-2">
+            {(importJobId || importStatus?.activeImportId || importStatus?.id) && importStatus?.status === 'processing' && (
               <button
                 onClick={() => {
                   const jobId = importJobId || importStatus.activeImportId || importStatus.id;
@@ -493,251 +439,282 @@ export default function CourierRates() {
                     Swal.fire('Error!', 'Tidak dapat memeriksa status import: ID job tidak ditemukan', 'error');
                   }
                 }}
-                className="text-xs bg-white bg-opacity-50 hover:bg-opacity-75 px-2 py-1 rounded border border-current transition-colors"
-                title="Refresh status"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                title="Refresh status import"
               >
-                <Icon icon="solar:refresh-outline" className="w-4 h-4" />
+                <Icon icon="solar:refresh-outline" className="w-5 h-5" />
+                Cek Status
               </button>
             )}
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              disabled={importStatus?.status === 'processing'}
+              title={importStatus?.status === 'processing' ? 'Import sedang berjalan' : 'Import file tarif baru'}
+            >
+              <Icon icon="solar:upload-outline" className="w-5 h-5" />
+              Import Tarif
+            </button>
           </div>
-          {!checkingActiveImports && (importStatus?.message || importStatusMessage) && (
-            <p className="text-sm mt-1">{importStatusMessage || importStatus?.message}</p>
-          )}
-          {!checkingActiveImports && importStatus?.status === 'processing' && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs mb-1">
-                <span>Progress</span>
-                <span>{Math.round(importProgress)}%</span>
+        </div>
+
+        {/* Import Status */}
+        {(importStatus || checkingActiveImports) && (
+          <div className={`p-4 rounded-lg border ${checkingActiveImports ? 'bg-blue-50 border-blue-200 text-blue-700' :
+            importStatus?.status === 'completed' ? 'bg-green-50 border-green-200 text-green-700' :
+              importStatus?.status === 'failed' ? 'bg-red-50 border-red-200 text-red-700' :
+                'bg-yellow-50 border-yellow-200 text-yellow-700'
+            }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon
+                  icon={
+                    checkingActiveImports ? 'solar:refresh-outline' :
+                      importStatus?.status === 'completed' ? 'solar:check-circle-outline' :
+                        importStatus?.status === 'failed' ? 'solar:close-circle-outline' :
+                          'solar:clock-circle-outline'
+                  }
+                  className={`w-5 h-5 ${(importStatus?.status === 'processing' || checkingActiveImports) ? 'animate-spin' : ''
+                    }`}
+                />
+                <span className="font-medium">
+                  {checkingActiveImports ? 'Memeriksa import yang sedang berjalan...' :
+                    `Status Import: ${importStatus?.status === 'completed' ? 'Selesai' :
+                      importStatus?.status === 'failed' ? 'Gagal' : 'Sedang Diproses'}`}
+                </span>
               </div>
-              <div className="bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                  style={{ width: `${importProgress}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-          {!checkingActiveImports && importStatus?.status === 'completed' && importStatus?.summary && (
-            <div className="mt-2 text-sm">
-              <p>✓ {importStatus.summary.processed || 0} data berhasil diproses</p>
-              {importStatus.summary.errors > 0 && (
-                <p className="text-orange-600">⚠ {importStatus.summary.errors} data gagal diproses</p>
+              {importStatus && importStatus.status !== 'completed' && importStatus.status !== 'failed' && (
+                <button
+                  onClick={() => {
+                    const jobId = importJobId || importStatus.activeImportId || importStatus.id;
+                    if (jobId) {
+                      checkImportStatus(jobId);
+                    } else {
+                      console.error('No job ID available for status check');
+                      Swal.fire('Error!', 'Tidak dapat memeriksa status import: ID job tidak ditemukan', 'error');
+                    }
+                  }}
+                  className="text-xs bg-white bg-opacity-50 hover:bg-opacity-75 px-2 py-1 rounded border border-current transition-colors"
+                  title="Refresh status"
+                >
+                  <Icon icon="solar:refresh-outline" className="w-4 h-4" />
+                </button>
               )}
             </div>
-          )}
-          {!checkingActiveImports && importStatus?.status === 'processing' && (
-            <div className="mt-2 text-xs text-gray-600">
-              💡 <em>Data akan otomatis muncul di tabel setelah import selesai. Halaman akan diperbarui secara otomatis.</em>
-            </div>
-          )}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <p className="font-medium">Error!</p>
-          <p className="text-sm">{error}</p>
-        </div>
-      ) : (
-        <>
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-lg shadow-sm border space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Courier
-                </label>
-                <select
-                  value={selectedCourier || tikiCourierId || ''}
-                  onChange={(e) => setSelectedCourier(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                  disabled
-                >
-                  {tikiCourier ? (
-                    <option value={tikiCourier.id}>{tikiCourier.name}</option>
-                  ) : (
-                    <option value="">TIKI (Tidak ditemukan)</option>
-                  )}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">Hanya courier TIKI yang memiliki data tarif</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Provinsi
-                </label>
-                <input
-                  type="text"
-                  value={selectedProvince}
-                  onChange={(e) => setSelectedProvince(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Filter provinsi"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kota
-                </label>
-                <input
-                  type="text"
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Filter kota"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kecamatan
-                </label>
-                <input
-                  type="text"
-                  value={selectedDistrict}
-                  onChange={(e) => setSelectedDistrict(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Filter kecamatan"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Layanan
-                </label>
-                <select
-                  value={selectedServiceType}
-                  onChange={(e) => setSelectedServiceType(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Semua Layanan</option>
-                  {serviceTypes.map((s) => (
-                    <option key={s.code} value={s.code}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Pencarian
-                </label>
-                <div className="relative">
-                  <Icon
-                    icon="solar:magnifer-outline"
-                    className="absolute left-3 top-3 w-5 h-5 text-gray-400"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Cari tarif..."
-                    className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+            {!checkingActiveImports && (importStatus?.message || importStatusMessage) && (
+              <p className="text-sm mt-1">{importStatusMessage || importStatus?.message}</p>
+            )}
+            {!checkingActiveImports && importStatus?.status === 'processing' && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Progress</span>
+                  <span>{Math.round(importProgress)}%</span>
+                </div>
+                <div className="bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${importProgress}%` }}
+                  ></div>
                 </div>
               </div>
+            )}
+            {!checkingActiveImports && importStatus?.status === 'completed' && importStatus?.summary && (
+              <div className="mt-2 text-sm">
+                <p>✓ {importStatus.summary.processed || 0} data berhasil diproses</p>
+                {importStatus.summary.errors > 0 && (
+                  <p className="text-orange-600">⚠ {importStatus.summary.errors} data gagal diproses</p>
+                )}
+              </div>
+            )}
+            {!checkingActiveImports && importStatus?.status === 'processing' && (
+              <div className="mt-2 text-xs text-gray-600">
+                💡 <em>Data akan otomatis muncul di tabel setelah import selesai. Halaman akan diperbarui secara otomatis.</em>
+              </div>
+            )}
+          </div>
+        )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Filter Kode Wilayah
-                </label>
-                <select
-                  value={missingCodeFilter}
-                  onChange={(e) => setMissingCodeFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Semua</option>
-                  <option value="province">Tanpa Kode Provinsi</option>
-                  <option value="regency">Tanpa Kode Kota/Kab.</option>
-                  <option value="district">Tanpa Kode Kecamatan</option>
-                </select>
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <p className="font-medium">Error!</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        ) : (
+          <>
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Courier
+                  </label>
+                  <select
+                    value={selectedCourier || tikiCourierId || ''}
+                    onChange={(e) => setSelectedCourier(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                    disabled
+                  >
+                    {tikiCourier ? (
+                      <option value={tikiCourier.id}>{tikiCourier.name}</option>
+                    ) : (
+                      <option value="">TIKI (Tidak ditemukan)</option>
+                    )}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Hanya courier TIKI yang memiliki data tarif</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Provinsi
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedProvince}
+                    onChange={(e) => setSelectedProvince(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Filter provinsi"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Kota
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Filter kota"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Kecamatan
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedDistrict}
+                    onChange={(e) => setSelectedDistrict(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Filter kecamatan"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Layanan
+                  </label>
+                  <select
+                    value={selectedServiceType}
+                    onChange={(e) => setSelectedServiceType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Semua Layanan</option>
+                    {serviceTypes.map((s) => (
+                      <option key={s.code} value={s.code}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Pencarian
+                  </label>
+                  <div className="relative">
+                    <Icon
+                      icon="solar:magnifer-outline"
+                      className="absolute left-3 top-3 w-5 h-5 text-gray-400"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Cari tarif..."
+                      className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Rates Table */}
-          <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Courier
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Asal
+            {/* Rates Table */}
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Courier
                       </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tujuan
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Kode Wilayah
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Asal
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tujuan
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Kecocokan
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Layanan
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tarif Dasar
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estimasi
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredRates.map((rate) => (
-                    <tr key={rate.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {rate.courier?.name || '-'}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {rate.courier?.code || ''}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {rate.origin?.city || '-'}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {rate.origin?.province || ''}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {rate.destination?.district || '-'}
-                        </div>
-                        <div className="text-sm text-gray-900">
-                          {rate.destination?.city || '-'}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {rate.destination?.province || ''}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs text-gray-900">
-                          Prov: {rate.destination?.province_code || '-'}
-                        </div>
-                        <div className="text-xs text-gray-900">
-                          Kota/Kab: {rate.destination?.regency_code || '-'}
-                        </div>
-                        <div className="text-xs text-gray-900">
-                          Kec: {rate.destination?.district_code || '-'}
-                        </div>
-                        {(!rate.destination?.district_code) && (
-                          <span className="mt-1 inline-block px-2 py-0.5 text-xs rounded bg-red-100 text-red-700">Belum ada kode kecamatan</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Layanan
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Tarif Dasar
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estimasi
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredRates.map((rate) => (
+                      <tr key={rate.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {rate.courier?.name || '-'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {rate.courier?.code || ''}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {rate.origin?.city || '-'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {rate.origin?.province || ''}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {rate.destination?.district || '-'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {rate.destination?.district_code ? `Kode: ${rate.destination.district_code}` : ''}
+                          </div>
+                          <div className="text-sm text-gray-900">
+                            {rate.destination?.city || '-'}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {rate.destination?.city_code ? `Kode: ${rate.destination.city_code}` : ''}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {rate.destination?.province || ''}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {rate.destination?.province_code ? `Kode: ${rate.destination.province_code}` : ''}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
                         <span
                           className={`px-2 py-1 text-xs font-semibold rounded-full ${
                             rate.destination?.district_code
@@ -748,242 +725,289 @@ export default function CourierRates() {
                           {rate.destination?.district_code ? "Sesuai" : "Belum"}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {rate.service?.type || '-'}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {rate.service?.name || ''}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          Rp {rate.pricing?.base_price?.toLocaleString('id-ID') || '0'}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          +Rp {rate.pricing?.price_per_kg?.toLocaleString('id-ID') || '0'}/kg
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {rate.delivery?.estimated_days || '-'} hari
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            rate.availability?.is_available
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {rate.service?.type || '-'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {rate.service?.name || ''}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            Rp {rate.pricing?.base_price?.toLocaleString('id-ID') || '0'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            +Rp {rate.pricing?.price_per_kg?.toLocaleString('id-ID') || '0'}/kg
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {rate.delivery?.estimated_days || '-'} hari
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${rate.availability?.is_available
                               ? "bg-green-100 text-green-800"
                               : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {rate.availability?.is_available ? "Tersedia" : "Tidak Tersedia"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {filteredRates.length === 0 && (
-              <div className="text-center py-12">
-                <Icon
-                  icon="solar:delivery-outline"
-                  className="w-12 h-12 text-gray-400 mx-auto mb-4"
-                />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Tidak ada tarif ditemukan
-                </h3>
-                <p className="text-gray-500">
-                  {searchTerm || selectedCourier || selectedProvince || selectedCity || selectedDistrict || selectedServiceType
-                    ? "Coba ubah filter pencarian"
-                    : "Belum ada data tarif courier"}
-                </p>
+                              }`}
+                          >
+                            {rate.availability?.is_available ? "Tersedia" : "Tidak Tersedia"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
 
-          {/* Pagination */}
-          {pagination.total > 0 && (
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setCurrentPage(Math.min(pagination.last_page, currentPage + 1))}
-                  disabled={currentPage === pagination.last_page}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Menampilkan{' '}
-                    <span className="font-medium">{pagination.from}</span>
-                    {' '}sampai{' '}
-                    <span className="font-medium">{pagination.to}</span>
-                    {' '}dari{' '}
-                    <span className="font-medium">{pagination.total}</span>
-                    {' '}hasil
+              {filteredRates.length === 0 && (
+                <div className="text-center py-12">
+                  <Icon
+                    icon="solar:delivery-outline"
+                    className="w-12 h-12 text-gray-400 mx-auto mb-4"
+                  />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Tidak ada tarif ditemukan
+                  </h3>
+                  <p className="text-gray-500">
+                    {searchTerm || selectedCourier || selectedProvince || selectedCity || selectedDistrict || selectedServiceType
+                      ? "Coba ubah filter pencarian"
+                      : "Belum ada data tarif courier"}
                   </p>
                 </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Icon icon="solar:alt-arrow-left-outline" className="h-5 w-5" />
-                    </button>
-                    
-                    {/* Page numbers */}
-                    {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
-                      let pageNum;
-                      if (pagination.last_page <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= pagination.last_page - 2) {
-                        pageNum = pagination.last_page - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            currentPage === pageNum
+              )}
+            </div>
+
+            {/* Pagination */}
+            {pagination.total > 0 && (
+              <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(pagination.last_page, currentPage + 1))}
+                    disabled={currentPage === pagination.last_page}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Menampilkan{' '}
+                      <span className="font-medium">{pagination.from}</span>
+                      {' '}sampai{' '}
+                      <span className="font-medium">{pagination.to}</span>
+                      {' '}dari{' '}
+                      <span className="font-medium">{pagination.total}</span>
+                      {' '}hasil
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Icon icon="solar:alt-arrow-left-outline" className="h-5 w-5" />
+                      </button>
+
+                      {/* Page numbers */}
+                      {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
+                        let pageNum;
+                        if (pagination.last_page <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= pagination.last_page - 2) {
+                          pageNum = pagination.last_page - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === pageNum
                               ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                               : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                    
-                    <button
-                      onClick={() => setCurrentPage(Math.min(pagination.last_page, currentPage + 1))}
-                      disabled={currentPage === pagination.last_page}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Icon icon="solar:alt-arrow-right-outline" className="h-5 w-5" />
-                    </button>
-                  </nav>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+                              }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
 
-      {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Import Tarif Courier
-              </h3>
-              <button
-                onClick={() => setShowImportModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <Icon icon="solar:close-circle-outline" className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  File Excel/CSV *
-                </label>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={(e) => setImportFile(e.target.files[0])}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Format yang didukung: Excel (.xlsx, .xls) atau CSV (.csv)
-                </p>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <Icon icon="solar:info-circle-outline" className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <div className="text-sm text-blue-700">
-                    <p className="font-medium mb-1">Format File yang Diharapkan:</p>
-                    <div className="space-y-1 text-xs">
-                      <p><strong>Header (Baris 1-4):</strong> Judul dan header kolom</p>
-                      <p><strong>Kolom A-C:</strong> PROVINCE, CITY, DISTRICT</p>
-                      <p><strong>Kolom D-U:</strong> Service types (ECO, REG, ONS, SDS, TRC, T15, T25, T60)</p>
-                      <p><strong>Format:</strong> Setiap service type memiliki 2 kolom (RATE dan SLA)</p>
-                      <p><strong>Data mulai baris 5:</strong> Data tarif aktual</p>
-                      <p className="text-orange-600 mt-2"><strong>Catatan:</strong> File harus berformat .xlsx atau .xls, maksimal 10MB</p>
-                    </div>
+                      <button
+                        onClick={() => setCurrentPage(Math.min(pagination.last_page, currentPage + 1))}
+                        disabled={currentPage === pagination.last_page}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Icon icon="solar:alt-arrow-right-outline" className="h-5 w-5" />
+                      </button>
+                    </nav>
                   </div>
                 </div>
               </div>
+            )}
+          </>
+        )}
 
-              <div className="flex justify-end gap-3 pt-4">
+        {/* Import Modal */}
+        {showImportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Import Tarif Courier
+                </h3>
                 <button
-                  type="button"
-                  onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setRemapExisting(true);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={importLoading}
                 >
-                  Batal
+                  <Icon icon="solar:close-circle-outline" className="w-6 h-6" />
                 </button>
-                <button
-                  onClick={handleImport}
-                  disabled={!importFile || importLoading}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {importLoading && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  )}
-                  {importLoading ? 'Mengimport...' : 'Import'}
-                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* File Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    File Excel/CSV *
+                  </label>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => setImportFile(e.target.files[0])}
+                    disabled={importLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Format yang didukung: Excel (.xlsx, .xls) atau CSV (.csv)
+                  </p>
+                </div>
+
+                {/* REMAP OPTION */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="remapExisting"
+                      checked={remapExisting}
+                      onChange={(e) => setRemapExisting(e.target.checked)}
+                      disabled={importLoading}
+                      className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="remapExisting"
+                        className="text-sm font-medium text-gray-900 cursor-pointer"
+                      >
+                        Auto-remap data lama yang belum ter-mapping
+                      </label>
+                      <p className="text-xs text-gray-600 mt-1">
+                        ✅ <strong>Direkomendasikan:</strong> Sistem akan mencocokkan data lama
+                        yang belum memiliki ID wilayah sebelum import data baru.
+                      </p>
+                      <p className="text-xs text-blue-600 mt-2">
+                        ℹ️ <strong>Strategi Import:</strong> Data lama di-UPDATE, data baru di-INSERT.
+                        Data existing tetap aman.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* INFO FORMAT */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Icon
+                      icon="solar:info-circle-outline"
+                      className="w-5 h-5 text-gray-600 mt-0.5"
+                    />
+                    <div className="text-sm text-gray-700">
+                      <p className="font-medium mb-1">Format File yang Diharapkan:</p>
+                      <div className="space-y-1 text-xs">
+                        <p><strong>Header (Baris 1-4):</strong> Judul dan header kolom</p>
+                        <p><strong>Kolom A-C:</strong> PROVINCE, CITY, DISTRICT</p>
+                        <p><strong>Kolom D-U:</strong> Service types (ECO, REG, ONS, SDS, TRC, T15, T25, T60)</p>
+                        <p><strong>Format:</strong> Setiap service type memiliki 2 kolom (RATE & SLA)</p>
+                        <p><strong>Data mulai baris 5:</strong> Data tarif aktual</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ACTIONS */}
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setImportFile(null);
+                      setRemapExisting(true);
+                    }}
+                    disabled={importLoading}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                  >
+                    Batal
+                  </button>
+
+                  <button
+                    onClick={() => handleImport(importFile, remapExisting)}
+                    disabled={!importFile || importLoading}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {importLoading && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    )}
+                    {importLoading ? "Mengimport..." : "Import"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-      {importJobId && importStatus?.status === 'processing' && (
-        <div className="fixed bottom-4 right-4 z-50 w-96 bg-white shadow-lg border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-            <span className="text-sm font-semibold text-gray-800">Sedang mencocokkan data wilayah dan ongkir</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded h-2 mb-3">
-            <div className="bg-blue-600 h-2 rounded" style={{ width: `${Math.min(100, importProgress || 0)}%` }}></div>
-          </div>
-          {importStatusMessage && (
-            <div className="text-xs text-gray-700 mb-2">{importStatusMessage}</div>
-          )}
-          {Array.isArray(importStatus?.logs) && importStatus.logs.length > 0 && (
-            <div className="max-h-40 overflow-auto text-xs text-gray-600 space-y-1">
-              {importStatus.logs.slice(-10).reverse().map((log, idx) => (
-                <div key={idx} className="flex justify-between gap-2">
-                  <span className="text-gray-500">{new Date(log.time).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</span>
-                  <span className="text-gray-800">{log.message}</span>
-                </div>
-              ))}
+        )}
+
+        {importJobId && importStatus?.status === 'processing' && (
+          <div className="fixed bottom-4 right-4 z-50 w-96 bg-white shadow-lg border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              <span className="text-sm font-semibold text-gray-800">Sedang mencocokkan data wilayah dan ongkir</span>
             </div>
-          )}
-        </div>
-      )}
+            <div className="w-full bg-gray-200 rounded h-2 mb-3">
+              <div className="bg-blue-600 h-2 rounded" style={{ width: `${Math.min(100, importProgress || 0)}%` }}></div>
+            </div>
+            {importStatusMessage && (
+              <div className="text-xs text-gray-700 mb-2">{importStatusMessage}</div>
+            )}
+            {Array.isArray(importStatus?.logs) && importStatus.logs.length > 0 && (
+              <div className="max-h-40 overflow-auto text-xs text-gray-600 space-y-1">
+                {importStatus.logs.slice(-10).reverse().map((log, idx) => (
+                  <div key={idx} className="flex justify-between gap-2">
+                    <span className="text-gray-500">{new Date(log.time).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</span>
+                    <span className="text-gray-800">{log.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

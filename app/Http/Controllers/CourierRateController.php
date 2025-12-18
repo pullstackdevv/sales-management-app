@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CourierRate;
 use App\Models\Courier;
 use App\Jobs\ImportCourierRatesJob;
+use App\Services\WilayahMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -12,8 +13,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
-use App\Services\WilayahMatcher;
-use App\Models\Wilayah;
 
 class CourierRateController extends Controller
 {
@@ -33,10 +32,6 @@ class CourierRateController extends Controller
                 'province' => 'nullable|string|max:100',
                 'city' => 'nullable|string|max:100',
                 'district' => 'nullable|string|max:100',
-                'province_code' => 'nullable|string|max:32',
-                'regency_code' => 'nullable|string|max:32',
-                'district_code' => 'nullable|string|max:64',
-                'missing_code' => 'nullable|string|in:province,regency,district',
                 'service_type' => 'nullable|string|in:ECO,REG,ONS',
                 'origin_city' => 'nullable|string|max:100',
                 'min_price' => 'nullable|numeric|min:0',
@@ -258,199 +253,118 @@ class CourierRateController extends Controller
      * @param Request $request
      * @return void
      */
-    // private function applyFilters(Builder $query, Request $request): void
-    // {
-    //     // Courier filter
-    //     if ($request->has('courier_id')) {
-    //         $query->where('courier_id', $request->courier_id);
-    //     }
+    private function applyFilters(Builder $query, Request $request): void
+    {
+        $maps = null;
+        $resolvedByCode = false;
 
-    //     if ($request->has('courier_name')) {
-    //         $query->whereHas('courier', function ($q) use ($request) {
-    //             $q->where('name', 'like', '%' . $request->courier_name . '%');
-    //         });
-    //     }
+        if ($request->has('province') || $request->has('city') || $request->has('district')) {
+            $maps = WilayahMatcher::buildMaps();
+            $match = WilayahMatcher::matchCodes(
+                $request->get('province'),
+                $request->get('city'),
+                $request->get('district'),
+                $maps
+            );
+            if ($match['matched']) {
+                if (!empty($match['district']['kode'])) {
+                    $query->where('destination_district_code', $match['district']['kode']);
+                    $resolvedByCode = true;
+                }
+                if (!empty($match['regency']['kode'])) {
+                    $query->where('destination_regency_code', $match['regency']['kode']);
+                }
+                if (!empty($match['province']['kode'])) {
+                    $query->where('destination_province_code', $match['province']['kode']);
+                }
+            }
+        }
 
-    //     // Location filters (codes take precedence)
-    //     if ($request->has('province_code')) {
-    //         $provCode = (string)$request->province_code;
-    //         $query->where(function($q) use ($provCode) {
-    //             $q->where('destination_province_code', $provCode)
-    //               ->orWhere('destination_province_code', 'like', $provCode.'%');
-    //         });
-    //     }
-    //     if ($request->has('regency_code')) {
-    //         $regCode = (string)$request->regency_code;
-    //         $canonReg = \App\Services\WilayahMatcher::canonicalRegencyCode($regCode) ?? $regCode;
-    //         $query->where(function($q) use ($regCode, $canonReg) {
-    //             $q->where('destination_regency_code', $regCode)
-    //               ->orWhere('destination_regency_code', $canonReg)
-    //               ->orWhere('destination_regency_code', 'like', $canonReg.'%')
-    //               ->orWhere('destination_regency_code', 'like', $regCode.'%');
-    //         });
-    //     }
-    //     if ($request->has('district_code')) {
-    //         $distCode = (string)$request->district_code;
-    //         $canon = \App\Services\WilayahMatcher::canonicalDistrictCode($distCode) ?? $distCode;
-    //         $query->where(function($q) use ($distCode, $canon) {
-    //             $q->where('destination_district_code', $distCode)
-    //               ->orWhere('destination_district_code', $canon)
-    //               ->orWhere('destination_district_code', 'like', $canon.'%')
-    //               ->orWhere('destination_district_code', 'like', $distCode.'%');
-    //         });
-    //     }
+        // Courier filter
+        if ($request->has('courier_id')) {
+            $query->where('courier_id', $request->courier_id);
+        }
 
-    //     if ($request->has('missing_code')) {
-    //         $missing = $request->input('missing_code');
-    //         if ($missing === 'province') {
-    //             $query->whereNull('destination_province_code');
-    //         } elseif ($missing === 'regency') {
-    //             $query->whereNull('destination_regency_code');
-    //         } elseif ($missing === 'district') {
-    //             $query->whereNull('destination_district_code');
-    //         }
-    //     }
+        if ($request->has('courier_name')) {
+            $query->whereHas('courier', function ($q) use ($request) {
+                $q->where('name', 'like', '%' . $request->courier_name . '%');
+            });
+        }
 
-    //     // Resolve codes from names when codes are missing but names are provided
-    //     $hasCodes = $request->has('province_code') || $request->has('regency_code') || $request->has('district_code');
-    //     $hasNames = $request->has('province') || $request->has('city') || $request->has('district');
-    //     if (!$hasCodes && $hasNames) {
-    //         try {
-    //             [$provByName, $regByProv, $distByReg] = WilayahMatcher::buildMaps();
-    //             [$pCode, $rCode, $dCode] = WilayahMatcher::matchCodes(
-    //                 $request->input('province'),
-    //                 $request->input('city'),
-    //                 $request->input('district'),
-    //                 [$provByName, $regByProv, $distByReg]
-    //             );
-    //             if ($pCode) {
-    //                 $provVariants = $this->normalizeProvinceVariants((string)$request->input('province'));
-    //                 $query->where(function ($q) use ($pCode, $provVariants) {
-    //                     $q->where('destination_province_code', $pCode);
-    //                     foreach ($provVariants as $pv) {
-    //                         $q->orWhere('destination_province', 'like', '%' . $pv . '%');
-    //                     }
-    //                 });
-    //             }
-    //             if ($rCode) {
-    //                 $cityVariants = $this->normalizeCityVariants((string)$request->input('city'));
-    //                 $query->where(function ($q) use ($rCode, $cityVariants) {
-    //                     $q->where('destination_regency_code', $rCode);
-    //                     foreach ($cityVariants as $cv) {
-    //                         $q->orWhere('destination_city', 'like', '%' . $cv . '%');
-    //                     }
-    //                 });
-    //             }
-    //             if ($dCode) {
-    //                 $cleanDistrict = $this->normalizeDistrictName((string)$request->input('district'));
-    //                 $query->where(function ($q) use ($dCode, $cleanDistrict) {
-    //                     $q->where('destination_district_code', $dCode)
-    //                       ->orWhere('destination_district', 'like', '%' . $cleanDistrict . '%');
-    //                 });
-    //             }
-    //         } catch (\Throwable $e) {
-    //             Log::warning('WilayahMatcher failed to resolve codes', ['error' => $e->getMessage()]);
-    //         }
-    //     }
+        // Location filters
+        if ($request->has('province') && !$resolvedByCode) {
+            $provinceVariants = $this->normalizeProvinceVariants($request->province);
+            $query->where(function ($q) use ($provinceVariants) {
+                foreach ($provinceVariants as $pv) {
+                    $q->orWhere('destination_province', 'like', '%' . $pv . '%');
+                }
+            });
+        }
 
-    //     // Name-based filters (fallback)
-    //     if (!$hasCodes && $request->has('province')) {
-    //         $provinceVariants = $this->normalizeProvinceVariants($request->province);
-    //         $query->where(function ($q) use ($provinceVariants) {
-    //             foreach ($provinceVariants as $pv) {
-    //                 $q->orWhere('destination_province', 'like', '%' . $pv . '%');
-    //             }
-    //         });
-    //     }
+        if ($request->has('city') && !$resolvedByCode) {
+            $cityVariants = $this->normalizeCityVariants($request->city);
+            $query->where(function ($q) use ($cityVariants) {
+                foreach ($cityVariants as $cv) {
+                    $q->orWhere('destination_city', 'like', '%' . $cv . '%');
+                }
+            });
+        }
 
-    //     if (!$hasCodes && $request->has('city')) {
-    //         $cityVariants = $this->normalizeCityVariants($request->city);
-    //         $query->where(function ($q) use ($cityVariants) {
-    //             foreach ($cityVariants as $cv) {
-    //                 $q->orWhere('destination_city', 'like', '%' . $cv . '%');
-    //             }
-    //         });
-    //     }
-
-    //     if (!$hasCodes && $request->has('district')) {
-    //         $district = $request->district;
+        if ($request->has('district') && !$resolvedByCode) {
+            $district = $request->district;
             
-    //         // Clean and normalize district name for flexible search
-    //         $cleanDistrict = $this->normalizeDistrictName($district);
+            // Clean and normalize district name for flexible search
+            $cleanDistrict = $this->normalizeDistrictName($district);
             
-    //         // Search with multiple approaches for flexibility
-    //         $query->where(function ($q) use ($district, $cleanDistrict) {
-    //             // Exact match
-    //             $q->where('destination_district', 'like', '%' . $district . '%')
-    //               // Match without common prefixes
-    //               ->orWhere('destination_district', 'like', '%' . $cleanDistrict . '%')
-    //               // Match if database has prefix but search doesn't
-    //               ->orWhere('destination_district', 'like', '%Kabupaten ' . $cleanDistrict . '%')
-    //               ->orWhere('destination_district', 'like', '%Kota ' . $cleanDistrict . '%')
-    //               ->orWhere('destination_district', 'like', '%Kecamatan ' . $cleanDistrict . '%');
-    //         });
-    //     }
+            // Search with multiple approaches for flexibility
+            $query->where(function ($q) use ($district, $cleanDistrict) {
+                // Exact match
+                $q->where('destination_district', 'like', '%' . $district . '%')
+                  // Match without common prefixes
+                  ->orWhere('destination_district', 'like', '%' . $cleanDistrict . '%')
+                  // Match if database has prefix but search doesn't
+                  ->orWhere('destination_district', 'like', '%Kabupaten ' . $cleanDistrict . '%')
+                  ->orWhere('destination_district', 'like', '%Kota ' . $cleanDistrict . '%')
+                  ->orWhere('destination_district', 'like', '%Kecamatan ' . $cleanDistrict . '%');
+            });
+        }
 
-    //     // Optional fuzzy toggle: when enabled, broaden search cautiously
-    //     if ($request->boolean('fuzzy_match') && !$hasCodes) {
-    //         $district = $request->district ?? null;
-    //         $city = $request->city ?? null;
-    //         $province = $request->province ?? null;
-    //         if ($district || $city || $province) {
-    //             // Fuzzy broadening via normalized tokens; keep safe by AND-ing with city/province when provided
-    //             $normDist = $district ? $this->normalizeDistrictName($district) : null;
-    //             $normCity = $city ? $this->normalizeCityVariants($city) : [];
-    //             $normProv = $province ? $this->normalizeProvinceVariants($province) : [];
-    //             $query->where(function ($q) use ($normDist, $normCity, $normProv) {
-    //                 if ($normDist) {
-    //                     $q->orWhere('destination_district', 'like', '%' . $normDist . '%');
-    //                 }
-    //                 foreach ($normCity as $cv) {
-    //                     $q->orWhere('destination_city', 'like', '%' . $cv . '%');
-    //                 }
-    //                 foreach ($normProv as $pv) {
-    //                     $q->orWhere('destination_province', 'like', '%' . $pv . '%');
-    //                 }
-    //             });
-    //         }
-    //     }
+        if ($request->has('origin_city')) {
+            $query->where('origin_city', 'like', '%' . $request->origin_city . '%');
+        }
 
-    //     if ($request->has('origin_city')) {
-    //         $query->where('origin_city', 'like', '%' . $request->origin_city . '%');
-    //     }
+        $allowedServiceTypes = ['ECO', 'REG', 'ONS'];
+        $isTiki = false;
+        if ($request->has('courier_name') && stripos($request->courier_name, 'tiki') !== false) {
+            $isTiki = true;
+        }
+        if ($request->has('service_type')) {
+            $query->where('service_type', $request->service_type);
+        } else {
+            if (!$isTiki) {
+                $query->whereIn('service_type', $allowedServiceTypes);
+            }
+        }
 
-    //     $allowedServiceTypes = ['ECO', 'REG', 'ONS'];
-    //     $isTiki = false;
-    //     if ($request->has('courier_name') && stripos($request->courier_name, 'tiki') !== false) {
-    //         $isTiki = true;
-    //     }
-    //     if ($request->has('service_type')) {
-    //         $query->where('service_type', $request->service_type);
-    //     } else {
-    //         if (!$isTiki) {
-    //             $query->whereIn('service_type', $allowedServiceTypes);
-    //         }
-    //     }
+        // Price filters
+        if ($request->has('min_price')) {
+            $query->where('base_price', '>=', $request->min_price);
+        }
 
-    //     // Price filters
-    //     if ($request->has('min_price')) {
-    //         $query->where('base_price', '>=', $request->min_price);
-    //     }
+        if ($request->has('max_price')) {
+            $query->where('base_price', '<=', $request->max_price);
+        }
 
-    //     if ($request->has('max_price')) {
-    //         $query->where('base_price', '<=', $request->max_price);
-    //     }
+        // Estimated days filter
+        if ($request->has('max_days')) {
+            $query->where('estimated_days', '<=', $request->max_days);
+        }
 
-    //     // Estimated days filter
-    //     if ($request->has('max_days')) {
-    //         $query->where('estimated_days', '<=', $request->max_days);
-    //     }
-
-    //     // Availability filter
-    //     if ($request->has('is_available')) {
-    //         $query->where('is_available', $request->boolean('is_available'));
-    //     }
-    // }
+        // Availability filter
+        if ($request->has('is_available')) {
+            $query->where('is_available', $request->boolean('is_available'));
+        }
+    }
 
     /**
      * Transform rate data for API response
@@ -474,11 +388,11 @@ class CourierRateController extends Controller
             ],
             'destination' => [
                 'province' => $rate->destination_province,
-                'city' => $rate->destination_city,
-                'district' => $rate->destination_district,
                 'province_code' => $rate->destination_province_code,
-                'regency_code' => $rate->destination_regency_code,
-                'district_code' => $rate->destination_district_code
+                'city' => $rate->destination_city,
+                'city_code' => $rate->destination_regency_code,
+                'district' => $rate->destination_district,
+                'district_code' => $rate->destination_district_code,
             ],
             'service' => [
                 'type' => $rate->service_type,
@@ -495,6 +409,7 @@ class CourierRateController extends Controller
                 'estimated_days' => $rate->estimated_days,
                 'etd_days' => $rate->etd_days
             ],
+            'matched' => !is_null($rate->destination_district_code),
             'availability' => [
                 'is_available' => $rate->is_available,
                 'effective_date' => $rate->effective_date ? $rate->effective_date->format('Y-m-d') : null,
@@ -866,291 +781,5 @@ class CourierRateController extends Controller
             ], 500);
         }
     }
-    /**
-     * Apply filters to query - IMPROVED VERSION
-     *
-     * @param Builder $query
-     * @param Request $request
-     * @return void
-     */
-    private function applyFilters(Builder $query, Request $request): void
-    {
-        // Courier filter
-        if ($request->has('courier_id')) {
-            $query->where('courier_id', $request->courier_id);
-        }
-
-        if ($request->has('courier_name')) {
-            $query->whereHas('courier', function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->courier_name . '%');
-            });
-        }
-
-        // Determine if we should use code-based or name-based filtering
-        $hasCodes = $request->has('province_code') || $request->has('regency_code') || $request->has('district_code');
-        $hasNames = $request->has('province') || $request->has('city') || $request->has('district');
-
-        // PRIORITY 1: Filter by codes if provided
-        if ($request->has('province_code')) {
-            $provCode = (string)$request->province_code;
-            $canonProv = WilayahMatcher::canonicalProvinceCode($provCode) ?? $provCode;
-            $provName = Wilayah::where('kode', $canonProv)->value('nama');
-            $provVariants = $provName ? WilayahMatcher::getProvinceVariants($provName) : [];
-            $query->where(function($q) use ($provCode, $canonProv, $provVariants) {
-                $q->where('destination_province_code', $provCode)
-                  ->orWhere('destination_province_code', 'like', $provCode . '%');
-                if ($canonProv && $canonProv !== $provCode) {
-                    $q->orWhere('destination_province_code', $canonProv)
-                      ->orWhere('destination_province_code', 'like', $canonProv . '%');
-                }
-                foreach ($provVariants as $variant) {
-                    $q->orWhere('destination_province', 'like', '%' . $variant . '%');
-                }
-            });
-        }
-
-        if ($request->has('regency_code')) {
-            $regCode = (string)$request->regency_code;
-            $canonReg = WilayahMatcher::canonicalRegencyCode($regCode) ?? $regCode;
-            $regName = Wilayah::where('kode', $canonReg)->value('nama');
-            $cityVariants = $regName ? WilayahMatcher::getCityVariants($regName) : [];
-            $query->where(function($q) use ($regCode, $canonReg, $cityVariants) {
-                $q->where('destination_regency_code', $regCode)
-                  ->orWhere('destination_regency_code', 'like', $regCode . '%');
-                if ($canonReg && $canonReg !== $regCode) {
-                    $q->orWhere('destination_regency_code', $canonReg)
-                      ->orWhere('destination_regency_code', 'like', $canonReg . '%');
-                }
-                foreach ($cityVariants as $variant) {
-                    $q->orWhere('destination_city', 'like', '%' . $variant . '%');
-                }
-            });
-        }
-
-        if ($request->has('district_code')) {
-            $distCode = (string)$request->district_code;
-            $canon = WilayahMatcher::canonicalDistrictCode($distCode) ?? $distCode;
-            $distName = Wilayah::where('kode', $canon)->value('nama');
-            $districtVariants = $distName ? WilayahMatcher::getDistrictVariants($distName) : [];
-            $query->where(function($q) use ($distCode, $canon, $districtVariants) {
-                $q->where('destination_district_code', $distCode)
-                  ->orWhere('destination_district_code', 'like', $distCode . '%');
-                if ($canon && $canon !== $distCode) {
-                    $q->orWhere('destination_district_code', $canon)
-                      ->orWhere('destination_district_code', 'like', $canon . '%');
-                }
-                foreach ($districtVariants as $variant) {
-                    $q->orWhere('destination_district', 'like', '%' . $variant . '%');
-                }
-            });
-        }
-
-        // PRIORITY 2: If no codes but names provided, try to resolve and filter
-        if (!$hasCodes && $hasNames) {
-            $this->applyNameBasedFilters($query, $request);
-        }
-
-        // Filter for missing codes
-        if ($request->has('missing_code')) {
-            $missing = $request->input('missing_code');
-            if ($missing === 'province') {
-                $query->whereNull('destination_province_code');
-            } elseif ($missing === 'regency') {
-                $query->whereNull('destination_regency_code');
-            } elseif ($missing === 'district') {
-                $query->whereNull('destination_district_code');
-            }
-        }
-
-        // Origin city filter
-        if ($request->has('origin_city')) {
-            $query->where('origin_city', 'like', '%' . $request->origin_city . '%');
-        }
-
-        // Service type filter
-        $this->applyServiceTypeFilter($query, $request);
-
-        // Price filters
-        if ($request->has('min_price')) {
-            $query->where('base_price', '>=', $request->min_price);
-        }
-
-        if ($request->has('max_price')) {
-            $query->where('base_price', '<=', $request->max_price);
-        }
-
-        // Estimated days filter
-        if ($request->has('max_days')) {
-            $query->where('estimated_days', '<=', $request->max_days);
-        }
-
-        // Availability filter
-        if ($request->has('is_available')) {
-            $query->where('is_available', $request->boolean('is_available'));
-        }
-    }
-
-    /**
-     * Apply name-based filters with wilayah code resolution
-     *
-     * @param Builder $query
-     * @param Request $request
-     * @return void
-     */
-    private function applyNameBasedFilters(Builder $query, Request $request): void
-    {
-        try {
-            // Build wilayah maps
-            $maps = WilayahMatcher::buildMaps();
-            
-            // Try to match codes from names
-            [$pCode, $rCode, $dCode] = WilayahMatcher::matchCodes(
-                $request->input('province'),
-                $request->input('city'),
-                $request->input('district'),
-                $maps
-            );
-
-            // Apply filters based on what we found
-            if ($pCode) {
-                $provVariants = WilayahMatcher::getProvinceVariants($request->input('province', ''));
-                
-                $query->where(function ($q) use ($pCode, $provVariants) {
-                    // Filter by code (most accurate)
-                    $q->where('destination_province_code', $pCode)
-                      ->orWhere('destination_province_code', 'like', $pCode . '%');
-                    
-                    // Also filter by name variants (for records without codes)
-                    foreach ($provVariants as $variant) {
-                        $q->orWhere('destination_province', 'like', '%' . $variant . '%');
-                    }
-                });
-            } elseif ($request->has('province')) {
-                // Fallback to name-only filtering
-                $this->applyProvinceNameFilter($query, $request->input('province'));
-            }
-
-            if ($rCode) {
-                $cityVariants = WilayahMatcher::getCityVariants($request->input('city', ''));
-                
-                $query->where(function ($q) use ($rCode, $cityVariants) {
-                    $q->where('destination_regency_code', $rCode)
-                      ->orWhere('destination_regency_code', 'like', $rCode . '%');
-                    
-                    foreach ($cityVariants as $variant) {
-                        $q->orWhere('destination_city', 'like', '%' . $variant . '%');
-                    }
-                });
-            } elseif ($request->has('city')) {
-                $this->applyCityNameFilter($query, $request->input('city'));
-            }
-
-            if ($dCode) {
-                $districtVariants = WilayahMatcher::getDistrictVariants($request->input('district', ''));
-                
-                $query->where(function ($q) use ($dCode, $districtVariants) {
-                    $q->where('destination_district_code', $dCode)
-                      ->orWhere('destination_district_code', 'like', $dCode . '%');
-                    
-                    foreach ($districtVariants as $variant) {
-                        $q->orWhere('destination_district', 'like', '%' . $variant . '%');
-                    }
-                });
-            } elseif ($request->has('district')) {
-                $this->applyDistrictNameFilter($query, $request->input('district'));
-            }
-
-        } catch (\Throwable $e) {
-            Log::warning('WilayahMatcher failed, falling back to name-based filtering', [
-                'error' => $e->getMessage()
-            ]);
-            
-            // Fallback to simple name-based filtering
-            if ($request->has('province')) {
-                $this->applyProvinceNameFilter($query, $request->input('province'));
-            }
-            if ($request->has('city')) {
-                $this->applyCityNameFilter($query, $request->input('city'));
-            }
-            if ($request->has('district')) {
-                $this->applyDistrictNameFilter($query, $request->input('district'));
-            }
-        }
-    }
-
-    /**
-     * Apply province name filter with variants
-     */
-    private function applyProvinceNameFilter(Builder $query, string $province): void
-    {
-        $variants = WilayahMatcher::getProvinceVariants($province);
-        
-        $query->where(function ($q) use ($variants) {
-            foreach ($variants as $variant) {
-                $q->orWhere('destination_province', 'like', '%' . $variant . '%');
-            }
-        });
-    }
-
-    /**
-     * Apply city name filter with variants
-     */
-    private function applyCityNameFilter(Builder $query, string $city): void
-    {
-        $variants = WilayahMatcher::getCityVariants($city);
-        
-        $query->where(function ($q) use ($variants) {
-            foreach ($variants as $variant) {
-                $q->orWhere('destination_city', 'like', '%' . $variant . '%');
-            }
-        });
-    }
-
-    /**
-     * Apply district name filter with variants
-     */
-    private function applyDistrictNameFilter(Builder $query, string $district): void
-    {
-        $variants = WilayahMatcher::getDistrictVariants($district);
-        
-        $query->where(function ($q) use ($variants) {
-            foreach ($variants as $variant) {
-                $q->orWhere('destination_district', 'like', '%' . $variant . '%');
-            }
-        });
-    }
-
-    /**
-     * Apply service type filter
-     */
-    private function applyServiceTypeFilter(Builder $query, Request $request): void
-    {
-        $allowedServiceTypes = ['ECO', 'REG', 'ONS'];
-        
-        // Check if this is TIKI courier
-        $isTiki = false;
-        if ($request->has('courier_name') && stripos($request->courier_name, 'tiki') !== false) {
-            $isTiki = true;
-        }
-        if ($request->has('courier_id')) {
-            try {
-                $courier = \App\Models\Courier::find($request->courier_id);
-                if ($courier && stripos($courier->name, 'tiki') !== false) {
-                    $isTiki = true;
-                }
-            } catch (\Exception $e) {
-                // Ignore
-            }
-        }
-
-        // Apply service type filter
-        if ($request->has('service_type')) {
-            $query->where('service_type', $request->service_type);
-        } else {
-            // Default filter: exclude certain service types for non-TIKI
-            if (!$isTiki) {
-                $query->whereIn('service_type', $allowedServiceTypes);
-            }
-        }
-    }
+    
 }

@@ -66,11 +66,8 @@ class CustomerController extends Controller
                 'addresses.*.recipient_name' => 'required|string|max:255',
                 'addresses.*.recipient_phone' => 'required|string|max:20',
                 'addresses.*.province' => 'required|string|max:255',
-                'addresses.*.province_code' => 'nullable|string|max:32',
                 'addresses.*.city' => 'required|string|max:255',
-                'addresses.*.regency_code' => 'nullable|string|max:32',
                 'addresses.*.district' => 'required|string|max:255',
-                'addresses.*.district_code' => 'nullable|string|max:64',
                 'addresses.*.postal_code' => 'nullable|string|regex:/^\d{5}$/',
                 'addresses.*.address_detail' => 'required|string',
                 'addresses.*.is_default' => 'boolean',
@@ -118,11 +115,8 @@ class CustomerController extends Controller
                         'recipient_name' => $addressData['recipient_name'],
                         'phone' => $addressData['recipient_phone'],
                         'province' => $addressData['province'],
-                        'province_code' => $addressData['province_code'] ?? null,
                         'city' => $addressData['city'],
-                        'regency_code' => $addressData['regency_code'] ?? null,
                         'district' => $addressData['district'],
-                        'district_code' => $addressData['district_code'] ?? null,
                         'postal_code' => $addressData['postal_code'] ?? null,
                         'address_detail' => $addressData['address_detail'],
                         'is_default' => $addressData['is_default'] ?? ($index === 0),
@@ -199,11 +193,8 @@ class CustomerController extends Controller
             'addresses.*.recipient_name' => 'required_with:addresses|string|max:255',
             'addresses.*.recipient_phone' => 'required_with:addresses|string|max:20',
             'addresses.*.province' => 'required_with:addresses|string|max:255',
-            'addresses.*.province_code' => 'nullable|string|max:32',
             'addresses.*.city' => 'required_with:addresses|string|max:255',
-            'addresses.*.regency_code' => 'nullable|string|max:32',
             'addresses.*.district' => 'required_with:addresses|string|max:255',
-            'addresses.*.district_code' => 'nullable|string|max:64',
             'addresses.*.postal_code' => 'nullable|string|regex:/^\d{5}$/',
             'addresses.*.address_detail' => 'required_with:addresses|string',
             'addresses.*.is_default' => 'boolean',
@@ -236,11 +227,8 @@ class CustomerController extends Controller
                         'recipient_name' => $addressData['recipient_name'],
                         'phone' => $addressData['recipient_phone'],
                         'province' => $addressData['province'],
-                        'province_code' => $addressData['province_code'] ?? null,
                         'city' => $addressData['city'],
-                        'regency_code' => $addressData['regency_code'] ?? null,
                         'district' => $addressData['district'],
-                        'district_code' => $addressData['district_code'] ?? null,
                         'postal_code' => $addressData['postal_code'] ?? null,
                         'address_detail' => $addressData['address_detail'],
                         'is_default' => $addressData['is_default'] ?? ($index === 0),
@@ -549,22 +537,22 @@ class CustomerController extends Controller
             ]);
         }
 
-        $customers = Customer::where(function($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('phone', 'like', "%{$search}%");
-            })
+        $customers = Customer::where(function ($query) use ($search) {
+            $query->where('name', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%");
+        })
             ->limit(10)
             ->get(['id', 'name', 'phone', 'email']);
 
         // Exclude specific phone (085000000000) from marketplace search results
-        $customers = $customers->reject(function($customer) {
+        $customers = $customers->reject(function ($customer) {
             $digits = preg_replace('/[^0-9]/', '', (string) $customer->phone);
             $normalized = preg_replace('/^62/', '0', $digits);
             return $normalized === '085000000000';
         })->values();
 
         // Return customers with masked phone/email for privacy
-        $maskedCustomers = $customers->map(function($customer) {
+        $maskedCustomers = $customers->map(function ($customer) {
             return [
                 'id' => $customer->id,
                 'name' => $customer->name,
@@ -609,7 +597,7 @@ class CustomerController extends Controller
             $normalizedCustomerPhone = preg_replace('/^62/', '0', $normalizedCustomerPhone);
             $normalizedInputPhone = preg_replace('/^62/', '0', $normalizedInputPhone);
             $isVerified = $normalizedCustomerPhone === $normalizedInputPhone;
-            
+
             \Log::info('Guest verify phone comparison', [
                 'customer_id' => $customer->id,
                 'customer_phone_raw' => $customer->phone,
@@ -625,7 +613,7 @@ class CustomerController extends Controller
         if (!$isVerified) {
             return response()->json([
                 'status' => 'error',
-                'message' => $validated['verification_type'] === 'phone' 
+                'message' => $validated['verification_type'] === 'phone'
                     ? 'Nomor HP tidak sesuai dengan data customer'
                     : 'Email tidak sesuai dengan data customer'
             ], 403);
@@ -691,7 +679,7 @@ class CustomerController extends Controller
         try {
             // Check if customer already exists
             $existingCustomer = Customer::where('phone', $validated['phone'])
-                ->orWhere(function($query) use ($validated) {
+                ->orWhere(function ($query) use ($validated) {
                     if (!empty($validated['email'])) {
                         $query->where('email', $validated['email']);
                     }
@@ -773,7 +761,7 @@ class CustomerController extends Controller
         try {
             // Find customer and verify ownership
             $customer = Customer::find($customerId);
-            
+
             if (!$customer) {
                 return response()->json([
                     'status' => 'error',
@@ -874,7 +862,7 @@ class CustomerController extends Controller
 
         try {
             $customer = Customer::find($customerId);
-            
+
             if (!$customer) {
                 return response()->json([
                     'status' => 'error',
@@ -904,7 +892,7 @@ class CustomerController extends Controller
 
             // Find and delete the address
             $address = $customer->addresses()->find($addressId);
-            
+
             if (!$address) {
                 return response()->json([
                     'status' => 'error',

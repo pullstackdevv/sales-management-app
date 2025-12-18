@@ -1,10 +1,40 @@
 import { useState, useEffect } from "react";
-import { Icon } from "@iconify/react";
+import { 
+    Power, 
+    Wallet, 
+    Gift, 
+    ListChecks, 
+    Info, 
+    Save, 
+    Loader2,
+    Award
+} from "lucide-react";
 import { Link } from "@inertiajs/react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
-import { Button, TextInput, Label, ToggleSwitch, Spinner, Card } from "flowbite-react";
 import api from "../../api/axios";
 import Swal from "sweetalert2";
+
+const ToggleSwitch = ({ label, description, checked, onChange }) => {
+    return (
+        <div className="flex items-start justify-between">
+            <div className="flex-1">
+                {label && <label className="font-medium">{label}</label>}
+                {description && (
+                    <p className="text-xs text-gray-500 mt-1">{description}</p>
+                )}
+            </div>
+            <label className="inline-flex items-center cursor-pointer">
+                <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={checked}
+                    onChange={(e) => onChange(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+        </div>
+    );
+};
 
 function LoyaltySettings() {
     const [loading, setLoading] = useState(true);
@@ -72,7 +102,7 @@ function LoyaltySettings() {
         return (
             <DashboardLayout>
                 <div className="p-6 flex justify-center items-center min-h-[400px]">
-                    <Spinner size="xl" />
+                    <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
                 </div>
             </DashboardLayout>
         );
@@ -92,54 +122,49 @@ function LoyaltySettings() {
                         href="/cms/loyalty/tiers"
                         className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
                     >
-                        <Icon icon="solar:medal-ribbons-star-outline" width={20} />
+                        <Award className="w-5 h-5" />
                         Kelola Tier Membership
                     </Link>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Status Sistem */}
-                    <Card>
+                    <div className="bg-white rounded-lg shadow-sm border p-5">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Icon icon="solar:power-outline" width={24} className="text-green-600" />
+                            <Power className="w-6 h-6 text-green-600" />
                             Status Sistem Loyalty
                         </h2>
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                            <div>
-                                <p className="font-medium">Aktifkan Sistem Loyalty</p>
-                                <p className="text-sm text-gray-500">
-                                    Jika dinonaktifkan, customer tidak akan mendapat poin
-                                </p>
-                            </div>
+                        <div className="p-4 bg-gray-50 rounded-lg">
                             <ToggleSwitch
+                                label="Aktifkan Sistem Loyalty"
+                                description="Jika dinonaktifkan, customer tidak akan mendapat poin"
                                 checked={settings.loyalty_active?.value === "1"}
                                 onChange={(checked) =>
                                     handleChange("loyalty_active", "value", checked ? "1" : "0")
                                 }
                             />
                         </div>
-                    </Card>
+                    </div>
 
                     {/* Earn Points */}
-                    <Card>
+                    <div className="bg-white rounded-lg shadow-sm border p-5">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Icon icon="solar:wallet-money-outline" width={24} className="text-blue-600" />
+                            <Wallet className="w-6 h-6 text-blue-600" />
                             Pengaturan Earn Points
                         </h2>
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="point_rate" value="Rate Poin (Rupiah per 1 Poin)" />
+                                <label className="block text-sm font-medium mb-1">Rate Poin (Rupiah per 1 Poin)</label>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-gray-500">Rp</span>
-                                    <TextInput
-                                        id="point_rate"
+                                    <input
                                         type="number"
                                         value={settings.point_rate?.value || ""}
                                         onChange={(e) =>
                                             handleChange("point_rate", "value", e.target.value)
                                         }
                                         placeholder="10000"
-                                        className="flex-1"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                     <span className="text-gray-500">= 1 Poin</span>
                                 </div>
@@ -148,28 +173,27 @@ function LoyaltySettings() {
                                 </p>
                             </div>
                         </div>
-                    </Card>
+                    </div>
 
                     {/* Redeem Points */}
-                    <Card>
+                    <div className="bg-white rounded-lg shadow-sm border p-5">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Icon icon="solar:gift-outline" width={24} className="text-orange-600" />
+                            <Gift className="w-6 h-6 text-orange-600" />
                             Pengaturan Redeem
                         </h2>
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="min_redeem_amount" value="Minimal Nilai Redeem (Rupiah)" />
+                                <label className="block text-sm font-medium mb-1">Minimal Nilai Redeem (Rupiah)</label>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-gray-500">Rp</span>
-                                    <TextInput
-                                        id="min_redeem_amount"
+                                    <input
                                         type="number"
                                         value={settings.min_redeem_amount?.value || ""}
                                         onChange={(e) =>
                                             handleChange("min_redeem_amount", "value", e.target.value)
                                         }
                                         placeholder="50000"
-                                        className="flex-1"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">
@@ -178,19 +202,18 @@ function LoyaltySettings() {
                             </div>
 
                             <div>
-                                <Label htmlFor="max_redeem_percentage" value="Maksimal Redeem (% dari Total Transaksi)" />
+                                <label className="block text-sm font-medium mb-1">Maksimal Redeem (% dari Total Transaksi)</label>
                                 <div className="flex items-center gap-2 mt-1">
-                                    <TextInput
-                                        id="max_redeem_percentage"
+                                    <input
                                         type="number"
                                         value={settings.max_redeem_percentage?.value || ""}
                                         onChange={(e) =>
                                             handleChange("max_redeem_percentage", "value", e.target.value)
                                         }
                                         placeholder="20"
-                                        className="flex-1"
                                         min="1"
                                         max="100"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                     <span className="text-gray-500">%</span>
                                 </div>
@@ -199,26 +222,25 @@ function LoyaltySettings() {
                                 </p>
                             </div>
                         </div>
-                    </Card>
+                    </div>
 
                     {/* Redeem Options */}
-                    <Card>
+                    <div className="bg-white rounded-lg shadow-sm border p-5">
                         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <Icon icon="solar:checklist-outline" width={24} className="text-purple-600" />
+                            <ListChecks className="w-6 h-6 text-purple-600" />
                             Pilihan Redeem
                         </h2>
                         <div className="space-y-4">
                             <div>
-                                <Label htmlFor="redeem_options" value="Pilihan Nilai Rupiah untuk Redeem" />
-                                <TextInput
-                                    id="redeem_options"
+                                <label className="block text-sm font-medium mb-1">Pilihan Nilai Rupiah untuk Redeem</label>
+                                <input
                                     type="text"
                                     value={settings.redeem_options?.value || ""}
                                     onChange={(e) =>
                                         handleChange("redeem_options", "value", e.target.value)
                                     }
                                     placeholder="50000,100000,200000"
-                                    className="mt-1"
+                                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">
                                     Pisahkan dengan koma. Contoh: 50000,100000,200000
@@ -250,13 +272,13 @@ function LoyaltySettings() {
                                 </div>
                             </div>
                         </div>
-                    </Card>
+                    </div>
                 </div>
 
                 {/* Info Box */}
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-3">
-                        <Icon icon="solar:info-circle-outline" width={24} className="text-blue-600 mt-0.5" />
+                        <Info className="w-6 h-6 text-blue-600 mt-0.5 flex-shrink-0" />
                         <div>
                             <h3 className="font-medium text-blue-800">Informasi Penting</h3>
                             <ul className="text-sm text-blue-700 mt-1 list-disc list-inside space-y-1">
@@ -272,24 +294,24 @@ function LoyaltySettings() {
 
                 {/* Save Button */}
                 <div className="mt-6 flex justify-end">
-                    <Button
-                        color="blue"
+                    <button
+                        type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-6"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
                     >
                         {saving ? (
                             <>
-                                <Spinner size="sm" className="mr-2" />
+                                <Loader2 className="w-4 h-4 animate-spin" />
                                 Menyimpan...
                             </>
                         ) : (
                             <>
-                                <Icon icon="solar:diskette-outline" width={20} className="mr-2" />
+                                <Save className="w-5 h-5" />
                                 Simpan Pengaturan
                             </>
                         )}
-                    </Button>
+                    </button>
                 </div>
             </div>
         </DashboardLayout>

@@ -32,6 +32,7 @@ class MapCourierRatesJob implements ShouldQueue
         $maps = [$provByName, $regByProv, $distByReg];
 
         $query = CourierRate::query()
+            ->select('id', 'destination_province', 'destination_city', 'destination_district')
             ->whereNull('destination_district_code')
             ->whereNotNull('destination_province')
             ->whereNotNull('destination_city')
@@ -48,37 +49,38 @@ class MapCourierRatesJob implements ShouldQueue
         $updated = 0;
         $skipped = 0;
 
-        $query->orderBy('id')->chunk(500, function ($chunk) use (&$processed, &$updated, &$skipped, $maps, $total) {
-            DB::transaction(function () use ($chunk, &$processed, &$updated, &$skipped, $maps, $total) {
-                foreach ($chunk as $rate) {
-                    try {
-                        $match = WilayahMatcher::matchCodes(
-                            $rate->destination_province,
-                            $rate->destination_city,
-                            $rate->destination_district,
-                            $maps
-                        );
+        $query->chunkById(500, function ($chunk) use (&$processed, &$updated, &$skipped, $maps, $total) {
+            foreach ($chunk as $rate) {
+                try {
+                    $match = WilayahMatcher::matchCodes(
+                        $rate->destination_province,
+                        $rate->destination_city,
+                        $rate->destination_district,
+                        $maps
+                    );
 
-                        if ($match['district']) {
-                            $rate->destination_province_code = $match['province']['kode'] ?? null;
-                            $rate->destination_regency_code = $match['regency']['kode'] ?? null;
-                            $rate->destination_district_code = $match['district']['kode'] ?? null;
-                            $rate->save();
-                            $updated++;
-                        } else {
-                            $skipped++;
-                        }
-                    } catch (\Exception $e) {
+                    if ($match['district']) {
+                        DB::table('courier_rates')
+                            ->where('id', $rate->id)
+                            ->update([
+                                'destination_province_code' => $match['province']['kode'] ?? null,
+                                'destination_regency_code' => $match['regency']['kode'] ?? null,
+                                'destination_district_code' => $match['district']['kode'] ?? null,
+                            ]);
+                        $updated++;
+                    } else {
                         $skipped++;
-                    } finally {
-                        $processed++;
                     }
+                } catch (\Exception $e) {
+                    $skipped++;
+                } finally {
+                    $processed++;
                 }
-            });
+            }
 
             $progress = $total > 0 ? round(($processed / $total) * 100, 2) : 100;
             $this->updateJobStatus('processing', 'Progress ' . $progress . '% | Updated ' . $updated . ' | Skipped ' . $skipped);
-        });
+        }, 'id');
 
         $this->updateJobStatus('completed', 'Completed. Updated ' . $updated . ', Skipped ' . $skipped . ', Total ' . $total);
         Log::info('MapCourierRatesJob completed', ['updated' => $updated, 'skipped' => $skipped, 'total' => $total]);
@@ -122,4 +124,3 @@ class MapCourierRatesJob implements ShouldQueue
         return $this->jobId;
     }
 }
-

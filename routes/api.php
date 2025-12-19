@@ -245,6 +245,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
         Route::put('/{id}/map-destination', [CourierRateController::class, 'mapDestination']);
+        Route::post('/map', [CourierRateController::class, 'startMapping']);
+        Route::get('/map-status/{jobId}', [CourierRateController::class, 'mapStatus']);
+        Route::get('/active-maps', [CourierRateController::class, 'activeMaps']);
     });
 
     Route::post('wilayah/custom-upsert', [WilayahController::class, 'customUpsert']);

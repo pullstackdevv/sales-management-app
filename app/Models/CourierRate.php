@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Services\WilayahMatcher;
 
 class CourierRate extends Model
 {
@@ -104,5 +105,27 @@ class CourierRate extends Model
             return 'not_matched';
         }
         return 'matched';
+    }
+
+    public function attemptMapping(?array $maps = null): bool
+    {
+        if ($this->destination_district_code) {
+            return true;
+        }
+        $maps = $maps ?: WilayahMatcher::buildMaps();
+        $match = WilayahMatcher::matchCodes(
+            $this->destination_province,
+            $this->destination_city,
+            $this->destination_district,
+            $maps
+        );
+        if (!empty($match['district'])) {
+            $this->destination_province_code = $match['province']['kode'] ?? null;
+            $this->destination_regency_code = $match['regency']['kode'] ?? null;
+            $this->destination_district_code = $match['district']['kode'] ?? null;
+            $this->save();
+            return true;
+        }
+        return false;
     }
 }

@@ -16,6 +16,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Collection;
 use Exception;
 use Database\Seeders\CourierRateWilayahCodesSeeder;
+use App\Services\WilayahMatcher;
 
 class ImportCourierRatesJob implements ShouldQueue
 {
@@ -44,86 +45,86 @@ class ImportCourierRatesJob implements ShouldQueue
     {
         try {
             Log::info("Starting courier rates import job: {$this->jobId}");
-            
+
             // Update job status to processing
             $this->updateJobStatus('processing', 'Reading Excel file...');
-            
+
             // Read Excel data
-        $fullPath = Storage::path($this->filePath);
-        
-        if (!file_exists($fullPath)) {
-            throw new Exception('File not found: ' . $fullPath);
-        }
-        
-        Log::info("Reading Excel file for job: {$this->jobId}", ['file_path' => $fullPath]);
-        
-        // Increase memory limit for large Excel files
-        ini_set('memory_limit', '512M');
-        
-        try {
-            // Load the spreadsheet using PhpSpreadsheet
-            $spreadsheet = IOFactory::load($fullPath);
-            $worksheet = $spreadsheet->getActiveSheet();
-            
-            // Get all data as array
-            $data = $worksheet->toArray();
-            
-            if (empty($data)) {
-                Log::warning("Excel file is empty or has no data: {$fullPath}");
-                throw new Exception('No data found in Excel file');
+            $fullPath = Storage::path($this->filePath);
+
+            if (!file_exists($fullPath)) {
+                throw new Exception('File not found: ' . $fullPath);
             }
-            
-            // Remove empty rows
-            $data = array_filter($data, function ($row) {
-                return !empty(array_filter($row, function ($cell) {
-                    return !is_null($cell) && $cell !== '';
-                }));
-            });
-            
-            Log::info('Excel data read successfully', [
-                'total_rows' => count($data),
-                'first_row' => array_slice($data[0] ?? [], 0, 5)
-            ]);
-            
-            $data = array_values($data);
-            
-        } catch (Exception $e) {
-            Log::error('Failed to read Excel file in job', [
-                'error' => $e->getMessage(),
-                'file_path' => $fullPath
-            ]);
-            throw new Exception('Failed to read Excel file: ' . $e->getMessage());
-        }
-            
+
+            Log::info("Reading Excel file for job: {$this->jobId}", ['file_path' => $fullPath]);
+
+            // Increase memory limit for large Excel files
+            ini_set('memory_limit', '512M');
+
+            try {
+                // Load the spreadsheet using PhpSpreadsheet
+                $spreadsheet = IOFactory::load($fullPath);
+                $worksheet = $spreadsheet->getActiveSheet();
+
+                // Get all data as array
+                $data = $worksheet->toArray();
+
+                if (empty($data)) {
+                    Log::warning("Excel file is empty or has no data: {$fullPath}");
+                    throw new Exception('No data found in Excel file');
+                }
+
+                // Remove empty rows
+                $data = array_filter($data, function ($row) {
+                    return !empty(array_filter($row, function ($cell) {
+                        return !is_null($cell) && $cell !== '';
+                    }));
+                });
+
+                Log::info('Excel data read successfully', [
+                    'total_rows' => count($data),
+                    'first_row' => array_slice($data[0] ?? [], 0, 5)
+                ]);
+
+                $data = array_values($data);
+            } catch (Exception $e) {
+                Log::error('Failed to read Excel file in job', [
+                    'error' => $e->getMessage(),
+                    'file_path' => $fullPath
+                ]);
+                throw new Exception('Failed to read Excel file: ' . $e->getMessage());
+            }
+
             Log::info('Excel data read', [
                 'total_rows' => count($data),
                 'first_few_rows' => array_slice($data, 0, 5)
             ]);
-            
+
             if (empty($data)) {
                 throw new Exception('No data found in Excel file');
             }
-            
+
             $totalRows = count($data) - 4; // Exclude header rows (rows 1-4)
             $this->updateJobStatus('processing', "Processing {$totalRows} rows...");
-            
+
             // Get courier
             $courier = $this->getCourier();
-            
-            
-            
+
+
+
             $imported = 0;
             $skipped = 0;
             $batchSize = 500; // Process in batches
-            
+
             // Skip header rows (rows 1-4)
-             $dataRows = array_slice($data, 4);
-            
+            $dataRows = array_slice($data, 4);
+
+            $maps = WilayahMatcher::buildMaps();
             foreach (array_chunk($dataRows, $batchSize) as $batch) {
-                DB::transaction(function () use ($batch, $courier, &$imported, &$skipped) {
+                DB::transaction(function () use ($batch, $courier, &$imported, &$skipped, $maps) {
                     foreach ($batch as $row) {
                         try {
-                            $result = $this->processRow($row, $courier);
+                            $result = $this->processRow($row, $courier, $maps);
                             if ($result) {
                                 $imported++;
                             } else {
@@ -135,28 +136,23 @@ class ImportCourierRatesJob implements ShouldQueue
                         }
                     }
                 });
-                
+
                 // Update progress
                 $progress = round((($imported + $skipped) / $totalRows) * 100, 2);
                 $this->updateJobStatus('processing', "Processed {$imported} records, skipped {$skipped}. Progress: {$progress}%");
             }
-            $this->updateJobStatus('processing', 'Matching wilayah codes with courier rates...');
-            $seeder = new CourierRateWilayahCodesSeeder($this->courierId);
-            $seeder->run();
-            $this->updateJobStatus('processing', "Reconcile completed. Codes updated: {$seeder->updated}, Skipped: {$seeder->skipped}, Total: {$seeder->total}");
             $this->updateJobStatus('completed', "Import completed. Imported: {$imported}, Skipped: {$skipped}");
-            
+
             Log::info("Courier rates import job completed: {$this->jobId}", [
                 'imported' => $imported,
                 'skipped' => $skipped
             ]);
-            
         } catch (Exception $e) {
             Log::error("Courier rates import job failed: {$this->jobId}", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             $this->updateJobStatus('failed', 'Import failed: ' . $e->getMessage());
             throw $e;
         } finally {
@@ -166,9 +162,9 @@ class ImportCourierRatesJob implements ShouldQueue
             }
         }
     }
-    
 
-    
+
+
     private function getCourier()
     {
         if ($this->courierId) {
@@ -178,22 +174,22 @@ class ImportCourierRatesJob implements ShouldQueue
             }
             return $courier;
         }
-        
+
         // Default to TIKI if no courier specified
-        return Courier::where('name', 'TIKI')->first() ?? 
-               Courier::first() ?? 
-               Courier::create(['name' => 'TIKI', 'code' => 'tiki']);
+        return Courier::where('name', 'TIKI')->first() ??
+            Courier::first() ??
+            Courier::create(['name' => 'TIKI', 'code' => 'tiki']);
     }
-    
-    private function processRow($row, $courier)
+
+    private function processRow($row, $courier, $maps = null)
     {
         $imported = 0;
         $skipped = 0;
-        
+
         // Service type mapping
         $courierMapping = [
             'ECO' => 'ECO',
-            'REG' => 'REG', 
+            'REG' => 'REG',
             'ONS' => 'ONS',
             'SDS' => 'SDS',
             'TRC' => 'TRC',
@@ -222,12 +218,12 @@ class ImportCourierRatesJob implements ShouldQueue
 
         // Process each service type
         $serviceIndex = 3; // Starting from column D (index 3)
-        
+
         foreach ($courierMapping as $serviceType => $serviceCode) {
             try {
                 $rate = $this->parseRate($row[$serviceIndex] ?? null);
                 $sla = $this->parseSLA($row[$serviceIndex + 1] ?? null);
-                
+
                 if ($rate > 0) {
                     // Check if record already exists
                     $existing = CourierRate::where([
@@ -239,29 +235,37 @@ class ImportCourierRatesJob implements ShouldQueue
                     ])->first();
 
                     if ($existing) {
-                        $skipped++;
+                        $existing->update([
+                            'base_price' => $rate,
+                            'estimated_days' => $sla,
+                            'is_available' => true,
+                            'price_per_kg' => $rate
+                        ]);
+                        $existing->attemptMapping($maps);
+                        $imported++;
                     } else {
-                         CourierRate::create([
-                             'courier_id' => $courier->id,
-                             'origin_city' => 'Jakarta', // Default origin
-                             'destination_city' => $city,
-                             'destination_province' => $province,
-                             'destination_district' => $district,
-                             'service_type' => $serviceCode,
-                             'price_per_kg' => $rate,
-                             'base_price' => $rate,
-                             'estimated_days' => $sla,
-                             'is_available' => true,
-                             'etd_days' => $sla ? $sla . ' days' : '1-2 days'
-                         ]);
+                        $created = CourierRate::create([
+                            'courier_id' => $courier->id,
+                            'origin_city' => 'Jakarta', // Default origin
+                            'destination_city' => $city,
+                            'destination_province' => $province,
+                            'destination_district' => $district,
+                            'service_type' => $serviceCode,
+                            'price_per_kg' => $rate,
+                            'base_price' => $rate,
+                            'estimated_days' => $sla,
+                            'is_available' => true,
+                            'etd_days' => $sla ? $sla . ' days' : '1-2 days'
+                        ]);
+                        $created->attemptMapping($maps);
                         $imported++;
                     }
                 } else {
                     $skipped++;
                 }
-                
+
                 $serviceIndex += 2; // Move to next service (rate + sla)
-                
+
             } catch (Exception $e) {
                 $skipped++;
                 $serviceIndex += 2;
@@ -270,36 +274,36 @@ class ImportCourierRatesJob implements ShouldQueue
 
         return $imported > 0;
     }
-    
+
     private function parseRate($value)
     {
         if (empty($value) || $value === '-' || $value === 'N/A' || $value === '0') {
             return 0;
         }
-        
+
         // Convert to string if it's not already
         $value = (string) $value;
-        
+
         // Remove currency symbols and keep only numbers and commas
         $cleaned = preg_replace('/[^0-9,.]/', '', $value);
-        
+
         // Replace comma with empty string (Indonesian number format)
         $cleaned = str_replace(',', '', $cleaned);
-        
+
         return floatval($cleaned);
     }
-    
+
     private function parseSLA($value)
     {
         if (empty($value) || $value === '-' || $value === 'N/A') {
             return null;
         }
-        
+
         // Extract number from SLA (e.g., "2-3 days" -> 3)
         preg_match('/\d+/', $value, $matches);
         return isset($matches[0]) ? intval($matches[0]) : null;
     }
-    
+
     private function updateJobStatus($status, $message)
     {
         $existing = cache()->get("import_job_{$this->jobId}") ?: [];
@@ -323,17 +327,17 @@ class ImportCourierRatesJob implements ShouldQueue
         ];
 
         cache()->put("import_job_{$this->jobId}", $jobData, now()->addHours(24));
-        
+
         // Remove from active jobs list when completed or failed
         if (in_array($status, ['completed', 'failed'])) {
             $activeJobs = cache()->get('active_import_jobs', []);
-            $activeJobs = array_filter($activeJobs, function($jobId) {
+            $activeJobs = array_filter($activeJobs, function ($jobId) {
                 return $jobId !== $this->jobId;
             });
             cache()->put('active_import_jobs', array_values($activeJobs), now()->addHours(24));
         }
     }
-    
+
     /**
      * Get the unique identifier for the job.
      */

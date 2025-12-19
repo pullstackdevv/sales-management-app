@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CourierRate;
 use App\Models\Courier;
 use App\Jobs\ImportCourierRatesJob;
+use App\Jobs\MapCourierRatesJob;
 use App\Services\WilayahMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -843,6 +844,100 @@ class CourierRateController extends Controller
                 'message' => 'Failed to get active imports',
                 'data' => [
                     'active_imports' => [],
+                    'count' => 0
+                ]
+            ], 500);
+        }
+    }
+
+    public function startMapping(Request $request): JsonResponse
+    {
+        try {
+            $courierId = $request->input('courier_id');
+            $jobId = uniqid('map_', true);
+
+            MapCourierRatesJob::dispatch($courierId, $jobId);
+
+            cache()->put('map_job_' . $jobId, [
+                'id' => $jobId,
+                'status' => 'queued',
+                'message' => 'Mapping job has been queued',
+                'courier_id' => $courierId,
+                'created_at' => now()->toISOString()
+            ], now()->addHours(24));
+
+            $activeJobIds = cache()->get('active_map_jobs', []);
+            $activeJobIds[] = $jobId;
+            cache()->put('active_map_jobs', $activeJobIds, now()->addHours(24));
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'job_id' => $jobId,
+                    'status' => 'queued'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to start mapping job'
+            ], 500);
+        }
+    }
+
+    public function mapStatus(string $jobId): JsonResponse
+    {
+        try {
+            $status = cache()->get('map_job_' . $jobId);
+            if (!$status) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Job not found or expired'
+                ], 404);
+            }
+            return response()->json([
+                'success' => true,
+                'data' => $status
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get mapping status'
+            ], 500);
+        }
+    }
+
+    public function activeMaps(Request $request): JsonResponse
+    {
+        try {
+            $courierId = $request->input('courier_id');
+            $active = [];
+            $activeJobIds = cache()->get('active_map_jobs', []);
+            foreach ($activeJobIds as $jobId) {
+                $status = cache()->get('map_job_' . $jobId);
+                if ($status && isset($status['status']) && in_array($status['status'], ['queued', 'processing'])) {
+                    if ($courierId && isset($status['courier_id']) && $status['courier_id'] != $courierId) {
+                        continue;
+                    }
+                    $active[] = $status;
+                } else {
+                    $activeJobIds = array_filter($activeJobIds, function ($id) use ($jobId) { return $id !== $jobId; });
+                    cache()->put('active_map_jobs', array_values($activeJobIds), now()->addHours(24));
+                }
+            }
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'active_maps' => $active,
+                    'count' => count($active)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get active mapping jobs',
+                'data' => [
+                    'active_maps' => [],
                     'count' => 0
                 ]
             ], 500);

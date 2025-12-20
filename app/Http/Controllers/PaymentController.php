@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
 use App\Helpers\NotificationHelper;
+use App\Services\LoyaltyPointService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,7 @@ class PaymentController extends Controller
     private $paymentGateway;
     private $secretKey;
     private $baseUrl;
+    private LoyaltyPointService $loyaltyPointService;
 
     public function __construct()
     {
@@ -37,6 +39,8 @@ class PaymentController extends Controller
                 ? 'https://api.xendit.co'
                 : 'https://api.xendit.co';
         }
+
+        $this->loyaltyPointService = app(LoyaltyPointService::class);
     }
 
     /**
@@ -424,6 +428,7 @@ class PaymentController extends Controller
         if ($paymentStatus === PaymentStatus::PAID) {
             $order->update(['status' => 'processing']);
             WebOrderController::updateVoucherUsedCount($order->id);
+            $this->awardLoyaltyPoints($order);
             
             // Create payment received notification
             NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -550,12 +555,10 @@ class PaymentController extends Controller
 
         if ($response->successful()) {
             $invoiceData = $response->json();
-            $status = $invoiceData['status'];
-
+            $status = $invoiceData['status'] ?? null;
             $paymentStatus = $this->mapXenditStatus($status);
 
             if ($order->payment_status !== $paymentStatus) {
-                // Update payment status
                 $order->update([
                     'payment_status' => $paymentStatus,
                     'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
@@ -563,6 +566,7 @@ class PaymentController extends Controller
 
                 if ($paymentStatus === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    $this->awardLoyaltyPoints($order);
                     
                     // Create payment received notification
                     NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -574,6 +578,7 @@ class PaymentController extends Controller
                         ->where('type', StockMovementType::IN)
                         ->where('note', 'like', "Cancel Order #{$order->order_number}%")
                         ->exists();
+
                     if (!$alreadyRestocked) {
                         if ($order->status !== 'cancelled') {
                             $order->update(['status' => 'cancelled']);
@@ -621,7 +626,11 @@ class PaymentController extends Controller
 
             // Get transaction status
             $transactionData = \Midtrans\Transaction::status($order->order_number);
-            $status = $transactionData->transaction_status ?? null;
+            if (is_array($transactionData)) {
+                $status = $transactionData['transaction_status'] ?? null;
+            } else {
+                $status = $transactionData->transaction_status ?? null;
+            }
 
             $paymentStatusFromGateway = $this->mapMidtransStatus($status);
 
@@ -645,6 +654,7 @@ class PaymentController extends Controller
 
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    $this->awardLoyaltyPoints($order);
                     
                     // Create payment received notification
                     NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -738,6 +748,18 @@ class PaymentController extends Controller
                 return PaymentStatus::CANCELLED;
             default:
                 return PaymentStatus::PENDING;
+        }
+    }
+
+    private function awardLoyaltyPoints(Order $order): void
+    {
+        try {
+            $this->loyaltyPointService->awardPointsForOrder($order);
+        } catch (\Throwable $th) {
+            Log::error('Failed to award loyalty points for order', [
+                'order_id' => $order->id,
+                'message' => $th->getMessage(),
+            ]);
         }
     }
 }

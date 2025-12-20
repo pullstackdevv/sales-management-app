@@ -246,7 +246,9 @@ class ImportCourierRatesJob implements ShouldQueue
                                 'is_available' => true,
                                 'price_per_kg' => $rate
                             ]);
-                            $existing->attemptMapping($maps);
+                            if (is_null($existing->destination_district_code)) {
+                                $existing->attemptMapping($maps);
+                            }
                             $imported++;
                         } else {
                             // Only update rates for already-mapped records; skip unmapped
@@ -278,7 +280,9 @@ class ImportCourierRatesJob implements ShouldQueue
                                 'is_available' => true,
                                 'etd_days' => $sla ? $sla . ' days' : '1-2 days'
                             ]);
-                            $created->attemptMapping($maps);
+                            if (is_null($created->destination_district_code)) {
+                                $created->attemptMapping($maps);
+                            }
                             $imported++;
                         } else {
                             // Create only if we can reuse existing mapped destination codes from any record with same destination

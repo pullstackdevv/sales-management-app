@@ -3,7 +3,7 @@ import { Link, router } from '@inertiajs/react';
 import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search, Phone, Mail, ExternalLink, RefreshCw, LogOut } from 'lucide-react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { formatCurrency } from '@/utils/helpers';
-import checkoutSession from '@/utils/checkoutSession';
+import customerSession from '@/utils/customerSession';
 import Swal from 'sweetalert2';
 import api from '@/api/axios';
 import axios from 'axios';
@@ -36,8 +36,8 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
 
     useEffect(() => {
         // Check if customer data exists in checkout session
-        const sessionData = checkoutSession.get();
-        if (!sessionData || !sessionData.customer) {
+        const sessionData = customerSession.get();
+        if (!sessionData) {
             setShowCustomerForm(true);
         } else {
             setShowCustomerForm(false);
@@ -50,11 +50,16 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
             try {
                 setLoadingOrders(true);
 
-                const sessionData = checkoutSession.get();
-                const customer = sessionData?.customer || {};
+                const sessionData = customerSession.get();
                 const searchBase = (searchQuery && searchQuery.trim().length >= 3)
                     ? searchQuery.trim()
-                    : (customer.phone || customer.email || '');
+                    : (
+                        sessionData?.phone ||
+                        sessionData?.email ||
+                        (sessionData?.verification_type === 'phone' ? sessionData.verification_value : null) ||
+                        (sessionData?.verification_type === 'email' ? sessionData.verification_value : null) ||
+                        ''
+                    );
 
                 if (!searchBase || searchBase.trim().length < 3) {
                     setOrders([]);
@@ -152,7 +157,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
             cancelButtonText: 'Batal'
         }).then((result) => {
             if (result.isConfirmed) {
-                checkoutSession.clear();
+                customerSession.clear();
                 window.location.reload();
             }
         });
@@ -247,12 +252,13 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
             if (response.data.status === 'success' && response.data.data) {
                 const verifiedCustomer = response.data.data;
 
-                // Verified, save to session with full customer data
-                checkoutSession.updateStep('customer', {
-                    phone: verifiedCustomer.phone,
-                    email: verifiedCustomer.email,
-                    customer_id: verifiedCustomer.id
-                });
+                // Verified, save to shared customer session
+                customerSession.setVerified(
+                    verifiedCustomer.id,
+                    verificationMethod,
+                    verificationInput.trim(),
+                    verifiedCustomer
+                );
 
                 Swal.fire({
                     icon: 'success',

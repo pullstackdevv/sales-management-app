@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Models\Wilayah;
+use Illuminate\Support\Facades\DB;
 
 class WilayahController extends Controller
 {
@@ -232,6 +233,82 @@ class WilayahController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error fetching villages: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function customUpsert(Request $request): JsonResponse
+    {
+        $request->validate([
+            'province' => 'required|string',
+            'city' => 'required|string',
+            'district' => 'required|string',
+        ]);
+
+        $provinceName = trim($request->get('province'));
+        $cityName = trim($request->get('city'));
+        $districtName = trim($request->get('district'));
+
+        DB::beginTransaction();
+        try {
+            $province = Wilayah::provinsi()
+                ->where('nama', 'like', '%' . $provinceName . '%')
+                ->first();
+            if (!$province) {
+                $maxProv = Wilayah::provinsi()->select('kode')->get()
+                    ->map(function ($w) { return (int)preg_replace('/\D+/', '', $w->kode); })
+                    ->max();
+                $nextProv = str_pad((string)max(1, ($maxProv ?? 0) + 1), 2, '0', STR_PAD_LEFT);
+                $province = Wilayah::create(['kode' => $nextProv, 'nama' => $provinceName]);
+            }
+
+            $provCode = $province->kode;
+            $regency = Wilayah::kabupatenKota($provCode)
+                ->where('nama', 'like', '%' . $cityName . '%')
+                ->first();
+            if (!$regency) {
+                $existingRegs = Wilayah::kabupatenKota($provCode)->select('kode')->get();
+                $maxReg = $existingRegs->map(function ($w) {
+                    $parts = explode('.', $w->kode);
+                    return isset($parts[1]) ? (int)$parts[1] : 0;
+                })->max();
+                $nextReg = str_pad((string)max(1, ($maxReg ?? 0) + 1), 2, '0', STR_PAD_LEFT);
+                $regCode = $provCode . '.' . $nextReg;
+                $regency = Wilayah::create(['kode' => $regCode, 'nama' => $cityName]);
+            }
+
+            $regCode = $regency->kode;
+            $district = Wilayah::kecamatan($regCode)
+                ->where('nama', 'like', '%' . $districtName . '%')
+                ->first();
+            if (!$district) {
+                $existingDists = Wilayah::kecamatan($regCode)->select('kode')->get();
+                $maxDist = $existingDists->map(function ($w) {
+                    $parts = explode('.', $w->kode);
+                    return isset($parts[2]) ? (int)$parts[2] : 0;
+                })->max();
+                $nextDist = str_pad((string)max(1, ($maxDist ?? 0) + 1), 2, '0', STR_PAD_LEFT);
+                $distCode = $regCode . '.' . $nextDist;
+                $district = Wilayah::create(['kode' => $distCode, 'nama' => $districtName]);
+            }
+
+            DB::commit();
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'province_code' => $province->kode,
+                    'province_name' => $province->nama,
+                    'regency_code' => $regency->kode,
+                    'regency_name' => $regency->nama,
+                    'district_code' => $district->kode,
+                    'district_name' => $district->nama,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal membuat data wilayah: ' . $e->getMessage()
             ], 500);
         }
     }

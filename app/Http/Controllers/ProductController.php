@@ -288,6 +288,11 @@ class ProductController extends Controller
             ], 403);
         }
 
+        if ($request->has('tag_ids') && is_string($request->input('tag_ids'))) {
+            $decodedTagIds = json_decode($request->input('tag_ids'), true);
+            $request->merge(['tag_ids' => is_array($decodedTagIds) ? $decodedTagIds : []]);
+        }
+
         // Custom validation for variants SKU
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',

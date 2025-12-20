@@ -67,12 +67,27 @@ Artisan::command('audit:wilayah-ongkir {--export=xlsx} {--limit=0} {--path=}', f
         $existsByCode = $canon ? Wilayah::where('kode', $canon)->exists() : false;
         $exists = $existsByCode;
         if (!$existsByCode) {
-            // Try resolve via matcher
-            [$pCode, $rCode, $dCode] = WilayahMatcher::matchCodes($r->destination_province, $r->destination_city, $r->destination_district, [$provByName, $regByProv, $distByReg]);
-            $exists = $dCode ? true : Wilayah::kecamatan()
-                ->where('nama','like','%'.($r->destination_district ?? '').'%')
-                ->orWhere('nama','like','%'.$dn.'%')
-                ->exists();
+            $match = WilayahMatcher::matchCodes(
+                $r->destination_province,
+                $r->destination_city,
+                $r->destination_district,
+                [$provByName, $regByProv, $distByReg]
+            );
+            $matchedDistrictCode = $match['district']['kode'] ?? null;
+            if ($matchedDistrictCode) {
+                $exists = true;
+            } else {
+                $dnLower = mb_strtolower($dn);
+                $dnNoParen = preg_replace('/\([^\)]*\)/u', ' ', $dnLower);
+                $dnNoParen = preg_replace('/\s+/', ' ', trim($dnNoParen));
+                $dnNospace = str_replace(' ', '', $dnNoParen);
+
+                $exists = Wilayah::kecamatan()
+                    ->whereRaw('LOWER(nama) LIKE ?', ['%'.$dnLower.'%'])
+                    ->orWhereRaw('LOWER(nama) LIKE ?', ['%'.$dnNoParen.'%'])
+                    ->orWhereRaw('REPLACE(LOWER(nama), " ", "") LIKE ?', ['%'.$dnNospace.'%'])
+                    ->exists();
+            }
         }
         if (!$exists) {
             $ratesUnmapped[] = [

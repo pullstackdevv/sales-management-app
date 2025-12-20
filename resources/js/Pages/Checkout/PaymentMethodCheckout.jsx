@@ -76,9 +76,6 @@ const PaymentMethodCheckout = () => {
       const district = customerAddress.district || checkoutData.customer.district;
       const city = customerAddress.city || checkoutData.customer.city;
       const province = customerAddress.province || checkoutData.customer.province;
-      const districtCode = customerAddress.district_code || checkoutData.customer.district_code || null;
-      const regencyCode = customerAddress.regency_code || checkoutData.customer.regency_code || null;
-      const provinceCode = customerAddress.province_code || checkoutData.customer.province_code || null;
 
       console.log('Shipping calculation data:', {
         district,
@@ -104,21 +101,9 @@ const PaymentMethodCheckout = () => {
       queryParams.append('per_page', '50');
       queryParams.append('sort_by', 'base_price');
       queryParams.append('sort_order', 'asc');
-      if (districtCode) {
-        queryParams.append('district_code', districtCode);
-      } else if (district) {
-        queryParams.append('district', district);
-      }
-      if (regencyCode) {
-        queryParams.append('regency_code', regencyCode);
-      } else if (city) {
-        queryParams.append('city', city);
-      }
-      if (provinceCode) {
-        queryParams.append('province_code', provinceCode);
-      } else if (province) {
-        queryParams.append('province', province);
-      }
+      if (district) queryParams.append('district', district);
+      if (city) queryParams.append('city', city);
+      if (province) queryParams.append('province', province);
       queryParams.append('courier_name', 'TIKI');
       queryParams.append('origin_city', 'Jakarta');
       const response = await axios.get(`/api/courier-rates?${queryParams.toString()}`);
@@ -494,9 +479,6 @@ const PaymentMethodCheckout = () => {
         webOrderData.address_city = selectedAddress?.city || checkoutData.customer.city;
         webOrderData.address_province = selectedAddress?.province || checkoutData.customer.province;
         webOrderData.address_district = selectedAddress?.district || checkoutData.customer.district || '';
-        webOrderData.address_province_code = selectedAddress?.province_code || checkoutData.customer.province_code || null;
-        webOrderData.address_regency_code = selectedAddress?.regency_code || checkoutData.customer.regency_code || null;
-        webOrderData.address_district_code = selectedAddress?.district_code || checkoutData.customer.district_code || null;
         webOrderData.address_postal_code = selectedAddress?.postal_code || '';
       }
 

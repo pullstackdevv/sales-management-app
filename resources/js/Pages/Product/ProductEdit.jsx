@@ -284,11 +284,7 @@ export default function ProductEdit() {
           formData.append(`category_ids[${idx}]`, cid);
         });
       }
-      if (Array.isArray(product.tag_ids)) {
-        product.tag_ids.forEach((tid, idx) => {
-          formData.append(`tag_ids[${idx}]`, tid);
-        });
-      }
+      formData.append('tag_ids', JSON.stringify(Array.isArray(product.tag_ids) ? product.tag_ids : []));
       formData.append('is_active', product.is_active ? '1' : '0');
       formData.append('is_storefront', product.is_storefront ? '1' : '0');
       

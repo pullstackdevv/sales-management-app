@@ -72,9 +72,7 @@ class WebOrderController extends Controller
                 'address_city' => 'required_without:address_id|string|max:100',
                 'address_province' => 'required_without:address_id|string|max:100',
                 'address_postal_code' => 'nullable|string|regex:/^\d{5}$/',
-                'address_province_code' => 'nullable|string|max:32',
-                'address_regency_code' => 'nullable|string|max:32',
-                'address_district_code' => 'nullable|string|max:64',
+                
             ]);
 
             if ($validator->fails()) {
@@ -137,9 +135,6 @@ class WebOrderController extends Controller
                         'city' => $request->address_city,
                         'province' => $request->address_province,
                         'district' => $request->address_district ?? '',
-                        'province_code' => $request->address_province_code ?? null,
-                        'regency_code' => $request->address_regency_code ?? null,
-                        'district_code' => $request->address_district_code ?? null,
                         'postal_code' => $request->address_postal_code,
                         'is_default' => false,
                     ]);

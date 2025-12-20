@@ -129,6 +129,10 @@ const API_ROUTES = {
     destinations: '/courier-rates/destinations',
     serviceTypes: '/courier-rates/service-types',
     getCouriers: '/courier-rates/couriers',
+    mapDestination: (id) => `/courier-rates/${id}/map-destination`,
+  },
+  wilayah: {
+    customUpsert: '/wilayah/custom-upsert',
   },
 };
 

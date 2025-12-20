@@ -73,7 +73,7 @@ export default function CourierRates() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
-  const [remapExisting, setRemapExisting] = useState(true);
+  const [remapExisting, setRemapExisting] = useState(false);
 
 
   // Get courier ID from URL params
@@ -309,7 +309,7 @@ export default function CourierRates() {
       setImportJobId(jobId);
       setShowImportModal(false);
       setImportFile(null);
-      setRemapExisting(true);
+      setRemapExisting(false);
 
       Swal.fire('Berhasil!', 'Import dimulai. Anda dapat memeriksa status import.', 'success');
 
@@ -979,7 +979,7 @@ export default function CourierRates() {
                   onClick={() => {
                     setShowImportModal(false);
                     setImportFile(null);
-                    setRemapExisting(true);
+                    setRemapExisting(false);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                   disabled={importLoading}
@@ -1063,7 +1063,7 @@ export default function CourierRates() {
                     onClick={() => {
                       setShowImportModal(false);
                       setImportFile(null);
-                      setRemapExisting(true);
+                      setRemapExisting(false);
                     }}
                     disabled={importLoading}
                     className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg"

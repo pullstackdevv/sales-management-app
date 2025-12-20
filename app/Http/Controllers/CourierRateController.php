@@ -558,7 +558,8 @@ class CourierRateController extends Controller
             // Validate request
             $validator = Validator::make($request->all(), [
                 'file' => 'required|file|mimetypes:application/zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel|max:10240', // Max 10MB
-                'courier_id' => 'nullable|integer|exists:couriers,id'
+                'courier_id' => 'nullable|integer|exists:couriers,id',
+                'remap_existing' => 'nullable|boolean'
             ]);
 
             if ($validator->fails()) {
@@ -571,6 +572,7 @@ class CourierRateController extends Controller
 
             $file = $request->file('file');
             $courierId = $request->input('courier_id');
+            $remapExisting = (bool) $request->input('remap_existing', true);
             $userId = Auth::id();
             
             // Additional file validation
@@ -584,7 +586,7 @@ class CourierRateController extends Controller
             $jobId = uniqid('import_', true);
             
             // Dispatch the import job
-            ImportCourierRatesJob::dispatch($filePath, $courierId, $userId, $jobId);
+            ImportCourierRatesJob::dispatch($filePath, $courierId, $userId, $jobId, $remapExisting);
             
             // Store initial job status
             cache()->put("import_job_{$jobId}", [
@@ -592,6 +594,7 @@ class CourierRateController extends Controller
                 'status' => 'queued',
                 'message' => 'Import job has been queued for processing',
                 'courier_id' => $courierId,
+                'remap_existing' => $remapExisting,
                 'created_at' => now()->toISOString()
             ], now()->addHours(24));
             

@@ -26,16 +26,18 @@ class ImportCourierRatesJob implements ShouldQueue
     protected $courierId;
     protected $userId;
     protected $jobId;
+    protected $remapExisting = true;
 
     /**
      * Create a new job instance.
      */
-    public function __construct($filePath, $courierId = null, $userId = null, $jobId = null)
+    public function __construct($filePath, $courierId = null, $userId = null, $jobId = null, $remapExisting = true)
     {
         $this->filePath = $filePath;
         $this->courierId = $courierId;
         $this->userId = $userId;
         $this->jobId = $jobId ?? uniqid('import_', true);
+        $this->remapExisting = (bool) $remapExisting;
     }
 
     /**
@@ -119,7 +121,7 @@ class ImportCourierRatesJob implements ShouldQueue
             // Skip header rows (rows 1-4)
             $dataRows = array_slice($data, 4);
 
-            $maps = WilayahMatcher::buildMaps();
+            $maps = $this->remapExisting ? WilayahMatcher::buildMaps() : null;
             foreach (array_chunk($dataRows, $batchSize) as $batch) {
                 DB::transaction(function () use ($batch, $courier, &$imported, &$skipped, $maps) {
                     foreach ($batch as $row) {
@@ -139,7 +141,8 @@ class ImportCourierRatesJob implements ShouldQueue
 
                 // Update progress
                 $progress = round((($imported + $skipped) / $totalRows) * 100, 2);
-                $this->updateJobStatus('processing', "Processed {$imported} records, skipped {$skipped}. Progress: {$progress}%");
+                $mode = $this->remapExisting ? 'mapping-enabled' : 'mapping-disabled';
+                $this->updateJobStatus('processing', "Processed {$imported} records, skipped {$skipped}. Progress: {$progress}% ({$mode})");
             }
             $this->updateJobStatus('completed', "Import completed. Imported: {$imported}, Skipped: {$skipped}");
 
@@ -235,30 +238,79 @@ class ImportCourierRatesJob implements ShouldQueue
                     ])->first();
 
                     if ($existing) {
-                        $existing->update([
-                            'base_price' => $rate,
-                            'estimated_days' => $sla,
-                            'is_available' => true,
-                            'price_per_kg' => $rate
-                        ]);
-                        $existing->attemptMapping($maps);
-                        $imported++;
+                        // Update existing record
+                        if ($this->remapExisting) {
+                            $existing->update([
+                                'base_price' => $rate,
+                                'estimated_days' => $sla,
+                                'is_available' => true,
+                                'price_per_kg' => $rate
+                            ]);
+                            $existing->attemptMapping($maps);
+                            $imported++;
+                        } else {
+                            // Only update rates for already-mapped records; skip unmapped
+                            if (!is_null($existing->destination_district_code)) {
+                                $existing->update([
+                                    'base_price' => $rate,
+                                    'estimated_days' => $sla,
+                                    'is_available' => true,
+                                    'price_per_kg' => $rate
+                                ]);
+                                $imported++;
+                            } else {
+                                $skipped++;
+                            }
+                        }
                     } else {
-                        $created = CourierRate::create([
-                            'courier_id' => $courier->id,
-                            'origin_city' => 'Jakarta', // Default origin
-                            'destination_city' => $city,
-                            'destination_province' => $province,
-                            'destination_district' => $district,
-                            'service_type' => $serviceCode,
-                            'price_per_kg' => $rate,
-                            'base_price' => $rate,
-                            'estimated_days' => $sla,
-                            'is_available' => true,
-                            'etd_days' => $sla ? $sla . ' days' : '1-2 days'
-                        ]);
-                        $created->attemptMapping($maps);
-                        $imported++;
+                        // No existing record
+                        if ($this->remapExisting) {
+                            $created = CourierRate::create([
+                                'courier_id' => $courier->id,
+                                'origin_city' => 'Jakarta',
+                                'destination_city' => $city,
+                                'destination_province' => $province,
+                                'destination_district' => $district,
+                                'service_type' => $serviceCode,
+                                'price_per_kg' => $rate,
+                                'base_price' => $rate,
+                                'estimated_days' => $sla,
+                                'is_available' => true,
+                                'etd_days' => $sla ? $sla . ' days' : '1-2 days'
+                            ]);
+                            $created->attemptMapping($maps);
+                            $imported++;
+                        } else {
+                            // Create only if we can reuse existing mapped destination codes from any record with same destination
+                            $ref = CourierRate::where([
+                                'destination_city' => $city,
+                                'destination_province' => $province,
+                                'destination_district' => $district,
+                            ])->whereNotNull('destination_district_code')->first();
+
+                            if ($ref) {
+                                $created = CourierRate::create([
+                                    'courier_id' => $courier->id,
+                                    'origin_city' => 'Jakarta',
+                                    'destination_city' => $city,
+                                    'destination_province' => $province,
+                                    'destination_district' => $district,
+                                    'service_type' => $serviceCode,
+                                    'price_per_kg' => $rate,
+                                    'base_price' => $rate,
+                                    'estimated_days' => $sla,
+                                    'is_available' => true,
+                                    'etd_days' => $sla ? $sla . ' days' : '1-2 days',
+                                    'destination_province_code' => $ref->destination_province_code,
+                                    'destination_regency_code' => $ref->destination_regency_code,
+                                    'destination_district_code' => $ref->destination_district_code,
+                                ]);
+                                $imported++;
+                            } else {
+                                // Skip creation when mapping is disabled and no mapped reference exists
+                                $skipped++;
+                            }
+                        }
                     }
                 } else {
                     $skipped++;

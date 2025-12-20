@@ -11,6 +11,103 @@ use Illuminate\Http\Request;
 
 class PointController extends Controller
 {
+    /**
+     * Get loyalty points for guest customer (storefront)
+     * Requires verification via phone or email
+     */
+    public function getGuestLoyalty(Request $request)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|integer',
+            'verification_type' => 'required|in:phone,email',
+            'verification_value' => 'required|string',
+        ]);
+
+        $customer = Customer::find($validated['customer_id']);
+
+        if (!$customer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Customer tidak ditemukan'
+            ], 404);
+        }
+
+        // Verify ownership
+        $isVerified = false;
+        if ($validated['verification_type'] === 'phone') {
+            $normalizedCustomerPhone = preg_replace('/[^0-9]/', '', $customer->phone);
+            $normalizedInputPhone = preg_replace('/[^0-9]/', '', $validated['verification_value']);
+            $normalizedCustomerPhone = preg_replace('/^62/', '0', $normalizedCustomerPhone);
+            $normalizedInputPhone = preg_replace('/^62/', '0', $normalizedInputPhone);
+            $isVerified = $normalizedCustomerPhone === $normalizedInputPhone;
+        } else {
+            $isVerified = strtolower($customer->email) === strtolower($validated['verification_value']);
+        }
+
+        if (!$isVerified) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Verifikasi gagal'
+            ], 403);
+        }
+
+        // Get loyalty data
+        $customerPoint = CustomerPoint::getOrCreate($customer->id);
+        $customerPoint->load('tier');
+        $progress = $customerPoint->getProgressToNextTier();
+
+        // Get recent transactions
+        $transactions = PointTransaction::forCustomer($customer->id)
+            ->with('order:id,order_number')
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
+
+        // Get redeem options
+        $redeemOptions = LoyaltySetting::getRedeemOptions();
+        $pointRate = LoyaltySetting::getPointRate();
+
+        return response()->json([
+            'status' => 'success',
+            'customer' => [
+                'id' => $customer->id,
+                'name' => $customer->name,
+            ],
+            'points' => [
+                'current' => $customerPoint->current_points,
+                'lifetime' => $customerPoint->lifetime_points,
+                'annual_spend' => $customerPoint->annual_spend,
+                'annual_spend_year' => $customerPoint->annual_spend_year,
+            ],
+            'tier' => $customerPoint->tier ? [
+                'id' => $customerPoint->tier->id,
+                'name' => $customerPoint->tier->name,
+                'slug' => $customerPoint->tier->slug,
+                'multiplier' => $customerPoint->tier->multiplier,
+                'color' => $customerPoint->tier->color,
+                'icon' => $customerPoint->tier->icon,
+                'benefits' => $customerPoint->tier->benefits_array,
+            ] : null,
+            'progress' => [
+                'next_tier' => $progress['next_tier'] ? [
+                    'id' => $progress['next_tier']->id,
+                    'name' => $progress['next_tier']->name,
+                    'min_annual_spend' => $progress['next_tier']->min_annual_spend,
+                ] : null,
+                'current_spend' => $progress['current_spend'],
+                'required_spend' => $progress['required_spend'],
+                'remaining' => $progress['remaining'],
+                'percentage' => $progress['percentage'],
+            ],
+            'transactions' => $transactions,
+            'settings' => [
+                'point_rate' => $pointRate,
+                'redeem_options' => $redeemOptions,
+                'is_active' => LoyaltySetting::isLoyaltyActive(),
+            ],
+        ]);
+    }
+
     public function getCustomerPoints(Customer $customer)
     {
         $customerPoint = CustomerPoint::getOrCreate($customer->id);

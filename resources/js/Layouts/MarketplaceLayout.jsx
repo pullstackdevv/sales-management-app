@@ -76,7 +76,6 @@ export default function MarketplaceLayout({ children }) {
                                 <FullLogo />
                             </div>
 
-                            {/* Desktop Navigation - Removed for cleaner look */}
                             {/* Right side icons */}
                             <div className="flex items-center space-x-2 sm:space-x-4">
                                 {/* Pesanan Saya */}
@@ -98,7 +97,14 @@ export default function MarketplaceLayout({ children }) {
                                     )}
                                 </Link>
 
-                                {/* User Profile - Hidden */}
+                                {/* Profile */}
+                                <Link
+                                    href="/profile"
+                                    className="hidden sm:block text-gray-700 hover:text-blue-600 p-2 transition-colors duration-200"
+                                    title="Profil"
+                                >
+                                    <UserCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+                                </Link>
 
                                 {/* Mobile menu button */}
                                 <button
@@ -147,6 +153,14 @@ export default function MarketplaceLayout({ children }) {
                                             {cartCount}
                                         </span>
                                     )}
+                                </Link>
+                                <Link
+                                    href="/profile"
+                                    className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-3 rounded-lg text-base font-medium transition-all duration-200"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <UserCircle className="h-5 w-5" />
+                                    <span>Profil</span>
                                 </Link>
                             </div>
                         </div>

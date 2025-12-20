@@ -291,6 +291,7 @@ Route::prefix('loyalty')->group(function () {
     Route::get('/redeem-options', [PointController::class, 'getRedeemOptions']);
     Route::post('/calculate-earn', [PointController::class, 'calculateEarnPoints']);
     Route::post('/calculate-redeem', [PointController::class, 'calculateRedeemValue']);
+    Route::post('/guest-loyalty', [PointController::class, 'getGuestLoyalty']);
 });
 
 // Payment Gateway Routes (public access for webhooks and order payment)

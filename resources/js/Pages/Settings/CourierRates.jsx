@@ -446,14 +446,14 @@ export default function CourierRates() {
 
   useEffect(() => {
     fetchRates();
-  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSelectedDistrict, selectedServiceType, debouncedSearchTerm, currentPage]);
+  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSelectedDistrict, selectedServiceType, selectedMatchStatus, debouncedSearchTerm, currentPage]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     if (currentPage !== 1) {
       setCurrentPage(1);
     }
-  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSelectedDistrict, selectedServiceType, debouncedSearchTerm]);
+  }, [selectedCourier, debouncedSelectedProvince, debouncedSelectedCity, debouncedSelectedDistrict, selectedServiceType, selectedMatchStatus, debouncedSearchTerm]);
 
   // Set initial courier filter from URL or default to TIKI
   useEffect(() => {

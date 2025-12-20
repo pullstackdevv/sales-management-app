@@ -56,11 +56,11 @@ export default function CourierRates() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatusMessage, setImportStatusMessage] = useState('');
   const [checkingActiveImports, setCheckingActiveImports] = useState(false);
-  const [mapJobId, setMapJobId] = useState(null);
-  const [mapStatus, setMapStatus] = useState(null);
-  const [mapProgress, setMapProgress] = useState(0);
-  const [mapStatusMessage, setMapStatusMessage] = useState('');
-  const [checkingActiveMaps, setCheckingActiveMaps] = useState(false);
+  // const [mapJobId, setMapJobId] = useState(null);
+  // const [mapStatus, setMapStatus] = useState(null);
+  // const [mapProgress, setMapProgress] = useState(0);
+  // const [mapStatusMessage, setMapStatusMessage] = useState('');
+  // const [checkingActiveMaps, setCheckingActiveMaps] = useState(false);
   const [pagination, setPagination] = useState({
     current_page: 1,
     last_page: 1,
@@ -114,32 +114,7 @@ export default function CourierRates() {
     }
   };
 
-  const checkActiveMaps = async () => {
-    try {
-      setCheckingActiveMaps(true);
-      const params = new URLSearchParams();
-      if (courierIdFromUrl) {
-        params.append('courier_id', courierIdFromUrl);
-      }
-      const response = await api.get(`${API_ROUTES.courierRates.activeMaps}?${params.toString()}`);
-      if (response.data.success && response.data.data && response.data.data.active_maps && response.data.data.active_maps.length > 0) {
-        const activeMap = response.data.data.active_maps[0];
-        setMapJobId(activeMap.id);
-        setMapStatus(activeMap);
-        if (activeMap.status === 'processing') {
-          const progressMatch = activeMap.message?.match(/Progress ([\d.]+)%/);
-          if (progressMatch) {
-            setMapProgress(parseFloat(progressMatch[1]));
-          }
-          setMapStatusMessage(activeMap.message || 'Sedang memproses...');
-        }
-      }
-    } catch (err) {
-      console.error('Error checking active maps:', err);
-    } finally {
-      setCheckingActiveMaps(false);
-    }
-  };
+  
 
   // Find TIKI courier ID
   const tikiCourier = couriers.find(courier => courier.name.toLowerCase().includes('tiki'));
@@ -244,41 +219,7 @@ export default function CourierRates() {
     setShowMapModal(true);
   };
 
-  const handleRemapAttempt = async (id) => {
-    try {
-      const res = await api.post(API_ROUTES.courierRates.remapAttempt(id));
-      const ok = res?.data?.success;
-      if (ok) {
-        Swal.fire('Berhasil', res?.data?.message || 'Remap tanpa reset berhasil', 'success');
-        fetchRates();
-      } else {
-        Swal.fire('Gagal', res?.data?.message || 'Remap tanpa reset gagal', 'error');
-      }
-    } catch (err) {
-      Swal.fire('Error', 'Terjadi kesalahan saat remap tanpa reset', 'error');
-    }
-  };
-
-  const startBatchRemap = async () => {
-    try {
-      const payload = { force: true };
-      if (selectedCourier || courierIdFromUrl) {
-        payload.courier_id = selectedCourier || courierIdFromUrl;
-      }
-      const res = await api.post(API_ROUTES.courierRates.startMap, payload);
-      const data = res?.data?.data || {};
-      if (res?.data?.success) {
-        setMapJobId(data.job_id);
-        setMapStatus({ status: data.status, message: data.message });
-        setMapStatusMessage(data.message || 'Antrian dimulai');
-        Swal.fire('Dimulai', 'Remap batch tanpa reset telah diantrikan', 'success');
-      } else {
-        Swal.fire('Gagal', res?.data?.message || 'Tidak dapat memulai remap batch', 'error');
-      }
-    } catch (err) {
-      Swal.fire('Error', 'Terjadi kesalahan saat memulai remap batch', 'error');
-    }
-  };
+  
 
   const applyMapping = async (selected) => {
     try {
@@ -441,7 +382,6 @@ export default function CourierRates() {
     fetchCouriers();
     fetchServiceTypes();
     checkActiveImports();
-    checkActiveMaps();
   }, []);
 
   useEffect(() => {
@@ -524,35 +464,7 @@ export default function CourierRates() {
     };
   }, [importJobId, importStatus?.status]);
 
-  useEffect(() => {
-    let interval;
-    if (mapJobId && mapStatus?.status === 'processing') {
-      interval = setInterval(async () => {
-        try {
-          const response = await api.get(API_ROUTES.courierRates.mapStatus(mapJobId));
-          const result = response?.data?.data || {};
-          if (result.status === 'completed') {
-            setMapStatus(result);
-            setMapProgress(100);
-            fetchRates();
-          } else if (result.status === 'failed') {
-            setMapStatus(result);
-          } else if (result.status === 'processing') {
-            setMapStatus(result);
-            const progressMatch = result.message?.match(/Progress ([\d.]+)%/);
-            if (progressMatch) {
-              setMapProgress(parseFloat(progressMatch[1]));
-            }
-            setMapStatusMessage(result.message || 'Sedang memproses...');
-          }
-        } catch (err) {
-        }
-      }, 2000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [mapJobId, mapStatus?.status]);
+  
 
   return (
     <DashboardLayout>
@@ -597,12 +509,7 @@ export default function CourierRates() {
           </div>
           <div className="flex gap-2">
 
-            <button
-              onClick={startBatchRemap}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
-            >
-              Remap Ulang
-            </button>
+            
 
             {(importJobId || importStatus?.activeImportId || importStatus?.id) && importStatus?.status === 'processing' && (
               <button
@@ -936,22 +843,21 @@ export default function CourierRates() {
                           >
                             {rate.destination?.district_code ? "Sesuai" : "Belum"}
                           </span>
-                          {!rate.destination?.district_code && (
+                          {!rate.destination?.district_code ? (
                             <button
                               onClick={() => openMappingModal(rate)}
                               className="ml-3 text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white"
                             >
                               Cocokkan
                             </button>
-                          )}
-                          {/* {rate.destination?.district_code && (
+                          ) : (
                             <button
-                              onClick={() => handleRemapAttempt(rate.id)}
-                              className="ml-3 text-xs px-3 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white"
+                              onClick={() => openMappingModal(rate)}
+                              className="ml-3 text-xs px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white"
                             >
-                              Remap ulang
+                              Edit
                             </button>
-                          )} */}
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -1301,7 +1207,7 @@ export default function CourierRates() {
           </div>
         )}
 
-        {mapJobId && mapStatus?.status === 'processing' && (
+        {/* {mapJobId && mapStatus?.status === 'processing' && (
           <div className="fixed bottom-4 left-4 z-50 w-96 bg-white shadow-lg border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
@@ -1314,7 +1220,7 @@ export default function CourierRates() {
               <div className="text-xs text-gray-700 mb-2">{mapStatusMessage}</div>
             )}
           </div>
-        )}
+        )} */}
       </div>
     </DashboardLayout>
   );

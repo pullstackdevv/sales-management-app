@@ -73,8 +73,6 @@ Route::prefix('courier-rates')->group(function () {
     Route::get('/couriers', [CourierRateController::class, 'getCouriers']);
     Route::get('/import-status/{jobId}', [CourierRateController::class, 'importStatus']);
     Route::get('/active-imports', [CourierRateController::class, 'activeImports']);
-    Route::get('/map-status/{jobId}', [CourierRateController::class, 'mapStatus']);
-    Route::get('/active-maps', [CourierRateController::class, 'activeMaps']);
     Route::get('/{id}', [CourierRateController::class, 'show']);
 });
 
@@ -250,8 +248,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/map', [CourierRateController::class, 'startMapping']);
         Route::get('/map-status/{jobId}', [CourierRateController::class, 'mapStatus']);
         Route::get('/active-maps', [CourierRateController::class, 'activeMaps']);
-        Route::post('/{id}/remap-attempt', [CourierRateController::class, 'remapAttempt']);
-        Route::post('/remap-batch', [CourierRateController::class, 'remapBatch']);
+        // Route::post('/{id}/remap-attempt', [CourierRateController::class, 'remapAttempt']);
+        // Route::post('/remap-batch', [CourierRateController::class, 'remapBatch']);
     });
 
     Route::post('wilayah/custom-upsert', [WilayahController::class, 'customUpsert']);

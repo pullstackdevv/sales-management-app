@@ -18,11 +18,13 @@ class MapCourierRatesJob implements ShouldQueue
 
     protected ?int $courierId;
     protected string $jobId;
+    protected bool $force;
 
-    public function __construct(?int $courierId = null, ?string $jobId = null)
+    public function __construct(?int $courierId = null, ?string $jobId = null, bool $force = false)
     {
         $this->courierId = $courierId;
         $this->jobId = $jobId ?: uniqid('map_', true);
+        $this->force = $force;
     }
 
     public function handle(): void
@@ -33,10 +35,12 @@ class MapCourierRatesJob implements ShouldQueue
 
         $query = CourierRate::query()
             ->select('id', 'destination_province', 'destination_city', 'destination_district')
-            ->whereNull('destination_district_code')
             ->whereNotNull('destination_province')
             ->whereNotNull('destination_city')
             ->whereNotNull('destination_district');
+        if (!$this->force) {
+            $query->whereNull('destination_district_code');
+        }
 
         if ($this->courierId) {
             $query->where('courier_id', $this->courierId);

@@ -130,6 +130,10 @@ const API_ROUTES = {
     serviceTypes: '/courier-rates/service-types',
     getCouriers: '/courier-rates/couriers',
     mapDestination: (id) => `/courier-rates/${id}/map-destination`,
+    remapAttempt: (id) => `/courier-rates/${id}/remap-attempt`,
+    startMap: '/courier-rates/map',
+    mapStatus: (jobId) => `/courier-rates/map-status/${jobId}`,
+    activeMaps: '/courier-rates/active-maps',
   },
   wilayah: {
     customUpsert: '/wilayah/custom-upsert',

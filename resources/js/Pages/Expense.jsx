@@ -31,6 +31,10 @@ export default function ExpensePage() {
 
     const [filterStartDate, setFilterStartDate] = useState(monthRange.start);
     const [filterEndDate, setFilterEndDate] = useState(monthRange.end);
+    const [filterMonth, setFilterMonth] = useState(() => {
+        const d = new Date();
+        return d.toISOString().slice(0, 7);
+    });
 
 
     // Pagination states
@@ -69,7 +73,7 @@ export default function ExpensePage() {
         // setCurrentPage(1);
     };
 
-    const fetchExpenses = async (page = 1) => {
+    const fetchExpenses = async (page = 1, overrideStart = null, overrideEnd = null) => {
         try {
             setLoading(true);
             const params = {
@@ -78,8 +82,10 @@ export default function ExpensePage() {
             };
 
             // Add date filters if they exist
-            if (filterStartDate) params.start_date = filterStartDate;
-            if (filterEndDate) params.end_date = filterEndDate;
+            const start = overrideStart ?? filterStartDate;
+            const end = overrideEnd ?? filterEndDate;
+            if (start) params.start_date = start;
+            if (end) params.end_date = end;
 
             const response = await api.get('/expenses', { params });
 
@@ -317,57 +323,83 @@ export default function ExpensePage() {
             <div className="p-6">
                 <h1 className="text-2xl font-bold mb-4">Expense</h1>
 
-                <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 mb-4 ">
                     <div className="flex flex-wrap gap-3 items-center">
-                        <select className="border text-sm px-3 py-2 rounded-md">
-                            <option>By Date</option>
-                        </select>
                         <input
-                            type="date"
-                            value={filterStartDate}
-                            onChange={(e) => setFilterStartDate(e.target.value)}
+                            type="month"
+                            value={filterMonth}
+                            onChange={(e) => setFilterMonth(e.target.value)}
                             className="border text-sm px-3 py-2 rounded-md"
-                            placeholder="Tanggal Mulai"
-                        />
-                        <input
-                            type="date"
-                            value={filterEndDate}
-                            onChange={(e) => setFilterEndDate(e.target.value)}
-                            className="border text-sm px-3 py-2 rounded-md"
-                            placeholder="Tanggal Akhir"
                         />
                         <button
-                            onClick={applyFilter}
-                            className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-blue-50 border-blue-300 text-blue-600"
-                            title="Filter Data"
+                            onClick={() => {
+                                const [yearStr, monthStr] = filterMonth.split('-');
+                                const year = parseInt(yearStr, 10);
+                                const month = parseInt(monthStr, 10);
+                                const daysInMonth = new Date(year, month, 0).getDate();
+                                const start_date = `${yearStr}-${String(monthStr).padStart(2, '0')}-01`;
+                                const end_date = `${yearStr}-${String(monthStr).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+                                setFilterStartDate(start_date);
+                                setFilterEndDate(end_date);
+                                setCurrentPage(1);
+                                fetchExpenses(1, start_date, end_date);
+                            }}
+                            className="text-sm px-3 py-2 rounded-md bg-amber-500 text-white hover:bg-amber-600"
                         >
-                            <Icon icon="mdi:magnify" />
-                        </button>
-                        <button
-                            onClick={resetFilter}
-                            className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-red-50 border-red-300 text-red-600"
-                            title="Reset Filter"
-                        >
-                            <Icon icon="mdi:refresh" />
+                            Tampilkan Bulan
                         </button>
                     </div>
 
-                    <div className="flex gap-2">
-                        {/* <Button className="text-sm border border-blue-600 text-blue-600">
-                            <Icon
-                                icon="mdi:download"
-                                className="text-lg mr-1"
+                    <div className="flex flex-wrap gap-3 items-center justify-between ">
+                        <div className="flex flex-wrap gap-3 items-center">
+                            <input
+                                type="date"
+                                value={filterStartDate}
+                                onChange={(e) => setFilterStartDate(e.target.value)}
+                                className="border text-sm px-3 py-2 rounded-md"
+                                placeholder="Tanggal Mulai"
                             />
-                            Unduh Excel
-                        </Button> */}
-                        <Button
-                            onClick={() => setIsModalOpen(true)}
-                            className="bg-blue-600 text-white"
-                        >
-                            <Icon icon="ic:baseline-add" className="mr-1" />
-                            Tambah Pengeluaran
-                        </Button>
+                            <input
+                                type="date"
+                                value={filterEndDate}
+                                onChange={(e) => setFilterEndDate(e.target.value)}
+                                className="border text-sm px-3 py-2 rounded-md"
+                                placeholder="Tanggal Akhir"
+                            />
+                            <button
+                                onClick={applyFilter}
+                                className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-blue-50 border-blue-300 text-blue-600"
+                                title="Filter Data"
+                            >
+                                <Icon icon="mdi:magnify" />
+                            </button>
+                            <button
+                                onClick={resetFilter}
+                                className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-red-50 border-red-300 text-red-600"
+                                title="Reset Filter"
+                            >
+                                <Icon icon="mdi:refresh" />
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            {/* <Button className="text-sm border border-blue-600 text-blue-600">
+                                <Icon
+                                    icon="mdi:download"
+                                    className="text-lg mr-1"
+                                />
+                                Unduh Excel
+                            </Button> */}
+                            <Button
+                                onClick={() => setIsModalOpen(true)}
+                                className="bg-blue-600 text-white"
+                            >
+                                <Icon icon="ic:baseline-add" className="mr-1" />
+                                Tambah Pengeluaran
+                            </Button>
+                        </div>
                     </div>
+
+
                 </div>
 
                 <div className="bg-red-100 border border-red-200 rounded-lg p-4 text-sm mb-4">

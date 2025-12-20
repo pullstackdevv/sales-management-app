@@ -6,6 +6,7 @@ use App\Models\CourierRate;
 use App\Models\Courier;
 use App\Jobs\ImportCourierRatesJob;
 use App\Jobs\MapCourierRatesJob;
+use App\Models\Wilayah;
 use App\Services\WilayahMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -365,6 +366,16 @@ class CourierRateController extends Controller
         if ($request->has('is_available')) {
             $query->where('is_available', $request->boolean('is_available'));
         }
+
+        // Match status filter
+        if ($request->has('match_status')) {
+            $status = strtolower($request->get('match_status'));
+            if ($status === 'matched') {
+                $query->whereNotNull('destination_district_code');
+            } else if ($status === 'unmatched') {
+                $query->whereNull('destination_district_code');
+            }
+        }
     }
 
     /**
@@ -375,6 +386,24 @@ class CourierRateController extends Controller
      */
     private function transformRate(CourierRate $rate): array
     {
+        // Resolve official wilayah names when codes are present
+        $matchedProvinceName = null;
+        $matchedRegencyName = null;
+        $matchedDistrictName = null;
+
+        if (!empty($rate->destination_province_code)) {
+            $p = Wilayah::where('kode', $rate->destination_province_code)->first();
+            $matchedProvinceName = $p?->nama;
+        }
+        if (!empty($rate->destination_regency_code)) {
+            $r = Wilayah::where('kode', $rate->destination_regency_code)->first();
+            $matchedRegencyName = $r?->nama;
+        }
+        if (!empty($rate->destination_district_code)) {
+            $d = Wilayah::where('kode', $rate->destination_district_code)->first();
+            $matchedDistrictName = $d?->nama;
+        }
+
         return [
             'id' => $rate->id,
             'courier' => [
@@ -390,10 +419,13 @@ class CourierRateController extends Controller
             'destination' => [
                 'province' => $rate->destination_province,
                 'province_code' => $rate->destination_province_code,
+                'province_matched_name' => $matchedProvinceName,
                 'city' => $rate->destination_city,
                 'city_code' => $rate->destination_regency_code,
+                'city_matched_name' => $matchedRegencyName,
                 'district' => $rate->destination_district,
                 'district_code' => $rate->destination_district_code,
+                'district_matched_name' => $matchedDistrictName,
             ],
             'service' => [
                 'type' => $rate->service_type,
@@ -856,13 +888,15 @@ class CourierRateController extends Controller
             $courierId = $request->input('courier_id');
             $jobId = uniqid('map_', true);
 
-            MapCourierRatesJob::dispatch($courierId, $jobId);
+            $force = (bool) $request->input('force', false);
+            MapCourierRatesJob::dispatch($courierId, $jobId, $force);
 
             cache()->put('map_job_' . $jobId, [
                 'id' => $jobId,
                 'status' => 'queued',
                 'message' => 'Mapping job has been queued',
                 'courier_id' => $courierId,
+                'force' => $force,
                 'created_at' => now()->toISOString()
             ], now()->addHours(24));
 
@@ -874,13 +908,35 @@ class CourierRateController extends Controller
                 'success' => true,
                 'data' => [
                     'job_id' => $jobId,
-                    'status' => 'queued'
+                    'status' => 'queued',
+                    'force' => $force
                 ]
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to start mapping job'
+            ], 500);
+        }
+    }
+
+    public function remapAttempt(Request $request, int $id): JsonResponse
+    {
+        try {
+            $rate = CourierRate::findOrFail($id);
+            $maps = \App\Services\WilayahMatcher::buildMaps();
+            $ok = $rate->attemptMapping($maps, true);
+            $rate = $rate->fresh('courier');
+            return response()->json([
+                'success' => $ok,
+                'message' => $ok ? 'Remap tanpa reset berhasil' : 'Remap tanpa reset gagal',
+                'data' => $this->transformRate($rate)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal remap tanpa reset',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

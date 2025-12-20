@@ -107,9 +107,9 @@ class CourierRate extends Model
         return 'matched';
     }
 
-    public function attemptMapping(?array $maps = null): bool
+    public function attemptMapping(?array $maps = null, bool $force = false): bool
     {
-        if ($this->destination_district_code) {
+        if ($this->destination_district_code && !$force) {
             return true;
         }
         $maps = $maps ?: WilayahMatcher::buildMaps();

@@ -35,6 +35,7 @@ export default function CourierRates() {
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedServiceType, setSelectedServiceType] = useState("");
+  const [selectedMatchStatus, setSelectedMatchStatus] = useState("");
   const [serviceTypes, setServiceTypes] = useState([]);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mappingRate, setMappingRate] = useState(null);
@@ -55,6 +56,11 @@ export default function CourierRates() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatusMessage, setImportStatusMessage] = useState('');
   const [checkingActiveImports, setCheckingActiveImports] = useState(false);
+  const [mapJobId, setMapJobId] = useState(null);
+  const [mapStatus, setMapStatus] = useState(null);
+  const [mapProgress, setMapProgress] = useState(0);
+  const [mapStatusMessage, setMapStatusMessage] = useState('');
+  const [checkingActiveMaps, setCheckingActiveMaps] = useState(false);
   const [pagination, setPagination] = useState({
     current_page: 1,
     last_page: 1,
@@ -108,6 +114,33 @@ export default function CourierRates() {
     }
   };
 
+  const checkActiveMaps = async () => {
+    try {
+      setCheckingActiveMaps(true);
+      const params = new URLSearchParams();
+      if (courierIdFromUrl) {
+        params.append('courier_id', courierIdFromUrl);
+      }
+      const response = await api.get(`${API_ROUTES.courierRates.activeMaps}?${params.toString()}`);
+      if (response.data.success && response.data.data && response.data.data.active_maps && response.data.data.active_maps.length > 0) {
+        const activeMap = response.data.data.active_maps[0];
+        setMapJobId(activeMap.id);
+        setMapStatus(activeMap);
+        if (activeMap.status === 'processing') {
+          const progressMatch = activeMap.message?.match(/Progress ([\d.]+)%/);
+          if (progressMatch) {
+            setMapProgress(parseFloat(progressMatch[1]));
+          }
+          setMapStatusMessage(activeMap.message || 'Sedang memproses...');
+        }
+      }
+    } catch (err) {
+      console.error('Error checking active maps:', err);
+    } finally {
+      setCheckingActiveMaps(false);
+    }
+  };
+
   // Find TIKI courier ID
   const tikiCourier = couriers.find(courier => courier.name.toLowerCase().includes('tiki'));
   const tikiCourierId = tikiCourier?.id || null;
@@ -132,6 +165,9 @@ export default function CourierRates() {
       }
       if (selectedServiceType) {
         params.append('service_type', selectedServiceType);
+      }
+      if (selectedMatchStatus) {
+        params.append('match_status', selectedMatchStatus);
       }
       if (debouncedSearchTerm) {
         params.append('search', debouncedSearchTerm);
@@ -206,6 +242,42 @@ export default function CourierRates() {
     setMappingRate(rate);
     setWilayahQuery(rate?.destination?.district || '');
     setShowMapModal(true);
+  };
+
+  const handleRemapAttempt = async (id) => {
+    try {
+      const res = await api.post(API_ROUTES.courierRates.remapAttempt(id));
+      const ok = res?.data?.success;
+      if (ok) {
+        Swal.fire('Berhasil', res?.data?.message || 'Remap tanpa reset berhasil', 'success');
+        fetchRates();
+      } else {
+        Swal.fire('Gagal', res?.data?.message || 'Remap tanpa reset gagal', 'error');
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Terjadi kesalahan saat remap tanpa reset', 'error');
+    }
+  };
+
+  const startBatchRemap = async () => {
+    try {
+      const payload = { force: true };
+      if (selectedCourier || courierIdFromUrl) {
+        payload.courier_id = selectedCourier || courierIdFromUrl;
+      }
+      const res = await api.post(API_ROUTES.courierRates.startMap, payload);
+      const data = res?.data?.data || {};
+      if (res?.data?.success) {
+        setMapJobId(data.job_id);
+        setMapStatus({ status: data.status, message: data.message });
+        setMapStatusMessage(data.message || 'Antrian dimulai');
+        Swal.fire('Dimulai', 'Remap batch tanpa reset telah diantrikan', 'success');
+      } else {
+        Swal.fire('Gagal', res?.data?.message || 'Tidak dapat memulai remap batch', 'error');
+      }
+    } catch (err) {
+      Swal.fire('Error', 'Terjadi kesalahan saat memulai remap batch', 'error');
+    }
   };
 
   const applyMapping = async (selected) => {
@@ -368,7 +440,8 @@ export default function CourierRates() {
   useEffect(() => {
     fetchCouriers();
     fetchServiceTypes();
-    checkActiveImports(); // Check for active imports on page load
+    checkActiveImports();
+    checkActiveMaps();
   }, []);
 
   useEffect(() => {
@@ -451,6 +524,36 @@ export default function CourierRates() {
     };
   }, [importJobId, importStatus?.status]);
 
+  useEffect(() => {
+    let interval;
+    if (mapJobId && mapStatus?.status === 'processing') {
+      interval = setInterval(async () => {
+        try {
+          const response = await api.get(API_ROUTES.courierRates.mapStatus(mapJobId));
+          const result = response?.data?.data || {};
+          if (result.status === 'completed') {
+            setMapStatus(result);
+            setMapProgress(100);
+            fetchRates();
+          } else if (result.status === 'failed') {
+            setMapStatus(result);
+          } else if (result.status === 'processing') {
+            setMapStatus(result);
+            const progressMatch = result.message?.match(/Progress ([\d.]+)%/);
+            if (progressMatch) {
+              setMapProgress(parseFloat(progressMatch[1]));
+            }
+            setMapStatusMessage(result.message || 'Sedang memproses...');
+          }
+        } catch (err) {
+        }
+      }, 2000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [mapJobId, mapStatus?.status]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -493,6 +596,14 @@ export default function CourierRates() {
             <p className="text-gray-600 mt-1">Kelola tarif pengiriman untuk setiap courier</p>
           </div>
           <div className="flex gap-2">
+
+            <button
+              onClick={startBatchRemap}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+            >
+              Remap Ulang
+            </button>
+
             {(importJobId || importStatus?.activeImportId || importStatus?.id) && importStatus?.status === 'processing' && (
               <button
                 onClick={() => {
@@ -689,6 +800,21 @@ export default function CourierRates() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status Kecocokan
+                  </label>
+                  <select
+                    value={selectedMatchStatus}
+                    onChange={(e) => setSelectedMatchStatus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Semua</option>
+                    <option value="matched">Sesuai</option>
+                    <option value="unmatched">Belum</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Pencarian
                   </label>
                   <div className="relative">
@@ -708,6 +834,8 @@ export default function CourierRates() {
               </div>
             </div>
 
+
+
             {/* Rates Table */}
             <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
               <div className="overflow-x-auto">
@@ -723,9 +851,7 @@ export default function CourierRates() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tujuan
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Kecocokan
-                    </th>
+                      
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Layanan
                       </th>
@@ -764,32 +890,22 @@ export default function CourierRates() {
                             {rate.destination?.district || '-'}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {rate.destination?.district_code ? `Kode: ${rate.destination.district_code}` : ''}
+                            {rate.destination?.district_code ? `Kode: ${rate.destination.district_code} — Nama: ${rate.destination?.district_matched_name || '-'}` : ''}
                           </div>
                           <div className="text-sm text-gray-900">
                             {rate.destination?.city || '-'}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {rate.destination?.city_code ? `Kode: ${rate.destination.city_code}` : ''}
+                            {rate.destination?.city_code ? `Kode: ${rate.destination.city_code} — Nama: ${rate.destination?.city_matched_name || '-'}` : ''}
                           </div>
                           <div className="text-sm text-gray-500">
                             {rate.destination?.province || ''}
                           </div>
                           <div className="text-xs text-gray-400">
-                            {rate.destination?.province_code ? `Kode: ${rate.destination.province_code}` : ''}
+                            {rate.destination?.province_code ? `Kode: ${rate.destination.province_code} — Nama: ${rate.destination?.province_matched_name || '-'}` : ''}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            rate.destination?.district_code
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {rate.destination?.district_code ? "Sesuai" : "Belum"}
-                        </span>
-                      </td>
+
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">
                             {rate.service?.type || '-'}
@@ -813,12 +929,12 @@ export default function CourierRates() {
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full ${rate.availability?.is_available
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${rate.destination?.district_code
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
                               }`}
                           >
-                            {rate.availability?.is_available ? "Tersedia" : "Tidak Tersedia"}
+                            {rate.destination?.district_code ? "Sesuai" : "Belum"}
                           </span>
                           {!rate.destination?.district_code && (
                             <button
@@ -828,6 +944,14 @@ export default function CourierRates() {
                               Cocokkan
                             </button>
                           )}
+                          {/* {rate.destination?.district_code && (
+                            <button
+                              onClick={() => handleRemapAttempt(rate.id)}
+                              className="ml-3 text-xs px-3 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white"
+                            >
+                              Remap ulang
+                            </button>
+                          )} */}
                         </td>
                       </tr>
                     ))}
@@ -1089,55 +1213,55 @@ export default function CourierRates() {
                     <div className="p-3 text-sm text-gray-500">Mencari...</div>
                   ) : (
                     <ul>
-                  {wilayahResults.map((item, idx) => (
-                    <li key={idx} className="p-3 border-b hover:bg-gray-50 cursor-pointer" onClick={() => applyMapping(item)}>
-                      <div className="text-sm text-gray-900">{item.district_name || item.regency_name || item.name}</div>
-                      <div className="text-xs text-gray-600">{item.regency_name} • {item.province_name}</div>
-                      <div className="text-xs text-gray-400">Kode: {item.code} {item.district_name ? `(Kec.)` : `(Kab/Kota)`}</div>
-                    </li>
-                  ))}
-                  {wilayahResults.length === 0 && wilayahQuery.trim().length > 0 && (
-                    <li className="p-3 text-sm text-gray-500">
-                      <div className="mb-2">Tidak ada hasil</div>
-                      <button
-                        onClick={async () => {
-                          try {
-                            if (!mappingRate?.destination) return;
-                            const payload = {
-                              province: mappingRate.destination.province,
-                              city: mappingRate.destination.city,
-                              district: mappingRate.destination.district,
-                            };
-                            const res = await api.post(API_ROUTES.wilayah.customUpsert, payload);
-                            const data = res?.data?.data;
-                            if (data?.district_code) {
-                              await applyMapping({
-                                type: 'Kecamatan',
-                                code: data.district_code,
-                                regency_code: data.regency_code,
-                                province_code: data.province_code,
-                                district_name: data.district_name,
-                                regency_name: data.regency_name,
-                                province_name: data.province_name,
-                              });
-                            } else {
-                              Swal.fire('Gagal', 'Tidak dapat membuat data wilayah baru', 'error');
-                            }
-                          } catch (err) {
-                            Swal.fire('Error', 'Terjadi kesalahan saat membuat data wilayah', 'error');
-                          }
-                        }}
-                        className="mt-2 px-3 py-2 text-xs rounded bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        Buat Wilayah dari Tujuan Ini
-                      </button>
-                    </li>
+                      {wilayahResults.map((item, idx) => (
+                        <li key={idx} className="p-3 border-b hover:bg-gray-50 cursor-pointer" onClick={() => applyMapping(item)}>
+                          <div className="text-sm text-gray-900">{item.district_name || item.regency_name || item.name}</div>
+                          <div className="text-xs text-gray-600">{item.regency_name} • {item.province_name}</div>
+                          <div className="text-xs text-gray-400">Kode: {item.code} {item.district_name ? `(Kec.)` : `(Kab/Kota)`}</div>
+                        </li>
+                      ))}
+                      {wilayahResults.length === 0 && wilayahQuery.trim().length > 0 && (
+                        <li className="p-3 text-sm text-gray-500">
+                          <div className="mb-2">Tidak ada hasil</div>
+                          <button
+                            onClick={async () => {
+                              try {
+                                if (!mappingRate?.destination) return;
+                                const payload = {
+                                  province: mappingRate.destination.province,
+                                  city: mappingRate.destination.city,
+                                  district: mappingRate.destination.district,
+                                };
+                                const res = await api.post(API_ROUTES.wilayah.customUpsert, payload);
+                                const data = res?.data?.data;
+                                if (data?.district_code) {
+                                  await applyMapping({
+                                    type: 'Kecamatan',
+                                    code: data.district_code,
+                                    regency_code: data.regency_code,
+                                    province_code: data.province_code,
+                                    district_name: data.district_name,
+                                    regency_name: data.regency_name,
+                                    province_name: data.province_name,
+                                  });
+                                } else {
+                                  Swal.fire('Gagal', 'Tidak dapat membuat data wilayah baru', 'error');
+                                }
+                              } catch (err) {
+                                Swal.fire('Error', 'Terjadi kesalahan saat membuat data wilayah', 'error');
+                              }
+                            }}
+                            className="mt-2 px-3 py-2 text-xs rounded bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Buat Wilayah dari Tujuan Ini
+                          </button>
+                        </li>
+                      )}
+                      {wilayahResults.length === 0 && wilayahQuery.trim().length === 0 && (
+                        <li className="p-3 text-sm text-gray-500">Masukkan kata kunci untuk mencari kecamatan</li>
+                      )}
+                    </ul>
                   )}
-                  {wilayahResults.length === 0 && wilayahQuery.trim().length === 0 && (
-                    <li className="p-3 text-sm text-gray-500">Masukkan kata kunci untuk mencari kecamatan</li>
-                  )}
-                </ul>
-              )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <button
@@ -1173,6 +1297,21 @@ export default function CourierRates() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {mapJobId && mapStatus?.status === 'processing' && (
+          <div className="fixed bottom-4 left-4 z-50 w-96 bg-white shadow-lg border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+              <span className="text-sm font-semibold text-gray-800">Sedang remap tanpa reset</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded h-2 mb-3">
+              <div className="bg-indigo-600 h-2 rounded" style={{ width: `${Math.min(100, mapProgress || 0)}%` }}></div>
+            </div>
+            {mapStatusMessage && (
+              <div className="text-xs text-gray-700 mb-2">{mapStatusMessage}</div>
             )}
           </div>
         )}

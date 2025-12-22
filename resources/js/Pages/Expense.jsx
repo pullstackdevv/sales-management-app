@@ -59,6 +59,44 @@ export default function ExpensePage() {
 
     const subtotal = amount * qty;
 
+    const normalizeDateInput = (value) => {
+        if (!value) {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+        if (typeof value === 'string') {
+            // If purely YYYY-MM-DD, use as-is (no timezone ambiguity)
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            // If has time component (T or space), parse to local date to avoid UTC shifts
+            if (/^\d{4}-\d{2}-\d{2}[ T].*$/.test(value)) {
+                const dt = new Date(value);
+                if (!isNaN(dt.getTime())) {
+                    const y = dt.getFullYear();
+                    const m = String(dt.getMonth() + 1).padStart(2, '0');
+                    const d = String(dt.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+            }
+        }
+        try {
+            const dt = new Date(value);
+            if (!isNaN(dt.getTime())) {
+                const y = dt.getFullYear();
+                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                const d = String(dt.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        } catch {}
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
     // Fetch expenses data
     useEffect(() => {
         fetchExpenses(currentPage);
@@ -185,7 +223,7 @@ export default function ExpensePage() {
         setName(expense.name);
         setDescription(expense.description || "");
         setCategory(expense.category || "");
-        setDate(expense.expense_date);
+        setDate(normalizeDateInput(expense.expense_date));
         setAmount(expense.amount);
         setQty(expense.quantity);
         setNotes(expense.notes || "");

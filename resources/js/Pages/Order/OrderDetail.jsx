@@ -362,7 +362,12 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                                 <p>{orderData.address.address_detail}</p>
                                                 <p>{orderData.address.district}, {orderData.address.city}, {orderData.address.province} {orderData.address.postal_code}</p>
                                                 <p>Telp: {orderData.address.phone || orderData.customer?.phone || '-'}</p>
-                                                {orderData.address.is_dropship && (<p className="text-xs text-gray-500">Dropship</p>)}
+                                                {orderData.address.is_dropship && (
+                                                    <>
+                                                        <p className="text-xs text-gray-500">Dropship</p>
+                                                        <p>Pemesan: {orderData.customer?.name || '-'}</p>
+                                                    </>
+                                                )}
                                             </div>
                                         </>
                                     ) : (

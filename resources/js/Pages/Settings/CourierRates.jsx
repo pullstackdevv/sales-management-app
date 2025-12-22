@@ -1126,43 +1126,6 @@ export default function CourierRates() {
                           <div className="text-xs text-gray-400">Kode: {item.code} {item.district_name ? `(Kec.)` : `(Kab/Kota)`}</div>
                         </li>
                       ))}
-                      {wilayahResults.length === 0 && wilayahQuery.trim().length > 0 && (
-                        <li className="p-3 text-sm text-gray-500">
-                          <div className="mb-2">Tidak ada hasil</div>
-                          <button
-                            onClick={async () => {
-                              try {
-                                if (!mappingRate?.destination) return;
-                                const payload = {
-                                  province: mappingRate.destination.province,
-                                  city: mappingRate.destination.city,
-                                  district: mappingRate.destination.district,
-                                };
-                                const res = await api.post(API_ROUTES.wilayah.customUpsert, payload);
-                                const data = res?.data?.data;
-                                if (data?.district_code) {
-                                  await applyMapping({
-                                    type: 'Kecamatan',
-                                    code: data.district_code,
-                                    regency_code: data.regency_code,
-                                    province_code: data.province_code,
-                                    district_name: data.district_name,
-                                    regency_name: data.regency_name,
-                                    province_name: data.province_name,
-                                  });
-                                } else {
-                                  Swal.fire('Gagal', 'Tidak dapat membuat data wilayah baru', 'error');
-                                }
-                              } catch (err) {
-                                Swal.fire('Error', 'Terjadi kesalahan saat membuat data wilayah', 'error');
-                              }
-                            }}
-                            className="mt-2 px-3 py-2 text-xs rounded bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            Buat Wilayah dari Tujuan Ini
-                          </button>
-                        </li>
-                      )}
                       {wilayahResults.length === 0 && wilayahQuery.trim().length === 0 && (
                         <li className="p-3 text-sm text-gray-500">Masukkan kata kunci untuk mencari kecamatan</li>
                       )}
@@ -1170,6 +1133,38 @@ export default function CourierRates() {
                   )}
                 </div>
                 <div className="flex justify-end gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        if (!mappingRate?.destination) return;
+                        const payload = {
+                          province: mappingRate.destination.province,
+                          city: mappingRate.destination.city,
+                          district: mappingRate.destination.district,
+                        };
+                        const res = await api.post(API_ROUTES.wilayah.customUpsert, payload);
+                        const data = res?.data?.data;
+                        if (data?.district_code) {
+                          await applyMapping({
+                            type: 'Kecamatan',
+                            code: data.district_code,
+                            regency_code: data.regency_code,
+                            province_code: data.province_code,
+                            district_name: data.district_name,
+                            regency_name: data.regency_name,
+                            province_name: data.province_name,
+                          });
+                        } else {
+                          Swal.fire('Gagal', 'Tidak dapat membuat data wilayah baru', 'error');
+                        }
+                      } catch (err) {
+                        Swal.fire('Error', 'Terjadi kesalahan saat membuat data wilayah', 'error');
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                  >
+                    Tambah Wilayah dari Tujuan Ini
+                  </button>
                   <button
                     onClick={() => { setShowMapModal(false); setMappingRate(null); setWilayahQuery(''); setWilayahResults([]); }}
                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg"

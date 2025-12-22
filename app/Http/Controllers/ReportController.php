@@ -10,6 +10,8 @@ use App\Models\Courier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ReportController extends Controller
 {
@@ -40,6 +42,103 @@ class ReportController extends Controller
             return ResponseFormatter::success('Report data retrieved successfully', $data);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve report data: ' . $e->getMessage(), [], 500);
+        }
+    }
+
+    public function exportSales(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user->hasPermission('reports.sales')) {
+                return ResponseFormatter::error('Unauthorized access', [], 403);
+            }
+
+            $month = $request->get('month');
+            $startDate = $request->get('start_date');
+            $endDate = $request->get('end_date');
+            if ($month && (!$startDate || !$endDate)) {
+                $parts = explode('-', $month);
+                $y = (int)($parts[0] ?? date('Y'));
+                $m = (int)($parts[1] ?? date('m'));
+                $startDate = Carbon::create($y, $m, 1)->startOfDay();
+                $endDate = Carbon::create($y, $m, 1)->endOfMonth()->endOfDay();
+            } else {
+                $startDate = $startDate ? Carbon::parse($startDate)->startOfDay() : Carbon::now()->subDays(30)->startOfDay();
+                $endDate = $endDate ? Carbon::parse($endDate)->endOfDay() : Carbon::now()->endOfDay();
+            }
+
+            $monthly = $this->getSalesChart($startDate->copy()->startOfMonth(), $endDate->copy()->endOfMonth());
+            $daily = $this->getDailySalesChart($startDate->copy(), $endDate->copy());
+
+            $spreadsheet = new Spreadsheet();
+            $summarySheet = $spreadsheet->getActiveSheet();
+            $summarySheet->setTitle('Summary');
+            $summarySheet->setCellValue('A1', 'Total Revenue');
+            $summarySheet->setCellValue('B1', (float)($daily['summary']['total_revenue'] ?? 0));
+            $summarySheet->setCellValue('A2', 'Total Order Amount');
+            $summarySheet->setCellValue('B2', (float)($daily['summary']['total_order_amount'] ?? 0));
+            $summarySheet->setCellValue('A3', 'Gross Sales');
+            $summarySheet->setCellValue('B3', (float)($daily['summary']['gross_sales'] ?? 0));
+            $summarySheet->setCellValue('A4', 'Net Sales');
+            $summarySheet->setCellValue('B4', (float)($daily['summary']['net_sales'] ?? 0));
+            $summarySheet->setCellValue('A5', 'Shipping Total');
+            $summarySheet->setCellValue('B5', (float)($daily['summary']['shipping_total'] ?? 0));
+            $summarySheet->setCellValue('A6', 'Discounts Total');
+            $summarySheet->setCellValue('B6', (float)($daily['summary']['discounts_total'] ?? 0));
+            $summarySheet->setCellValue('A7', 'HPP Total');
+            $summarySheet->setCellValue('B7', (float)($daily['summary']['hpp_total'] ?? 0));
+            $summarySheet->setCellValue('A8', 'Gross Profit');
+            $summarySheet->setCellValue('B8', (float)($daily['summary']['gross_profit'] ?? 0));
+            $summarySheet->setCellValue('A9', 'Operational Cost');
+            $summarySheet->setCellValue('B9', (float)($daily['summary']['operational_cost'] ?? 0));
+            $summarySheet->setCellValue('A10', 'Net Profit');
+            $summarySheet->setCellValue('B10', (float)($daily['summary']['net_profit'] ?? 0));
+            $summarySheet->setCellValue('A11', 'Receivables');
+            $summarySheet->setCellValue('B11', (float)($daily['summary']['receivables_total'] ?? 0));
+            $summarySheet->setCellValue('A12', 'Total Orders');
+            $summarySheet->setCellValue('B12', (int)($daily['summary']['total_orders'] ?? 0));
+            $summarySheet->setCellValue('A13', 'Total Items');
+            $summarySheet->setCellValue('B13', (int)($daily['summary']['total_items'] ?? 0));
+
+            $monthlySheet = $spreadsheet->createSheet();
+            $monthlySheet->setTitle('Monthly');
+            $monthlySheet->setCellValue('A1', 'Periode');
+            $monthlySheet->setCellValue('B1', 'Revenue');
+            $monthlySheet->setCellValue('C1', 'Orders');
+            $idx = 2;
+            foreach ($monthly['labels'] as $i => $label) {
+                $monthlySheet->setCellValue("A{$idx}", $label);
+                $monthlySheet->setCellValue("B{$idx}", (float)($monthly['data'][$i] ?? 0));
+                $monthlySheet->setCellValue("C{$idx}", (int)($monthly['orders'][$i] ?? 0));
+                $idx++;
+            }
+
+            $dailySheet = $spreadsheet->createSheet();
+            $dailySheet->setTitle('Daily');
+            $dailySheet->setCellValue('A1', 'Tanggal');
+            $dailySheet->setCellValue('B1', 'Revenue');
+            $dailySheet->setCellValue('C1', 'Orders');
+            $dailySheet->setCellValue('D1', 'Items');
+            $idx = 2;
+            foreach ($daily['labels'] as $i => $label) {
+                $dailySheet->setCellValue("A{$idx}", $label);
+                $dailySheet->setCellValue("B{$idx}", (float)($daily['data'][$i] ?? 0));
+                $dailySheet->setCellValue("C{$idx}", (int)($daily['orders'][$i] ?? 0));
+                $dailySheet->setCellValue("D{$idx}", (int)($daily['items'][$i] ?? 0));
+                $idx++;
+            }
+
+            $filename = 'sales-report-' . now()->format('Ymd-His') . '.xlsx';
+            \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory('exports');
+            $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path('exports/' . $filename);
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($fullPath);
+
+            return ResponseFormatter::success('Export generated', [
+                'url' => \Illuminate\Support\Facades\Storage::url('exports/' . $filename)
+            ]);
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Failed to export report: ' . $e->getMessage(), [], 500);
         }
     }
 

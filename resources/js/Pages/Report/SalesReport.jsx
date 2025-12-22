@@ -188,6 +188,23 @@ const SalesReport = () => {
     }
   };
 
+  const handleExportSales = async () => {
+    try {
+      const payload = {};
+      if (dailyStartDate && dailyEndDate) {
+        payload.start_date = dailyStartDate;
+        payload.end_date = dailyEndDate;
+      } else if (dailyMonth) {
+        payload.month = dailyMonth;
+      }
+      const response = await api.post('/reports/export-sales', payload);
+      if (response.data?.status === 'success') {
+        const url = response.data?.data?.url;
+        if (url) window.open(url, '_blank');
+      }
+    } catch (e) {}
+  };
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -226,6 +243,12 @@ const SalesReport = () => {
                   className="bg-amber-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors duration-200 whitespace-nowrap"
                 >
                   Tampilkan Bulan
+                </button>
+                <button
+                  onClick={handleExportSales}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors duration-200 whitespace-nowrap"
+                >
+                  Unduh Excel
                 </button>
               </div>
 

@@ -4,10 +4,12 @@ import DashboardLayout from '@/Layouts/DashboardLayout.jsx';
 import { ChevronLeft, MessageCircle, Copy, Settings, Eye, Truck, ExternalLink, RefreshCw, DollarSign, Briefcase, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api/axios';
+import { useAuth } from '@/contexts/AuthContext';
 import PaymentHistoryModal from '../../components/ui/modal/PaymentHistoryModal';
 import OrderHistoryModal from '../../components/ui/modal/OrderHistoryModal';
 
 export default function OrderDetail({ auth, order }) {
+    const { isOwner, user } = useAuth();
     const formatRupiah = (value) => {
         const num = typeof value === 'number' ? value : parseFloat(value || 0);
         return num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
@@ -175,10 +177,20 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
         );
     }
 
-    // Calculate totals with base_price from order_items table
     const totalSellingPrice = orderData.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
-    // const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
-    // const profit = totalSellingPrice - totalProductCost;
+    const voucherDiscountAmount = orderData?.voucher?.type === 'percentage'
+        ? Math.floor(totalSellingPrice * ((orderData?.voucher?.value || 0) / 100))
+        : (orderData?.voucher?.value || 0);
+    const manualDiscount = orderData?.discount_amount || 0;
+    const netSales = Math.max(totalSellingPrice - voucherDiscountAmount - manualDiscount, 0);
+    const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
+    const grossProfit = netSales - totalProductCost;
+    let paidAmount = orderData.payments?.reduce((sum, p) => sum + (p.amount_paid || 0), 0) || 0;
+    if (isWebOrder() && orderData.payment_status === 'paid') {
+        paidAmount = orderData.total_price || 0;
+    }
+    const receivable = Math.max((orderData.total_price || 0) - paidAmount, 0);
+    const canViewFinance = isOwner || (user?.id === orderData?.user_id);
 
     return (
         <DashboardLayout user={auth.user}>
@@ -421,6 +433,19 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <span>Subtotal Produk</span>
                                         <span>Rp{formatRupiah(totalSellingPrice)}</span>
                                     </div>
+                                    {canViewFinance && (
+                                        <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+                                            <h4 className="font-semibold mb-3">Ringkasan Finansial</h4>
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex justify-between"><span>Pendapatan</span><span>Rp{formatRupiah(orderData.total_price)}</span></div>
+                                                <div className="flex justify-between"><span>Penjualan Kotor</span><span>Rp{formatRupiah(totalSellingPrice)}</span></div>
+                                                <div className="flex justify-between"><span>Penjualan Bersih</span><span>Rp{formatRupiah(netSales)}</span></div>
+                                                <div className="flex justify-between"><span>HPP</span><span>Rp{formatRupiah(totalProductCost)}</span></div>
+                                                <div className="flex justify-between"><span>Laba Kotor</span><span>Rp{formatRupiah(grossProfit)}</span></div>
+                                                <div className="flex justify-between"><span>Piutang</span><span>Rp{formatRupiah(receivable)}</span></div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-sm">
                                         <span>{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</span>
                                         <span>Rp{formatRupiah(orderData.shipping_cost)}</span>

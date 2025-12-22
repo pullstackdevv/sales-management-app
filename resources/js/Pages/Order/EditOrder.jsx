@@ -573,6 +573,7 @@ export default function EditOrder() {
                 discount_amount: formData.manual_discount,
                 notes: formData.notes,
                 status: formData.status,
+                payment_status: formData.status === 'paid' ? 'paid' : 'pending',
                 payment_bank_id: formData.payment_bank_id || null,
                 courier_id: formData.courier || null,
                 courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,

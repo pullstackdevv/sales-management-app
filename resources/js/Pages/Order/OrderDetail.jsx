@@ -191,15 +191,15 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
     if (isWebOrder() && orderData.payment_status === 'paid') {
         paidAmount = orderData.total_price || 0;
     }
-    const receivable = Math.max((orderData.total_price || 0) - paidAmount, 0);
-    const isPaymentInactive = ['pending', 'cancelled', 'expired'].includes(String(orderData.payment_status || '').toLowerCase());
+    const outstanding = Math.max((orderData.total_price || 0) );
+    const isPaymentInactive = ['pending', 'cancelled'].includes(String(orderData.payment_status || '').toLowerCase());
     const finance = {
         revenue: isPaymentInactive ? 0 : (orderData.total_price || 0),
         totalSellingPrice: isPaymentInactive ? 0 : totalSellingPrice,
         netSales: isPaymentInactive ? 0 : netSales,
         totalProductCost: isPaymentInactive ? 0 : totalProductCost,
         grossProfit: isPaymentInactive ? 0 : grossProfit,
-        receivable: isPaymentInactive ? 0 : receivable,
+        receivable: String(orderData.payment_status || '').toLowerCase() === 'cancelled' ? 0 : outstanding,
     };
     const canViewFinance = isOwner || (user?.id === orderData?.user_id);
 

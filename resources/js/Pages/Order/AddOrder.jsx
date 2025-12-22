@@ -24,6 +24,13 @@ export default function AddOrder() {
         service_type: ''
     });
 
+    useEffect(() => {
+        setFormData(prev => ({
+            ...prev,
+            payment_status: prev.status === 'paid' ? 'paid' : 'pending'
+        }));
+    }, [formData.status]);
+
     const [orderItems, setOrderItems] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -853,7 +860,7 @@ export default function AddOrder() {
                     discount_amount: formData.manual_discount,
                     notes: formData.notes,
                     status: formData.status,
-                    payment_status: formData.payment_status || (formData.status === 'paid' ? 'paid' : 'pending'),
+                    payment_status: formData.status === 'paid' ? 'paid' : 'pending',
                     payment_bank_id: formData.payment_bank_id || null,
                     courier_id: formData.courier || null,
                     courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,

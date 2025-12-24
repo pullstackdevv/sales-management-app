@@ -201,7 +201,7 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
     const effectivePaymentStatus = (!isWebOrder() && paymentStatusStr === 'pending' && ['paid','shipped','processing','delivered'].includes(orderStatusStr)) ? 'paid' :
                                  (!isWebOrder() && paymentStatusStr === 'pending' && orderStatusStr === 'cancelled') ? 'cancelled' :
                                  paymentStatusStr;
-    const isPaymentInactive = ['pending', 'cancelled'].includes(effectivePaymentStatus);
+    const isPaymentInactive = ['cancelled','expired'].includes(effectivePaymentStatus);
     const finance = {
         revenue: isPaymentInactive ? 0 : (orderData.total_price || 0),
         totalSellingPrice: isPaymentInactive ? 0 : totalSellingPrice,
@@ -486,14 +486,14 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                 <div className="mt-6 bg-white p-6 rounded-lg shadow-sm">
                                     <h3 className="text-lg font-semibold mb-4">Ringkasan Finansial</h3>
                                     <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between"><span>Pendapatan</span><span>Rp{formatRupiah(finance.revenue)}</span></div>
-                                        <div className="flex justify-between"><span>Penjualan Kotor</span><span>Rp{formatRupiah(finance.totalSellingPrice)}</span></div>
+                                        {/* <div className="flex justify-between"><span>Pendapatan</span><span>Rp{formatRupiah(finance.revenue)}</span></div> */}
+                                        <div className="flex justify-between"><span>Penjualan Kotor</span><span>Rp{formatRupiah(finance.revenue)}</span></div>
                                         <div className="flex justify-between"><span>Penjualan Bersih</span><span>Rp{formatRupiah(finance.netSales)}</span></div>
                                         <div className="flex justify-between"><span>HPP</span><span>Rp{formatRupiah(finance.totalProductCost)}</span></div>
                                         <div className="flex justify-between"><span>Laba Kotor</span><span>Rp{formatRupiah(finance.grossProfit)}</span></div>
                                         <div className="flex justify-between"><span>Piutang</span><span>Rp{formatRupiah(finance.receivable)}</span></div>
                                     </div>
-                                    {['pending', 'cancelled'].includes(String(orderData.payment_status || '').toLowerCase()) && (
+                                    {['cancelled', 'expired'].includes(String(orderData.payment_status || '').toLowerCase()) && (
                                         <p className="mt-2 text-xs text-gray-500">Status pembayaran {String(orderData.payment_status).toLowerCase()}. Nilai finansial ditampilkan 0.</p>
                                     )}
                                 </div>

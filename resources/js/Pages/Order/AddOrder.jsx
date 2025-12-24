@@ -83,24 +83,12 @@ export default function AddOrder() {
     
     // Error states
     const [errors, setErrors] = useState({});
-    // const [voucherCode, setVoucherCode] = useState('');
-    const [voucher, setVoucher] = useState(null);
-    const [discountAmount, setDiscountAmount] = useState(0);
-    const [voucherLoading, setVoucherLoading] = useState(false);
-    const [voucherError, setVoucherError] = useState('');
+  
     const formatIDR = (num) => {
         const n = Number(num || 0);
         return n.toLocaleString('id-ID', { maximumFractionDigits: 0 });
     };
-    const getVoucherLabel = (v) => {
-        const t = (v?.type || '').toString();
-        if (t === 'shipping') return 'Diskon Ongkir';
-        if (t === 'percentage') return 'Diskon Persentase';
-        if (t === 'fixed') return 'Diskon';
-        if (t === 'free_sample') return 'Gratis Sample';
-        if (t === 'shipping_free_sample') return 'Diskon Ongkir + Sample';
-        return 'Diskon';
-    };
+    
     const [addCustomerModalOpen, setAddCustomerModalOpen] = useState(false);
     const [newCustomer, setNewCustomer] = useState({
         full_name: "",
@@ -566,36 +554,7 @@ export default function AddOrder() {
         }
     };
 
-    const validateVoucher = async () => {
-        setVoucherError('');
-        if (!voucherCode.trim()) return;
-        setVoucherLoading(true);
-        try {
-            const response = await axios.post('/api/vouchers/validate', {
-                code: voucherCode.trim(),
-                order_amount: calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0),
-                shipping_cost: parseFloat(formData.shipping_cost) || 0
-            });
-            if (response.data.status === 'success') {
-                const data = response.data.data || {};
-                setVoucher(data.voucher || null);
-                setDiscountAmount(data.discount_amount || 0);
-                Swal.fire({ icon: 'success', title: 'Voucher diterapkan', timer: 1200, showConfirmButton: false });
-            } else {
-                setVoucher(null);
-                setDiscountAmount(0);
-                setVoucherError(response.data.message || 'Voucher tidak valid');
-            }
-        } catch (error) {
-            setVoucher(null);
-            setDiscountAmount(0);
-            const msg = error.response?.data?.message || 'Voucher tidak valid';
-            setVoucherError(msg);
-            Swal.fire({ icon: 'error', title: 'Voucher gagal', text: msg });
-        } finally {
-            setVoucherLoading(false);
-        }
-    };
+    
 
     const calculateTotalWeight = () => {
         if (!orderItems || orderItems.length === 0) return 0;
@@ -853,7 +812,6 @@ export default function AddOrder() {
                     discount_amount: formData.manual_discount,
                     notes: formData.notes,
                     status: formData.status,
-                    payment_status: formData.payment_status || (formData.status === 'paid' ? 'paid' : 'pending'),
                     payment_bank_id: formData.payment_bank_id || null,
                     courier_id: formData.courier || null,
                     courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,

@@ -282,13 +282,23 @@ class PaymentController extends Controller
             ];
         }
 
-        // Add discount as negative item if applicable
+        // Add voucher discount as negative item if applicable
         if ($order->voucher && $order->discount_amount > 0) {
             $items[] = [
-                'id' => 'discount',
+                'id' => 'voucher_discount',
                 'price' => -(int) $order->discount_amount,
                 'quantity' => 1,
                 'name' => $order->voucher->type === 'shipping' ? 'Shipping Discount' : 'Voucher Discount'
+            ];
+        }
+
+        // Add point discount as negative item if applicable
+        if ($order->point_discount && $order->point_discount > 0) {
+            $items[] = [
+                'id' => 'point_discount',
+                'price' => -(int) $order->point_discount,
+                'quantity' => 1,
+                'name' => 'Point Discount - ' . $order->redeemed_points . ' poin'
             ];
         }
 
@@ -297,6 +307,8 @@ class PaymentController extends Controller
             'final_amount' => $order->total_price,
             'voucher_code' => $order->voucher ? $order->voucher->code : null,
             'voucher_type' => $order->voucher ? $order->voucher->type : null,
+            'redeemed_points' => $order->redeemed_points ?? 0,
+            'point_discount' => $order->point_discount ?? 0,
             'items_count' => count($items)
         ]);
 

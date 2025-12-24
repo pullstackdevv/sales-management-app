@@ -22,6 +22,13 @@ const PaymentMethodCheckout = () => {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [loadingVoucher, setLoadingVoucher] = useState(false);
 
+  // Loyalty points states
+  const [loyaltyPoints, setLoyaltyPoints] = useState(null);
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [pointDiscount, setPointDiscount] = useState(0);
+  const [redeemOptions, setRedeemOptions] = useState([]);
+
   // Promotion states
   const [promotions, setPromotions] = useState([]);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
@@ -50,9 +57,23 @@ const PaymentMethodCheckout = () => {
 
   // Separate useEffect to fetch courier rates after checkoutData is set
   useEffect(() => {
+    console.log('UseEffect triggered - checkoutData:', checkoutData);
     if (checkoutData && checkoutData.customer) {
+      console.log('Fetching courier rates, promotions, and loyalty points...');
       fetchCourierRates();
       fetchActivePromotions();
+      
+      // Fetch loyalty points immediately
+      const customerId = checkoutData.customer.customer_id || checkoutData.customer.id;
+      console.log('Initial loyalty fetch - customer_id:', customerId);
+      if (customerId) {
+        fetchLoyaltyPoints();
+      }
+    } else {
+      console.log('Skipping fetch - checkoutData or customer missing:', {
+        hasCheckoutData: !!checkoutData,
+        hasCustomer: !!checkoutData?.customer
+      });
     }
   }, [checkoutData]);
 
@@ -289,11 +310,99 @@ const PaymentMethodCheckout = () => {
     }
   };
 
+  // Function to fetch customer loyalty points
+  const fetchLoyaltyPoints = async () => {
+    // Try to get customer_id from various sources
+    const customerId = checkoutData?.customer?.customer_id || 
+                      checkoutData?.customer?.id;
+    
+    console.log('Fetching loyalty points - customer data:', {
+      hasCheckoutData: !!checkoutData,
+      hasCustomer: !!checkoutData?.customer,
+      customer: checkoutData?.customer,
+      customerId: customerId
+    });
+
+    if (!customerId) {
+      console.log('No customer_id available for loyalty points');
+      return;
+    }
+
+    setLoadingLoyalty(true);
+    try {
+      const orderTotal = checkoutData.product.subtotal + shippingCost;
+      
+      console.log('Calling loyalty API with:', {
+        customerId,
+        orderTotal
+      });
+      
+      const response = await axios.get(`/api/loyalty/redeem-options?customer_id=${customerId}&order_total=${orderTotal}`);
+      
+      console.log('Loyalty API response:', response.data);
+      
+      if (response.data) {
+        setLoyaltyPoints({
+          current: response.data.customer_points || 0,
+          redeemValue: response.data.redeem_value || 1000,
+          minRedeem: response.data.min_redeem || 0,
+          maxPercentage: response.data.max_percentage || 20,
+          maxDiscount: response.data.max_discount || 0
+        });
+        setRedeemOptions(response.data.options || []);
+        console.log('Loyalty points loaded successfully:', {
+          current: response.data.customer_points,
+          options: response.data.options
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching loyalty points:', error);
+      console.error('Error details:', error.response?.data);
+    } finally {
+      setLoadingLoyalty(false);
+    }
+  };
+
+  // Refetch loyalty when shipping cost changes
+  useEffect(() => {
+    const customerId = checkoutData?.customer?.customer_id || checkoutData?.customer?.id;
+    if (customerId && shippingCost >= 0) {
+      console.log('Refetching loyalty points due to shipping cost change:', shippingCost);
+      fetchLoyaltyPoints();
+    }
+  }, [shippingCost]);
+
+  // Function to apply point redemption
+  const applyPointRedemption = (points) => {
+    if (!loyaltyPoints || points <= 0) return;
+
+    const discount = Math.min(
+      points * loyaltyPoints.redeemValue,
+      loyaltyPoints.maxDiscount || Infinity
+    );
+
+    setPointsToRedeem(points);
+    setPointDiscount(discount);
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Poin Berhasil Diterapkan!',
+      text: `${points} poin ditukar menjadi diskon ${formatCurrency(discount)}`,
+      confirmButtonColor: '#3b82f6'
+    });
+  };
+
+  // Function to remove point redemption
+  const removePointRedemption = () => {
+    setPointsToRedeem(0);
+    setPointDiscount(0);
+  };
+
   // Calculate total including shipping and discount
   const calculateTotal = () => {
     if (!checkoutData || !checkoutData.product) return 0;
     const subtotal = checkoutData.product.subtotal + shippingCost;
-    return subtotal - voucherDiscount;
+    return subtotal - voucherDiscount - pointDiscount;
   };
 
   // Function to validate and apply voucher
@@ -460,6 +569,8 @@ const PaymentMethodCheckout = () => {
         items: items.map(p => ({ product_variant_id: p.product_variant_id, quantity: p.quantity })),
         shipping_cost: shippingCost,
         voucher_id: appliedVoucher ? appliedVoucher.id : null,
+        redeemed_points: pointsToRedeem,
+        point_discount: pointDiscount,
         notes: (notes || '').trim() ? (notes || '').trim() : '-',
         guest_email: guestEmail,
         guest_phone: guestPhone,
@@ -799,6 +910,88 @@ const PaymentMethodCheckout = () => {
                     </div>
                   )}
 
+                  {/* Loyalty Points Section - Debug */}
+                  {checkoutData?.customer && (
+                    <div className="border-t pt-3 mt-3 bg-yellow-50 p-2 text-xs">
+                      <div>DEBUG - Customer Data:</div>
+                      <div>customer_id: {checkoutData.customer.customer_id || 'MISSING'}</div>
+                      <div>id: {checkoutData.customer.id || 'MISSING'}</div>
+                      <div>loyaltyPoints: {loyaltyPoints ? 'EXISTS' : 'NULL'}</div>
+                      <div>current points: {loyaltyPoints?.current || 0}</div>
+                      <div>loadingLoyalty: {loadingLoyalty ? 'YES' : 'NO'}</div>
+                    </div>
+                  )}
+
+                  {/* Loyalty Points Section */}
+                  {loyaltyPoints && loyaltyPoints.current > 0 && (
+                    <div className="border-t pt-3 mt-3">
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          💎 Tukar Poin Loyalty
+                        </label>
+                        
+                        {pointsToRedeem === 0 ? (
+                          <div className="space-y-2">
+                            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded p-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-purple-700">Poin Tersedia:</span>
+                                <span className="text-sm font-bold text-purple-900">{loyaltyPoints.current} poin</span>
+                              </div>
+                              <div className="text-xs text-purple-600 mt-1">
+                                1 poin = {formatCurrency(loyaltyPoints.redeemValue)}
+                              </div>
+                            </div>
+                            
+                            {redeemOptions.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2">
+                                {redeemOptions.map((option) => (
+                                  <button
+                                    key={option.points}
+                                    onClick={() => applyPointRedemption(option.points)}
+                                    disabled={!option.is_available || loadingLoyalty}
+                                    className={`px-3 py-2 rounded text-xs font-medium transition-colors ${
+                                      option.is_available
+                                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    <div>{option.points} poin</div>
+                                    <div className="text-xs opacity-90">-{formatCurrency(option.discount)}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {loyaltyPoints.current < loyaltyPoints.minRedeem && (
+                              <div className="text-xs text-gray-500 text-center mt-1">
+                                Minimal {loyaltyPoints.minRedeem} poin untuk redeem
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-purple-50 border border-purple-200 rounded p-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium text-purple-800">
+                                  💎 {pointsToRedeem} Poin Ditukar
+                                </div>
+                                <div className="text-xs text-purple-600">
+                                  Diskon: {formatCurrency(pointDiscount)}
+                                </div>
+                              </div>
+                              <button
+                                onClick={removePointRedemption}
+                                className="text-xs text-red-600 hover:text-red-800 font-medium"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Voucher Section - Compact & Responsive */}
                   <div className="border-t pt-3 mt-3">
                     <div className="mb-2">
@@ -874,6 +1067,13 @@ const PaymentMethodCheckout = () => {
                         {appliedVoucher?.type === 'shipping' ? 'Diskon Ongkir' : 'Diskon Voucher'}
                       </span>
                       <span className="font-medium">-Rp {voucherDiscount.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+
+                  {pointDiscount > 0 && (
+                    <div className="flex justify-between text-purple-600 text-sm">
+                      <span>Diskon Poin ({pointsToRedeem} poin)</span>
+                      <span className="font-medium">-Rp {pointDiscount.toLocaleString('id-ID')}</span>
                     </div>
                   )}
 

@@ -428,6 +428,7 @@ class PaymentController extends Controller
         if ($paymentStatus === PaymentStatus::PAID) {
             $order->update(['status' => 'processing']);
             WebOrderController::updateVoucherUsedCount($order->id);
+            $this->redeemLoyaltyPoints($order);
             $this->awardLoyaltyPoints($order);
             
             // Create payment received notification
@@ -493,6 +494,8 @@ class PaymentController extends Controller
         if ($paymentStatus === PaymentStatus::PAID) {
             $order->update(['status' => 'processing']);
             WebOrderController::updateVoucherUsedCount($order->id);
+            $this->redeemLoyaltyPoints($order);
+            $this->awardLoyaltyPoints($order);
             
             // Create payment received notification
             NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -566,6 +569,7 @@ class PaymentController extends Controller
 
                 if ($paymentStatus === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    $this->redeemLoyaltyPoints($order);
                     $this->awardLoyaltyPoints($order);
                     
                     // Create payment received notification
@@ -654,6 +658,7 @@ class PaymentController extends Controller
 
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    $this->redeemLoyaltyPoints($order);
                     $this->awardLoyaltyPoints($order);
                     
                     // Create payment received notification
@@ -757,6 +762,53 @@ class PaymentController extends Controller
             $this->loyaltyPointService->awardPointsForOrder($order);
         } catch (\Throwable $th) {
             Log::error('Failed to award loyalty points for order', [
+                'order_id' => $order->id,
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    private function redeemLoyaltyPoints(Order $order): void
+    {
+        if (!$order->redeemed_points || $order->redeemed_points <= 0) {
+            return;
+        }
+
+        try {
+            $customerPoint = \App\Models\CustomerPoint::where('customer_id', $order->customer_id)->first();
+            
+            if (!$customerPoint) {
+                Log::warning('Customer point not found for redemption', [
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                ]);
+                return;
+            }
+
+            // Redeem points
+            $transaction = $customerPoint->redeemPoints(
+                $order->redeemed_points,
+                $order->id,
+                "Points redeemed for order {$order->order_number}"
+            );
+
+            if (!$transaction) {
+                Log::error('Failed to redeem points - insufficient balance', [
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                    'redeemed_points' => $order->redeemed_points,
+                    'current_points' => $customerPoint->current_points,
+                ]);
+            } else {
+                Log::info('Loyalty points redeemed successfully', [
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                    'redeemed_points' => $order->redeemed_points,
+                    'point_discount' => $order->point_discount,
+                ]);
+            }
+        } catch (\Throwable $th) {
+            Log::error('Failed to redeem loyalty points for order', [
                 'order_id' => $order->id,
                 'message' => $th->getMessage(),
             ]);

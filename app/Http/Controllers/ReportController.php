@@ -256,40 +256,16 @@ class ReportController extends Controller
             $effectiveEndDate = $endDate->copy()->subDay()->endOfDay();
         }
         $rangeEndDateStr = $effectiveEndDate->toDateString();
-        // Build subquery to determine effective paid date per order (prefer verified_at)
-        $paymentsSub = DB::table('order_payments')
-            ->select('order_id', DB::raw('MIN(COALESCE(verified_at, paid_at)) as effective_paid_at'))
-            ->groupBy('order_id');
 
-        // Manual/admin monthly revenues based on order progression (unpaid but progressed)
-        $manualMonthlyRows = DB::table('orders')
-            ->where(function ($q) {
-                $q->where('payment_status', '!=', 'paid')
-                    ->whereIn('status', ['paid', 'shipped', 'delivered']);
-            })
-            ->whereBetween(DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
+        // Consolidated Sales Data (ignores payment method, relies on Order Status and Ordered At)
+        $salesRows = DB::table('orders')
+            ->whereIn('status', ['paid', 'shipped', 'processing', 'delivered'])
+            ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
             ->select(
-                DB::raw('YEAR(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at)) as year'),
-                DB::raw('MONTH(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at)) as month'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders'),
-                DB::raw('SUM(orders.total_price) as total_sales')
-            )
-            ->groupBy('year', 'month')
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
-            ->get();
-        // Gateway-paid monthly revenues (paid orders)
-        $gatewayMonthlyRows = DB::table('orders')
-            ->leftJoinSub($paymentsSub, 'p', function ($join) {
-                $join->on('p.order_id', '=', 'orders.id');
-            })
-            ->where('orders.payment_status', 'paid')
-            ->whereBetween(DB::raw('DATE(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
-            ->select(
-                DB::raw('YEAR(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at)) as year'),
-                DB::raw('MONTH(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at)) as month'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders'),
-                DB::raw('SUM(orders.total_price) as total_sales')
+                DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
+                DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
+                DB::raw('COUNT(DISTINCT id) as total_orders'),
+                DB::raw('SUM(total_price) as total_sales')
             )
             ->groupBy('year', 'month')
             ->orderBy('year', 'asc')
@@ -299,19 +275,6 @@ class ReportController extends Controller
         $labels = [];
         $data = [];
         $ordersMonthly = [];
-
-        $ordersMonthlyRows = DB::table('orders')
-            ->whereIn('orders.status', ['paid', 'processing', 'shipped', 'delivered'])
-            ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
-            ->select(
-                DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
-                DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders')
-            )
-            ->groupBy('year', 'month')
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
-            ->get();
 
         // Helper to get total for a given year/month from a collection
         $getMonthTotals = function ($collection, $year, $month) {
@@ -331,17 +294,15 @@ class ReportController extends Controller
             $labels[] = $current->format('M Y');
             $y = (int)$current->year;
             $m = (int)$current->month;
-            $manual = $getMonthTotals($manualMonthlyRows, $y, $m);
-            $gateway = $getMonthTotals($gatewayMonthlyRows, $y, $m);
-            $data[] = $manual['sales'] + $gateway['sales'];
-            $ordersMonthly[] = (int) ($ordersMonthlyRows->first(function ($item) use ($y, $m) {
-                return (int)$item->year === (int)$y && (int)$item->month === (int)$m;
-            })->total_orders ?? 0);
+            $monthData = $getMonthTotals($salesRows, $y, $m);
+            
+            $data[] = $monthData['sales'];
+            $ordersMonthly[] = $monthData['orders'];
             $current->addMonth();
         }
 
-        $totalRevenue = (float) $manualMonthlyRows->sum('total_sales') + (float) $gatewayMonthlyRows->sum('total_sales');
-        $totalOrders = (int) $ordersMonthlyRows->sum('total_orders');
+        $totalRevenue = (float) $salesRows->sum('total_sales');
+        $totalOrders = (int) $salesRows->sum('total_orders');
 
         return [
             'labels' => $labels,
@@ -359,59 +320,19 @@ class ReportController extends Controller
     {
         $queryStartDate = $startDate->copy()->toDateString();
         $queryEndDate = $endDate->copy()->addDay()->toDateString();
-        // Build subquery to determine effective paid date per order
-        $paymentsSub = DB::table('order_payments')
-            ->select('order_id', DB::raw('MIN(COALESCE(verified_at, paid_at)) as effective_paid_at'))
-            ->groupBy('order_id');
-
-        // Manual/admin revenues based on order progression (no verified_at)
-        $manualRevenueRows = DB::table('orders')
-            ->where('payment_status', '!=', 'paid')
-            ->whereIn('status', ['paid', 'shipped', 'delivered'])
-            ->where(function ($q) {
-                $q->whereNotIn('status', ['pending', 'cancelled'])
-                    ->orWhereNotNull('printed_at')
-                    ->orWhereNotNull('processed_by');
-            })
-            ->whereBetween(DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
-            ->select(
-                DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at)) as paid_date'),
-                DB::raw('SUM(orders.total_price) as total_sales')
-            )
-            ->groupBy('paid_date')
-            ->orderBy('paid_date', 'asc')
-            ->get()
-            ->keyBy('paid_date');
-
-        // Gateway-paid orders without verified manual bank payments
-        $gatewayRevenueRows = DB::table('orders')
-            ->leftJoinSub($paymentsSub, 'p', function ($join) {
-                $join->on('p.order_id', '=', 'orders.id');
-            })
-            ->where('orders.payment_status', 'paid')
-            ->whereBetween(DB::raw('DATE(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
-            ->select(
-                DB::raw('DATE(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at)) as paid_date'),
-                DB::raw('SUM(orders.total_price) as total_sales'),
-                DB::raw('COUNT(DISTINCT orders.id) as paid_orders')
-            )
-            ->groupBy('paid_date')
-            ->orderBy('paid_date', 'asc')
-            ->get()
-            ->keyBy('paid_date');
-
-        // Orders aggregated by order date (includes manual admin orders regardless of payment status)
-        $ordersRows = DB::table('orders')
-            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
+        // Consolidated Daily Sales Data (ignores payment method, relies on Order Status and Ordered At)
+        $salesRows = DB::table('orders')
+            ->whereIn('status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
-                DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as order_date'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders')
+                DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as date'),
+                DB::raw('SUM(total_price) as total_sales'),
+                DB::raw('COUNT(DISTINCT id) as total_orders')
             )
-            ->groupBy('order_date')
-            ->orderBy('order_date', 'asc')
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
             ->get()
-            ->keyBy('order_date');
+            ->keyBy('date');
 
         // Items aggregated by order date
         $itemsRows = DB::table('order_items')
@@ -439,10 +360,10 @@ class ReportController extends Controller
             $dayLabel = $current->format('d M');
             $dateKey = $current->format('Y-m-d');
             $labels[] = $dayLabel;
-            $revenueData[] =
-                ($manualRevenueRows->get($dateKey) ? (float) $manualRevenueRows->get($dateKey)->total_sales : 0) +
-                ($gatewayRevenueRows->get($dateKey) ? (float) $gatewayRevenueRows->get($dateKey)->total_sales : 0);
-            $ordersData[] = $ordersRows->get($dateKey) ? (int) $ordersRows->get($dateKey)->total_orders : 0;
+            
+            $dailySales = $salesRows->get($dateKey);
+            $revenueData[] = $dailySales ? (float) $dailySales->total_sales : 0;
+            $ordersData[] = $dailySales ? (int) $dailySales->total_orders : 0;
             $itemsData[] = $itemsRows->get($dateKey) ? (int) $itemsRows->get($dateKey)->total_items : 0;
 
             $current->addDay();
@@ -469,7 +390,7 @@ class ReportController extends Controller
 
         $modalItemValue = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.base_price,0)'));
@@ -502,10 +423,10 @@ class ReportController extends Controller
             'orders' => $ordersData,
             'items' => $itemsData,
             'summary' => [
-                'total_orders' => (int) $ordersRows->sum('total_orders'),
+                'total_orders' => (int) $salesRows->sum('total_orders'),
                 'total_items' => (int) $itemsRows->sum('total_items'),
                 'total_revenue' => $grossItemValue,
-                'average_daily_revenue' => $periodDays > 0 ? ($manualRevenueRows->sum('total_sales') + $gatewayRevenueRows->sum('total_sales')) / $periodDays : 0,
+                'average_daily_revenue' => $periodDays > 0 ? $grossItemValue / $periodDays : 0,
                 'total_order_amount' => $netSales,
                 'gross_sales' => $grossItemValue,
                 'net_sales' => $netSales,
@@ -533,24 +454,34 @@ class ReportController extends Controller
         }
         $rangeEndDateStr = $effectiveEndDate->toDateString();
 
-        // PERBAIKAN: Gunakan logika yang sama dengan getDailySalesChart
-        // Hanya ambil order dengan status: paid, processing, delivered
-        $profitRows = DB::table('orders')
-            ->leftJoin('order_items', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+        // PERBAIKAN: Gunakan logika yang sama dengan getDailySalesChart (Summary Logic)
+        // 1. Ambil data Sales (Total Price, Discount, Shipping) dari tabel orders
+        $salesRows = DB::table('orders')
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
+            ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
+            ->select(
+                DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
+                DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
+                DB::raw('SUM(COALESCE(orders.total_price, 0)) as total_sales'),
+                DB::raw('SUM(COALESCE(orders.discount_amount, 0)) as discount'),
+                // Shipping Cost
+                DB::raw('SUM(COALESCE(orders.shipping_cost, 0)) as shipping_cost')
+            )
+            ->groupBy('year', 'month')
+            ->orderBy('year', 'asc')
+            ->orderBy('month', 'asc')
+            ->get();
+
+        // 2. Ambil data HPP (Modal) dari tabel order_items
+        $hppRows = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
             ->select(
                 DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
                 DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
-                // Gross Sales (Product Value)
-                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.price, 0)) as gross_sales'),
-                // HPP (Modal/Base Price)
-                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.base_price, 0)) as hpp'),
-                // Discount
-                DB::raw('SUM(COALESCE(orders.discount_amount, 0)) as discount'),
-                // Shipping Cost
-                DB::raw('SUM(COALESCE(orders.shipping_cost, 0)) as shipping_cost')
+                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.base_price, 0)) as hpp')
             )
             ->groupBy('year', 'month')
             ->orderBy('year', 'asc')
@@ -575,17 +506,24 @@ class ReportController extends Controller
         $grossProfitData = [];
         $netProfitData = [];
 
-        // Helper to get totals for a given year/month
-        $getMonthTotals = function ($collection, $year, $month) {
+        // Helper to get sales totals
+        $getSalesTotals = function ($collection, $year, $month) {
             $row = $collection->first(function ($item) use ($year, $month) {
                 return (int)$item->year === (int)$year && (int)$item->month === (int)$month;
             });
             return [
-                'gross_sales' => $row ? (float) $row->gross_sales : 0.0,
-                'hpp' => $row ? (float) $row->hpp : 0.0,
+                'total_sales' => $row ? (float) $row->total_sales : 0.0,
                 'discount' => $row ? (float) $row->discount : 0.0,
                 'shipping_cost' => $row ? (float) $row->shipping_cost : 0.0,
             ];
+        };
+
+        // Helper to get HPP totals
+        $getHppTotal = function ($collection, $year, $month) {
+            $row = $collection->first(function ($item) use ($year, $month) {
+                return (int)$item->year === (int)$year && (int)$item->month === (int)$month;
+            });
+            return $row ? (float) $row->hpp : 0.0;
         };
 
         $getOperationalCost = function ($collection, $year, $month) {
@@ -607,17 +545,17 @@ class ReportController extends Controller
             $y = (int)$current->year;
             $m = (int)$current->month;
 
-            $data = $getMonthTotals($profitRows, $y, $m);
+            $salesData = $getSalesTotals($salesRows, $y, $m);
+            $hpp = $getHppTotal($hppRows, $y, $m);
             $opCost = $getOperationalCost($operationalCostRows, $y, $m);
 
-            $grossSales = $data['gross_sales'];
-            $hpp = $data['hpp'];
-            $discount = $data['discount'];
-            $shippingCost = $data['shipping_cost'];
+            $totalSales = $salesData['total_sales'];
+            $discount = $salesData['discount'];
+            $shippingCost = $salesData['shipping_cost'];
 
-            // Perhitungan sesuai formula:
-            // Net Sales (Penjualan Bersih) = Gross Sales - Discount
-            $netSales = $grossSales - $discount;
+            // Perhitungan disamakan dengan Summary getDailySalesChart:
+            // Net Sales = Total Sales (Gross Item Value) - Shipping - Discount
+            $netSales = $totalSales - $shippingCost - $discount;
 
             // Laba Kotor = Net Sales - HPP
             $labaKotor = $netSales - $hpp;

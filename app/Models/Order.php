@@ -20,6 +20,8 @@ class Order extends Model
         'voucher_id',
         'total_price',
         'discount_amount',
+        'redeemed_points',
+        'point_discount',
         'shipping_cost',
         'status',
         'ordered_at',
@@ -38,6 +40,8 @@ class Order extends Model
     protected $casts = [
         'total_price' => 'decimal:2',
         'discount_amount' => 'decimal:2',
+        'redeemed_points' => 'integer',
+        'point_discount' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'ordered_at' => 'datetime',
         'printed_at' => 'datetime',

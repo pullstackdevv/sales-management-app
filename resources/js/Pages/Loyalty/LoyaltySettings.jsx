@@ -169,7 +169,7 @@ function LoyaltySettings() {
                                     <span className="text-gray-500">= 1 Poin</span>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">
-                                    Contoh: Belanja {formatRupiah(settings.point_rate?.value || 10000)} mendapat 1 poin dasar
+                                    Contoh: 1 point setara dengan {formatRupiah(settings.point_rate?.value || 10000)}
                                 </p>
                             </div>
                         </div>

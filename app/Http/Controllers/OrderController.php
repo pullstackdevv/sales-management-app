@@ -292,6 +292,24 @@ class OrderController extends Controller
                 );
             }
 
+            
+            if (isset($validated['status'])) {
+                $order->update(['status' => $validated['status']]);
+
+                // Sync payment_status for manual orders (no payment_url)
+                if (is_null($order->payment_url)) {
+                    if ($validated['status'] === 'paid') {
+                        $order->update(['payment_status' => PaymentStatus::PAID]);
+                    } elseif ($validated['status'] === 'cancelled') {
+                        $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                    }
+                }
+
+                if (!is_null($order->payment_url) && $validated['status'] === 'cancelled') {
+                    $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                }
+            }
+
             // Create payment record if payment bank is provided (manual payment)
             if (!empty($validated['payment_bank_id'])) {
                 $order->payments()->create([

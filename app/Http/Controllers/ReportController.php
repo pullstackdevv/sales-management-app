@@ -249,6 +249,7 @@ class ReportController extends Controller
 
     private function getSalesChart($startDate, $endDate)
     {
+
         $rangeStartDateStr = $startDate->copy()->toDateString();
         $effectiveEndDate = $endDate->copy();
         if ((int)$endDate->day === 1) {
@@ -262,11 +263,9 @@ class ReportController extends Controller
 
         // Manual/admin monthly revenues based on order progression (unpaid but progressed)
         $manualMonthlyRows = DB::table('orders')
-            ->where('payment_status', '!=', 'paid')
             ->where(function ($q) {
-                $q->whereNotIn('status', ['pending', 'cancelled'])
-                    ->orWhereNotNull('printed_at')
-                    ->orWhereNotNull('processed_by');
+                $q->where('payment_status', '!=', 'paid')
+                    ->whereIn('status', ['paid', 'shipped', 'delivered']);
             })
             ->whereBetween(DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
             ->select(
@@ -279,7 +278,6 @@ class ReportController extends Controller
             ->orderBy('year', 'asc')
             ->orderBy('month', 'asc')
             ->get();
-
         // Gateway-paid monthly revenues (paid orders)
         $gatewayMonthlyRows = DB::table('orders')
             ->leftJoinSub($paymentsSub, 'p', function ($join) {
@@ -369,6 +367,7 @@ class ReportController extends Controller
         // Manual/admin revenues based on order progression (no verified_at)
         $manualRevenueRows = DB::table('orders')
             ->where('payment_status', '!=', 'paid')
+            ->whereIn('status', ['paid', 'shipped', 'delivered'])
             ->where(function ($q) {
                 $q->whereNotIn('status', ['pending', 'cancelled'])
                     ->orWhereNotNull('printed_at')
@@ -403,7 +402,7 @@ class ReportController extends Controller
 
         // Orders aggregated by order date (includes manual admin orders regardless of payment status)
         $ordersRows = DB::table('orders')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
                 DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as order_date'),
@@ -417,7 +416,7 @@ class ReportController extends Controller
         // Items aggregated by order date
         $itemsRows = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
@@ -453,23 +452,20 @@ class ReportController extends Controller
 
         // Summary metrics over the selected period (order date window)
         $ordersPeriodQuery = DB::table('orders')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate]);
 
-        $totalOrderAmount = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
+        // $totalOrderAmount = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
+        $totalOrderAmount = 0;
         $discountsTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.discount_amount, 0)'));
         $shippingTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.shipping_cost, 0)'));
-        $receivablesTotal = (float) $ordersPeriodQuery->clone()
-            ->where('orders.payment_status', '!=', 'paid')
-            ->whereIn('orders.status', ['processing', 'delivered'])
+        $receivablesTotal = (float) DB::table('orders')
+            ->where('orders.payment_status', 'pending')
+            ->whereNotIn('orders.status', ['paid', 'shipped', 'delivered', 'cancelled'])
+            ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(orders.total_price, 0)'));
 
-        $grossItemValue = (float) DB::table('order_items')
-            ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
-            ->whereNull('order_items.deleted_at')
-            ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
-            ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.price,0)'));
+        $grossItemValue = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
 
         $modalItemValue = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
@@ -478,14 +474,27 @@ class ReportController extends Controller
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.base_price,0)'));
 
-        $netSales = $grossItemValue - $discountsTotal;
-        $grossProfit = $netSales - $modalItemValue; // ✅ BENAR - menggunakan Net Sales
+        $netSales = $grossItemValue - $shippingTotal - $discountsTotal;
+        $grossProfit = $netSales - $modalItemValue;
         $operationalCost = (float) DB::table('expenses')
             ->whereBetween('expense_date', [$startDate, $endDate])
             ->whereNull('deleted_at')
             ->sum(DB::raw('COALESCE(total_amount, 0)'));
-        $otherFees = (float) $shippingTotal;
-        $netProfit = $netSales - $modalItemValue - $operationalCost - $otherFees;
+        $otherFees = 0;
+        $netProfit = $grossProfit - $operationalCost - $otherFees;
+
+        // Calculate current inventory value (Stock * Price) and modal value (Stock * Base Price)
+        $inventoryQuery = DB::table('product_variants')
+            ->join('products', 'product_variants.product_id', '=', 'products.id')
+            ->whereNull('product_variants.deleted_at')
+            ->whereNull('products.deleted_at');
+
+        $currentProductValueTotal = (float) $inventoryQuery->clone()
+            ->sum(DB::raw('COALESCE(product_variants.stock, 0) * COALESCE(product_variants.price, 0)'));
+        $currentStockTotal = (float) $inventoryQuery->clone()->sum(DB::raw('COALESCE(product_variants.stock, 0)'));
+
+        $currentModalValueTotal = (float) $inventoryQuery->clone()
+            ->sum(DB::raw('COALESCE(product_variants.stock, 0) * COALESCE(product_variants.base_price, 0)'));
 
         return [
             'labels' => $labels,
@@ -497,7 +506,7 @@ class ReportController extends Controller
                 'total_items' => (int) $itemsRows->sum('total_items'),
                 'total_revenue' => (float) ($manualRevenueRows->sum('total_sales') + $gatewayRevenueRows->sum('total_sales')),
                 'average_daily_revenue' => $periodDays > 0 ? ($manualRevenueRows->sum('total_sales') + $gatewayRevenueRows->sum('total_sales')) / $periodDays : 0,
-                'total_order_amount' => $totalOrderAmount,
+                'total_order_amount' => $netSales,
                 'gross_sales' => $grossItemValue,
                 'net_sales' => $netSales,
                 'shipping_total' => $shippingTotal,
@@ -508,8 +517,9 @@ class ReportController extends Controller
                 'operational_cost' => $operationalCost,
                 'net_profit' => $netProfit,
                 'receivables_total' => $receivablesTotal,
-                'product_value_total' => $grossItemValue,
-                'modal_value_total' => $modalItemValue
+                'product_value_total' => $currentProductValueTotal,
+                'modal_value_total' => $currentModalValueTotal,
+                'current_stock_total' => $currentStockTotal
             ]
         ];
     }
@@ -588,7 +598,7 @@ class ReportController extends Controller
         // Build month labels and profit data
         $current = $startDate->copy()->startOfMonth();
         $endMonth = $effectiveEndDate->copy()->endOfMonth();
-        
+
         $totalGrossProfit = 0;
         $totalNetProfit = 0;
 
@@ -596,7 +606,7 @@ class ReportController extends Controller
             $labels[] = $current->format('M Y');
             $y = (int)$current->year;
             $m = (int)$current->month;
-            
+
             $data = $getMonthTotals($profitRows, $y, $m);
             $opCost = $getOperationalCost($operationalCostRows, $y, $m);
 
@@ -608,16 +618,16 @@ class ReportController extends Controller
             // Perhitungan sesuai formula:
             // Net Sales (Penjualan Bersih) = Gross Sales - Discount
             $netSales = $grossSales - $discount;
-            
+
             // Laba Kotor = Net Sales - HPP
             $labaKotor = $netSales - $hpp;
-            
-            // Laba Bersih = Laba Kotor - Biaya Operasional - Ongkos Kirim
-            $labaBersih = $labaKotor - $opCost - $shippingCost;
+
+            // Laba Bersih = Laba Kotor - Biaya Operasional
+            $labaBersih = $labaKotor - $opCost;
 
             $grossProfitData[] = $labaKotor;
             $netProfitData[] = $labaBersih;
-            
+
             $totalGrossProfit += $labaKotor;
             $totalNetProfit += $labaBersih;
 
@@ -641,23 +651,23 @@ class ReportController extends Controller
     {
         try {
             $user = auth()->user();
-            
+
             if (!$user->hasPermission('reports.profit')) {
                 return ResponseFormatter::error('Unauthorized access to profit report', [], 403);
             }
 
             $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
-            
+
             $profitData = $this->getProfitChart($startDate, $endDate);
-            
+
             // Tambahkan penjelasan perhitungan
             $profitData['calculation_explanation'] = [
                 'penjualan_bersih' => 'Nilai Produk (Gross Sales) - Diskon',
                 'laba_kotor' => 'Penjualan Bersih - HPP (Harga Pokok Penjualan)',
-                'laba_bersih' => 'Laba Kotor - Biaya Operasional - Ongkos Kirim'
+                'laba_bersih' => 'Laba Kotor - Biaya Operasional'
             ];
-            
+
             return ResponseFormatter::success('Profit data retrieved successfully', $profitData);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve profit data: ' . $e->getMessage(), [], 500);

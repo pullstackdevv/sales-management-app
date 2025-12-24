@@ -303,7 +303,7 @@ const SalesReport = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                 {/* Pendapatan */}
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Pendapatan</div>
+                  <div className="text-sm text-gray-600 mb-1">Total Penjualan</div>
                   <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.total_revenue || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
@@ -311,7 +311,7 @@ const SalesReport = () => {
 
                 {/* Total Penjualan */}
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Total Penjualan</div>
+                  <div className="text-sm text-gray-600 mb-1">Pendapatan</div>
                   <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.total_order_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
@@ -415,7 +415,7 @@ const SalesReport = () => {
 
                 {/* Nilai Produk */}
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Nilai Produk</div>
+                  <div className="text-sm text-gray-600 mb-1">Nilai Produk ({dailyReport.summary.current_stock_total || 0} stok produk)</div>
                   <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.product_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
@@ -423,7 +423,7 @@ const SalesReport = () => {
 
                 {/* Nilai Modal */}
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Nilai Modal</div>
+                  <div className="text-sm text-gray-600 mb-1">Nilai Modal ({dailyReport.summary.current_stock_total || 0} stok produk)</div>
                   <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.modal_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>

@@ -59,6 +59,10 @@ export default function OrderDetail({ auth, order }) {
     const handleCopyOrderDetails = () => {
         if (!orderData) return;
 
+        const paymentStatusStr = String(orderData?.payment_status || '').toLowerCase();
+        const orderStatusStr = String(orderData?.status || '').toLowerCase();
+        const effectivePaymentStatus = (!isWebOrder() && paymentStatusStr === 'pending' && orderStatusStr === 'paid') ? 'paid' : paymentStatusStr;
+
         const orderDetails = `
 Order #${orderData.order_number || orderData.id}
 Tanggal: ${new Date(orderData.created_at).toLocaleDateString('id-ID')}
@@ -74,7 +78,7 @@ ${orderData.items?.map(item =>
 Ongkir: Rp${formatRupiah(orderData.shipping_cost)}
 Total: Rp${formatRupiah(orderData.total_price)}
 
-Status: ${getStatusLabel(orderData.payment_status)}
+Status: ${getStatusLabel(effectivePaymentStatus)}
 Kurir: ${orderData.shipping?.courier?.name || 'Kurir'} - ${orderData.shipping?.service_type || 'Reguler'}
 Resi: ${orderData.shipping?.tracking_number || '-'}
         `;
@@ -192,14 +196,19 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
         paidAmount = orderData.total_price || 0;
     }
     const outstanding = Math.max((orderData.total_price || 0) );
-    const isPaymentInactive = ['pending', 'cancelled'].includes(String(orderData.payment_status || '').toLowerCase());
+    const paymentStatusStr = String(orderData?.payment_status || '').toLowerCase();
+    const orderStatusStr = String(orderData?.status || '').toLowerCase();
+    const effectivePaymentStatus = (!isWebOrder() && paymentStatusStr === 'pending' && ['paid','shipped','processing','delivered'].includes(orderStatusStr)) ? 'paid' :
+                                 (!isWebOrder() && paymentStatusStr === 'pending' && orderStatusStr === 'cancelled') ? 'cancelled' :
+                                 paymentStatusStr;
+    const isPaymentInactive = ['pending', 'cancelled'].includes(effectivePaymentStatus);
     const finance = {
         revenue: isPaymentInactive ? 0 : (orderData.total_price || 0),
         totalSellingPrice: isPaymentInactive ? 0 : totalSellingPrice,
         netSales: isPaymentInactive ? 0 : netSales,
         totalProductCost: isPaymentInactive ? 0 : totalProductCost,
         grossProfit: isPaymentInactive ? 0 : grossProfit,
-        receivable: String(orderData.payment_status || '').toLowerCase() === 'cancelled' ? 0 : outstanding,
+        receivable: effectivePaymentStatus === 'pending' ? outstanding : 0,
     };
     const canViewFinance = isOwner || (user?.id === orderData?.user_id);
 
@@ -278,8 +287,8 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <p className="text-sm text-gray-600 mb-2">Status bayar & Total Bayar</p>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center space-x-2">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(orderData.payment_status)}`}>
-                                                    {getStatusLabel(orderData.payment_status)}
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(effectivePaymentStatus)}`}>
+                                                    {getStatusLabel(effectivePaymentStatus)}
                                                 </span>
                                                 <div className="text-sm text-gray-600">
                                                     <div>{new Date(orderData.created_at).toLocaleDateString('id-ID')}</div>

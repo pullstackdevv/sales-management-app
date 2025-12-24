@@ -153,7 +153,6 @@ class DashboardController extends Controller
             $todayOrdersList = Order::with(['customer', 'salesChannel'])
                 ->whereDate('created_at', $today)
                 ->latest()
-                ->take(10)
                 ->get()
                 ->map(function ($o) use ($isOwner) {
                     return [

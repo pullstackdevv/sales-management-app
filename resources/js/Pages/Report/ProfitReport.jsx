@@ -253,7 +253,7 @@ export default function ProfitReport() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                                        <span><strong>Laba Bersih:</strong> Laba Kotor - Biaya Operasional - Ongkir</span>
+                                        <span><strong>Laba Bersih:</strong> Laba Kotor - Biaya Operasional</span>
                                     </div>
                                 </div>
                             </div>

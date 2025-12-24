@@ -504,7 +504,7 @@ class ReportController extends Controller
             'summary' => [
                 'total_orders' => (int) $ordersRows->sum('total_orders'),
                 'total_items' => (int) $itemsRows->sum('total_items'),
-                'total_revenue' => (float) ($manualRevenueRows->sum('total_sales') + $gatewayRevenueRows->sum('total_sales')),
+                'total_revenue' => $grossItemValue,
                 'average_daily_revenue' => $periodDays > 0 ? ($manualRevenueRows->sum('total_sales') + $gatewayRevenueRows->sum('total_sales')) / $periodDays : 0,
                 'total_order_amount' => $netSales,
                 'gross_sales' => $grossItemValue,

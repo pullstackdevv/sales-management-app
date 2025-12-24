@@ -340,13 +340,22 @@ export default function ProductData() {
                               : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`
                           ) : 'Belum ada harga'}
                         </p>
-                        {canViewBasePrice && minBasePrice > 0 && (
-                          <p className="text-gray-500 text-xs">
-                            Modal: {minBasePrice === maxBasePrice
-                              ? formatCurrency(minBasePrice)
-                              : `${formatCurrency(minBasePrice)} - ${formatCurrency(maxBasePrice)}`
-                            }
-                          </p>
+                        {canViewBasePrice && product.variants?.length > 0 && (
+                          <div className="text-gray-500 text-xs mt-1 flex items-center gap-1">
+                            <span>Modal:</span>
+                            {minBasePrice > 0 ? (
+                              <span>
+                                {minBasePrice === maxBasePrice
+                                  ? formatCurrency(minBasePrice)
+                                  : `${formatCurrency(minBasePrice)} - ${formatCurrency(maxBasePrice)}`
+                                }
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 border border-red-200">
+                                Belum diset
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                       {product.description && (
@@ -497,7 +506,13 @@ export default function ProductData() {
                                   <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2 text-gray-600">
-                                      {variant.base_price > 0 ? formatCurrency(variant.base_price) : '-'}
+                                      {variant.base_price > 0 ? (
+                                        formatCurrency(variant.base_price)
+                                      ) : (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 border border-red-200">
+                                          Belum diset
+                                        </span>
+                                      )}
                                     </td>
                                   )}
                                   <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>

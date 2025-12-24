@@ -97,6 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('user-performance', [ReportController::class, 'userPerformance']);
         Route::get('payments', [ReportController::class, 'payments']);
         Route::post('export-sales', [ReportController::class, 'exportSales']);
+        Route::post('fix-base-prices', [ReportController::class, 'fixBasePrices']);
     });
 });
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\PaymentBank;
 use App\Models\Courier;
@@ -156,6 +157,19 @@ class ReportController extends Controller
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
 
             $salesData = $this->getSalesChart($startDate, $endDate);
+
+            // Check for missing base prices
+            $missingBasePriceCount = OrderItem::where(function($q) {
+                $q->whereNull('base_price')->orWhere('base_price', 0);
+            })->whereHas('order', function($q) {
+                $q->whereIn('status', ['paid', 'shipped', 'processing', 'delivered']);
+            })->count();
+
+            $salesData['meta'] = [
+                'has_missing_base_price' => $missingBasePriceCount > 0,
+                'missing_count' => $missingBasePriceCount
+            ];
+
             return ResponseFormatter::success('Sales data retrieved successfully', $salesData);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve sales data: ' . $e->getMessage(), [], 500);
@@ -184,6 +198,45 @@ class ReportController extends Controller
             return ResponseFormatter::success('Daily sales data retrieved successfully', $salesData);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve daily sales data: ' . $e->getMessage(), [], 500);
+        }
+    }
+
+    public function fixBasePrices(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user->hasPermission('reports.sales')) {
+                return ResponseFormatter::error('Unauthorized access', [], 403);
+            }
+
+            // Get items with missing base price (null or 0)
+            // Ensure we only pick items that have a valid related product variant
+            $query = OrderItem::where(function($q) {
+                $q->whereNull('base_price')->orWhere('base_price', 0);
+            })->whereHas('productVariant', function($q) {
+                $q->whereNotNull('base_price')->where('base_price', '>', 0);
+            })->with('productVariant');
+
+            $updatedCount = 0;
+            
+            // Process in chunks to handle potentially large datasets
+            $query->chunkById(100, function ($items) use (&$updatedCount) {
+                foreach ($items as $item) {
+                    // Double check the variant exists and has a valid base price
+                    if ($item->productVariant && $item->productVariant->base_price > 0) {
+                        $item->base_price = $item->productVariant->base_price;
+                        $item->save();
+                        $updatedCount++;
+                    }
+                }
+            });
+
+            return ResponseFormatter::success("Berhasil memperbarui harga modal untuk {$updatedCount} item pesanan.", [
+                'updated_count' => $updatedCount
+            ]);
+
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Gagal memperbarui harga modal: ' . $e->getMessage(), [], 500);
         }
     }
 

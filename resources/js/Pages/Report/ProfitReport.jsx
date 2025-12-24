@@ -138,7 +138,7 @@ export default function ProfitReport() {
     return (
         <DashboardLayout>
             <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-                <div className="max-w-screen mx-auto">
+                <div className="w-full">
                     {/* Header */}
                     <div className="mb-6">
                         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Laporan Keuntungan</h1>

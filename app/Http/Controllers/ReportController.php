@@ -395,7 +395,7 @@ class ReportController extends Controller
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.base_price,0)'));
 
-        $netSales = $grossItemValue - $shippingTotal - $discountsTotal;
+        $netSales = $grossItemValue - $shippingTotal;
         $grossProfit = $netSales - $modalItemValue;
         $operationalCost = (float) DB::table('expenses')
             ->whereBetween('expense_date', [$startDate, $endDate])

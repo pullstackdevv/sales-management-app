@@ -202,7 +202,7 @@ const SalesReport = () => {
         const url = response.data?.data?.url;
         if (url) window.open(url, '_blank');
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -219,7 +219,7 @@ const SalesReport = () => {
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
               Filter terpusat untuk kartu ringkasan dan grafik harian
             </h2>
-            
+
             {/* Month Filter */}
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
@@ -302,129 +302,209 @@ const SalesReport = () => {
               {/* Summary Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                 {/* Pendapatan */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Total Penjualan</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Total Penjualan</span>
+                      <span className="text-xs text-gray-400">(Termasuk Ongkos Kirim & Diskon)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.total_revenue || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Total Penjualan */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Pendapatan</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Pendapatan</span>
+                      <span className="text-xs text-gray-400">(Total Penjualan - ongkir)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.total_order_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Penjualan Kotor */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Penjualan Kotor</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Penjualan Kotor</span>
+                      <span className="text-xs text-gray-400">(Termasuk Ongkos Kirim & Diskon)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.gross_sales || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Penjualan Bersih */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Penjualan Bersih</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Penjualan Bersih</span>
+                      <span className="text-xs text-gray-400">(Penjualan kotor - ongkir)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.net_sales || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Ongkos Kirim */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Ongkos Kirim</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Ongkos Kirim</span>
+                      <span className="text-xs text-gray-400">(Total Ongkos Kirim)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.shipping_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Diskon */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Diskon</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Diskon</span>
+                      <span className="text-xs text-gray-400">(Total Diskon)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.discounts_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Biaya Tambahan */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Biaya Tambahan Lainnya</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Biaya Tambahan Lainnya</span>
+                      <span className="text-xs text-gray-400">(Total Biaya Tambahan Lainnya)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.other_fees || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* HPP */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Harga Pokok Penjualan (HPP)</div>
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Harga Pokok Penjualan (HPP)</span>
+                      <span className="text-xs text-gray-400">(Total Harga Pokok Penjualan)</span>
+                    </div>
+                  </div>
                   <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.hpp_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Laba Kotor */}
-                <div className="bg-white rounded-lg shadow-sm p-4 ">
-                  <div className="text-sm opacity-90 mb-1">Laba Kotor</div>
-                  <div className="text-xl sm:text-2xl font-bold">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Laba Kotor</span>
+                      <span className="text-xs text-gray-400">(Penjualan Bersih - HPP)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.gross_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Biaya Operasional */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Biaya Operasional</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Biaya Operasional</span>
+                      <span className="text-xs text-gray-400">(Total Pengeluaran)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.operational_cost || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Laba Bersih */}
-                <div className="bg-white rounded-lg shadow-sm p-4 ">
-                  <div className="text-sm opacity-90 mb-1">Laba Bersih</div>
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Laba Bersih</span>
+                      <span className="text-xs text-gray-400">(Laba Kotor - Biaya Operasional)</span>
+                    </div>
+                  </div>
                   <div className="text-xl sm:text-2xl font-bold">
                     Rp {(dailyReport.summary.net_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Piutang */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Piutang</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Piutang</span>
+                      <span className="text-xs text-gray-400">(Total Biaya Belum Terbayarkan)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.receivables_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Transaksi */}
-                <div className="bg-white rounded-lg shadow-sm p-4 ">
-                  <div className="text-sm opacity-90 mb-1">Transaksi</div>
-                  <div className="text-xl sm:text-2xl font-bold">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Transaksi</span>
+                      <span className="text-xs text-gray-400">(Total Transaksi Terbayarkan)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     {dailyReport.summary.total_orders || 0}
                   </div>
                 </div>
 
                 {/* Item Terjual */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Item Terjual</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Item Terjual</span>
+                      <span className="text-xs text-gray-400">(Total Item Terjual)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     {dailyReport.summary.total_items || 0}
                   </div>
                 </div>
 
                 {/* Nilai Produk */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Nilai Produk ({dailyReport.summary.current_stock_total || 0} stok produk)</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Nilai Produk ({dailyReport.summary.current_stock_total || 0} stok produk)</span>
+                      <span className="text-xs text-gray-400">(Total Nilai Produk Stok Saat Ini)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.product_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Nilai Modal */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Nilai Modal ({dailyReport.summary.current_stock_total || 0} stok produk)</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Nilai Modal ({dailyReport.summary.current_stock_total || 0} stok produk)</span>
+                      <span className="text-xs text-gray-400">(Total Nilai Modal Stok Saat Ini)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.modal_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
@@ -447,25 +527,22 @@ const SalesReport = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => setDailyMetric('orders')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          dailyMetric === 'orders' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${dailyMetric === 'orders' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
                       >
                         Transaksi
                       </button>
                       <button
                         onClick={() => setDailyMetric('items')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          dailyMetric === 'items' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${dailyMetric === 'items' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
                       >
                         Item
                       </button>
                       <button
                         onClick={() => setDailyMetric('revenue')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          dailyMetric === 'revenue' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${dailyMetric === 'revenue' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
                       >
                         Revenue
                       </button>

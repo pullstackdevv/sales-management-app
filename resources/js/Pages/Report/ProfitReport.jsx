@@ -232,14 +232,13 @@ export default function ProfitReport() {
                                 </div>
                             )}
 
-                            {/* Chart */}
-                            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-                                <h2 className="text-lg font-semibold mb-4 text-gray-800">Grafik Keuntungan</h2>
-                                <div className="w-full overflow-x-auto">
-                                    <HighchartsReact
-                                        highcharts={Highcharts}
-                                        options={chartOptions}
-                                    />
+                            {/* Charts Section */}
+                            <div className="grid grid-cols-1 gap-6 mb-6">
+                                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+                                    <h2 className="text-lg font-semibold text-gray-800 mb-4">Grafik Keuntungan</h2>
+                                    <div className="w-full overflow-x-auto">
+                                        <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+                                    </div>
                                 </div>
                             </div>
 

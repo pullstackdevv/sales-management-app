@@ -555,7 +555,7 @@ class ReportController extends Controller
 
             // Perhitungan disamakan dengan Summary getDailySalesChart:
             // Net Sales = Total Sales (Gross Item Value) - Shipping - Discount
-            $netSales = $totalSales - $shippingCost - $discount;
+            $netSales = $totalSales - $shippingCost;
 
             // Laba Kotor = Net Sales - HPP
             $labaKotor = $netSales - $hpp;

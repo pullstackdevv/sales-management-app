@@ -83,8 +83,8 @@ class LoyaltySeeder extends Seeder
             [
                 'name' => 'Pretty Luxe',
                 'slug' => 'pretty-luxe',
-                'min_annual_spend' => 5000001, // Placeholder: Rp 5.000.001
-                'max_annual_spend' => null, // Unlimited (tier tertinggi)
+                'min_annual_spend' => 5000001, // Rp 5.000.001
+                'max_annual_spend' => 999999999999, // Unlimited (tier tertinggi - nilai sangat besar)
                 'multiplier' => 2.00,
                 'color' => '#8b5cf6',
                 'icon' => 'solar:crown-outline',

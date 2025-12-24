@@ -74,7 +74,7 @@ class LoyaltySetting extends Model
 
     public static function getMinRedeem(): int
     {
-        return (int) self::getValue('min_redeem', 10);
+        return (int) self::getValue('min_redeem', 1);
     }
 
     public static function isLoyaltyActive(): bool

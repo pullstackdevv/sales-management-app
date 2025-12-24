@@ -863,93 +863,47 @@ const PaymentMethodCheckout = () => {
                     </span>
                   </div>
 
-                  {/* Promotions Section */}
+                  {/* Promotions Section - Compact */}
                   {promotions.length > 0 && (
-                    <div className="border-t pt-3 mt-3">
-                      <div className="mb-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-2">
-                          🎉 Promosi Aktif
-                        </label>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="border-t pt-2 mt-2">
+                      <details className="group">
+                        <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 hover:text-orange-600">
+                          <span>🎉 Promosi Aktif ({promotions.length})</span>
+                          <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto">
                           {promotions.map((promo) => (
-                            <div
-                              key={promo.id}
-                              className="p-3 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg"
-                            >
-                              <div className="flex items-start gap-2">
-                                <span className="text-orange-600 text-sm">🏷️</span>
-                                <div className="flex-1">
-                                  <p className="text-xs font-bold text-orange-900 mb-1">
-                                    {promo.title}
-                                  </p>
-                                  <p className="text-xs text-orange-800 leading-relaxed">
-                                    {promo.description}
-                                  </p>
-                                  {(promo.start_date || promo.end_date) && (
-                                    <div className="mt-2 text-xs text-orange-700">
-                                      <span className="font-medium">Periode: </span>
-                                      {promo.start_date && new Date(promo.start_date).toLocaleDateString('id-ID', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric'
-                                      })}
-                                      {promo.start_date && promo.end_date && ' - '}
-                                      {promo.end_date && new Date(promo.end_date).toLocaleDateString('id-ID', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric'
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                            <div key={promo.id} className="p-2 bg-orange-50 border border-orange-200 rounded">
+                              <p className="text-xs font-semibold text-orange-900">{promo.title}</p>
+                              <p className="text-xs text-orange-700 line-clamp-2">{promo.description}</p>
                             </div>
                           ))}
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Loyalty Points Section - Debug */}
-                  {checkoutData?.customer && (
-                    <div className="border-t pt-3 mt-3 bg-yellow-50 p-2 text-xs">
-                      <div>DEBUG - Customer Data:</div>
-                      <div>customer_id: {checkoutData.customer.customer_id || 'MISSING'}</div>
-                      <div>id: {checkoutData.customer.id || 'MISSING'}</div>
-                      <div>loyaltyPoints: {loyaltyPoints ? 'EXISTS' : 'NULL'}</div>
-                      <div>current points: {loyaltyPoints?.current || 0}</div>
-                      <div>loadingLoyalty: {loadingLoyalty ? 'YES' : 'NO'}</div>
+                      </details>
                     </div>
                   )}
 
                   {/* Loyalty Points Section */}
                   {loyaltyPoints && loyaltyPoints.current > 0 && (
-                    <div className="border-t pt-3 mt-3">
-                      <div className="mb-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          💎 Tukar Poin Loyalty
-                        </label>
-                        
-                        {pointsToRedeem === 0 ? (
-                          <div className="space-y-2">
-                            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded p-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-purple-700">Poin Tersedia:</span>
-                                <span className="text-sm font-bold text-purple-900">{loyaltyPoints.current} poin</span>
-                              </div>
-                              <div className="text-xs text-purple-600 mt-1">
-                                1 poin = {formatCurrency(loyaltyPoints.redeemValue)}
-                              </div>
+                    <div className="border-t pt-2 mt-2">
+                      {pointsToRedeem === 0 ? (
+                        <details className="group">
+                          <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 hover:text-purple-600">
+                            <span>💎 Tukar Poin ({loyaltyPoints.current} poin)</span>
+                            <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                          </summary>
+                          <div className="mt-2 space-y-1.5">
+                            <div className="text-xs text-purple-600 mb-1">
+                              1 poin = {formatCurrency(loyaltyPoints.redeemValue)}
                             </div>
-                            
                             {redeemOptions.length > 0 && (
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid grid-cols-2 gap-1.5">
                                 {redeemOptions.map((option) => (
                                   <button
                                     key={option.points}
                                     onClick={() => applyPointRedemption(option.points)}
                                     disabled={!option.is_available || loadingLoyalty}
-                                    className={`px-3 py-2 rounded text-xs font-medium transition-colors ${
+                                    className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
                                       option.is_available
                                         ? 'bg-purple-600 text-white hover:bg-purple-700'
                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -961,34 +915,19 @@ const PaymentMethodCheckout = () => {
                                 ))}
                               </div>
                             )}
-                            
-                            {loyaltyPoints.current < loyaltyPoints.minRedeem && (
-                              <div className="text-xs text-gray-500 text-center mt-1">
-                                Minimal {loyaltyPoints.minRedeem} poin untuk redeem
-                              </div>
-                            )}
                           </div>
-                        ) : (
-                          <div className="bg-purple-50 border border-purple-200 rounded p-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium text-purple-800">
-                                  💎 {pointsToRedeem} Poin Ditukar
-                                </div>
-                                <div className="text-xs text-purple-600">
-                                  Diskon: {formatCurrency(pointDiscount)}
-                                </div>
-                              </div>
-                              <button
-                                onClick={removePointRedemption}
-                                className="text-xs text-red-600 hover:text-red-800 font-medium"
-                              >
-                                Hapus
-                              </button>
+                        </details>
+                      ) : (
+                        <div className="bg-purple-50 border border-purple-200 rounded p-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-medium text-purple-800">💎 {pointsToRedeem} Poin</div>
+                              <div className="text-xs text-purple-600">-{formatCurrency(pointDiscount)}</div>
                             </div>
+                            <button onClick={removePointRedemption} className="text-xs text-red-600 hover:text-red-800">✕</button>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

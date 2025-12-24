@@ -268,8 +268,8 @@ class PointController extends Controller
 
     public function getRedeemOptions(Request $request)
     {
-        $options = LoyaltySetting::getRedeemOptions();
-        $redeemValue = LoyaltySetting::getRedeemValue();
+        $options = LoyaltySetting::getRedeemOptions(); // Array of rupiah amounts
+        $pointRate = LoyaltySetting::getPointRate(); // Rupiah per 1 point
         $minRedeem = LoyaltySetting::getMinRedeem();
         $maxPercentage = LoyaltySetting::getMaxRedeemPercentage();
 
@@ -283,17 +283,21 @@ class PointController extends Controller
         $maxDiscount = $orderTotal > 0 ? ($orderTotal * $maxPercentage) / 100 : null;
 
         $formattedOptions = [];
-        foreach ($options as $points) {
-            $discount = $points * $redeemValue;
-            $isAvailable = $points <= $customerPoints && $points >= $minRedeem;
+        foreach ($options as $discountAmount) {
+            // Calculate points needed for this discount amount
+            $pointsNeeded = (int) ceil($discountAmount / $pointRate);
             
-            if ($maxDiscount !== null && $discount > $maxDiscount) {
+            // Check if customer has enough points and meets minimum
+            $isAvailable = $pointsNeeded <= $customerPoints && $pointsNeeded >= $minRedeem;
+            
+            // Check if discount exceeds max allowed
+            if ($maxDiscount !== null && $discountAmount > $maxDiscount) {
                 $isAvailable = false;
             }
 
             $formattedOptions[] = [
-                'points' => $points,
-                'discount' => $discount,
+                'points' => $pointsNeeded,
+                'discount' => $discountAmount,
                 'is_available' => $isAvailable,
             ];
         }
@@ -301,7 +305,7 @@ class PointController extends Controller
         return response()->json([
             'options' => $formattedOptions,
             'customer_points' => $customerPoints,
-            'redeem_value' => $redeemValue,
+            'redeem_value' => $pointRate,
             'min_redeem' => $minRedeem,
             'max_percentage' => $maxPercentage,
             'max_discount' => $maxDiscount,

@@ -57,13 +57,19 @@ class LoyaltySetting extends Model
 
     public static function getRedeemOptions(): array
     {
-        $options = self::getValue('redeem_options', '10,20,50');
+        $options = self::getValue('redeem_options', '50000,100000,200000');
         return array_map('intval', explode(',', $options));
     }
 
     public static function getRedeemValue(): int
     {
-        return (int) self::getValue('redeem_value', 1000);
+        $explicit = self::getValue('redeem_value', null);
+        if ($explicit !== null) {
+            return (int) $explicit;
+        }
+
+        // Fallback ke point_rate jika nilai khusus redeem belum diatur
+        return self::getPointRate();
     }
 
     public static function getMinRedeem(): int

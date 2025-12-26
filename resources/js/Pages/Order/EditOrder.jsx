@@ -4,6 +4,7 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { getCurrentDateWIB } from "../../utils/helpers";
 import { usePage, router } from '@inertiajs/react';
 
 export default function EditOrder() {
@@ -18,7 +19,7 @@ export default function EditOrder() {
         shipping_cost: 0,
         manual_discount: 0,
         notes: '',
-        order_date: new Date().toISOString().split('T')[0],
+        order_date: getCurrentDateWIB(),
         status: 'pending',
         payment_bank_id: '',
         courier: '',
@@ -113,7 +114,7 @@ export default function EditOrder() {
                 shipping_cost: parseFloat(order.shipping_cost) || 0,
                 manual_discount: parseFloat(order.discount_amount) || 0,
                 notes: order.notes || '',
-                order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
+                order_date: order.order_date ? order.order_date.split(' ')[0] : getCurrentDateWIB(),
                 status: order.status || 'pending',
                 payment_bank_id: paymentBankId,
                 courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : '',

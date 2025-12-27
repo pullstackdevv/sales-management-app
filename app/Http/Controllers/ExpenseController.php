@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExpenseController extends Controller
 {
@@ -264,10 +266,56 @@ class ExpenseController extends Controller
             'category' => 'nullable|string'
         ]);
 
-        // Implementation for Excel export will be added later
+        $query = Expense::byDateRange($validated['start_date'], $validated['end_date'])
+            ->with(['creator'])
+            ->orderBy('expense_date', 'asc');
+        if (isset($validated['category']) && $validated['category'] !== '') {
+            $query->byCategory($validated['category']);
+        }
+        $rows = $query->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Expenses');
+        $sheet->setCellValue('A1', 'Tanggal');
+        $sheet->setCellValue('B1', 'Nama Pengeluaran');
+        $sheet->setCellValue('C1', 'Kategori');
+        $sheet->setCellValue('D1', 'Harga');
+        $sheet->setCellValue('E1', 'Jumlah');
+        $sheet->setCellValue('F1', 'Subtotal');
+        $sheet->setCellValue('G1', 'Catatan');
+
+        $rowIndex = 2;
+        foreach ($rows as $r) {
+            $sheet->setCellValue("A{$rowIndex}", optional($r->expense_date)->format('Y-m-d'));
+            $sheet->setCellValue("B{$rowIndex}", $r->name);
+            $sheet->setCellValue("C{$rowIndex}", $r->category);
+            $sheet->setCellValue("D{$rowIndex}", (float) $r->amount);
+            $sheet->setCellValue("E{$rowIndex}", (int) $r->quantity);
+            $sheet->setCellValue("F{$rowIndex}", (float) $r->total_amount);
+            $sheet->setCellValue("G{$rowIndex}", $r->notes);
+            $rowIndex++;
+        }
+
+        $sheet->getColumnDimension('A')->setWidth(14);
+        $sheet->getColumnDimension('B')->setWidth(30);
+        $sheet->getColumnDimension('C')->setWidth(18);
+        $sheet->getColumnDimension('D')->setWidth(16);
+        $sheet->getColumnDimension('E')->setWidth(10);
+        $sheet->getColumnDimension('F')->setWidth(16);
+        $sheet->getColumnDimension('G')->setWidth(40);
+
+        $filename = 'expenses-' . now()->format('Ymd-His') . '.xlsx';
+        Storage::disk('public')->makeDirectory('exports');
+        $fullPath = Storage::disk('public')->path('exports/' . $filename);
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($fullPath);
+
         return response()->json([
             'status' => 'success',
-            'message' => 'Excel export feature coming soon'
+            'data' => [
+                'url' => Storage::url('exports/' . $filename)
+            ]
         ]);
     }
 }

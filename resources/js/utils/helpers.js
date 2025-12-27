@@ -76,3 +76,17 @@ export const truncateText = (text, length = 50) => {
   if (!text) return '';
   return text.length > length ? text.substring(0, length) + '...' : text;
 };
+
+/**
+ * Get current date in WIB (UTC+7) format YYYY-MM-DD
+ * @returns {string} Date string in YYYY-MM-DD format
+ */
+export const getCurrentDateWIB = () => {
+  // Create date object from current timestamp + 7 hours (WIB offset)
+  // We add 7 hours to the UTC timestamp so that when we call toISOString() (which prints UTC),
+  // it actually prints the time 7 hours ahead (which is WIB time).
+  const now = new Date();
+  const wibOffset = 7 * 60 * 60 * 1000; // 7 hours in milliseconds
+  const wibDate = new Date(now.getTime() + wibOffset);
+  return wibDate.toISOString().split('T')[0];
+};

@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Helpers\ResponseFormatter;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\OrderPayment;
 use App\Models\PaymentBank;
 use App\Models\Courier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ReportController extends Controller
 {
@@ -43,6 +46,103 @@ class ReportController extends Controller
         }
     }
 
+    public function exportSales(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user->hasPermission('reports.sales')) {
+                return ResponseFormatter::error('Unauthorized access', [], 403);
+            }
+
+            $month = $request->get('month');
+            $startDate = $request->get('start_date');
+            $endDate = $request->get('end_date');
+            if ($month && (!$startDate || !$endDate)) {
+                $parts = explode('-', $month);
+                $y = (int)($parts[0] ?? date('Y'));
+                $m = (int)($parts[1] ?? date('m'));
+                $startDate = Carbon::create($y, $m, 1)->startOfDay();
+                $endDate = Carbon::create($y, $m, 1)->endOfMonth()->endOfDay();
+            } else {
+                $startDate = $startDate ? Carbon::parse($startDate)->startOfDay() : Carbon::now()->subDays(30)->startOfDay();
+                $endDate = $endDate ? Carbon::parse($endDate)->endOfDay() : Carbon::now()->endOfDay();
+            }
+
+            $monthly = $this->getSalesChart($startDate->copy()->startOfMonth(), $endDate->copy()->endOfMonth());
+            $daily = $this->getDailySalesChart($startDate->copy(), $endDate->copy());
+
+            $spreadsheet = new Spreadsheet();
+            $summarySheet = $spreadsheet->getActiveSheet();
+            $summarySheet->setTitle('Summary');
+            $summarySheet->setCellValue('A1', 'Total Revenue');
+            $summarySheet->setCellValue('B1', (float)($daily['summary']['total_revenue'] ?? 0));
+            $summarySheet->setCellValue('A2', 'Total Order Amount');
+            $summarySheet->setCellValue('B2', (float)($daily['summary']['total_order_amount'] ?? 0));
+            $summarySheet->setCellValue('A3', 'Gross Sales');
+            $summarySheet->setCellValue('B3', (float)($daily['summary']['gross_sales'] ?? 0));
+            $summarySheet->setCellValue('A4', 'Net Sales');
+            $summarySheet->setCellValue('B4', (float)($daily['summary']['net_sales'] ?? 0));
+            $summarySheet->setCellValue('A5', 'Shipping Total');
+            $summarySheet->setCellValue('B5', (float)($daily['summary']['shipping_total'] ?? 0));
+            $summarySheet->setCellValue('A6', 'Discounts Total');
+            $summarySheet->setCellValue('B6', (float)($daily['summary']['discounts_total'] ?? 0));
+            $summarySheet->setCellValue('A7', 'HPP Total');
+            $summarySheet->setCellValue('B7', (float)($daily['summary']['hpp_total'] ?? 0));
+            $summarySheet->setCellValue('A8', 'Gross Profit');
+            $summarySheet->setCellValue('B8', (float)($daily['summary']['gross_profit'] ?? 0));
+            $summarySheet->setCellValue('A9', 'Operational Cost');
+            $summarySheet->setCellValue('B9', (float)($daily['summary']['operational_cost'] ?? 0));
+            $summarySheet->setCellValue('A10', 'Net Profit');
+            $summarySheet->setCellValue('B10', (float)($daily['summary']['net_profit'] ?? 0));
+            $summarySheet->setCellValue('A11', 'Receivables');
+            $summarySheet->setCellValue('B11', (float)($daily['summary']['receivables_total'] ?? 0));
+            $summarySheet->setCellValue('A12', 'Total Orders');
+            $summarySheet->setCellValue('B12', (int)($daily['summary']['total_orders'] ?? 0));
+            $summarySheet->setCellValue('A13', 'Total Items');
+            $summarySheet->setCellValue('B13', (int)($daily['summary']['total_items'] ?? 0));
+
+            $monthlySheet = $spreadsheet->createSheet();
+            $monthlySheet->setTitle('Monthly');
+            $monthlySheet->setCellValue('A1', 'Periode');
+            $monthlySheet->setCellValue('B1', 'Revenue');
+            $monthlySheet->setCellValue('C1', 'Orders');
+            $idx = 2;
+            foreach ($monthly['labels'] as $i => $label) {
+                $monthlySheet->setCellValue("A{$idx}", $label);
+                $monthlySheet->setCellValue("B{$idx}", (float)($monthly['data'][$i] ?? 0));
+                $monthlySheet->setCellValue("C{$idx}", (int)($monthly['orders'][$i] ?? 0));
+                $idx++;
+            }
+
+            $dailySheet = $spreadsheet->createSheet();
+            $dailySheet->setTitle('Daily');
+            $dailySheet->setCellValue('A1', 'Tanggal');
+            $dailySheet->setCellValue('B1', 'Revenue');
+            $dailySheet->setCellValue('C1', 'Orders');
+            $dailySheet->setCellValue('D1', 'Items');
+            $idx = 2;
+            foreach ($daily['labels'] as $i => $label) {
+                $dailySheet->setCellValue("A{$idx}", $label);
+                $dailySheet->setCellValue("B{$idx}", (float)($daily['data'][$i] ?? 0));
+                $dailySheet->setCellValue("C{$idx}", (int)($daily['orders'][$i] ?? 0));
+                $dailySheet->setCellValue("D{$idx}", (int)($daily['items'][$i] ?? 0));
+                $idx++;
+            }
+
+            $filename = 'sales-report-' . now()->format('Ymd-His') . '.xlsx';
+            \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory('exports');
+            $fullPath = \Illuminate\Support\Facades\Storage::disk('public')->path('exports/' . $filename);
+            $writer = new Xlsx($spreadsheet);
+            $writer->save($fullPath);
+
+            return ResponseFormatter::success('Export generated', [
+                'url' => \Illuminate\Support\Facades\Storage::url('exports/' . $filename)
+            ]);
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Failed to export report: ' . $e->getMessage(), [], 500);
+        }
+    }
+
     public function sales(Request $request)
     {
         try {
@@ -57,6 +157,19 @@ class ReportController extends Controller
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
 
             $salesData = $this->getSalesChart($startDate, $endDate);
+
+            // Check for missing base prices
+            $missingBasePriceCount = OrderItem::where(function($q) {
+                $q->whereNull('base_price')->orWhere('base_price', 0);
+            })->whereHas('order', function($q) {
+                $q->whereIn('status', ['paid', 'shipped', 'processing', 'delivered']);
+            })->count();
+
+            $salesData['meta'] = [
+                'has_missing_base_price' => $missingBasePriceCount > 0,
+                'missing_count' => $missingBasePriceCount
+            ];
+
             return ResponseFormatter::success('Sales data retrieved successfully', $salesData);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve sales data: ' . $e->getMessage(), [], 500);
@@ -85,6 +198,45 @@ class ReportController extends Controller
             return ResponseFormatter::success('Daily sales data retrieved successfully', $salesData);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve daily sales data: ' . $e->getMessage(), [], 500);
+        }
+    }
+
+    public function fixBasePrices(Request $request)
+    {
+        try {
+            $user = auth()->user();
+            if (!$user->hasPermission('reports.sales')) {
+                return ResponseFormatter::error('Unauthorized access', [], 403);
+            }
+
+            // Get items with missing base price (null or 0)
+            // Ensure we only pick items that have a valid related product variant
+            $query = OrderItem::where(function($q) {
+                $q->whereNull('base_price')->orWhere('base_price', 0);
+            })->whereHas('productVariant', function($q) {
+                $q->whereNotNull('base_price')->where('base_price', '>', 0);
+            })->with('productVariant');
+
+            $updatedCount = 0;
+            
+            // Process in chunks to handle potentially large datasets
+            $query->chunkById(100, function ($items) use (&$updatedCount) {
+                foreach ($items as $item) {
+                    // Double check the variant exists and has a valid base price
+                    if ($item->productVariant && $item->productVariant->base_price > 0) {
+                        $item->base_price = $item->productVariant->base_price;
+                        $item->save();
+                        $updatedCount++;
+                    }
+                }
+            });
+
+            return ResponseFormatter::success("Berhasil memperbarui harga modal untuk {$updatedCount} item pesanan.", [
+                'updated_count' => $updatedCount
+            ]);
+
+        } catch (\Exception $e) {
+            return ResponseFormatter::error('Gagal memperbarui harga modal: ' . $e->getMessage(), [], 500);
         }
     }
 
@@ -150,49 +302,23 @@ class ReportController extends Controller
 
     private function getSalesChart($startDate, $endDate)
     {
+
         $rangeStartDateStr = $startDate->copy()->toDateString();
         $effectiveEndDate = $endDate->copy();
         if ((int)$endDate->day === 1) {
             $effectiveEndDate = $endDate->copy()->subDay()->endOfDay();
         }
         $rangeEndDateStr = $effectiveEndDate->toDateString();
-        // Build subquery to determine effective paid date per order (prefer verified_at)
-        $paymentsSub = DB::table('order_payments')
-            ->select('order_id', DB::raw('MIN(COALESCE(verified_at, paid_at)) as effective_paid_at'))
-            ->groupBy('order_id');
 
-        // Manual/admin monthly revenues based on order progression (unpaid but progressed)
-        $manualMonthlyRows = DB::table('orders')
-            ->where('payment_status', '!=', 'paid')
-            ->where(function ($q) {
-                $q->whereNotIn('status', ['pending', 'cancelled'])
-                    ->orWhereNotNull('printed_at')
-                    ->orWhereNotNull('processed_by');
-            })
-            ->whereBetween(DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
+        // Consolidated Sales Data (ignores payment method, relies on Order Status and Ordered At)
+        $salesRows = DB::table('orders')
+            ->whereIn('status', ['paid', 'shipped', 'processing', 'delivered'])
+            ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
             ->select(
-                DB::raw('YEAR(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at)) as year'),
-                DB::raw('MONTH(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at)) as month'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders'),
-                DB::raw('SUM(orders.total_price) as total_sales')
-            )
-            ->groupBy('year', 'month')
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
-            ->get();
-
-        // Gateway-paid monthly revenues (paid orders)
-        $gatewayMonthlyRows = DB::table('orders')
-            ->leftJoinSub($paymentsSub, 'p', function ($join) {
-                $join->on('p.order_id', '=', 'orders.id');
-            })
-            ->where('orders.payment_status', 'paid')
-            ->whereBetween(DB::raw('DATE(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
-            ->select(
-                DB::raw('YEAR(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at)) as year'),
-                DB::raw('MONTH(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at)) as month'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders'),
-                DB::raw('SUM(orders.total_price) as total_sales')
+                DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
+                DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
+                DB::raw('COUNT(DISTINCT id) as total_orders'),
+                DB::raw('SUM(total_price) as total_sales')
             )
             ->groupBy('year', 'month')
             ->orderBy('year', 'asc')
@@ -202,19 +328,6 @@ class ReportController extends Controller
         $labels = [];
         $data = [];
         $ordersMonthly = [];
-
-        $ordersMonthlyRows = DB::table('orders')
-            ->whereIn('orders.status', ['paid', 'processing', 'shipped', 'delivered'])
-            ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
-            ->select(
-                DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
-                DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders')
-            )
-            ->groupBy('year', 'month')
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
-            ->get();
 
         // Helper to get total for a given year/month from a collection
         $getMonthTotals = function ($collection, $year, $month) {
@@ -234,17 +347,15 @@ class ReportController extends Controller
             $labels[] = $current->format('M Y');
             $y = (int)$current->year;
             $m = (int)$current->month;
-            $manual = $getMonthTotals($manualMonthlyRows, $y, $m);
-            $gateway = $getMonthTotals($gatewayMonthlyRows, $y, $m);
-            $data[] = $manual['sales'] + $gateway['sales'];
-            $ordersMonthly[] = (int) ($ordersMonthlyRows->first(function ($item) use ($y, $m) {
-                return (int)$item->year === (int)$y && (int)$item->month === (int)$m;
-            })->total_orders ?? 0);
+            $monthData = $getMonthTotals($salesRows, $y, $m);
+            
+            $data[] = $monthData['sales'];
+            $ordersMonthly[] = $monthData['orders'];
             $current->addMonth();
         }
 
-        $totalRevenue = (float) $manualMonthlyRows->sum('total_sales') + (float) $gatewayMonthlyRows->sum('total_sales');
-        $totalOrders = (int) $ordersMonthlyRows->sum('total_orders');
+        $totalRevenue = (float) $salesRows->sum('total_sales');
+        $totalOrders = (int) $salesRows->sum('total_orders');
 
         return [
             'labels' => $labels,
@@ -262,63 +373,24 @@ class ReportController extends Controller
     {
         $queryStartDate = $startDate->copy()->toDateString();
         $queryEndDate = $endDate->copy()->addDay()->toDateString();
-        // Build subquery to determine effective paid date per order
-        $paymentsSub = DB::table('order_payments')
-            ->select('order_id', DB::raw('MIN(COALESCE(verified_at, paid_at)) as effective_paid_at'))
-            ->groupBy('order_id');
-
-        // Manual/admin revenues based on order progression (no verified_at)
-        $manualRevenueRows = DB::table('orders')
-            ->where('payment_status', '!=', 'paid')
-            ->where(function ($q) {
-                $q->whereNotIn('status', ['pending', 'cancelled'])
-                    ->orWhereNotNull('printed_at')
-                    ->orWhereNotNull('processed_by');
-            })
-            ->whereBetween(DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
-            ->select(
-                DB::raw('DATE(COALESCE(orders.printed_at, orders.ordered_at, orders.created_at)) as paid_date'),
-                DB::raw('SUM(orders.total_price) as total_sales')
-            )
-            ->groupBy('paid_date')
-            ->orderBy('paid_date', 'asc')
-            ->get()
-            ->keyBy('paid_date');
-
-        // Gateway-paid orders without verified manual bank payments
-        $gatewayRevenueRows = DB::table('orders')
-            ->leftJoinSub($paymentsSub, 'p', function ($join) {
-                $join->on('p.order_id', '=', 'orders.id');
-            })
-            ->where('orders.payment_status', 'paid')
-            ->whereBetween(DB::raw('DATE(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
-            ->select(
-                DB::raw('DATE(COALESCE(p.effective_paid_at, orders.ordered_at, orders.created_at)) as paid_date'),
-                DB::raw('SUM(orders.total_price) as total_sales'),
-                DB::raw('COUNT(DISTINCT orders.id) as paid_orders')
-            )
-            ->groupBy('paid_date')
-            ->orderBy('paid_date', 'asc')
-            ->get()
-            ->keyBy('paid_date');
-
-        // Orders aggregated by order date (includes manual admin orders regardless of payment status)
-        $ordersRows = DB::table('orders')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+        // Consolidated Daily Sales Data (ignores payment method, relies on Order Status and Ordered At)
+        $salesRows = DB::table('orders')
+            ->whereIn('status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
-                DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as order_date'),
-                DB::raw('COUNT(DISTINCT orders.id) as total_orders')
+                DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as date'),
+                DB::raw('SUM(total_price) as total_sales'),
+                DB::raw('COUNT(DISTINCT id) as total_orders')
             )
-            ->groupBy('order_date')
-            ->orderBy('order_date', 'asc')
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
             ->get()
-            ->keyBy('order_date');
+            ->keyBy('date');
 
         // Items aggregated by order date
         $itemsRows = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$queryStartDate, $queryEndDate])
             ->select(
@@ -341,10 +413,10 @@ class ReportController extends Controller
             $dayLabel = $current->format('d M');
             $dateKey = $current->format('Y-m-d');
             $labels[] = $dayLabel;
-            $revenueData[] =
-                ($manualRevenueRows->get($dateKey) ? (float) $manualRevenueRows->get($dateKey)->total_sales : 0) +
-                ($gatewayRevenueRows->get($dateKey) ? (float) $gatewayRevenueRows->get($dateKey)->total_sales : 0);
-            $ordersData[] = $ordersRows->get($dateKey) ? (int) $ordersRows->get($dateKey)->total_orders : 0;
+            
+            $dailySales = $salesRows->get($dateKey);
+            $revenueData[] = $dailySales ? (float) $dailySales->total_sales : 0;
+            $ordersData[] = $dailySales ? (int) $dailySales->total_orders : 0;
             $itemsData[] = $itemsRows->get($dateKey) ? (int) $itemsRows->get($dateKey)->total_items : 0;
 
             $current->addDay();
@@ -354,39 +426,49 @@ class ReportController extends Controller
 
         // Summary metrics over the selected period (order date window)
         $ordersPeriodQuery = DB::table('orders')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate]);
 
-        $totalOrderAmount = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
+        // $totalOrderAmount = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
+        $totalOrderAmount = 0;
         $discountsTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.discount_amount, 0)'));
         $shippingTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.shipping_cost, 0)'));
-        $receivablesTotal = (float) $ordersPeriodQuery->clone()
-            ->where('orders.payment_status', '!=', 'paid')
-            ->whereIn('orders.status', ['processing', 'delivered'])
+        $receivablesTotal = (float) DB::table('orders')
+            ->where('orders.payment_status', 'pending')
+            ->whereNotIn('orders.status', ['paid', 'shipped', 'delivered', 'cancelled'])
+            ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(orders.total_price, 0)'));
 
-        $grossItemValue = (float) DB::table('order_items')
-            ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
-            ->whereNull('order_items.deleted_at')
-            ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
-            ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.price,0)'));
+        $grossItemValue = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
 
         $modalItemValue = (float) DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.base_price,0)'));
 
-        $netSales = $grossItemValue - $discountsTotal;
-        $grossProfit = $netSales - $modalItemValue; // ✅ BENAR - menggunakan Net Sales
+        $netSales = $grossItemValue - $shippingTotal;
+        $grossProfit = $netSales - $modalItemValue;
         $operationalCost = (float) DB::table('expenses')
             ->whereBetween('expense_date', [$startDate, $endDate])
             ->whereNull('deleted_at')
             ->sum(DB::raw('COALESCE(total_amount, 0)'));
-        $otherFees = (float) $shippingTotal;
-        $netProfit = $netSales - $modalItemValue - $operationalCost - $otherFees;
+        $otherFees = 0;
+        $netProfit = $grossProfit - $operationalCost - $otherFees;
+
+        // Calculate current inventory value (Stock * Price) and modal value (Stock * Base Price)
+        $inventoryQuery = DB::table('product_variants')
+            ->join('products', 'product_variants.product_id', '=', 'products.id')
+            ->whereNull('product_variants.deleted_at')
+            ->whereNull('products.deleted_at');
+
+        $currentProductValueTotal = (float) $inventoryQuery->clone()
+            ->sum(DB::raw('COALESCE(product_variants.stock, 0) * COALESCE(product_variants.price, 0)'));
+        $currentStockTotal = (float) $inventoryQuery->clone()->sum(DB::raw('COALESCE(product_variants.stock, 0)'));
+
+        $currentModalValueTotal = (float) $inventoryQuery->clone()
+            ->sum(DB::raw('COALESCE(product_variants.stock, 0) * COALESCE(product_variants.base_price, 0)'));
 
         return [
             'labels' => $labels,
@@ -394,11 +476,11 @@ class ReportController extends Controller
             'orders' => $ordersData,
             'items' => $itemsData,
             'summary' => [
-                'total_orders' => (int) $ordersRows->sum('total_orders'),
+                'total_orders' => (int) $salesRows->sum('total_orders'),
                 'total_items' => (int) $itemsRows->sum('total_items'),
-                'total_revenue' => (float) ($manualRevenueRows->sum('total_sales') + $gatewayRevenueRows->sum('total_sales')),
-                'average_daily_revenue' => $periodDays > 0 ? ($manualRevenueRows->sum('total_sales') + $gatewayRevenueRows->sum('total_sales')) / $periodDays : 0,
-                'total_order_amount' => $totalOrderAmount,
+                'total_revenue' => $grossItemValue,
+                'average_daily_revenue' => $periodDays > 0 ? $grossItemValue / $periodDays : 0,
+                'total_order_amount' => $netSales,
                 'gross_sales' => $grossItemValue,
                 'net_sales' => $netSales,
                 'shipping_total' => $shippingTotal,
@@ -409,8 +491,9 @@ class ReportController extends Controller
                 'operational_cost' => $operationalCost,
                 'net_profit' => $netProfit,
                 'receivables_total' => $receivablesTotal,
-                'product_value_total' => $grossItemValue,
-                'modal_value_total' => $modalItemValue
+                'product_value_total' => $currentProductValueTotal,
+                'modal_value_total' => $currentModalValueTotal,
+                'current_stock_total' => $currentStockTotal
             ]
         ];
     }
@@ -424,24 +507,34 @@ class ReportController extends Controller
         }
         $rangeEndDateStr = $effectiveEndDate->toDateString();
 
-        // PERBAIKAN: Gunakan logika yang sama dengan getDailySalesChart
-        // Hanya ambil order dengan status: paid, processing, delivered
-        $profitRows = DB::table('orders')
-            ->leftJoin('order_items', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('orders.status', ['paid', 'processing', 'delivered'])
+        // PERBAIKAN: Gunakan logika yang sama dengan getDailySalesChart (Summary Logic)
+        // 1. Ambil data Sales (Total Price, Discount, Shipping) dari tabel orders
+        $salesRows = DB::table('orders')
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
+            ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
+            ->select(
+                DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
+                DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
+                DB::raw('SUM(COALESCE(orders.total_price, 0)) as total_sales'),
+                DB::raw('SUM(COALESCE(orders.discount_amount, 0)) as discount'),
+                // Shipping Cost
+                DB::raw('SUM(COALESCE(orders.shipping_cost, 0)) as shipping_cost')
+            )
+            ->groupBy('year', 'month')
+            ->orderBy('year', 'asc')
+            ->orderBy('month', 'asc')
+            ->get();
+
+        // 2. Ambil data HPP (Modal) dari tabel order_items
+        $hppRows = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['paid', 'shipped', 'processing', 'delivered'])
             ->whereNull('order_items.deleted_at')
             ->whereBetween(DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at))'), [$rangeStartDateStr, $rangeEndDateStr])
             ->select(
                 DB::raw('YEAR(COALESCE(orders.ordered_at, orders.created_at)) as year'),
                 DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
-                // Gross Sales (Product Value)
-                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.price, 0)) as gross_sales'),
-                // HPP (Modal/Base Price)
-                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.base_price, 0)) as hpp'),
-                // Discount
-                DB::raw('SUM(COALESCE(orders.discount_amount, 0)) as discount'),
-                // Shipping Cost
-                DB::raw('SUM(COALESCE(orders.shipping_cost, 0)) as shipping_cost')
+                DB::raw('SUM(COALESCE(order_items.quantity, 0) * COALESCE(order_items.base_price, 0)) as hpp')
             )
             ->groupBy('year', 'month')
             ->orderBy('year', 'asc')
@@ -466,17 +559,24 @@ class ReportController extends Controller
         $grossProfitData = [];
         $netProfitData = [];
 
-        // Helper to get totals for a given year/month
-        $getMonthTotals = function ($collection, $year, $month) {
+        // Helper to get sales totals
+        $getSalesTotals = function ($collection, $year, $month) {
             $row = $collection->first(function ($item) use ($year, $month) {
                 return (int)$item->year === (int)$year && (int)$item->month === (int)$month;
             });
             return [
-                'gross_sales' => $row ? (float) $row->gross_sales : 0.0,
-                'hpp' => $row ? (float) $row->hpp : 0.0,
+                'total_sales' => $row ? (float) $row->total_sales : 0.0,
                 'discount' => $row ? (float) $row->discount : 0.0,
                 'shipping_cost' => $row ? (float) $row->shipping_cost : 0.0,
             ];
+        };
+
+        // Helper to get HPP totals
+        $getHppTotal = function ($collection, $year, $month) {
+            $row = $collection->first(function ($item) use ($year, $month) {
+                return (int)$item->year === (int)$year && (int)$item->month === (int)$month;
+            });
+            return $row ? (float) $row->hpp : 0.0;
         };
 
         $getOperationalCost = function ($collection, $year, $month) {
@@ -489,7 +589,7 @@ class ReportController extends Controller
         // Build month labels and profit data
         $current = $startDate->copy()->startOfMonth();
         $endMonth = $effectiveEndDate->copy()->endOfMonth();
-        
+
         $totalGrossProfit = 0;
         $totalNetProfit = 0;
 
@@ -497,28 +597,28 @@ class ReportController extends Controller
             $labels[] = $current->format('M Y');
             $y = (int)$current->year;
             $m = (int)$current->month;
-            
-            $data = $getMonthTotals($profitRows, $y, $m);
+
+            $salesData = $getSalesTotals($salesRows, $y, $m);
+            $hpp = $getHppTotal($hppRows, $y, $m);
             $opCost = $getOperationalCost($operationalCostRows, $y, $m);
 
-            $grossSales = $data['gross_sales'];
-            $hpp = $data['hpp'];
-            $discount = $data['discount'];
-            $shippingCost = $data['shipping_cost'];
+            $totalSales = $salesData['total_sales'];
+            $discount = $salesData['discount'];
+            $shippingCost = $salesData['shipping_cost'];
 
-            // Perhitungan sesuai formula:
-            // Net Sales (Penjualan Bersih) = Gross Sales - Discount
-            $netSales = $grossSales - $discount;
-            
+            // Perhitungan disamakan dengan Summary getDailySalesChart:
+            // Net Sales = Total Sales (Gross Item Value) - Shipping - Discount
+            $netSales = $totalSales - $shippingCost;
+
             // Laba Kotor = Net Sales - HPP
             $labaKotor = $netSales - $hpp;
-            
-            // Laba Bersih = Laba Kotor - Biaya Operasional - Ongkos Kirim
-            $labaBersih = $labaKotor - $opCost - $shippingCost;
+
+            // Laba Bersih = Laba Kotor - Biaya Operasional
+            $labaBersih = $labaKotor - $opCost;
 
             $grossProfitData[] = $labaKotor;
             $netProfitData[] = $labaBersih;
-            
+
             $totalGrossProfit += $labaKotor;
             $totalNetProfit += $labaBersih;
 
@@ -542,23 +642,23 @@ class ReportController extends Controller
     {
         try {
             $user = auth()->user();
-            
+
             if (!$user->hasPermission('reports.profit')) {
                 return ResponseFormatter::error('Unauthorized access to profit report', [], 403);
             }
 
             $startDate = $request->get('start_date') ? Carbon::parse($request->get('start_date')) : Carbon::now()->subMonths(12);
             $endDate = $request->get('end_date') ? Carbon::parse($request->get('end_date')) : Carbon::now();
-            
+
             $profitData = $this->getProfitChart($startDate, $endDate);
-            
+
             // Tambahkan penjelasan perhitungan
             $profitData['calculation_explanation'] = [
                 'penjualan_bersih' => 'Nilai Produk (Gross Sales) - Diskon',
                 'laba_kotor' => 'Penjualan Bersih - HPP (Harga Pokok Penjualan)',
-                'laba_bersih' => 'Laba Kotor - Biaya Operasional - Ongkos Kirim'
+                'laba_bersih' => 'Laba Kotor - Biaya Operasional'
             ];
-            
+
             return ResponseFormatter::success('Profit data retrieved successfully', $profitData);
         } catch (\Exception $e) {
             return ResponseFormatter::error('Failed to retrieve profit data: ' . $e->getMessage(), [], 500);

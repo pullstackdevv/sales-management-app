@@ -5,6 +5,7 @@ import { Button } from "flowbite-react";
 import DashboardLayout from "../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
+import { getCurrentDateWIB } from "../utils/helpers";
 
 
 export default function ExpensePage() {
@@ -16,7 +17,7 @@ export default function ExpensePage() {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [category, setCategory] = useState("");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(getCurrentDateWIB());
     const [amount, setAmount] = useState(0);
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState("");
@@ -32,8 +33,7 @@ export default function ExpensePage() {
     const [filterStartDate, setFilterStartDate] = useState(monthRange.start);
     const [filterEndDate, setFilterEndDate] = useState(monthRange.end);
     const [filterMonth, setFilterMonth] = useState(() => {
-        const d = new Date();
-        return d.toISOString().slice(0, 7);
+        return getCurrentDateWIB().slice(0, 7);
     });
 
 
@@ -42,6 +42,8 @@ export default function ExpensePage() {
     const [totalPages, setTotalPages] = useState(1);
     const [perPage, setPerPage] = useState(10);
     const [totalItems, setTotalItems] = useState(0);
+    const [grandTotalAmount, setGrandTotalAmount] = useState(0);
+    const [grandTotalCount, setGrandTotalCount] = useState(0);
     // ⬇️ TAMBAHKAN
 
 
@@ -57,14 +59,72 @@ export default function ExpensePage() {
 
     const subtotal = amount * qty;
 
+    const normalizeDateInput = (value) => {
+        if (!value) {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+        if (typeof value === 'string') {
+            // If purely YYYY-MM-DD, use as-is (no timezone ambiguity)
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            // If has time component (T or space), parse to local date to avoid UTC shifts
+            if (/^\d{4}-\d{2}-\d{2}[ T].*$/.test(value)) {
+                const dt = new Date(value);
+                if (!isNaN(dt.getTime())) {
+                    const y = dt.getFullYear();
+                    const m = String(dt.getMonth() + 1).padStart(2, '0');
+                    const d = String(dt.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+            }
+        }
+        try {
+            const dt = new Date(value);
+            if (!isNaN(dt.getTime())) {
+                const y = dt.getFullYear();
+                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                const d = String(dt.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        } catch {}
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
     // Fetch expenses data
     useEffect(() => {
         fetchExpenses(currentPage);
+        fetchExpenseSummary();
     }, [currentPage, perPage, filterStartDate, filterEndDate]);
 
     // Handle page change
     const handlePageChange = (page) => {
         setCurrentPage(page);
+    };
+
+    const handleExportExcel = async () => {
+        try {
+            const params = {
+                start_date: filterStartDate,
+                end_date: filterEndDate
+            };
+            if (category) params.category = category;
+            const response = await api.post('/expenses/export-excel', params);
+            if (response.data?.status === 'success') {
+                const url = response.data?.data?.url;
+                if (url) window.open(url, '_blank');
+            } else {
+                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Export Excel gagal' });
+            }
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Terjadi kesalahan saat export' });
+        }
     };
 
     // Handle per page change
@@ -123,11 +183,32 @@ export default function ExpensePage() {
         }
     };
 
+    const fetchExpenseSummary = async () => {
+        try {
+            const params = {
+                start_date: filterStartDate,
+                end_date: filterEndDate
+            };
+            if (category) params.category = category;
+            const response = await api.get('/expense-summary', { params });
+            if (response.data.status === 'success' && response.data.data) {
+                setGrandTotalAmount(parseFloat(response.data.data.total_amount || 0));
+                setGrandTotalCount(parseInt(response.data.data.total_expenses || 0));
+            } else {
+                setGrandTotalAmount(0);
+                setGrandTotalCount(0);
+            }
+        } catch (error) {
+            setGrandTotalAmount(0);
+            setGrandTotalCount(0);
+        }
+    };
+
     const resetForm = () => {
         setName("");
         setDescription("");
         setCategory("");
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getCurrentDateWIB());
         setAmount(0);
         setQty(1);
         setNotes("");
@@ -142,7 +223,7 @@ export default function ExpensePage() {
         setName(expense.name);
         setDescription(expense.description || "");
         setCategory(expense.category || "");
-        setDate(expense.expense_date);
+        setDate(normalizeDateInput(expense.expense_date));
         setAmount(expense.amount);
         setQty(expense.quantity);
         setNotes(expense.notes || "");
@@ -307,13 +388,22 @@ export default function ExpensePage() {
 
     const totalExpenses = Array.isArray(filteredExpenses) ? filteredExpenses.reduce((sum, expense) => sum + parseFloat(expense.total_amount || 0), 0) : 0;
     function getCurrentMonthRange() {
-        const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const wibDate = getCurrentDateWIB();
+        const [y, m] = wibDate.split('-').map(Number);
+        
+        const start = new Date(y, m - 1, 1);
+        const end = new Date(y, m, 0);
+
+        const fmt = (d) => {
+             const yy = d.getFullYear();
+             const mm = String(d.getMonth() + 1).padStart(2, '0');
+             const dd = String(d.getDate()).padStart(2, '0');
+             return `${yy}-${mm}-${dd}`;
+        };
 
         return {
-            start: start.toISOString().split("T")[0],
-            end: end.toISOString().split("T")[0],
+            start: fmt(start),
+            end: fmt(end),
         };
     }
 
@@ -390,12 +480,20 @@ export default function ExpensePage() {
                                 Unduh Excel
                             </Button> */}
                             <Button
+                                onClick={handleExportExcel}
+                                className="bg-green-600 text-white"
+                            >
+                                <Icon icon="mdi:file-excel" className="mr-1" />
+                                Unduh Excel
+                            </Button>
+                            <Button
                                 onClick={() => setIsModalOpen(true)}
                                 className="bg-blue-600 text-white"
                             >
                                 <Icon icon="ic:baseline-add" className="mr-1" />
                                 Tambah Pengeluaran
                             </Button>
+
                         </div>
                     </div>
 
@@ -404,11 +502,12 @@ export default function ExpensePage() {
 
                 <div className="bg-red-100 border border-red-200 rounded-lg p-4 text-sm mb-4">
                     <p className="font-semibold text-red-800">
-                        Total Pengeluaran: {formatCurrency(totalExpenses)}
+
+                        Total Pengeluaran: {formatCurrency(grandTotalAmount)}
                     </p>
                     <p className="text-red-600">
                         Ini adalah total pengeluaran dari list daftar
-                        pengeluaran yang ada.
+                        pengeluaran {grandTotalCount} data yang ada
                     </p>
                 </div>
 

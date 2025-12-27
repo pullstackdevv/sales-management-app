@@ -28,45 +28,53 @@ class DashboardController extends Controller
             }
             // Get today's date
             $today = Carbon::today();
-            
+
             // Summary Cards Data
-            $totalOrders = Order::whereDate('created_at', $today)->count();
+            // Hitung order yang dibuat atau di-update hari ini
+            $totalOrders = Order::where(function ($q) use ($today) {
+                $q->whereDate('created_at', $today)
+                    ->orWhereDate('updated_at', $today);
+            })->count();
+
             $totalCustomers = Customer::count();
             $activeProducts = Product::where('is_active', true)->count();
-            
-            $todaySales = Order::whereDate('created_at', $today)
-            ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
-            ->sum('total_price');
-            
-            $ordersNeedPayment = Order::whereDate('created_at', $today)
+
+            // Pendapatan hari ini: order yang di-update hari ini dan memenuhi status
+            $todaySales = Order::whereDate('updated_at', $today)
+                ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
+                ->sum('total_price');
+
+            // Order yang perlu perhatian berdasarkan update hari ini
+            $ordersNeedPayment = Order::whereDate('updated_at', $today)
                 ->where('status', 'pending')
                 ->count();
-            $ordersNeedProcess = Order::whereDate('created_at', $today)
+            $ordersNeedProcess = Order::whereDate('updated_at', $today)
                 ->where('status', 'paid')
                 ->count();
-            $ordersNeedShip = Order::whereDate('created_at', $today)
+            $ordersNeedShip = Order::whereDate('updated_at', $today)
                 ->where('status', 'processing')
                 ->count();
-            $ordersCancelled = Order::whereDate('created_at', $today)
+            $ordersCancelled = Order::whereDate('updated_at', $today)
                 ->where('status', 'cancelled')
                 ->count();
-            
+
             $weeklyRevenueData = [];
             $weeklyOrderCounts = [];
             $labels = [];
             for ($i = 6; $i >= 0; $i--) {
                 $date = Carbon::now()->subDays($i);
-                $revenue = Order::whereDate('created_at', $date)
+                // Pendapatan & jumlah order berdasarkan tanggal updated_at
+                $revenue = Order::whereDate('updated_at', $date)
                     ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                     ->sum('total_price');
                 $weeklyRevenueData[] = (float) $revenue;
-                $ordersCountForDay = Order::whereDate('created_at', $date)
+                $ordersCountForDay = Order::whereDate('updated_at', $date)
                     ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                     ->count();
                 $weeklyOrderCounts[] = (int) $ordersCountForDay;
                 $labels[] = $date->format('d M');
             }
-            
+
             $summaryCards = [
                 [
                     'label' => 'Order Belum Dibayar',
@@ -104,13 +112,15 @@ class DashboardController extends Controller
                     'value' => $activeProducts,
                     'color' => 'bg-yellow-100 text-yellow-800'
                 ],
-                
+
             ];
 
             $isOwner = false;
             try {
                 if (method_exists(Auth::user(), 'roles')) {
-                    $isOwner = Auth::user()->roles()->where(function($q){ $q->where('name', 'owner')->orWhere('id', 1); })->exists();
+                    $isOwner = Auth::user()->roles()->where(function ($q) {
+                        $q->where('name', 'owner')->orWhere('id', 1);
+                    })->exists();
                 } elseif (property_exists(Auth::user(), 'role_id')) {
                     $isOwner = ((int) (Auth::user()->role_id ?? 0)) === 1;
                 }
@@ -133,7 +143,7 @@ class DashboardController extends Controller
                     'color' => 'bg-purple-100 text-purple-800'
                 ];
             }
-            
+
             if ($isOwner) {
                 $salesChart = [
                     'categories' => $labels,
@@ -151,9 +161,11 @@ class DashboardController extends Controller
             }
 
             $todayOrdersList = Order::with(['customer', 'salesChannel'])
-                ->whereDate('created_at', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereDate('updated_at', $today)
+                        ->orWhereDate('created_at', $today);
+                })
                 ->latest()
-                ->take(10)
                 ->get()
                 ->map(function ($o) use ($isOwner) {
                     return [
@@ -165,17 +177,19 @@ class DashboardController extends Controller
                         'total_price' => $isOwner ? (float) $o->total_price : null,
                         'created_at' => $o->created_at->toDateTimeString(),
                         'sales_channel' => optional($o->salesChannel)->name,
+                        'updated_at' => $o->updated_at->toDateTimeString(),
                     ];
                 });
 
+            // Transaksi yang tercatat hari ini = yang di-update hari ini
             $statusCounts = Order::select('status', DB::raw('COUNT(*) as count'))
-                ->whereDate('created_at', $today)
+                ->whereDate('updated_at', $today)
                 ->groupBy('status')
                 ->pluck('count', 'status');
 
             $todayOrdersSummary = [
                 'total' => $todayOrdersList->count(),
-                'total_revenue' => $isOwner ? (float) Order::whereDate('created_at', $today)
+                'total_revenue' => $isOwner ? (float) Order::whereDate('updated_at', $today)
                     ->whereIn('status', ['paid', 'processing', 'shipped', 'delivered'])
                     ->sum('total_price') : null,
                 'by_status' => [
@@ -216,7 +230,7 @@ class DashboardController extends Controller
                     ->where('type', 'in')
                     ->count(),
             ];
-            
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -235,7 +249,6 @@ class DashboardController extends Controller
                     ],
                 ]
             ]);
-            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

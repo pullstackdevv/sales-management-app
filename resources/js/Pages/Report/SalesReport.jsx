@@ -29,6 +29,11 @@ const SalesReport = () => {
   const [dailyStartDate, setDailyStartDate] = React.useState('');
   const [dailyEndDate, setDailyEndDate] = React.useState('');
   const [dailyMetric, setDailyMetric] = React.useState('orders');
+  const [missingBasePriceInfo, setMissingBasePriceInfo] = React.useState({
+    has_missing: false,
+    count: 0
+  });
+  const [fixingBasePrices, setFixingBasePrices] = React.useState(false);
 
   React.useEffect(() => {
     fetchSalesData();
@@ -53,6 +58,13 @@ const SalesReport = () => {
           orders: data.orders || [],
           summary: data.summary
         });
+        
+        if (data.meta) {
+          setMissingBasePriceInfo({
+            has_missing: data.meta.has_missing_base_price,
+            count: data.meta.missing_count
+          });
+        }
       } else {
         setError('Gagal mengambil data laporan penjualan');
       }
@@ -188,6 +200,42 @@ const SalesReport = () => {
     }
   };
 
+  const handleFixBasePrices = async () => {
+    if (!confirm('Apakah Anda yakin ingin memperbarui harga modal untuk item pesanan yang kosong berdasarkan harga modal produk saat ini?')) return;
+    
+    try {
+      setFixingBasePrices(true);
+      const response = await api.post('/reports/fix-base-prices');
+      if (response.data.status === 'success') {
+        alert(response.data.message);
+        // Refresh data to update the warning status
+        fetchSalesData(); 
+      }
+    } catch (err) {
+      console.error('Error fixing base prices:', err);
+      alert('Gagal memperbarui harga modal');
+    } finally {
+      setFixingBasePrices(false);
+    }
+  };
+
+  const handleExportSales = async () => {
+    try {
+      const payload = {};
+      if (dailyStartDate && dailyEndDate) {
+        payload.start_date = dailyStartDate;
+        payload.end_date = dailyEndDate;
+      } else if (dailyMonth) {
+        payload.month = dailyMonth;
+      }
+      const response = await api.post('/reports/export-sales', payload);
+      if (response.data?.status === 'success') {
+        const url = response.data?.data?.url;
+        if (url) window.open(url, '_blank');
+      }
+    } catch (e) { }
+  };
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -197,12 +245,41 @@ const SalesReport = () => {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Laporan Penjualan</h1>
           </div>
 
+          {/* Missing Base Price Alert */}
+          {missingBasePriceInfo.has_missing && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="text-yellow-600 mt-0.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-yellow-800">Perhatian: Data Harga Modal Tidak Lengkap</h3>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Ditemukan <strong>{missingBasePriceInfo.count}</strong> item pesanan yang belum memiliki data harga modal (base price). 
+                    Hal ini akan mempengaruhi keakuratan laporan laba rugi.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleFixBasePrices}
+                disabled={fixingBasePrices}
+                className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors duration-200 whitespace-nowrap ${
+                  fixingBasePrices ? 'bg-yellow-400 cursor-not-allowed' : 'bg-yellow-600 hover:bg-yellow-700'
+                }`}
+              >
+                {fixingBasePrices ? 'Memproses...' : 'Generate Harga Modal'}
+              </button>
+            </div>
+          )}
+
           {/* Filter Section */}
           <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
               Filter terpusat untuk kartu ringkasan dan grafik harian
             </h2>
-            
+
             {/* Month Filter */}
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
@@ -226,6 +303,12 @@ const SalesReport = () => {
                   className="bg-amber-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors duration-200 whitespace-nowrap"
                 >
                   Tampilkan Bulan
+                </button>
+                <button
+                  onClick={handleExportSales}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors duration-200 whitespace-nowrap"
+                >
+                  Unduh Excel
                 </button>
               </div>
 
@@ -279,129 +362,209 @@ const SalesReport = () => {
               {/* Summary Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                 {/* Pendapatan */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Pendapatan</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Total Penjualan</span>
+                      <span className="text-xs text-gray-400">(Termasuk Ongkos Kirim & Diskon)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.total_revenue || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Total Penjualan */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Total Penjualan</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Pendapatan</span>
+                      <span className="text-xs text-gray-400">(Total Penjualan - ongkir)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.total_order_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Penjualan Kotor */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Penjualan Kotor</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Penjualan Kotor</span>
+                      <span className="text-xs text-gray-400">(Termasuk Ongkos Kirim & Diskon)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.gross_sales || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Penjualan Bersih */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Penjualan Bersih</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Penjualan Bersih</span>
+                      <span className="text-xs text-gray-400">(Penjualan kotor - ongkir)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.net_sales || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Ongkos Kirim */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Ongkos Kirim</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Ongkos Kirim</span>
+                      <span className="text-xs text-gray-400">(Total Ongkos Kirim)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.shipping_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Diskon */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Diskon</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Diskon</span>
+                      <span className="text-xs text-gray-400">(Total Diskon)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.discounts_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Biaya Tambahan */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Biaya Tambahan Lainnya</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Biaya Tambahan Lainnya</span>
+                      <span className="text-xs text-gray-400">(Total Biaya Tambahan Lainnya)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.other_fees || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* HPP */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Harga Pokok Penjualan (HPP)</div>
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Harga Pokok Penjualan (HPP)</span>
+                      <span className="text-xs text-gray-400">(Total Harga Pokok Penjualan)</span>
+                    </div>
+                  </div>
                   <div className="text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.hpp_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Laba Kotor */}
-                <div className="bg-white rounded-lg shadow-sm p-4 ">
-                  <div className="text-sm opacity-90 mb-1">Laba Kotor</div>
-                  <div className="text-xl sm:text-2xl font-bold">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Laba Kotor</span>
+                      <span className="text-xs text-gray-400">(Penjualan Bersih - HPP)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.gross_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Biaya Operasional */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Biaya Operasional</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Biaya Operasional</span>
+                      <span className="text-xs text-gray-400">(Total Pengeluaran)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.operational_cost || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Laba Bersih */}
-                <div className="bg-white rounded-lg shadow-sm p-4 ">
-                  <div className="text-sm opacity-90 mb-1">Laba Bersih</div>
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Laba Bersih</span>
+                      <span className="text-xs text-gray-400">(Laba Kotor - Biaya Operasional)</span>
+                    </div>
+                  </div>
                   <div className="text-xl sm:text-2xl font-bold">
                     Rp {(dailyReport.summary.net_profit || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Piutang */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Piutang</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Piutang</span>
+                      <span className="text-xs text-gray-400">(Total Biaya Belum Terbayarkan)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.receivables_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Transaksi */}
-                <div className="bg-white rounded-lg shadow-sm p-4 ">
-                  <div className="text-sm opacity-90 mb-1">Transaksi</div>
-                  <div className="text-xl sm:text-2xl font-bold">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Transaksi</span>
+                      <span className="text-xs text-gray-400">(Total Transaksi Terbayarkan)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     {dailyReport.summary.total_orders || 0}
                   </div>
                 </div>
 
                 {/* Item Terjual */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Item Terjual</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Item Terjual</span>
+                      <span className="text-xs text-gray-400">(Total Item Terjual)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     {dailyReport.summary.total_items || 0}
                   </div>
                 </div>
 
                 {/* Nilai Produk */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Nilai Produk</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Nilai Produk ({dailyReport.summary.current_stock_total || 0} stok produk)</span>
+                      <span className="text-xs text-gray-400">(Total Nilai Produk Stok Saat Ini)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.product_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
 
                 {/* Nilai Modal */}
-                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                  <div className="text-sm text-gray-600 mb-1">Nilai Modal</div>
-                  <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Nilai Modal ({dailyReport.summary.current_stock_total || 0} stok produk)</span>
+                      <span className="text-xs text-gray-400">(Total Nilai Modal Stok Saat Ini)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.modal_value_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
@@ -424,25 +587,22 @@ const SalesReport = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => setDailyMetric('orders')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          dailyMetric === 'orders' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${dailyMetric === 'orders' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
                       >
                         Transaksi
                       </button>
                       <button
                         onClick={() => setDailyMetric('items')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          dailyMetric === 'items' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${dailyMetric === 'items' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
                       >
                         Item
                       </button>
                       <button
                         onClick={() => setDailyMetric('revenue')}
-                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                          dailyMetric === 'revenue' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${dailyMetric === 'revenue' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
                       >
                         Revenue
                       </button>

@@ -5,6 +5,7 @@ import { Button } from "flowbite-react";
 import DashboardLayout from "../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
+import { getCurrentDateWIB } from "../utils/helpers";
 
 
 export default function ExpensePage() {
@@ -16,7 +17,7 @@ export default function ExpensePage() {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [category, setCategory] = useState("");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(getCurrentDateWIB());
     const [amount, setAmount] = useState(0);
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState("");
@@ -32,8 +33,7 @@ export default function ExpensePage() {
     const [filterStartDate, setFilterStartDate] = useState(monthRange.start);
     const [filterEndDate, setFilterEndDate] = useState(monthRange.end);
     const [filterMonth, setFilterMonth] = useState(() => {
-        const d = new Date();
-        return d.toISOString().slice(0, 7);
+        return getCurrentDateWIB().slice(0, 7);
     });
 
 
@@ -208,7 +208,7 @@ export default function ExpensePage() {
         setName("");
         setDescription("");
         setCategory("");
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getCurrentDateWIB());
         setAmount(0);
         setQty(1);
         setNotes("");
@@ -388,13 +388,22 @@ export default function ExpensePage() {
 
     const totalExpenses = Array.isArray(filteredExpenses) ? filteredExpenses.reduce((sum, expense) => sum + parseFloat(expense.total_amount || 0), 0) : 0;
     function getCurrentMonthRange() {
-        const now = new Date();
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const wibDate = getCurrentDateWIB();
+        const [y, m] = wibDate.split('-').map(Number);
+        
+        const start = new Date(y, m - 1, 1);
+        const end = new Date(y, m, 0);
+
+        const fmt = (d) => {
+             const yy = d.getFullYear();
+             const mm = String(d.getMonth() + 1).padStart(2, '0');
+             const dd = String(d.getDate()).padStart(2, '0');
+             return `${yy}-${mm}-${dd}`;
+        };
 
         return {
-            start: start.toISOString().split("T")[0],
-            end: end.toISOString().split("T")[0],
+            start: fmt(start),
+            end: fmt(end),
         };
     }
 

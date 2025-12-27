@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import axios from "axios";
 import api from "../../api/axios";
 import Swal from "sweetalert2";
+import { getCurrentDateWIB } from "../../utils/helpers";
 
 export default function AddOrder() {
     // State management untuk form order
@@ -16,7 +17,7 @@ export default function AddOrder() {
         shipping_cost: 0,
         manual_discount: 0,
         notes: '',
-        order_date: new Date().toISOString().split('T')[0],
+        order_date: getCurrentDateWIB(),
         status: 'pending',
         payment_status: 'pending',
         payment_bank_id: '',
@@ -841,6 +842,7 @@ export default function AddOrder() {
                     window.history.back();
                 }, 1500);
             }
+            console.log('AddOrder - Response:', response.data);
         } catch (error) {
             console.error('Error creating order:', error);
             if (error.response?.data?.errors) {

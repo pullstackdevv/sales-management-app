@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\PointTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,18 +14,7 @@ class CustomerController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        // $customers = Customer::with(['addresses', 'orders' => function($q) {
-        //         $q->select('id', 'customer_id', 'total_amount', 'status', 'created_at')
-        //             ->latest()
-        //             ->limit(5);
-        //     }])
-        //     ->withCount(['orders', 'addresses'])
-        //     ->when($request->search, function($query, $search) {
-        //         $query->where('name', 'like', "%{$search}%")
-        //             ->orWhere('phone', 'like', "%{$search}%")
-        //             ->orWhere('email', 'like', "%{$search}%");
-        //     })
-        $customers = Customer::with(['addresses'])
+        $customers = Customer::with(['addresses', 'loyaltyPoints.tier'])
             ->withCount(['addresses'])
             ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -941,6 +931,54 @@ class CustomerController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Gagal menghapus alamat: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get customer point transaction history
+     */
+    public function getPointHistory(Request $request, $customerId): JsonResponse
+    {
+        try {
+            $customer = Customer::with('loyaltyPoints.tier')->find($customerId);
+
+            if (!$customer) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Customer tidak ditemukan'
+                ], 404);
+            }
+
+            $transactions = PointTransaction::where('customer_id', $customerId)
+                ->with(['order', 'createdBy'])
+                ->when($request->type, function ($query, $type) {
+                    if ($type === 'earn') {
+                        $query->earn();
+                    } elseif ($type === 'redeem') {
+                        $query->redeem();
+                    }
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate($request->per_page ?? 20);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'customer' => [
+                        'id' => $customer->id,
+                        'name' => $customer->name,
+                        'current_points' => $customer->loyaltyPoints?->current_points ?? 0,
+                        'lifetime_points' => $customer->loyaltyPoints?->lifetime_points ?? 0,
+                        'tier' => $customer->loyaltyPoints?->tier,
+                    ],
+                    'transactions' => $transactions
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal memuat riwayat poin: ' . $e->getMessage()
             ], 500);
         }
     }

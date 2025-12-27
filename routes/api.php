@@ -147,6 +147,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Customer routes (protected - sensitive data, admin-only; exclude store/update to keep public endpoints working)
     Route::apiResource('customers', CustomerController::class)->except(['store', 'update']);
     Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+    Route::get('customers/{customer}/point-history', [CustomerController::class, 'getPointHistory']);
 
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);

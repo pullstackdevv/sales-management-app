@@ -125,7 +125,7 @@ class CustomerPoint extends Model
         }
         
         $this->save();
-        $this->checkAndUpdateTier();
+        // Tier update removed - will be handled by scheduled cronjob (loyalty:update-tiers)
     }
 
     public function checkAndUpdateTier(): void

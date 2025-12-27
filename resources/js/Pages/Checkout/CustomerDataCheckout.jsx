@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, Plus, X, User, MapPin, Phone, Mail, UserPlus, Search, Trash2 } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
+import customerSession from '../../utils/customerSession';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
@@ -151,8 +152,22 @@ const CustomerDataCheckout = () => {
 
     setProductData(checkoutData.product);
 
-    // Jika sudah ada data customer, isi form
-    if (checkoutData.customer) {
+    // Check customerSession first (priority)
+    const customerSessionData = customerSession.get();
+    if (customerSessionData && customerSessionData.customer_id) {
+      // Customer already logged in via customerSession
+      setCustomerType('existing');
+      setSelectedCustomer({
+        id: customerSessionData.customer_id,
+        customer_id: customerSessionData.customer_id,
+        name: customerSessionData.name,
+        phone: customerSessionData.phone,
+        email: customerSessionData.email,
+        whatsapp: customerSessionData.phone
+      });
+      fetchCustomerAddressesFromSession(customerSessionData.customer_id);
+    } else if (checkoutData.customer) {
+      // Fallback to checkoutSession customer data
       if (checkoutData.customer.customer_id) {
         // Existing customer
         setCustomerType('existing');
@@ -186,7 +201,7 @@ const CustomerDataCheckout = () => {
       }
       // Sync minimal server session even if address belum terpilih
       try {
-        const base = checkoutData.customer;
+        const base = customerSessionData || checkoutData.customer;
         syncServerCustomerSession({
           customer_id: base.customer_id || base.id,
           name: base.name || '',
@@ -415,6 +430,18 @@ const CustomerDataCheckout = () => {
 
       if (response.data.status === 'success' && response.data.data) {
         const verifiedCustomer = response.data.data;
+        
+        // Save to customerSession for global use (Profile, MyOrders, etc)
+        customerSession.setVerified(
+          verifiedCustomer.id,
+          verificationMethod,
+          verificationValue.trim(),
+          {
+            name: verifiedCustomer.name,
+            email: verifiedCustomer.email,
+            phone: verifiedCustomer.phone
+          }
+        );
         
         // Verified, proceed with customer selection
         setSelectedCustomer(verifiedCustomer);

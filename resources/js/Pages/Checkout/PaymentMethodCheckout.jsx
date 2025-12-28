@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, CheckCircle, CreditCard } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, CreditCard, RefreshCw } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
 import { formatCurrency } from '../../utils/helpers';
@@ -741,8 +741,18 @@ const PaymentMethodCheckout = () => {
                     <span className="font-medium">Rp {checkoutData.product.subtotal.toLocaleString('id-ID')}</span>
                   </div>
 
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Ongkos Kirim</span>
+                  <div className="flex justify-between text-sm items-center">
+                    <span className="text-gray-600 flex items-center gap-2">
+                      Ongkos Kirim
+                      <button
+                        onClick={fetchCourierRates}
+                        disabled={loadingShipping}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                        title="Reload Ongkir"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingShipping ? 'animate-spin' : ''}`} />
+                      </button>
+                    </span>
                     <span className="font-medium">
                       {loadingShipping ? (
                         <span className="text-xs text-gray-400">Menghitung...</span>
@@ -988,11 +998,15 @@ const PaymentMethodCheckout = () => {
 
                 <button
                   onClick={handleContinue}
-                  disabled={submitting}
+                  disabled={submitting || loadingShipping || loadingVoucher}
                   className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {submitting ? (
                     'Memproses...'
+                  ) : loadingShipping ? (
+                    'Menghitung Ongkir...'
+                  ) : loadingVoucher ? (
+                    'Memvalidasi Voucher...'
                   ) : (
                     <>
                       Lanjutkan ke Pembayaran

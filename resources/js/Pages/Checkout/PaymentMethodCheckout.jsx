@@ -1021,7 +1021,7 @@ const PaymentMethodCheckout = () => {
                         ? (settings.social_whatsapp_url.includes('?') 
                             ? settings.social_whatsapp_url 
                             : `${settings.social_whatsapp_url}?text=${encodeURIComponent('Halo Admin, saya mau order tapi ongkir tidak muncul')}`)
-                        : 'https://wa.me/6281234567890?text=Halo%20Admin,%20saya%20mau%20order%20tapi%20ongkir%20tidak%20muncul';
+                        : 'https://wa.me/6283867000077?text=Halo%20Admin,%20saya%20mau%20order%20tapi%20ongkir%20tidak%20muncul';
                       window.open(waUrl, '_blank');
                     }}
                     className="w-full bg-green-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center justify-center"

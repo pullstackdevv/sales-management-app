@@ -28,15 +28,47 @@ export default function ProductData() {
   const [stockHistoryModal, setStockHistoryModal] = useState({ isOpen: false, variant: null });
   const [stockAdjustmentModal, setStockAdjustmentModal] = useState({ isOpen: false, variant: null });
 
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedTag, setSelectedTag] = useState("");
+  const [filterNoBasePrice, setFilterNoBasePrice] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
+
+  // Fetch categories and tags on mount
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const [catRes, tagRes] = await Promise.all([
+          api.get('/product-categories?per_page=1000&is_active=1'),
+          api.get('/tags?per_page=1000&is_active=1')
+        ]);
+        setCategories(catRes.data.data.data || []);
+        setTags(tagRes.data.data.data || []);
+      } catch (error) {
+        console.error("Error fetching filters:", error);
+      }
+    };
+    fetchFilters();
+  }, []);
+
   // Fetch products from API
-  const fetchProducts = async (searchTerm = "", categoryFilter = "", page = 1) => {
+  const fetchProducts = async (page = 1, overrides = {}) => {
     try {
       setLoading(true);
+      
+      // Determine values to use (override or current state)
+      const searchTerm = overrides.search !== undefined ? overrides.search : search;
+      const catFilter = overrides.category !== undefined ? overrides.category : selectedCategory;
+      const tagFilter = overrides.tag !== undefined ? overrides.tag : selectedTag;
+      const noBasePriceFilter = overrides.noBasePrice !== undefined ? overrides.noBasePrice : filterNoBasePrice;
+
       const params = {
         page,
         per_page: 10,
         ...(searchTerm && { search: searchTerm }),
-        ...(categoryFilter && { category: categoryFilter })
+        ...(catFilter && { category_ids: catFilter }),
+        ...(tagFilter && { tag_ids: tagFilter }),
+        ...(noBasePriceFilter && { no_base_price: 1 })
       };
 
       const response = await api.get("/products", { params });
@@ -69,7 +101,7 @@ export default function ProductData() {
           showConfirmButton: false,
           timer: 1500
         });
-        fetchProducts(search, category); // Refresh data
+        fetchProducts(pagination?.current_page || 1); // Refresh data
       } catch (error) {
         console.error("Error deleting product:", error);
         Swal.fire({
@@ -85,7 +117,7 @@ export default function ProductData() {
   const handleSearch = (e) => {
     const searchTerm = e.target.value;
     setSearch(searchTerm);
-    fetchProducts(searchTerm, category);
+    fetchProducts(1, { search: searchTerm });
   };
 
   const handleImportClick = () => {
@@ -135,7 +167,7 @@ export default function ProductData() {
           } else {
             Swal.fire({ icon: "success", title: "Berhasil", text: `Impor produk selesai. Imported: ${importedCount || 0}` });
           }
-          fetchProducts(search, category);
+          fetchProducts(pagination?.current_page || 1);
         } else if (status === "failed") {
           clearInterval(interval);
           setImporting(false);
@@ -194,13 +226,13 @@ export default function ProductData() {
   };
 
   const handleStockAdjustmentSuccess = () => {
-    fetchProducts(search, category); // Refresh data
+    fetchProducts(pagination?.current_page || 1); // Refresh data
   };
 
   const handlePageChange = (page) => {
     const last = pagination?.last_page || 1;
     const target = Math.max(1, Math.min(page, last));
-    fetchProducts(search, category, target);
+    fetchProducts(target);
   };
 
   const getPageSlots = (current, last) => {
@@ -218,7 +250,7 @@ export default function ProductData() {
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(1);
   }, []);
 
   // Format currency
@@ -258,14 +290,67 @@ export default function ProductData() {
           </div>
         </div>
 
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Cari nama, SKU, atau scan barcode..."
-            className="w-full border px-4 py-2 rounded-md text-sm"
-            value={search}
-            onChange={handleSearch}
-          />
+        <div className="mb-4 space-y-3">
+         
+          <div className="flex flex-wrap gap-4 items-center">
+            {/* Category Filter */}
+            <select 
+                className="border px-4 py-2 rounded-md text-sm min-w-[200px] bg-white"
+                value={selectedCategory}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCategory(val);
+                    fetchProducts(1, { category: val });
+                }}
+            >
+                <option value="">Semua Kategori</option>
+                {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+            </select>
+
+            {/* Tag Filter */}
+            <select 
+                className="border px-4 py-2 rounded-md text-sm min-w-[200px] bg-white"
+                value={selectedTag}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedTag(val);
+                    fetchProducts(1, { tag: val });
+                }}
+            >
+                <option value="">Semua Tag</option>
+                {tags.map(tag => (
+                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                ))}
+            </select>
+
+             {/* No Base Price Filter */}
+             <label className="flex items-center gap-2 text-sm cursor-pointer select-none bg-white border px-3 py-2 rounded-md hover:bg-gray-50">
+                <input 
+                    type="checkbox" 
+                    checked={filterNoBasePrice}
+                    onChange={(e) => {
+                        const val = e.target.checked;
+                        setFilterNoBasePrice(val);
+                        fetchProducts(1, { noBasePrice: val });
+                    }}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                />
+                <span className={filterNoBasePrice ? "font-medium text-blue-600" : "text-gray-700"}>
+                  Tanpa Harga Modal
+                </span>
+             </label>
+          </div>
+           <div className="flex gap-4">
+            <input
+              type="text"
+              placeholder="Cari nama, SKU, atau scan barcode..."
+              className="w-full border px-4 py-2 rounded-md text-sm"
+              value={search}
+              onChange={handleSearch}
+            />
+          </div>
         </div>
 
         <div className="bg-white rounded-md shadow-sm divide-y">

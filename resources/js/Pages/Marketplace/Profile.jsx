@@ -321,6 +321,10 @@ export default function Profile() {
     const points = loyaltyData?.points;
     const progress = loyaltyData?.progress;
     const transactions = loyaltyData?.transactions || [];
+    
+    // Get tier color or fallback to pink
+    const tierColor = tier?.color || '#ec4899';
+    const tierColorLight = tier?.color ? `${tier.color}20` : '#fce7f3';
 
     return (
         <MarketplaceLayout>
@@ -339,8 +343,13 @@ export default function Profile() {
                 {/* Profile Card */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 flex flex-col sm:flex-row items-start sm:items-center mb-6">
                     <div className="relative">
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-2xl font-bold">
-                            {customer.name?.charAt(0)?.toUpperCase() || 'U'}
+                        <div 
+                            className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+                            style={{
+                                background: `linear-gradient(135deg, ${tierColor}dd, ${tierColor})`
+                            }}
+                        >
+                            {customer?.name?.charAt(0)?.toUpperCase() || 'U'}
                         </div>
                     </div>
                     <div className="flex-1 sm:ml-5 mt-4 sm:mt-0">
@@ -360,7 +369,12 @@ export default function Profile() {
 
                 {/* Loyalty Points Card */}
                 {loyaltyData?.settings?.is_active && (
-                    <div className="bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg shadow-sm p-5 mb-6 text-white">
+                    <div 
+                        className="rounded-lg shadow-sm p-5 mb-6 text-white"
+                        style={{
+                            background: `linear-gradient(135deg, ${tierColor}dd, ${tierColor})`
+                        }}
+                    >
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
                                 <Award className="w-6 h-6" />
@@ -369,7 +383,11 @@ export default function Profile() {
                             {tier && (
                                 <span 
                                     className="px-3 py-1 rounded-full text-xs font-medium"
-                                    style={{ backgroundColor: tier.color || '#fff', color: '#000' }}
+                                    style={{ 
+                                        backgroundColor: 'rgba(255, 255, 255, 0.9)', 
+                                        color: tierColor,
+                                        fontWeight: '600'
+                                    }}
                                 >
                                     {tier.name}
                                 </span>
@@ -377,18 +395,18 @@ export default function Profile() {
                         </div>
 
                         <div className="text-center mb-4">
-                            <p className="text-4xl font-bold">{points?.current?.toLocaleString() || 0}</p>
-                            <p className="text-pink-100 text-sm">Poin Tersedia</p>
+                            <p className="text-4xl font-bold">{points?.current?.toLocaleString('id-ID') || 0}</p>
+                            <p className="text-white/80 text-sm">Poin Tersedia</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 text-center text-sm">
                             <div className="bg-white/10 rounded-lg p-3">
-                                <p className="text-pink-100">Total Poin</p>
-                                <p className="font-semibold">{points?.lifetime?.toLocaleString() || 0}</p>
+                                <p className="text-white/80">Total Poin</p>
+                                <p className="font-semibold">{points?.lifetime?.toLocaleString('id-ID') || 0}</p>
                             </div>
                             <div className="bg-white/10 rounded-lg p-3">
-                                <p className="text-pink-100">Belanja Tahun Ini</p>
-                                <p className="font-semibold">{formatRupiah(points?.annual_spend)}</p>
+                                <p className="text-white/80">Belanja Tahun Ini</p>
+                                <p className="font-semibold">{formatRupiah(points?.annual_spend || 0)}</p>
                             </div>
                         </div>
 
@@ -408,20 +426,20 @@ export default function Profile() {
                                         style={{ width: `${progress.percentage}%` }}
                                     />
                                 </div>
-                                <p className="text-xs text-pink-100 mt-2">
-                                    Belanja {formatRupiah(progress.remaining)} lagi untuk naik tier
+                                <p className="text-xs text-white/80 mt-2">
+                                    Belanja {formatRupiah(progress.remaining || 0)} lagi untuk naik tier
                                 </p>
                             </div>
                         )}
 
                         {/* Tier Benefits */}
-                        {tier?.benefits?.length > 0 && (
+                        {tier?.benefits && Array.isArray(tier.benefits) && tier.benefits.length > 0 && (
                             <div className="mt-4 pt-4 border-t border-white/20">
                                 <p className="text-sm font-medium mb-2 flex items-center gap-1">
                                     <Gift className="w-4 h-4" />
                                     Keuntungan {tier.name}
                                 </p>
-                                <ul className="text-sm text-pink-100 space-y-1">
+                                <ul className="text-sm text-white/80 space-y-1">
                                     {tier.benefits.slice(0, 3).map((benefit, idx) => (
                                         <li key={idx} className="flex items-center gap-2">
                                             <Star className="w-3 h-3" />
@@ -465,7 +483,7 @@ export default function Profile() {
                 <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">Riwayat Pemesanan</h3>
-                        <Link href="/orders" className="text-sm text-pink-600 hover:text-pink-700 flex items-center gap-1">
+                        <Link href="/orders" className="text-sm hover:underline flex items-center gap-1" style={{ color: tierColor }}>
                             Lihat semua <ChevronRight className="w-4 h-4" />
                         </Link>
                     </div>

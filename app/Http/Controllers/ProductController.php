@@ -45,6 +45,11 @@ class ProductController extends Controller
                     $q->whereIn('tags.id', $ids);
                 });
             })
+            ->when($request->no_base_price, function($query) {
+                $query->whereHas('variants', function($q) {
+                    $q->whereNull('base_price')->orWhere('base_price', 0);
+                });
+            })
             ->when($request->category, function($query, $category) {
                 $query->where('category', $category);
             })

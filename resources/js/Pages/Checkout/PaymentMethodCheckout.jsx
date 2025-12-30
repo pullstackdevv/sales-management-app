@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, CheckCircle, CreditCard } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, CreditCard, RefreshCw, MessageCircle } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
 import { formatCurrency } from '../../utils/helpers';
@@ -33,6 +33,8 @@ const PaymentMethodCheckout = () => {
   const [promotions, setPromotions] = useState([]);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
   const [notes, setNotes] = useState('');
+  const [settings, setSettings] = useState(null);
+
 
   useEffect(() => {
     // Ambil data checkout dari session
@@ -76,6 +78,20 @@ const PaymentMethodCheckout = () => {
       });
     }
   }, [checkoutData]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await axios.get('/api/general-settings/public');
+        if (res.data?.success) setSettings(res.data.data);
+        console.log(res)
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
+  }, []);
+
 
   // Function to fetch courier rates from API
   const fetchCourierRates = async () => {
@@ -730,6 +746,7 @@ const PaymentMethodCheckout = () => {
     );
   }
 
+
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
@@ -852,8 +869,18 @@ const PaymentMethodCheckout = () => {
                     <span className="font-medium">Rp {checkoutData.product.subtotal.toLocaleString('id-ID')}</span>
                   </div>
 
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Ongkos Kirim</span>
+                  <div className="flex justify-between text-sm items-center">
+                    <span className="text-gray-600 flex items-center gap-2">
+                      Ongkos Kirim
+                      <button
+                        onClick={fetchCourierRates}
+                        disabled={loadingShipping}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                        title="Reload Ongkir"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingShipping ? 'animate-spin' : ''}`} />
+                      </button>
+                    </span>
                     <span className="font-medium">
                       {loadingShipping ? (
                         <span className="text-xs text-gray-400">Menghitung...</span>
@@ -1105,7 +1132,7 @@ const PaymentMethodCheckout = () => {
                   </div>
 
                   <hr className="my-3" />
-                  
+
                   <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
                     <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
@@ -1125,20 +1152,42 @@ const PaymentMethodCheckout = () => {
 
 
 
-                <button
-                  onClick={handleContinue}
-                  disabled={submitting}
-                  className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {submitting ? (
-                    'Memproses...'
-                  ) : (
-                    <>
-                      Lanjutkan ke Pembayaran
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </button>
+                {/* Button Logic */}
+                {courierRates.length === 0 && !loadingShipping && shippingCost === 0 ? (
+                  <button
+                    onClick={() => {
+                      const waUrl = settings?.social_whatsapp_url 
+                        ? (settings.social_whatsapp_url.includes('?') 
+                            ? settings.social_whatsapp_url 
+                            : `${settings.social_whatsapp_url}?text=${encodeURIComponent('Halo Admin, saya mau order tapi ongkir tidak muncul')}`)
+                        : 'https://wa.me/6283867000077?text=Halo%20Admin,%20saya%20mau%20order%20tapi%20ongkir%20tidak%20muncul';
+                      window.open(waUrl, '_blank');
+                    }}
+                    className="w-full bg-green-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center justify-center"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Hubungi Admin (Ongkir Tidak Tersedia)
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleContinue}
+                    disabled={submitting || loadingShipping || loadingVoucher}
+                    className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {submitting ? (
+                      'Memproses...'
+                    ) : loadingShipping ? (
+                      'Menghitung Ongkir...'
+                    ) : loadingVoucher ? (
+                      'Memvalidasi Voucher...'
+                    ) : (
+                      <>
+                        Lanjutkan ke Pembayaran
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -465,10 +465,25 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                             <span>Rp{formatRupiah(orderData.shipping_cost)}</span>
                                         </div>
                                         {orderData.voucher?.code ? (
-                                            <div className="flex justify-between text-sm">
-                                                <span>Voucher {orderData.voucher.code}</span>
-                                                <span>{orderData.voucher.type === 'percentage' ? `${orderData.voucher.value}%` : `Rp${formatRupiah(orderData.voucher.value)}`}</span>
-                                            </div>
+                                            <>
+                                                <div className="flex justify-between text-sm">
+                                                    <span>Voucher {orderData.voucher.code}</span>
+                                                    <span>
+                                                        {orderData.voucher.type === 'percentage' && `${orderData.voucher.value}%`}
+                                                        {orderData.voucher.type === 'fixed' && `- Rp${formatRupiah(orderData.voucher.value)}`}
+                                                        {(orderData.voucher.type === 'shipping' || orderData.voucher.type === 'shipping_free_sample') && (
+                                                            `- Rp${formatRupiah(orderData.voucher.value)} (Ongkir)`
+                                                        )}
+                                                        {orderData.voucher.type === 'free_sample' && 'Free Product'}
+                                                    </span>
+                                                </div>
+                                                {(orderData.voucher.type === 'free_sample' || orderData.voucher.type === 'shipping_free_sample') && (
+                                                    <div className="flex justify-between text-sm text-green-600">
+                                                        <span>Bonus: {orderData.voucher.free_product_name}</span>
+                                                        <span>Gratis</span>
+                                                    </div>
+                                                )}
+                                            </>
                                         ) : orderData.discount_amount > 0 ? (
                                             <div className="flex justify-between text-sm">
                                                 <span>Diskon Manual</span>

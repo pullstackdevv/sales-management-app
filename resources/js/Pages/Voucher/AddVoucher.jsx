@@ -41,14 +41,21 @@ const AddVoucher = () => {
             };
             payload.minimum_amount = data.minimum_amount ?? data.min_purchase ?? 0;
             if (payload.type === 'percentage') {
-                payload.maximum_discount = (data.maximum_discount ?? null);
+                // If maximum_discount is 0 or empty, send null to backend (no limit)
+                const maxDisc = data.maximum_discount ? Number(data.maximum_discount) : 0;
+                payload.maximum_discount = maxDisc > 0 ? maxDisc : null;
             } else {
                 delete payload.maximum_discount;
             }
             delete payload.min_purchase;
             delete payload.max_discount;
-            if (payload.type === 'free_sample') {
+            if (payload.type === 'free_sample' || payload.type === 'shipping_free_sample') {
                 payload.value = payload.value ? Number(payload.value) : 1;
+            }
+
+            // Ensure value is numeric for other types
+            if (payload.type !== 'free_sample' && payload.type !== 'shipping_free_sample') {
+                payload.value = Number(payload.value);
             }
 
             const response = await axios.post('/api/vouchers', payload);
@@ -253,7 +260,7 @@ const AddVoucher = () => {
                                 {voucherType !== "free_sample" && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            {voucherType === "shipping" || "shipping_free_sample" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
+                                            {voucherType === "shipping" || voucherType === "shipping_free_sample" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
                                         </label>
                                         <div className="relative">
                                             {voucherType === "percentage" && (

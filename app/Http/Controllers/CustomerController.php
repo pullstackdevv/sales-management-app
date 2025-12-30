@@ -97,6 +97,9 @@ class CustomerController extends Controller
             $customerData['created_by'] = Auth::id() ?? null; // Allow null for public API
             $customer = Customer::create($customerData);
 
+            // Create loyalty points with default tier for new customer
+            $customer->getLoyaltyPoint();
+
             // Create addresses if provided
             if (isset($validated['addresses']) && !empty($validated['addresses'])) {
                 foreach ($validated['addresses'] as $index => $addressData) {
@@ -120,7 +123,7 @@ class CustomerController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Customer created successfully',
-                'data' => $customer->fresh()->load(['addresses', 'createdBy'])
+                'data' => $customer->fresh()->load(['addresses', 'createdBy', 'loyaltyPoints.tier'])
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -723,6 +726,9 @@ class CustomerController extends Controller
                 'is_active' => true,
             ]);
 
+            // Create loyalty points with default tier for new customer
+            $customer->getLoyaltyPoint();
+
             // Create addresses if provided
             if (!empty($validated['addresses'])) {
                 foreach ($validated['addresses'] as $index => $addressData) {
@@ -742,7 +748,7 @@ class CustomerController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'data' => $customer->load('addresses'),
+                'data' => $customer->load(['addresses', 'loyaltyPoints.tier']),
                 'message' => 'Customer berhasil dibuat'
             ], 201);
         } catch (\Exception $e) {

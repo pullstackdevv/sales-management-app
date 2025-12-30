@@ -741,6 +741,7 @@ export default function AddOrder() {
             // Update quantity if item already exists
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
+            updatedItems[existingItemIndex].price = (variant.discount_price && Number(variant.discount_price) > 0) ? Number(variant.discount_price) : Number(variant.price);
             setOrderItems(updatedItems);
 
         } else {
@@ -766,7 +767,7 @@ export default function AddOrder() {
                 variant_weight: variant.weight,
                 variant_stock: variant.stock,
                 quantity: 1,
-                price: variant.price
+                price: (variant.discount_price && Number(variant.discount_price) > 0) ? Number(variant.discount_price) : Number(variant.price)
             };
             setOrderItems(prev => [...prev, newItem]);
         }
@@ -1316,7 +1317,14 @@ export default function AddOrder() {
                                                             <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">Rp {formatIDR(variant.price)}</span>
+                                                            {variant.discount_price && Number(variant.discount_price) > 0 ? (
+                                                                <div className="flex flex-col items-end mr-2">
+                                                                    <span className="text-sm font-medium text-red-600">Rp {formatIDR(variant.discount_price)}</span>
+                                                                    <span className="text-xs text-gray-400 line-through">Rp {formatIDR(variant.price)}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-sm font-medium">Rp {formatIDR(variant.price)}</span>
+                                                            )}
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
                                                                 disabled={variant.stock <= 0}

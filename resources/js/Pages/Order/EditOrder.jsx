@@ -62,11 +62,6 @@ export default function EditOrder() {
     // Error states
     const [errors, setErrors] = useState({});
     const [cancelling, setCancelling] = useState(false);
-    const [voucherCode, setVoucherCode] = useState('');
-    const [voucher, setVoucher] = useState(null);
-    const [discountAmount, setDiscountAmount] = useState(0);
-    const [voucherLoading, setVoucherLoading] = useState(false);
-    const [voucherError, setVoucherError] = useState('');
 
     const formatRupiah = (num) => {
         if (!num || num === 0) return '';
@@ -81,16 +76,6 @@ export default function EditOrder() {
     const formatIDR = (num) => {
         const n = Number(num || 0);
         return n.toLocaleString('id-ID', { maximumFractionDigits: 0 });
-    };
-
-    const getVoucherLabel = (v) => {
-        const t = (v?.type || '').toString();
-        if (t === 'shipping') return 'Diskon Ongkir';
-        if (t === 'percentage') return 'Diskon Persentase';
-        if (t === 'fixed') return 'Diskon';
-        if (t === 'free_sample') return 'Gratis Sample';
-        if (t === 'shipping_free_sample') return 'Diskon Ongkir + Sample';
-        return 'Diskon';
     };
 
     // Fetch existing order data
@@ -122,9 +107,7 @@ export default function EditOrder() {
                 origin_setting_id: order.origin_setting_id ? String(order.origin_setting_id) : ''
             });
 
-            setVoucher(null);
-            setVoucherCode('');
-            setDiscountAmount(0);
+          
             
             // Set order items with complete variant details
             setOrderItems(order.items?.map(item => ({
@@ -318,6 +301,7 @@ export default function EditOrder() {
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
             updatedItems[existingItemIndex].variant_stock = additionalAvailable - 1;
+            updatedItems[existingItemIndex].price = (variant.discount_price && Number(variant.discount_price) > 0) ? Number(variant.discount_price) : Number(variant.price);
             setOrderItems(updatedItems);
         } else {
             if (variant.stock <= 0) {
@@ -339,7 +323,7 @@ export default function EditOrder() {
                 variant_weight: variant.weight,
                 variant_stock: Math.max(0, (variant.stock || 0) - 1),
                 quantity: 1,
-                price: variant.price
+                price: (variant.discount_price && Number(variant.discount_price) > 0) ? Number(variant.discount_price) : Number(variant.price)
             };
             setOrderItems(prev => [...prev, newItem]);
         }
@@ -499,38 +483,6 @@ export default function EditOrder() {
         const district = dest?.district || '';
         calculateShippingCostFromRate(courierRates, district, idx);
         setIsShippingCostManuallyEdited(false);
-    };
-
-    const validateVoucher = async () => {
-        setVoucherError('');
-        if (!voucherCode.trim()) return;
-        if (isWebOrder()) return;
-        setVoucherLoading(true);
-        try {
-            const response = await axios.post('/api/vouchers/validate', {
-                code: voucherCode.trim(),
-                order_amount: calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0),
-                shipping_cost: parseFloat(formData.shipping_cost) || 0
-            });
-            if (response.data.status === 'success') {
-                const data = response.data.data || {};
-                setVoucher(data.voucher || null);
-                setDiscountAmount(data.discount_amount || 0);
-                Swal.fire({ icon: 'success', title: 'Voucher diterapkan', timer: 1200, showConfirmButton: false });
-            } else {
-                setVoucher(null);
-                setDiscountAmount(0);
-                setVoucherError(response.data.message || 'Voucher tidak valid');
-            }
-        } catch (error) {
-            setVoucher(null);
-            setDiscountAmount(0);
-            const msg = error.response?.data?.message || 'Voucher tidak valid';
-            setVoucherError(msg);
-            Swal.fire({ icon: 'error', title: 'Voucher gagal', text: msg });
-        } finally {
-            setVoucherLoading(false);
-        }
     };
 
     // Handle form submission
@@ -1148,7 +1100,14 @@ console.log(formData)
                                                             <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                                            {variant.discount_price && Number(variant.discount_price) > 0 ? (
+                                                                <div className="flex flex-col items-end mr-2">
+                                                                    <span className="text-sm font-medium text-red-600">Rp {formatIDR(variant.discount_price)}</span>
+                                                                    <span className="text-xs text-gray-400 line-through">Rp {formatIDR(variant.price)}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-sm font-medium">Rp {formatIDR(variant.price)}</span>
+                                                            )}
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
                                                                 disabled={variant.stock <= 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
@@ -1189,7 +1148,7 @@ console.log(formData)
                                             <div className="flex-1">
                                                 <h4 className="font-medium">{item.product_name}</h4>
                                                 <p className="text-sm text-gray-500">{item.variant_name}</p>
-                                                <p className="text-sm font-medium text-blue-600">Rp {item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                                <p className="text-sm font-medium text-blue-600">Rp {formatIDR(item.price)}</p>
                                             </div>
                                             
                                             <div className="flex items-center gap-3">
@@ -1271,56 +1230,7 @@ console.log(formData)
                         {/* Summary */}
                         <div className="bg-white p-4 rounded-lg border space-y-4">
                             <h3 className="font-medium mb-4">Ringkasan Order</h3>
-                            {!isWebOrder() && (
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-gray-700">Kode Diskon</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={voucherCode}
-                                            onChange={(e) => setVoucherCode(e.target.value)}
-                                            placeholder="Masukkan kode voucher (opsional) misal : DISKON100"
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={validateVoucher}
-                                            disabled={voucherLoading || !voucherCode.trim()}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-400"
-                                        >
-                                            {voucherLoading ? 'Memeriksa...' : 'Gunakan'}
-                                        </button>
-                                        {voucher && (
-                                            <button
-                                                type="button"
-                                                onClick={() => { setVoucher(null); setDiscountAmount(0); setVoucherCode(''); setVoucherError(''); }}
-                                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg"
-                                            >
-                                                Hapus
-                                            </button>
-                                        )}
-                                    </div>
-                                    {voucherError && (
-                                        <p className="text-red-500 text-xs mt-1">{voucherError}</p>
-                                    )}
-                                    {voucher && (
-                                        <div className="mt-2 border rounded-lg p-3 bg-green-50 text-sm">
-                                            <div className="flex items-start justify-between">
-                                                <div className="space-y-1">
-                                                    <p className="font-semibold text-green-700">{voucher.code}</p>
-                                                    <p className="text-green-600">- {getVoucherLabel(voucher)}</p>
-                                                    {voucher.type === 'shipping' && (
-                                                        <p className="font-medium text-orange-600 flex items-center gap-1"><span>🚚</span> Potongan Ongkir</p>
-                                                    )}
-                                                    <p className="text-gray-700">{voucher.description || ''}</p>
-                                                    <p className="text-green-700 font-semibold">Diskon: Rp {formatIDR(discountAmount)}</p>
-                                                </div>
-                                                <button type="button" onClick={() => { setVoucher(null); setDiscountAmount(0); setVoucherCode(''); setVoucherError(''); }} className="text-red-600">✕</button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+                            
                             
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Subtotal ({orderItems.length} item)</span>

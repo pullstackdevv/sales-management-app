@@ -53,8 +53,37 @@ class ProductController extends Controller
             ->when($request->category, function($query, $category) {
                 $query->where('category', $category);
             })
+            ->when($request->has_discount, function($query, $hasDiscount) {
+                if ($hasDiscount) {
+                    $query->whereHas('variants', function($q) {
+                        $q->whereNotNull('discount_price')->where('discount_price', '>', 0);
+                    });
+                }
+            })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
-                $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
+                $direction = $request->sort_direction ?? 'asc';
+                switch ($sortBy) {
+                    case 'stock':
+                        $query->orderBy(
+                            \DB::raw('(SELECT SUM(stock) FROM product_variants WHERE product_variants.product_id = products.id)'),
+                            $direction
+                        );
+                        break;
+                    case 'price':
+                        $query->orderBy(
+                            \DB::raw('(SELECT MIN(price) FROM product_variants WHERE product_variants.product_id = products.id)'),
+                            $direction
+                        );
+                        break;
+                    case 'name':
+                        $query->orderBy('name', $direction);
+                        break;
+                    case 'created_at':
+                        $query->orderBy('created_at', $direction);
+                        break;
+                    default:
+                        $query->orderBy($sortBy, $direction);
+                }
             }, function ($query) {
                 $query->latest();
             })

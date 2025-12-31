@@ -31,6 +31,8 @@ export default function ProductData() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedTag, setSelectedTag] = useState("");
   const [filterNoBasePrice, setFilterNoBasePrice] = useState(false);
+  const [filterHasDiscount, setFilterHasDiscount] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
 
@@ -61,6 +63,8 @@ export default function ProductData() {
       const catFilter = overrides.category !== undefined ? overrides.category : selectedCategory;
       const tagFilter = overrides.tag !== undefined ? overrides.tag : selectedTag;
       const noBasePriceFilter = overrides.noBasePrice !== undefined ? overrides.noBasePrice : filterNoBasePrice;
+      const hasDiscountFilter = overrides.hasDiscount !== undefined ? overrides.hasDiscount : filterHasDiscount;
+      const currentSort = overrides.sort !== undefined ? overrides.sort : sortConfig;
 
       const params = {
         page,
@@ -68,7 +72,10 @@ export default function ProductData() {
         ...(searchTerm && { search: searchTerm }),
         ...(catFilter && { category_ids: catFilter }),
         ...(tagFilter && { tag_ids: tagFilter }),
-        ...(noBasePriceFilter && { no_base_price: 1 })
+        ...(noBasePriceFilter && { no_base_price: 1 }),
+        ...(hasDiscountFilter && { has_discount: 1 }),
+        sort_by: currentSort.key,
+        sort_direction: currentSort.direction
       };
 
       const response = await api.get("/products", { params });
@@ -262,6 +269,34 @@ export default function ProductData() {
     }).format(amount);
   };
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    fetchProducts(1, { sort: { key, direction } });
+  };
+
+  const SortHeader = ({ label, sortKey }) => (
+  <button 
+    onClick={() => handleSort(sortKey)}
+    className="flex items-center gap-2 hover:text-gray-800 transition-colors focus:outline-none group"
+  >
+    <span className="font-medium">{label}</span>
+    <div className="flex items-center gap-1 text-gray-400 group-hover:text-gray-600">
+      <Icon 
+        icon="mdi:arrow-up"
+        className={`text-sm transition-colors ${sortConfig.key === sortKey && sortConfig.direction === 'asc' ? "text-blue-600" : ""}`} 
+      />
+      <Icon 
+        icon="mdi:arrow-down" 
+        className={`text-sm transition-colors ${sortConfig.key === sortKey && sortConfig.direction === 'desc' ? "text-blue-600" : ""}`} 
+      />
+    </div>
+  </button>
+  );
+
   return (
     <DashboardLayout>
       <div className="p-6">
@@ -341,6 +376,23 @@ export default function ProductData() {
                   Tanpa Harga Modal
                 </span>
              </label>
+
+             {/* Has Discount Filter */}
+             <label className="flex items-center gap-2 text-sm cursor-pointer select-none bg-white border px-3 py-2 rounded-md hover:bg-gray-50">
+                <input 
+                    type="checkbox" 
+                    checked={filterHasDiscount}
+                    onChange={(e) => {
+                        const val = e.target.checked;
+                        setFilterHasDiscount(val);
+                        fetchProducts(1, { hasDiscount: val });
+                    }}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                />
+                <span className={filterHasDiscount ? "font-medium text-blue-600" : "text-gray-700"}>
+                  Sedang Diskon
+                </span>
+             </label>
           </div>
            <div className="flex gap-4">
             <input
@@ -356,13 +408,21 @@ export default function ProductData() {
         <div className="bg-white rounded-md shadow-sm divide-y">
           <div className="grid grid-cols-12 items-center px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50">
             <div className="col-span-1">Gambar</div>
-            <div className="col-span-3">Produk & Harga</div>
-            <div className="col-span-1">Stok</div>
+            <div className="col-span-3 flex items-center gap-4">
+                <SortHeader label="Produk" sortKey="name" />
+                <span className="text-gray-300">|</span>
+                <SortHeader label="Harga" sortKey="price" />
+            </div>
+            <div className="col-span-1">
+                <SortHeader label="Stok" sortKey="stock" />
+            </div>
             <div className="col-span-1">Varian</div>
             <div className="col-span-2">Kategori</div>
             <div className="col-span-1">Tag</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-1">Storefront</div>
+            <div className="col-span-1">
+                <SortHeader label="Storefront" sortKey="is_storefront" />
+            </div>
             <div className="col-span-1 flex justify-center">Aksi</div>
           </div>
 

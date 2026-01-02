@@ -1042,7 +1042,7 @@ const BannerRotator = ({ bannerUrls }) => {
 
     return (
         <div className="relative group">
-            <div className="relative overflow-hidden rounded-xl shadow-lg h-[120px] lg:h-[250px]">
+            <div className="relative overflow-hidden rounded-xl shadow-lg w-full aspect-[4/1]">
                 <img
                     key={`current-${index}`}
                     src={bannerUrls[index]}

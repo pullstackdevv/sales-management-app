@@ -717,13 +717,47 @@ class ReportController extends Controller
             ->get()
             ->keyBy('payment_bank_id');
 
+        // Get Midtrans transaction data from Orders
+        // Midtrans transactions are identified by payment_url containing 'midtrans' or 'snap'
+        $midtransData = Order::whereIn('status', ['paid', 'shipped', 'processing', 'delivered'])
+            ->where(function($q) {
+                $q->where('payment_url', 'like', '%midtrans%')
+                  ->orWhere('payment_url', 'like', '%snap%');
+            })
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->select(
+                DB::raw('COUNT(*) as transaction_count'),
+                DB::raw('SUM(total_price) as total_amount')
+            )
+            ->first();
+
         $totalTransactions = $transactionData->sum('transaction_count');
         $totalAmount = $transactionData->sum('total_amount');
 
-        $bankList = $allBanks->map(function ($bank) use ($transactionData, $totalTransactions) {
+        if ($midtransData) {
+            $totalTransactions += $midtransData->transaction_count;
+            $totalAmount += $midtransData->total_amount;
+        }
+
+        $bankList = $allBanks->map(function ($bank) use ($transactionData, $totalTransactions, $midtransData) {
             $data = $transactionData->get($bank->id);
             $transactionCount = $data ? $data->transaction_count : 0;
             $amount = $data ? $data->total_amount : 0;
+
+            // Handle Website Payment bank
+            if (strtolower($bank->bank_name) === 'website payment') {
+                // Reset manual transactions for Website Payment to avoid duplicates/errors
+                // We strictly only want Midtrans automated transactions here
+                $transactionCount = 0;
+                $amount = 0;
+
+                // Add Midtrans data if available
+                if ($midtransData) {
+                    $transactionCount = $midtransData->transaction_count;
+                    $amount = $midtransData->total_amount;
+                }
+            }
+
             $percentage = $totalTransactions > 0 ? ($transactionCount / $totalTransactions) * 100 : 0;
 
             return [
@@ -737,12 +771,17 @@ class ReportController extends Controller
             ];
         });
 
+        // Recalculate active banks based on final list
+        $activeBanksCount = $bankList->filter(function($bank) {
+            return $bank['transaction_count'] > 0;
+        })->count();
+
         return [
             'banks' => $bankList->toArray(),
             'summary' => [
                 'total_transactions' => (int) $totalTransactions,
                 'total_amount' => (float) $totalAmount,
-                'active_banks' => $transactionData->count()
+                'active_banks' => $activeBanksCount
             ]
         ];
     }

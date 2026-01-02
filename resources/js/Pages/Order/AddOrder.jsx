@@ -460,8 +460,13 @@ export default function AddOrder() {
             if (response.data.status === 'success' && response.data.data) {
                 // Handle paginated response - access the actual data array
                 const banksData = response.data.data.data || response.data.data;
-                setPaymentBanks(Array.isArray(banksData) ? banksData : []);
-                console.log('🏦 Payment banks set to state:', banksData);
+                // Filter out Website Payment (Client-side hardcode filtering)
+                const filteredBanks = Array.isArray(banksData) 
+                    ? banksData.filter(bank => bank.bank_name.toLowerCase() !== 'website payment') 
+                    : [];
+                
+                setPaymentBanks(filteredBanks);
+                console.log('🏦 Payment banks set to state:', filteredBanks);
             } else {
                 setPaymentBanks(Array.isArray(response.data) ? response.data : []);
                 console.log('🏦 Payment banks fallback set to state:', response.data);

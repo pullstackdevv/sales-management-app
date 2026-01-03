@@ -154,7 +154,10 @@ export default function Order() {
     try {
       const response = await api.get('/payment-banks');
       const banksData = response.data?.data?.data || response.data?.data || [];
-      const activeBanks = Array.isArray(banksData) ? banksData.filter(b => b.is_active) : [];
+      // Filter out Website Payment (Client-side hardcode filtering) and active check
+      const activeBanks = Array.isArray(banksData) 
+        ? banksData.filter(b => b.is_active && b.bank_name.toLowerCase() !== 'website payment') 
+        : [];
       setPaymentBanks(activeBanks);
     } catch (e) {
       setPaymentBanks([]);

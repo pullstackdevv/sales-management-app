@@ -7,18 +7,56 @@ import api from '@/api/axios';
 export default function ProfitReport() {
     const [reportData, setReportData] = useState({
         categories: [],
+        dates: [],
         grossProfit: [],
         netProfit: [],
         summary: {}
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    
+    // Helper untuk mendapatkan bulan saat ini dalam format YYYY-MM (Local Time)
+    const getCurrentMonth = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}`;
+    };
+
+    const getMonthDateRange = (monthStr) => {
+        if (!monthStr) return { start: '', end: '' };
+        const [yearStr, monthStrPart] = monthStr.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStrPart, 10);
+        const lastDay = new Date(year, month, 0).getDate();
+        
+        return {
+            start: `${yearStr}-${monthStrPart}-01`,
+            end: `${yearStr}-${monthStrPart}-${String(lastDay).padStart(2, '0')}`
+        };
+    };
+
+    // Initialize state with consistent local time values
+    const [currentMonth, setCurrentMonth] = useState(getCurrentMonth);
+    const [startDate, setStartDate] = useState(() => getMonthDateRange(getCurrentMonth()).start);
+    const [endDate, setEndDate] = useState(() => getMonthDateRange(getCurrentMonth()).end);
 
     useEffect(() => {
-        fetchProfitData();
+        fetchProfitData(startDate, endDate);
     }, []);
+
+    const handleMonthFilter = () => {
+        if (!currentMonth) return;
+        const { start, end } = getMonthDateRange(currentMonth);
+        
+        setStartDate(start);
+        setEndDate(end);
+        fetchProfitData(start, end);
+    };
+
+    const handleDateRangeFilter = () => {
+        fetchProfitData(startDate, endDate);
+    };
 
     const fetchProfitData = async (start_date = '', end_date = '') => {
         try {
@@ -34,6 +72,7 @@ export default function ProfitReport() {
                 const data = response.data.data;
                 setReportData({
                     categories: data.labels,
+                    dates: data.dates || [],
                     grossProfit: data.gross_profit || data.data, // fallback untuk kompatibilitas
                     netProfit: data.net_profit || [],
                     summary: data.summary,
@@ -85,7 +124,10 @@ export default function ProfitReport() {
         tooltip: {
             shared: true,
             formatter: function() {
-                let tooltip = '<b>' + this.x + '</b><br/>';
+                const index = this.points[0].point.index;
+                const dateLabel = reportData.dates && reportData.dates[index] ? reportData.dates[index] : this.x;
+                
+                let tooltip = '<b>' + dateLabel + '</b><br/>';
                 this.points.forEach(point => {
                     const color = point.color;
                     const value = Highcharts.numberFormat(point.y, 0, ',', '.');
@@ -147,27 +189,50 @@ export default function ProfitReport() {
 
                     {/* Filter Section */}
                     <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <input 
-                                type="date" 
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                                placeholder="Tanggal Mulai"
-                            />
-                            <input 
-                                type="date" 
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
-                                placeholder="Tanggal Akhir"
-                            />
-                            <button 
-                                onClick={() => fetchProfitData(startDate, endDate)}
-                                className="bg-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors duration-200 whitespace-nowrap"
-                            >
-                                Cari Laporan
-                            </button>
+                        <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
+                            Filter terpusat untuk kartu ringkasan dan grafik harian
+                        </h2>
+
+                        {/* Month Filter */}
+                        <div className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <input
+                                    type="month"
+                                    value={currentMonth}
+                                    onChange={(e) => setCurrentMonth(e.target.value)}
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                />
+                                <button
+                                    onClick={handleMonthFilter}
+                                    className="bg-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors duration-200 whitespace-nowrap"
+                                >
+                                    Tampilkan Bulan
+                                </button>
+                            </div>
+
+                            {/* Date Range Filter */}
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <input 
+                                    type="date" 
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                    placeholder="Tanggal Mulai"
+                                />
+                                <input 
+                                    type="date" 
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                                    placeholder="Tanggal Akhir"
+                                />
+                                <button 
+                                    onClick={handleDateRangeFilter}
+                                    className="bg-green-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors duration-200 whitespace-nowrap"
+                                >
+                                    Terapkan Rentang
+                                </button>
+                            </div>
                         </div>
                     </div>
 

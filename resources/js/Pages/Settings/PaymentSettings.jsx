@@ -380,20 +380,27 @@ export default function PaymentSettings() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(bank)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Edit"
-                        >
-                          <Icon icon="mdi:pencil" className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(bank)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Hapus"
-                        >
-                          <Icon icon="mdi:delete" className="w-4 h-4" />
-                        </button>
+                        {bank.bank_name.toLowerCase() !== 'website payment' && (
+                          <>
+                            <button
+                              onClick={() => handleEdit(bank)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Edit"
+                            >
+                              <Icon icon="mdi:pencil" className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(bank)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Hapus"
+                            >
+                              <Icon icon="mdi:delete" className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {bank.bank_name.toLowerCase() === 'website payment' && (
+                          <span className="text-gray-400 text-xs italic">System Default</span>
+                        )}
                       </div>
                     </td>
                   </tr>

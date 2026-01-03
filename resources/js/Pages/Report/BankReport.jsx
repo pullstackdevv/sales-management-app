@@ -10,12 +10,49 @@ export default function BankReport() {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    
+    // Helper untuk mendapatkan bulan saat ini dalam format YYYY-MM (Local Time)
+    const getCurrentMonth = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}`;
+    };
+
+    const getMonthDateRange = (monthStr) => {
+        if (!monthStr) return { start: '', end: '' };
+        const [yearStr, monthStrPart] = monthStr.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStrPart, 10);
+        const lastDay = new Date(year, month, 0).getDate();
+        
+        return {
+            start: `${yearStr}-${monthStrPart}-01`,
+            end: `${yearStr}-${monthStrPart}-${String(lastDay).padStart(2, '0')}`
+        };
+    };
+
+    // Initialize state with consistent local time values
+    const [currentMonth, setCurrentMonth] = useState(getCurrentMonth);
+    const [startDate, setStartDate] = useState(() => getMonthDateRange(getCurrentMonth()).start);
+    const [endDate, setEndDate] = useState(() => getMonthDateRange(getCurrentMonth()).end);
 
     useEffect(() => {
-        fetchBankData();
+        fetchBankData(startDate, endDate);
     }, []);
+
+    const handleMonthFilter = () => {
+        if (!currentMonth) return;
+        const { start, end } = getMonthDateRange(currentMonth);
+        
+        setStartDate(start);
+        setEndDate(end);
+        fetchBankData(start, end);
+    };
+
+    const handleDateRangeFilter = () => {
+        fetchBankData(startDate, endDate);
+    };
 
     const fetchBankData = async (start_date = '', end_date = '') => {
         try {
@@ -46,32 +83,60 @@ export default function BankReport() {
 
     return (
         <DashboardLayout>
-            <div className="flex justify-between items-center mb-6">
-                <div>
+            <div className="w-full">
+                {/* Header */}
+                <div className="mb-6">
                     <h1 className="text-2xl font-bold text-gray-800">Data Transaksi Bank</h1>
                     <p className="text-sm text-gray-600 mt-1">Laporan transaksi berdasarkan bank</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <input 
-                        type="date" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
-                        placeholder="Tanggal Mulai"
-                    />
-                    <input 
-                        type="date" 
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
-                        placeholder="Tanggal Akhir"
-                    />
-                    <button 
-                        onClick={() => fetchBankData(startDate, endDate)}
-                        className="bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-600 transition-colors duration-200 flex items-center gap-2"
-                    >
-                        <span>Cari Laporan</span>
-                    </button>
+
+                {/* Filter Section */}
+                <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
+                    <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
+                        Filter Periode
+                    </h2>
+
+                    {/* Month Filter */}
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <input
+                                type="month"
+                                value={currentMonth}
+                                onChange={(e) => setCurrentMonth(e.target.value)}
+                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                            <button
+                                onClick={handleMonthFilter}
+                                className="bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors duration-200 whitespace-nowrap"
+                            >
+                                Tampilkan Bulan
+                            </button>
+                        </div>
+
+                        {/* Date Range Filter */}
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <input 
+                                type="date" 
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                                placeholder="Tanggal Mulai"
+                            />
+                            <input 
+                                type="date" 
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                                placeholder="Tanggal Akhir"
+                            />
+                            <button 
+                                onClick={handleDateRangeFilter}
+                                className="bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors duration-200 whitespace-nowrap"
+                            >
+                                Terapkan Rentang
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

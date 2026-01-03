@@ -1318,6 +1318,20 @@ const CustomerDataCheckout = () => {
           recipient_phone: (primaryAddress?.recipient_phone || primaryAddress?.phone || createdCustomer.phone),
           addresses: createdCustomer.addresses
         };
+
+        // Save new customer to customerSession for Profile and MyOrders pages
+        customerSession.setVerified(
+          createdCustomer.id,
+          'phone',
+          createdCustomer.phone,
+          {
+            id: createdCustomer.id,
+            name: createdCustomer.name,
+            email: createdCustomer.email,
+            phone: createdCustomer.phone,
+            loyalty_points: createdCustomer.loyalty_points || null
+          }
+        );
       } else {
         const selectedAddress = customerAddresses.find(addr => addr.id == selectedAddressId);
         customerData = {

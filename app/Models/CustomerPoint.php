@@ -125,7 +125,10 @@ class CustomerPoint extends Model
         }
         
         $this->save();
-        // Tier update removed - will be handled by scheduled cronjob (loyalty:update-tiers)
+        
+        // Auto-update tier when annual spend changes (real-time)
+        // Cronjob (loyalty:update-tiers) will run as backup/fallback daily at 1 AM
+        $this->checkAndUpdateTier();
     }
 
     public function checkAndUpdateTier(): void
@@ -133,9 +136,22 @@ class CustomerPoint extends Model
         $newTier = LoyaltyTier::getTierForSpend((float) $this->annual_spend);
         
         if ($newTier && $newTier->id !== $this->tier_id) {
+            $oldTier = $this->tier;
+            
             $this->tier_id = $newTier->id;
             $this->tier_updated_at = now();
             $this->save();
+            
+            // Log tier upgrade for tracking
+            \Log::info('Tier upgraded (real-time)', [
+                'customer_id' => $this->customer_id,
+                'customer_name' => $this->customer?->name,
+                'old_tier' => $oldTier?->name ?? 'None',
+                'new_tier' => $newTier->name,
+                'annual_spend' => $this->annual_spend,
+                'trigger' => 'transaction',
+                'updated_at' => now()
+            ]);
         }
     }
 

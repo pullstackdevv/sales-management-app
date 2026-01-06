@@ -12,6 +12,8 @@ use App\Models\Shipping;
 use App\Models\StockMovement;
 use App\Enums\StockMovementType;
 use App\Enums\PaymentStatus;
+use App\Services\LoyaltyPointService;
+use App\Models\SalesChannel;
 use App\Http\Requests\Order\StoreRequest;
 use App\Http\Requests\Order\UpdateRequest;
 use Illuminate\Http\Request;
@@ -170,7 +172,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, LoyaltyPointService $loyaltyService): JsonResponse
     {
         // Check permission
         if (!Auth::user()->hasPermission('orders.create')) {
@@ -347,6 +349,8 @@ class OrderController extends Controller
 
             DB::commit();
 
+            $this->attemptAwardPointsForManualOrder($order, $loyaltyService);
+
             // Create notification for new order
             NotificationHelper::newOrder($order->load('customer'));
             
@@ -377,7 +381,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function update(Request $request, Order $order): JsonResponse
+    public function update(Request $request, Order $order, LoyaltyPointService $loyaltyService): JsonResponse
     {
         // Check permission
         if (!Auth::user()->hasPermission('orders.edit')) {
@@ -689,6 +693,9 @@ class OrderController extends Controller
 
             DB::commit();
 
+            // Attempt to award loyalty points if manual order became paid
+            $this->attemptAwardPointsForManualOrder($order, $loyaltyService);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order updated successfully',
@@ -747,7 +754,7 @@ class OrderController extends Controller
         }
     }
 
-    public function updateStatus(Request $request, Order $order): JsonResponse
+    public function updateStatus(Request $request, Order $order, LoyaltyPointService $loyaltyService): JsonResponse
     {
         // Check permission
         if (!Auth::user()->hasPermission('orders.update_status')) {
@@ -825,6 +832,8 @@ class OrderController extends Controller
             }
 
             DB::commit();
+
+            $this->attemptAwardPointsForManualOrder($order, $loyaltyService);
 
             return response()->json([
                 'status' => 'success',
@@ -1106,6 +1115,43 @@ class OrderController extends Controller
                 'status' => 'error',
                 'message' => 'Failed to retrieve audit history: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Attempt to award loyalty points for manual orders from WhatsApp
+     */
+    private function attemptAwardPointsForManualOrder(Order $order, LoyaltyPointService $loyaltyService): void
+    {
+        $order->refresh();
+        
+        // Award points if paid OR if status indicates progress (processing/shipped/delivered)
+        // This covers cases where manual orders are updated directly to advanced statuses without explicit payment status update
+        $isPaid = $order->payment_status === PaymentStatus::PAID;
+        $isAdvancedStatus = in_array($order->status, ['processing', 'shipped', 'delivered']);
+        $isValidPaymentStatus = !in_array($order->payment_status, [PaymentStatus::CANCELLED, PaymentStatus::FAILED, PaymentStatus::EXPIRED]);
+
+        if (($isPaid || $isAdvancedStatus) && $isValidPaymentStatus && $order->sales_channel_id) {
+            $salesChannel = SalesChannel::find($order->sales_channel_id);
+            // Use code for more robust check than name
+            if ($salesChannel && strtoupper($salesChannel->code) === 'WHATSAPP') {
+                $order->loadMissing('customer');
+                if ($order->customer && !empty($order->customer->phone)) {
+                    try {
+                        Log::info('Attempting to award loyalty points for manual WhatsApp order', [
+                            'order_id' => $order->id,
+                            'status' => $order->status,
+                            'payment_status' => $order->payment_status
+                        ]);
+                        $loyaltyService->awardPointsForOrder($order);
+                    } catch (\Throwable $th) {
+                        Log::error('Failed to award loyalty points for manual order', [
+                            'order_id' => $order->id,
+                            'message' => $th->getMessage(),
+                        ]);
+                    }
+                }
+            }
         }
     }
 }

@@ -439,8 +439,21 @@ const SalesReport = () => {
                   </div>
                 </div>
 
-                {/* Biaya Tambahan */}
+                {/* Diskon Poin */}
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-600">Diskon Poin Loyalty</span>
+                      <span className="text-xs text-gray-400">(Total Diskon Poin)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
+                    Rp {(dailyReport.summary.point_discounts_total || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+
+                {/* Biaya Tambahan */}
+                {/* <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">
                   <div className="flex items-start justify-between">
                     <div className="flex flex-col">
                       <span className="text-sm text-gray-600">Biaya Tambahan Lainnya</span>
@@ -450,7 +463,7 @@ const SalesReport = () => {
                   <div className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">
                     Rp {(dailyReport.summary.other_fees || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </div>
-                </div>
+                </div> */}
 
                 {/* HPP */}
                 <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 flex flex-col justify-between h-full">

@@ -432,6 +432,7 @@ class ReportController extends Controller
         // $totalOrderAmount = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.total_price, 0)'));
         $totalOrderAmount = 0;
         $discountsTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.discount_amount, 0)'));
+        $pointDiscountsTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.point_discount, 0)'));
         $shippingTotal = (float) $ordersPeriodQuery->clone()->sum(DB::raw('COALESCE(orders.shipping_cost, 0)'));
         $receivablesTotal = (float) DB::table('orders')
             ->where('orders.payment_status', 'pending')
@@ -448,7 +449,7 @@ class ReportController extends Controller
             ->whereBetween(DB::raw('COALESCE(orders.ordered_at, orders.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('COALESCE(order_items.quantity,0) * COALESCE(order_items.base_price,0)'));
 
-        $netSales = $grossItemValue - $shippingTotal;
+        $netSales = $grossItemValue - $shippingTotal - $pointDiscountsTotal;
         $grossProfit = $netSales - $modalItemValue;
         $operationalCost = (float) DB::table('expenses')
             ->whereBetween('expense_date', [$startDate, $endDate])
@@ -485,6 +486,7 @@ class ReportController extends Controller
                 'net_sales' => $netSales,
                 'shipping_total' => $shippingTotal,
                 'discounts_total' => $discountsTotal,
+                'point_discounts_total' => $pointDiscountsTotal,
                 'other_fees' => $otherFees,
                 'hpp_total' => $modalItemValue,
                 'gross_profit' => $grossProfit,
@@ -684,7 +686,8 @@ class ReportController extends Controller
 
             // Tambahkan penjelasan perhitungan
             $profitData['calculation_explanation'] = [
-                'penjualan_bersih' => 'Nilai Produk (Gross Sales) - Diskon',
+                'penjualan_kotor' => 'Nilai Produk (Gross Sales)',
+                'penjualan_bersih' => 'Nilai Produk (Gross Sales) - Ongkir - Diskon - Diskon Poin',
                 'laba_kotor' => 'Penjualan Bersih - HPP (Harga Pokok Penjualan)',
                 'laba_bersih' => 'Laba Kotor - Biaya Operasional'
             ];

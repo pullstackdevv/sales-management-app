@@ -188,7 +188,8 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
         ? Math.floor(totalSellingPrice * ((orderData?.voucher?.value || 0) / 100))
         : (orderData?.voucher?.value || 0);
     const manualDiscount = orderData?.discount_amount || 0;
-    const netSales = Math.max(totalSellingPrice - voucherDiscountAmount - manualDiscount, 0);
+    const pointDiscount = parseFloat(orderData?.point_discount || 0);
+    const netSales = Math.max(totalSellingPrice - voucherDiscountAmount - manualDiscount - pointDiscount, 0);
     const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
     const grossProfit = netSales - totalProductCost;
     let paidAmount = orderData.payments?.reduce((sum, p) => sum + (p.amount_paid || 0), 0) || 0;
@@ -490,6 +491,12 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                                 <span>- Rp{formatRupiah(orderData.discount_amount)}</span>
                                             </div>
                                         ) : null}
+                                        {pointDiscount > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span>Diskon Poin Loyalty</span>
+                                                <span>- Rp{formatRupiah(pointDiscount)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between font-bold text-lg pt-2 border-t">
                                             <span>TOTAL</span>
                                             <span>Rp{formatRupiah(orderData.total_price)}</span>

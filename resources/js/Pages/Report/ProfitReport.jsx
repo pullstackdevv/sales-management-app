@@ -291,6 +291,7 @@ export default function ProfitReport() {
                                     <h3 className="text-sm font-semibold text-blue-900 mb-2">📊 Rumus Perhitungan:</h3>
                                     <div className="space-y-1 text-sm text-blue-800">
                                         <p>• <strong>Penjualan Kotor:</strong> {reportData.calculation.penjualan_kotor}</p>
+                                        <p>• <strong>Penjualan Bersih:</strong> {reportData.calculation.penjualan_bersih}</p>
                                         <p>• <strong>Laba Kotor:</strong> {reportData.calculation.laba_kotor}</p>
                                         <p>• <strong>Laba Bersih:</strong> {reportData.calculation.laba_bersih}</p>
                                     </div>

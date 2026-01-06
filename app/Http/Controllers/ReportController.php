@@ -86,20 +86,22 @@ class ReportController extends Controller
             $summarySheet->setCellValue('B5', (float)($daily['summary']['shipping_total'] ?? 0));
             $summarySheet->setCellValue('A6', 'Discounts Total');
             $summarySheet->setCellValue('B6', (float)($daily['summary']['discounts_total'] ?? 0));
-            $summarySheet->setCellValue('A7', 'HPP Total');
-            $summarySheet->setCellValue('B7', (float)($daily['summary']['hpp_total'] ?? 0));
-            $summarySheet->setCellValue('A8', 'Gross Profit');
-            $summarySheet->setCellValue('B8', (float)($daily['summary']['gross_profit'] ?? 0));
-            $summarySheet->setCellValue('A9', 'Operational Cost');
-            $summarySheet->setCellValue('B9', (float)($daily['summary']['operational_cost'] ?? 0));
-            $summarySheet->setCellValue('A10', 'Net Profit');
-            $summarySheet->setCellValue('B10', (float)($daily['summary']['net_profit'] ?? 0));
-            $summarySheet->setCellValue('A11', 'Receivables');
-            $summarySheet->setCellValue('B11', (float)($daily['summary']['receivables_total'] ?? 0));
-            $summarySheet->setCellValue('A12', 'Total Orders');
-            $summarySheet->setCellValue('B12', (int)($daily['summary']['total_orders'] ?? 0));
-            $summarySheet->setCellValue('A13', 'Total Items');
-            $summarySheet->setCellValue('B13', (int)($daily['summary']['total_items'] ?? 0));
+            $summarySheet->setCellValue('A7', 'Point Discounts Total');
+            $summarySheet->setCellValue('B7', (float)($daily['summary']['point_discounts_total'] ?? 0));
+            $summarySheet->setCellValue('A8', 'HPP Total');
+            $summarySheet->setCellValue('B8', (float)($daily['summary']['hpp_total'] ?? 0));
+            $summarySheet->setCellValue('A9', 'Gross Profit');
+            $summarySheet->setCellValue('B9', (float)($daily['summary']['gross_profit'] ?? 0));
+            $summarySheet->setCellValue('A10', 'Operational Cost');
+            $summarySheet->setCellValue('B10', (float)($daily['summary']['operational_cost'] ?? 0));
+            $summarySheet->setCellValue('A11', 'Net Profit');
+            $summarySheet->setCellValue('B11', (float)($daily['summary']['net_profit'] ?? 0));
+            $summarySheet->setCellValue('A12', 'Receivables');
+            $summarySheet->setCellValue('B12', (float)($daily['summary']['receivables_total'] ?? 0));
+            $summarySheet->setCellValue('A13', 'Total Orders');
+            $summarySheet->setCellValue('B13', (int)($daily['summary']['total_orders'] ?? 0));
+            $summarySheet->setCellValue('A14', 'Total Items');
+            $summarySheet->setCellValue('B14', (int)($daily['summary']['total_items'] ?? 0));
 
             $monthlySheet = $spreadsheet->createSheet();
             $monthlySheet->setTitle('Monthly');
@@ -524,6 +526,7 @@ class ReportController extends Controller
                 DB::raw('DATE(COALESCE(orders.ordered_at, orders.created_at)) as date'),
                 DB::raw('SUM(COALESCE(orders.total_price, 0)) as total_sales'),
                 DB::raw('SUM(COALESCE(orders.discount_amount, 0)) as discount'),
+                DB::raw('SUM(COALESCE(orders.point_discount, 0)) as point_discount'),
                 DB::raw('SUM(COALESCE(orders.shipping_cost, 0)) as shipping_cost')
             )->groupBy('date')->get();
         } else {
@@ -532,6 +535,7 @@ class ReportController extends Controller
                 DB::raw('MONTH(COALESCE(orders.ordered_at, orders.created_at)) as month'),
                 DB::raw('SUM(COALESCE(orders.total_price, 0)) as total_sales'),
                 DB::raw('SUM(COALESCE(orders.discount_amount, 0)) as discount'),
+                DB::raw('SUM(COALESCE(orders.point_discount, 0)) as point_discount'),
                 DB::raw('SUM(COALESCE(orders.shipping_cost, 0)) as shipping_cost')
             )->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get();
         }
@@ -580,6 +584,7 @@ class ReportController extends Controller
         $netProfitData = [];
         $totalGrossProfit = 0;
         $totalNetProfit = 0;
+        $totalPointDiscount = 0;
 
         $current = $startDate->copy();
         if (!$isDaily) {
@@ -593,6 +598,7 @@ class ReportController extends Controller
         while ($current->lte($endLoop)) {
             $totalSales = 0;
             $discount = 0;
+            $pointDiscount = 0;
             $shippingCost = 0;
             $hpp = 0;
             $opCost = 0;
@@ -606,6 +612,7 @@ class ReportController extends Controller
                 if ($salesData) {
                     $totalSales = (float)$salesData->total_sales;
                     $discount = (float)$salesData->discount;
+                    $pointDiscount = (float)$salesData->point_discount;
                     $shippingCost = (float)$salesData->shipping_cost;
                 }
                 
@@ -625,6 +632,7 @@ class ReportController extends Controller
                 if ($salesData) {
                     $totalSales = (float)$salesData->total_sales;
                     $discount = (float)$salesData->discount;
+                    $pointDiscount = (float)$salesData->point_discount;
                     $shippingCost = (float)$salesData->shipping_cost;
                 }
 
@@ -635,7 +643,7 @@ class ReportController extends Controller
                 if ($opData) $opCost = (float)$opData->operational_cost;
             }
 
-            $netSales = $totalSales - $shippingCost;
+            $netSales = $totalSales - $shippingCost - $pointDiscount;   
 
             // Laba Kotor = Net Sales - HPP
             $labaKotor = $netSales - $hpp;
@@ -648,6 +656,7 @@ class ReportController extends Controller
 
             $totalGrossProfit += $labaKotor;
             $totalNetProfit += $labaBersih;
+            $totalPointDiscount += $pointDiscount;
 
             if ($isDaily) {
                 $current->addDay();
@@ -664,6 +673,7 @@ class ReportController extends Controller
             'summary' => [
                 'total_gross_profit' => $totalGrossProfit,
                 'total_net_profit' => $totalNetProfit,
+                'total_point_discount' => $totalPointDiscount,
                 'average_monthly_gross_profit' => $isDaily ? $totalGrossProfit : (count($labels) > 0 ? $totalGrossProfit / count($labels) : 0),
                 'average_monthly_net_profit' => $isDaily ? $totalNetProfit : (count($labels) > 0 ? $totalNetProfit / count($labels) : 0)
             ]

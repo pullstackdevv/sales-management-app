@@ -18,6 +18,7 @@ export default function EditOrder() {
         origin_setting_id: '',
         shipping_cost: 0,
         manual_discount: 0,
+        point_discount: 0,
         notes: '',
         order_date: getCurrentDateWIB(),
         status: 'pending',
@@ -98,6 +99,7 @@ export default function EditOrder() {
                 sales_channel_id: order.sales_channel_id ? order.sales_channel_id.toString() : '',
                 shipping_cost: parseFloat(order.shipping_cost) || 0,
                 manual_discount: parseFloat(order.discount_amount) || 0,
+                point_discount: parseFloat(order.point_discount) || 0,
                 notes: order.notes || '',
                 order_date: order.order_date ? order.order_date.split(' ')[0] : getCurrentDateWIB(),
                 status: order.status || 'pending',
@@ -340,7 +342,7 @@ export default function EditOrder() {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0) - (parseFloat(formData.manual_discount) || 0);
+        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0) - (parseFloat(formData.manual_discount) || 0) - (parseFloat(formData.point_discount) || 0);
     };
 
     const calculateTotalWeight = () => {
@@ -1251,6 +1253,13 @@ console.log(formData)
                                 <div className="flex justify-between">
                                     <span className="text-sm text-gray-700">Diskon Manual</span>
                                     <span className="text-sm font-medium text-green-600">- Rp {Number(formData.manual_discount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                </div>
+                            )}
+
+                            {(parseFloat(formData.point_discount) || 0) > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-700">Diskon Poin Loyalty</span>
+                                    <span className="text-sm font-medium text-green-600">- Rp {Number(formData.point_discount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                 </div>
                             )}
                             

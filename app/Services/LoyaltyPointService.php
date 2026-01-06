@@ -32,6 +32,27 @@ class LoyaltyPointService
             return null;
         }
 
+        // Check for product variant discount
+        // Exclude orders containing items sold at variant discount price
+        $order->loadMissing('items.productVariant');
+        $hasVariantDiscount = $order->items->contains(function ($item) {
+            $variant = $item->productVariant;
+            if (!$variant) return false;
+            
+            // Check if item was sold at discount price
+            return $variant->discount_price !== null && 
+                   $variant->discount_price > 0 && 
+                   abs((float)$item->price - (float)$variant->discount_price) < 0.01;
+        });
+
+        if ($hasVariantDiscount) {
+            Log::info('Skipping loyalty points award for order with variant discount', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number
+            ]);
+            return null;
+        }
+
         $customerPoint = CustomerPoint::getOrCreate($order->customer_id);
 
         $baseAmount = (float) $order->total_price;

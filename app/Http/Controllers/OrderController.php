@@ -587,7 +587,8 @@ class OrderController extends Controller
                 $discountAmount = $totalBeforeDiscount;
             }
 
-            $finalTotal = $totalBeforeDiscount - $discountAmount;
+            $pointDiscount = (float)($order->point_discount ?? 0);
+            $finalTotal = max(0, $totalBeforeDiscount - $discountAmount - $pointDiscount);
 
             $order->update([
                 'total_price' => $finalTotal,

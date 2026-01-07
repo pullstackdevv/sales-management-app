@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MarketplaceSettingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AddressController;
@@ -80,6 +81,13 @@ Route::prefix('courier-rates')->group(function () {
 
 // Public general settings
 Route::get('general-settings/public', [GeneralSettingController::class, 'publicSettings']);
+
+// Marketplace Settings
+Route::prefix('marketplace-settings')->group(function () {
+    Route::get('/', [MarketplaceSettingController::class, 'index']);
+    Route::post('/', [MarketplaceSettingController::class, 'update']);
+    Route::post('/generate', [MarketplaceSettingController::class, 'generate']);
+});
 
 // Public banners
 Route::get('banners', [BannerController::class, 'index']);

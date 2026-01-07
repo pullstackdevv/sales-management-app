@@ -35,22 +35,29 @@ export default function ProductData() {
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
+  const [marketplaceSettings, setMarketplaceSettings] = useState(null);
+  const [generating, setGenerating] = useState(false);
+
 
   // Fetch categories and tags on mount
   useEffect(() => {
-    const fetchFilters = async () => {
+    const fetchFiltersAndSettings = async () => {
       try {
-        const [catRes, tagRes] = await Promise.all([
+        const [catRes, tagRes, settingsRes] = await Promise.all([
           api.get('/product-categories?per_page=1000&is_active=1'),
-          api.get('/tags?per_page=1000&is_active=1')
+          api.get('/tags?per_page=1000&is_active=1'),
+          api.get('/marketplace-settings')
         ]);
         setCategories(catRes.data.data.data || []);
         setTags(tagRes.data.data.data || []);
+        if (settingsRes.data?.success) {
+            setMarketplaceSettings(settingsRes.data.data);
+        }
       } catch (error) {
-        console.error("Error fetching filters:", error);
+        console.error("Error fetching initial data:", error);
       }
     };
-    fetchFilters();
+    fetchFiltersAndSettings();
   }, []);
 
   // Fetch products from API
@@ -269,6 +276,109 @@ export default function ProductData() {
     }).format(amount);
   };
 
+  const handleShowMarketplaceBreakdown = (variant) => {
+    if (!marketplaceSettings) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Gagal memuat setting marketplace. Silakan refresh halaman.'
+        });
+        return;
+    }
+
+    const price = parseFloat(variant.marketplace_price || 0);
+    if (price <= 0) return;
+
+    // Parse settings
+    const adminRate = parseFloat(marketplaceSettings.marketplace_admin_fee || 0) / 100;
+    const insuranceRate = parseFloat(marketplaceSettings.marketplace_insurance_fee || 0) / 100;
+    const promoRate = parseFloat(marketplaceSettings.marketplace_promo_fee || 0) / 100;
+    const promoMax = parseFloat(marketplaceSettings.marketplace_promo_fee_max || 0);
+    const shippingRate = parseFloat(marketplaceSettings.marketplace_shipping_fee || 0) / 100;
+    const shippingMax = parseFloat(marketplaceSettings.marketplace_shipping_fee_max || 0);
+    const processFee = parseFloat(marketplaceSettings.marketplace_process_fee || 0);
+
+    // Calculate fees based on marketplace price
+    const adminFee = price * adminRate;
+    const insuranceFee = price * insuranceRate;
+    const promoFee = Math.min(price * promoRate, promoMax);
+    const shippingFee = Math.min(price * shippingRate, shippingMax);
+    
+    const fmt = (n) => `Rp ${Math.round(n).toLocaleString('id-ID')}`;
+
+    Swal.fire({
+      title: 'Rincian Harga Marketplace',
+      html: `
+        <div class="text-sm text-left font-sans">
+          <p class="mb-4 text-center text-lg">Harga Marketplace: <b>${fmt(price)}</b></p>
+          <div class="overflow-x-auto w-full">
+            <table class="w-full border-collapse border border-gray-300">
+              <thead class="bg-yellow-300 text-black">
+                <tr>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">HARGA MARKETPLACE</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">ADMIN ${parseFloat(marketplaceSettings.marketplace_admin_fee)}%</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">PREMI ASURANSI</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">FEE PROMO XTRA</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">FEE ONGKIR XTRA</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">PROSES PESANAN</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">HARGA TOTAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="text-center bg-white text-black">
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(price)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(adminFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(insuranceFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(promoFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(shippingFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(processFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(price - adminFee - insuranceFee - promoFee - shippingFee - processFee)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-4 text-xs text-gray-500 text-center">
+            *Perhitungan berdasarkan harga marketplace saat ini dan setting variabel marketplace.
+          </p>
+        </div>
+      `,
+      width: '800px',
+      confirmButtonText: 'Tutup',
+      confirmButtonColor: '#3b82f6',
+      customClass: {
+        container: 'font-sans'
+      }
+    });
+  };
+
+  const generateMarketplacePrices = async () => {
+    const result = await Swal.fire({
+      title: "Generate Marketplace Prices?",
+      text: "Ini akan menghitung ulang harga marketplace untuk semua produk berdasarkan setting saat ini.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya, Generate",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      setGenerating(true);
+      try {
+        const res = await api.post("/marketplace-settings/generate");
+        if (res.data?.success) {
+          Swal.fire("Berhasil", res.data.message, "success");
+          fetchProducts(pagination?.current_page || 1); // Refresh data
+        }
+      } catch (e) {
+        console.error(e);
+        const msg = e.response?.data?.message || "Gagal generate harga";
+        Swal.fire("Error", msg, "error");
+      } finally {
+        setGenerating(false);
+      }
+    }
+  };
+
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -304,6 +414,16 @@ export default function ProductData() {
           <h1 className="text-2xl font-semibold">Produk</h1>
 
           <div className="flex gap-2">
+            {hasPermission('products.edit') && (
+              <button 
+                className="text-sm border-2 border-green-600 text-green-600 px-3 py-1 rounded-md hover:bg-green-50 flex items-center gap-1"
+                onClick={generateMarketplacePrices}
+                disabled={generating}
+              >
+                {generating ? <Icon icon="eos-icons:loading" /> : <Icon icon="material-symbols:sync" />}
+                {generating ? "Proses..." : "Sync Marketplace Price"}
+              </button>
+            )}
             {hasPermission('products.import') && (
               <button className="text-sm border-2 px-3 py-1 rounded-md hover:bg-gray-100" onClick={handleImportClick} disabled={importing}>
                 {importing ? "Mengimpor..." : "Impor Produk"}
@@ -661,7 +781,17 @@ export default function ProductData() {
                                     </td>
                                   )}
                                   <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>
-                                  <td className="px-3 py-2">{variant.marketplace_price ? formatCurrency(variant.marketplace_price) : '-'}</td>
+                                  <td className="px-3 py-2">
+                                    {variant.marketplace_price ? (
+                                      <button 
+                                        onClick={() => handleShowMarketplaceBreakdown(variant)}
+                                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left"
+                                        title="Klik untuk melihat rincian"
+                                      >
+                                        {formatCurrency(variant.marketplace_price)}
+                                      </button>
+                                    ) : '-'}
+                                  </td>
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2">
                                       {variant.base_price > 0 ? (

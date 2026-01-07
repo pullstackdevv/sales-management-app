@@ -14,6 +14,7 @@ import GeneralSettings from "./GeneralSettings";
 import DashboardSettings from "./DashboardSettings";
 import ApiSettings from "./ApiSettings";
 import { Button } from "flowbite-react";
+import MarketplaceSettings from "./MarketplaceSettings";
 
 const stockOpnames = [
   {
@@ -34,6 +35,7 @@ const menus = [
   { key: "courier", label: "Couriers", icon: "solar:delivery-outline" },
   { key: "order", label: "Sales Channels", icon: "solar:shop-outline" },
   { key: "origin", label: "Origin Settings", icon: "solar:shop-outline" },
+  { key: "marketplace", label: "Marketplace Price", icon: "solar:dollar-outline" },
 ];
 
 function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
@@ -66,6 +68,7 @@ function SettingsPage({ activeMenu: initialActiveMenu = "general" }) {
         {activeMenu === "payment" && <PaymentSettings />}
         {activeMenu === "courier" && <CourierSettings />}
         {activeMenu === "origin" && <OriginSettings />}
+        {activeMenu === "marketplace" && <MarketplaceSettings />}
         
         {/* Legacy menus */}
         {activeMenu === "order" && <OrderSettings />}

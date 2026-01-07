@@ -176,6 +176,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Settings/index', ['activeMenu' => 'general']);
         })->name('settings.general');
 
+        Route::get('/settings/marketplace', function () {
+            return Inertia::render('Settings/index', ['activeMenu' => 'marketplace']);
+        })->name('settings.marketplace');
+
         Route::get('/settings/order', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'order']);
         })->name('settings.order');

@@ -45,14 +45,11 @@ class DashboardController extends Controller
                 ->sum('total_price');
 
             // Order yang perlu perhatian berdasarkan update hari ini
-            $ordersNeedPayment = Order::whereDate('updated_at', $today)
-                ->where('status', 'pending')
+            $ordersNeedPayment = Order::where('status', 'pending')
                 ->count();
-            $ordersNeedProcess = Order::whereDate('updated_at', $today)
-                ->where('status', 'paid')
+            $ordersNeedProcess = Order::where('status', 'paid')
                 ->count();
-            $ordersNeedShip = Order::whereDate('updated_at', $today)
-                ->where('status', 'processing')
+            $ordersNeedShip = Order::where('status', 'processing')
                 ->count();
             $ordersCancelled = Order::whereDate('updated_at', $today)
                 ->where('status', 'cancelled')

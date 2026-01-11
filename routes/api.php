@@ -42,6 +42,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\LoyaltyController;
 use App\Http\Controllers\PointController;
+use App\Http\Controllers\ProductReviewController;
 
 
 
@@ -289,6 +290,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/history', [PointController::class, 'getCustomerHistory']);
         Route::post('/adjust', [PointController::class, 'adjustPoints']);
     });
+
+    // Product Review routes (admin)
+    Route::prefix('reviews')->group(function () {
+        Route::get('/', [ProductReviewController::class, 'index']);
+        Route::get('/statistics', [ProductReviewController::class, 'statistics']);
+        Route::get('/{id}', [ProductReviewController::class, 'show']);
+        Route::delete('/{id}', [ProductReviewController::class, 'destroy']);
+        Route::post('/{id}/approve', [ProductReviewController::class, 'approve']);
+        Route::post('/{id}/reject', [ProductReviewController::class, 'reject']);
+    });
 });
 
 // Public voucher routes (for checkout)
@@ -303,6 +314,16 @@ Route::prefix('loyalty')->group(function () {
     Route::post('/calculate-redeem', [PointController::class, 'calculateRedeemValue']);
     Route::post('/guest-loyalty', [PointController::class, 'getGuestLoyalty']);
 });
+
+// Public Product Review routes (for storefront)
+Route::prefix('reviews')->group(function () {
+    Route::post('/', [ProductReviewController::class, 'store']); // Submit review
+    Route::put('/{id}', [ProductReviewController::class, 'update']); // Edit pending review
+    Route::post('/can-review', [ProductReviewController::class, 'canReview']); // Check eligibility
+});
+
+// Get reviews for specific product (public)
+Route::get('products/{productId}/reviews', [ProductReviewController::class, 'getProductReviews']);
 
 // Payment Gateway Routes (public access for webhooks and order payment)
 Route::prefix('payment')->name('payment.')->group(function () {

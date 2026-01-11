@@ -236,6 +236,11 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
         Route::get('/loyalty/settings', [LoyaltyController::class, 'settingsPage'])->name('loyalty.settings');
         Route::get('/loyalty/tiers', [LoyaltyController::class, 'tierPage'])->name('loyalty.tiers');
 
+        // Review Management
+        Route::get('/reviews', function () {
+            return Inertia::render('Review/ReviewManagement');
+        })->name('reviews.index');
+
         // User management routes
         Route::get('/settings/users/create', function () {
             return Inertia::render('Settings/AddEditUser', ['mode' => 'create']);

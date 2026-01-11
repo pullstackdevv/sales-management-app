@@ -135,6 +135,13 @@ const SidebarContent = [
         ],
     },
     {
+        name: "Review & Rating",
+        icon: "solar:star-outline",
+        id: uniqueId(),
+        url: "/cms/reviews",
+        permission: "reviews.view",
+    },
+    {
         name: "Expense",
         icon: "solar:money-bag-outline",
         id: uniqueId(),

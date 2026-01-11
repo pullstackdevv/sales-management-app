@@ -58,14 +58,16 @@ class LoyaltyPointService
         $baseAmount = (float) $order->total_price;
         $shippingCost = (float) ($order->shipping_cost ?? 0);
 
-        // Still track spend (for tier progression) excluding shipping when possible
+        // Track spend (for tier progression) excluding shipping when possible
         $spendAmount = max(0, $baseAmount - $shippingCost);
         if ($spendAmount <= 0) {
             $spendAmount = $baseAmount;
         }
 
-        // New earning model: 1 base point per transaction * tier multiplier
-        $basePoints = 1;
+        // Point earning model: Based on point_rate from settings (default: Rp 10,000 = 1 point)
+        // Example: Rp 50,000 with point_rate 10000 and 1.5x multiplier = (50000/10000) * 1.5 = 7.5 → 8 points
+        $pointRate = LoyaltySetting::getPointRate(); // Get from settings (default: 10000)
+        $basePoints = $spendAmount / $pointRate;
         $multiplier = $customerPoint->tier?->multiplier ?? 1;
         $earnedPoints = (int) ceil($basePoints * max(1, $multiplier));
 

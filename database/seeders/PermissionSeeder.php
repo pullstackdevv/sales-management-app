@@ -158,6 +158,13 @@ class PermissionSeeder extends Seeder
             ['name' => 'sales_channels.create', 'display_name' => 'Create Sales Channel', 'description' => 'Can create sales channel', 'module' => 'settings'],
             ['name' => 'sales_channels.edit', 'display_name' => 'Edit Sales Channel', 'description' => 'Can edit sales channel', 'module' => 'settings'],
             ['name' => 'sales_channels.delete', 'display_name' => 'Delete Sales Channel', 'description' => 'Can delete sales channel', 'module' => 'settings'],
+
+            // Reviews & Rating
+            ['name' => 'reviews.view', 'display_name' => 'View Reviews', 'description' => 'Can view review list', 'module' => 'reviews'],
+            ['name' => 'reviews.approve', 'display_name' => 'Approve Review', 'description' => 'Can approve customer review', 'module' => 'reviews'],
+            ['name' => 'reviews.reject', 'display_name' => 'Reject Review', 'description' => 'Can reject customer review', 'module' => 'reviews'],
+            ['name' => 'reviews.delete', 'display_name' => 'Delete Review', 'description' => 'Can delete review', 'module' => 'reviews'],
+            ['name' => 'reviews.statistics', 'display_name' => 'View Review Statistics', 'description' => 'Can view review statistics', 'module' => 'reviews'],
         ];
     }
 }

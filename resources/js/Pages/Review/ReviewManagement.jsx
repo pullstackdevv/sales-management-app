@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
+import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
-import TableComponent from "../../components/ui/table/TableComponent";
 import { Button, Badge, Modal, Textarea } from "flowbite-react";
 import api from "@/api/axios";
-import Swal from "sweetalert2";
+import { showSuccess, showError, showConfirm } from '@/utils/sweetalert';
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function ReviewManagement() {
@@ -46,11 +46,7 @@ export default function ReviewManagement() {
       }
     } catch (err) {
       setError(err.message);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Failed to load reviews',
-      });
+      showError('Failed to load reviews');
     } finally {
       setLoading(false);
     }
@@ -68,37 +64,23 @@ export default function ReviewManagement() {
   };
 
   const handleApprove = async (reviewId) => {
-    const result = await Swal.fire({
-      title: 'Approve Review?',
-      text: 'This review will be visible on the storefront',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#10b981',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, Approve',
-      cancelButtonText: 'Cancel'
-    });
+    const confirmed = await showConfirm(
+      'Approve Review?',
+      'This review will be visible on the storefront',
+      'Yes, Approve',
+      'Cancel'
+    );
 
-    if (result.isConfirmed) {
+    if (confirmed) {
       try {
         const response = await api.post(`/reviews/${reviewId}/approve`);
         if (response.data.success) {
-          Swal.fire({
-            icon: 'success',
-            title: 'Approved!',
-            text: 'Review has been approved',
-            timer: 2000,
-            showConfirmButton: false
-          });
+          showSuccess('Review has been approved');
           fetchReviews();
           fetchStatistics();
         }
       } catch (err) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: err.response?.data?.message || 'Failed to approve review',
-        });
+        showError(err.response?.data?.message || 'Failed to approve review');
       }
     }
   };
@@ -118,58 +100,34 @@ export default function ReviewManagement() {
       });
       
       if (response.data.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Rejected!',
-          text: 'Review has been rejected',
-          timer: 2000,
-          showConfirmButton: false
-        });
+        showSuccess('Review has been rejected');
         setShowRejectModal(false);
         fetchReviews();
         fetchStatistics();
       }
     } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: err.response?.data?.message || 'Failed to reject review',
-      });
+      showError(err.response?.data?.message || 'Failed to reject review');
     }
   };
 
   const handleDelete = async (reviewId) => {
-    const result = await Swal.fire({
-      title: 'Delete Review?',
-      text: 'This action cannot be undone',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, Delete',
-      cancelButtonText: 'Cancel'
-    });
+    const confirmed = await showConfirm(
+      'Delete Review?',
+      'This action cannot be undone',
+      'Yes, Delete',
+      'Cancel'
+    );
 
-    if (result.isConfirmed) {
+    if (confirmed) {
       try {
         const response = await api.delete(`/reviews/${reviewId}`);
         if (response.data.success) {
-          Swal.fire({
-            icon: 'success',
-            title: 'Deleted!',
-            text: 'Review has been deleted',
-            timer: 2000,
-            showConfirmButton: false
-          });
+          showSuccess('Review has been deleted');
           fetchReviews();
           fetchStatistics();
         }
       } catch (err) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: err.response?.data?.message || 'Failed to delete review',
-        });
+        showError(err.response?.data?.message || 'Failed to delete review');
       }
     }
   };
@@ -307,11 +265,12 @@ export default function ReviewManagement() {
   ];
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Review Management</h1>
-        <p className="text-gray-600">Manage product reviews and ratings</p>
-      </div>
+    <DashboardLayout>
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Review Management</h1>
+          <p className="text-gray-600">Manage product reviews and ratings</p>
+        </div>
 
       {/* Statistics Cards */}
       {statistics && (
@@ -436,12 +395,51 @@ export default function ReviewManagement() {
       </div>
 
       {/* Table */}
-      <TableComponent
-        columns={columns}
-        data={reviews}
-        loading={loading}
-        error={error}
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Icon icon="mdi:loading" className="text-4xl text-blue-600 animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <Icon icon="mdi:alert-circle" className="text-6xl text-red-300 mx-auto mb-4" />
+            <p className="text-red-500">{error}</p>
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="text-center py-12">
+            <Icon icon="mdi:comment-text-outline" className="text-6xl text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">No reviews found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {columns.map((column, index) => (
+                    <th
+                      key={index}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {reviews.map((review) => (
+                  <tr key={review.id} className="hover:bg-gray-50">
+                    {columns.map((column, index) => (
+                      <td key={index} className="px-6 py-4 whitespace-nowrap">
+                        {column.render ? column.render(review) : review[column.key]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Detail Modal */}
       <Modal show={showDetailModal} onClose={() => setShowDetailModal(false)} size="2xl">
@@ -544,6 +542,7 @@ export default function ReviewManagement() {
           </Button>
         </Modal.Footer>
       </Modal>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

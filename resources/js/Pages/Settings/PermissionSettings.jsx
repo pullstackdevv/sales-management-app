@@ -30,24 +30,11 @@ export default function PermissionSettings() {
     }
   };
 
-  // Define desired module order
-  const moduleOrder = [
-    "dashboard",
-    "orders",
-    "products",
-    "stock",
-    "vouchers",
-    "promotions",
-    "customers",
-    "expenses",
-    "reports",
-    "settings",
-  ];
-
-  // Get unique modules from permissions and sort by custom order
-  const modules = moduleOrder.filter((module) =>
-    permissions.some((p) => p.module === module)
-  );
+  const modules = [...new Set(permissions.map((p) => p.module))].sort((a, b) => {
+    const firstPermissionA = permissions.find((p) => p.module === a);
+    const firstPermissionB = permissions.find((p) => p.module === b);
+    return (firstPermissionA?.id || 0) - (firstPermissionB?.id || 0);
+  });
 
   // Filter permissions
   const filteredPermissions = permissions.filter((permission) => {

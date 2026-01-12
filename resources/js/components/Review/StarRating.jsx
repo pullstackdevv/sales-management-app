@@ -3,8 +3,8 @@ import { Icon } from '@iconify/react';
 
 export default function StarRating({ rating, maxRating = 5, size = 'md', showValue = false, interactive = false, onChange }) {
   const sizeClasses = {
-    sm: 'text-sm',
-    md: 'text-lg',
+    sm: 'text-base',
+    md: 'text-xl',
     lg: 'text-2xl',
     xl: 'text-3xl'
   };
@@ -27,7 +27,7 @@ export default function StarRating({ rating, maxRating = 5, size = 'md', showVal
             type="button"
             onClick={() => handleClick(starValue)}
             disabled={!interactive}
-            className={`${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'}`}
+            className={`${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'} focus:outline-none`}
           >
             <Icon
               icon={isFilled ? 'mdi:star' : 'mdi:star-outline'}

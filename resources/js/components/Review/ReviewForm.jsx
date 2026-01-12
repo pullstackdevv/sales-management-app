@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import StarRating from './StarRating';
-import { Button, Textarea } from 'flowbite-react';
 import { Icon } from '@iconify/react';
 import api from '@/api/axios';
 import Swal from 'sweetalert2';
@@ -16,8 +15,8 @@ export default function ReviewForm({ productId, customerId, orderId, onSuccess }
     if (rating === 0) {
       Swal.fire({
         icon: 'warning',
-        title: 'Rating Required',
-        text: 'Please select a rating before submitting',
+        title: 'Rating Diperlukan',
+        text: 'Silakan pilih rating sebelum mengirim ulasan',
       });
       return;
     }
@@ -35,17 +34,15 @@ export default function ReviewForm({ productId, customerId, orderId, onSuccess }
       if (response.data.success) {
         Swal.fire({
           icon: 'success',
-          title: 'Review Submitted!',
-          text: 'Your review has been submitted and will be displayed after admin approval.',
+          title: 'Ulasan Terkirim!',
+          text: 'Ulasan Anda akan ditampilkan setelah disetujui admin.',
           timer: 3000,
           showConfirmButton: false
         });
 
-        // Reset form
         setRating(0);
         setReviewText('');
 
-        // Callback
         if (onSuccess) {
           onSuccess();
         }
@@ -53,8 +50,8 @@ export default function ReviewForm({ productId, customerId, orderId, onSuccess }
     } catch (err) {
       Swal.fire({
         icon: 'error',
-        title: 'Failed to Submit',
-        text: err.response?.data?.message || 'Failed to submit review. Please try again.',
+        title: 'Gagal Mengirim',
+        text: err.response?.data?.message || 'Gagal mengirim ulasan. Silakan coba lagi.',
       });
     } finally {
       setLoading(false);
@@ -62,14 +59,13 @@ export default function ReviewForm({ productId, customerId, orderId, onSuccess }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h3 className="text-xl font-bold text-gray-900 mb-4">Write a Review</h3>
+    <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Tulis Ulasan</h3>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Rating */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Your Rating *
+            Rating Anda *
           </label>
           <StarRating
             rating={rating}
@@ -79,61 +75,60 @@ export default function ReviewForm({ productId, customerId, orderId, onSuccess }
           />
           {rating > 0 && (
             <p className="text-sm text-gray-600 mt-2">
-              {rating === 5 && '⭐ Excellent!'}
-              {rating === 4 && '👍 Very Good!'}
-              {rating === 3 && '😊 Good'}
-              {rating === 2 && '😐 Fair'}
-              {rating === 1 && '😞 Poor'}
+              {rating === 5 && '⭐ Sangat Bagus!'}
+              {rating === 4 && '👍 Bagus!'}
+              {rating === 3 && '😊 Cukup Baik'}
+              {rating === 2 && '😐 Kurang'}
+              {rating === 1 && '😞 Buruk'}
             </p>
           )}
         </div>
 
-        {/* Review Text */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Your Review (Optional)
+            Ulasan Anda (Opsional)
           </label>
-          <Textarea
+          <textarea
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
-            placeholder="Share your experience with this product..."
+            placeholder="Bagikan pengalaman Anda dengan produk ini..."
             rows={5}
             maxLength={1000}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
           />
           <p className="text-xs text-gray-500 mt-1">
-            {reviewText.length}/1000 characters
+            {reviewText.length}/1000 karakter
           </p>
         </div>
 
-        {/* Submit Button */}
-        <div className="flex items-center gap-3">
-          <Button
-            type="submit"
-            color="blue"
-            disabled={loading || rating === 0}
-            className="flex-1"
-          >
-            {loading ? (
-              <>
-                <Icon icon="mdi:loading" className="mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <Icon icon="mdi:send" className="mr-2" />
-                Submit Review
-              </>
-            )}
-          </Button>
-        </div>
+        <button
+          type="submit"
+          disabled={loading || rating === 0}
+          className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+            loading || rating === 0
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-gray-800 text-white hover:bg-gray-900'
+          }`}
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Icon icon="mdi:loading" className="animate-spin" />
+              Mengirim...
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2">
+              <Icon icon="mdi:send" />
+              Kirim Ulasan
+            </span>
+          )}
+        </button>
 
-        {/* Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
           <div className="flex items-start gap-2">
             <Icon icon="mdi:information" className="text-blue-600 text-lg flex-shrink-0 mt-0.5" />
             <p className="text-xs text-blue-800">
-              Your review will be checked by our team before being published. 
-              Please be honest and constructive in your feedback.
+              Ulasan Anda akan ditinjau oleh tim kami sebelum dipublikasikan. 
+              Mohon berikan ulasan yang jujur dan membangun.
             </p>
           </div>
         </div>

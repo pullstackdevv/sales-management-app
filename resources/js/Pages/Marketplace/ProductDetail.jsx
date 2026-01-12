@@ -17,6 +17,7 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import { checkoutSession } from '@/utils/checkoutSession';
 import { useCart } from '@/hooks/useCart';
+import ReviewSection from '@/components/Review/ReviewSection';
 
 export default function ProductDetail() {
     const { id } = usePage().props;
@@ -701,7 +702,8 @@ export default function ProductDetail() {
                         <div className="border-b border-gray-100">
                             <nav className="flex space-x-6 px-4 sm:px-4">
                                 {[
-                                    { id: 'description', label: 'Deskripsi' }
+                                    { id: 'description', label: 'Deskripsi' },
+                                    { id: 'reviews', label: 'Ulasan & Rating' }
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
@@ -743,6 +745,16 @@ export default function ProductDetail() {
                                             </ul>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {activeTab === 'reviews' && (
+                                <div>
+                                    <ReviewSection 
+                                        productId={product.id}
+                                        customerId={null}
+                                        orderId={null}
+                                    />
                                 </div>
                             )}
                         </div>

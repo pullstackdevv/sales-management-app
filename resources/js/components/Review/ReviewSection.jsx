@@ -58,8 +58,8 @@ export default function ReviewSection({ productId, customerId, orderId }) {
   return (
     <div className="space-y-6">
       {/* Header with Stats */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Customer Reviews</h2>
+      <div className="border-b border-gray-200 pb-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Ulasan Pelanggan</h2>
         
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -71,7 +71,7 @@ export default function ReviewSection({ productId, customerId, orderId }) {
                 </div>
                 <StarRating rating={stats.average_rating} size="md" />
                 <p className="text-sm text-gray-600 mt-2">
-                  Based on {stats.total_reviews} {stats.total_reviews === 1 ? 'review' : 'reviews'}
+                  Berdasarkan {stats.total_reviews} ulasan
                 </p>
               </div>
             </div>
@@ -87,7 +87,7 @@ export default function ReviewSection({ productId, customerId, orderId }) {
                 return (
                   <div key={star} className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700 w-8">
-                      {star} <Icon icon="mdi:star" className="inline text-yellow-400" />
+                      {star} <Icon icon="mdi:star" className="inline text-yellow-400 text-sm" />
                     </span>
                     <div className="flex-1 bg-gray-200 rounded-full h-2">
                       <div
@@ -107,24 +107,24 @@ export default function ReviewSection({ productId, customerId, orderId }) {
 
         {/* Write Review Button */}
         {customerId && canReview && !showReviewForm && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="mt-6">
             <button
               onClick={() => setShowReviewForm(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-6 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
             >
-              <Icon icon="mdi:pencil" className="text-xl" />
-              Write a Review
+              <Icon icon="mdi:pencil" className="text-lg" />
+              Tulis Ulasan
             </button>
           </div>
         )}
 
         {/* Login Prompt */}
         {!customerId && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3">
-              <Icon icon="mdi:information" className="text-blue-600 text-2xl flex-shrink-0" />
+          <div className="mt-6">
+            <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3 border border-gray-200">
+              <Icon icon="mdi:information" className="text-gray-600 text-xl flex-shrink-0" />
               <p className="text-sm text-gray-700">
-                Please <a href="/login" className="text-blue-600 hover:underline font-medium">login</a> to write a review
+                Silakan login untuk menulis ulasan
               </p>
             </div>
           </div>
@@ -132,11 +132,11 @@ export default function ReviewSection({ productId, customerId, orderId }) {
 
         {/* Already Reviewed */}
         {customerId && !canReview && !showReviewForm && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="bg-green-50 rounded-lg p-4 flex items-center gap-3">
-              <Icon icon="mdi:check-circle" className="text-green-600 text-2xl flex-shrink-0" />
+          <div className="mt-6">
+            <div className="bg-green-50 rounded-lg p-4 flex items-center gap-3 border border-green-200">
+              <Icon icon="mdi:check-circle" className="text-green-600 text-xl flex-shrink-0" />
               <p className="text-sm text-gray-700">
-                Thank you for your review! It will be displayed after admin approval.
+                Terima kasih atas ulasan Anda! Ulasan akan ditampilkan setelah disetujui admin.
               </p>
             </div>
           </div>
@@ -154,9 +154,9 @@ export default function ReviewSection({ productId, customerId, orderId }) {
       )}
 
       {/* Reviews List */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-6">
-          Customer Reviews ({stats?.total_reviews || 0})
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          Semua Ulasan ({stats?.total_reviews || 0})
         </h3>
         <ReviewList reviews={reviews} loading={loading} />
       </div>

@@ -16,6 +16,7 @@ import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { checkoutSession } from '@/utils/checkoutSession';
+import customerSession from '@/utils/customerSession';
 import { useCart } from '@/hooks/useCart';
 import ReviewSection from '@/components/Review/ReviewSection';
 
@@ -30,6 +31,7 @@ export default function ProductDetail() {
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [currentImage, setCurrentImage] = useState(null);
     const [imageLoading, setImageLoading] = useState(false);
+    const [currentCustomer, setCurrentCustomer] = useState(null);
     const { addToCart: addToCartHook } = useCart();
 
     // Order states
@@ -54,6 +56,13 @@ export default function ProductDetail() {
         submitting: false
     });
     const [orderErrors, setOrderErrors] = useState({});
+
+    useEffect(() => {
+        const sessionCustomer = customerSession.get();
+        if (sessionCustomer?.customer_id) {
+            setCurrentCustomer(sessionCustomer);
+        }
+    }, []);
 
     useEffect(() => {
         if (id) {
@@ -752,7 +761,7 @@ export default function ProductDetail() {
                                 <div>
                                     <ReviewSection 
                                         productId={product.id}
-                                        customerId={null}
+                                        customerId={currentCustomer?.customer_id || null}
                                         orderId={null}
                                     />
                                 </div>

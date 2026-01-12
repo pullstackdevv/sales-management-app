@@ -124,7 +124,7 @@ class ProductReviewController extends Controller
             $validator = Validator::make($request->all(), [
                 'product_id' => 'required|exists:products,id',
                 'customer_id' => 'required|exists:customers,id',
-                'order_id' => 'required|exists:orders,id',
+                'order_id' => 'nullable|exists:orders,id',
                 'rating' => 'required|integer|min:1|max:5',
                 'review_text' => 'nullable|string|max:1000',
             ]);
@@ -138,22 +138,26 @@ class ProductReviewController extends Controller
             }
 
             $product = Product::findOrFail($request->product_id);
-            $order = Order::findOrFail($request->order_id);
+            
+            // Jika order_id diberikan, validasi order
+            if ($request->order_id) {
+                $order = Order::findOrFail($request->order_id);
 
-            // Validasi: Order harus milik customer
-            if ($order->customer_id != $request->customer_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Order does not belong to this customer'
-                ], 403);
-            }
+                // Validasi: Order harus milik customer
+                if ($order->customer_id != $request->customer_id) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Order does not belong to this customer'
+                    ], 403);
+                }
 
-            // Validasi: Order harus sudah paid/shipped/delivered
-            if (!in_array($order->status, ['paid', 'shipped', 'delivered'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You can only review products from completed orders'
-                ], 403);
+                // Validasi: Order harus sudah processing/paid/shipped/delivered
+                if (!in_array($order->status, ['processing', 'paid', 'shipped', 'delivered'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'You can only review products from completed orders'
+                    ], 403);
+                }
             }
 
             // Validasi: Customer harus pernah beli produk ini

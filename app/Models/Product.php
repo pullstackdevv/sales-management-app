@@ -185,7 +185,7 @@ class Product extends Model
             ->join('product_variants', 'order_items.product_variant_id', '=', 'product_variants.id')
             ->where('product_variants.product_id', $this->id)
             ->where('orders.customer_id', $customerId)
-            ->whereIn('orders.status', ['paid', 'shipped', 'delivered'])
+            ->whereIn('orders.status', ['processing', 'paid', 'shipped', 'delivered'])
             ->exists();
     }
 }

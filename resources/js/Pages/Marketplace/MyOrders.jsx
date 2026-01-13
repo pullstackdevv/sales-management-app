@@ -606,7 +606,7 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                         {/* Review Button - Only show for delivered orders */}
                                                         {order.status === 'delivered' && item.product_variant?.product?.id && (
                                                             <Link
-                                                                href={`/products/${item.product_variant.product.id}?tab=reviews`}
+                                                                href={`/write-review?order_id=${order.id}&product_id=${item.product_variant.product.id}`}
                                                                 className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
                                                             >
                                                                 <Star className="w-3.5 h-3.5" />

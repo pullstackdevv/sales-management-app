@@ -1,24 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import StarRating from './StarRating';
 import ReviewList from './ReviewList';
-import ReviewForm from './ReviewForm';
 import { Icon } from '@iconify/react';
 import api from '@/api/axios';
 
-export default function ReviewSection({ productId, customerId, orderId }) {
+export default function ReviewSection({ productId }) {
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [canReview, setCanReview] = useState(false);
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewStatus, setReviewStatus] = useState(null); // 'can_review', 'already_reviewed', 'not_purchased'
 
   useEffect(() => {
     fetchReviews();
-    if (customerId) {
-      checkCanReview();
-    }
-  }, [productId, customerId]);
+  }, [productId]);
 
   const fetchReviews = async () => {
     try {
@@ -33,38 +26,6 @@ export default function ReviewSection({ productId, customerId, orderId }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const checkCanReview = async () => {
-    try {
-      const response = await api.post('/reviews/can-review', {
-        product_id: productId,
-        customer_id: customerId,
-        order_id: orderId,
-      });
-      if (response.data.success) {
-        const data = response.data.data;
-        setCanReview(data.can_review);
-        
-        // Set status berdasarkan response
-        if (data.can_review) {
-          setReviewStatus('can_review');
-        } else if (data.reason === 'already_reviewed') {
-          setReviewStatus('already_reviewed');
-        } else {
-          setReviewStatus('not_purchased');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to check review eligibility:', err);
-      setReviewStatus('not_purchased');
-    }
-  };
-
-  const handleReviewSuccess = () => {
-    setShowReviewForm(false);
-    fetchReviews();
-    checkCanReview();
   };
 
   return (
@@ -116,66 +77,7 @@ export default function ReviewSection({ productId, customerId, orderId }) {
             </div>
           </div>
         )}
-
-        {/* Write Review Button */}
-        {customerId && canReview && !showReviewForm && (
-          <div className="mt-6">
-            <button
-              onClick={() => setShowReviewForm(true)}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
-            >
-              <Icon icon="mdi:pencil" className="text-lg" />
-              Tulis Ulasan
-            </button>
-          </div>
-        )}
-
-        {/* Login Prompt */}
-        {!customerId && (
-          <div className="mt-6">
-            <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3 border border-gray-200">
-              <Icon icon="mdi:information" className="text-gray-600 text-xl flex-shrink-0" />
-              <p className="text-sm text-gray-700">
-                Silakan login untuk menulis ulasan
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Already Reviewed */}
-        {customerId && !canReview && !showReviewForm && reviewStatus === 'already_reviewed' && (
-          <div className="mt-6">
-            <div className="bg-green-50 rounded-lg p-4 flex items-center gap-3 border border-green-200">
-              <Icon icon="mdi:check-circle" className="text-green-600 text-xl flex-shrink-0" />
-              <p className="text-sm text-gray-700">
-                Terima kasih atas ulasan Anda! Ulasan akan ditampilkan setelah disetujui admin.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Not Purchased */}
-        {customerId && !canReview && !showReviewForm && reviewStatus === 'not_purchased' && (
-          <div className="mt-6">
-            <div className="bg-yellow-50 rounded-lg p-4 flex items-center gap-3 border border-yellow-200">
-              <Icon icon="mdi:information" className="text-yellow-600 text-xl flex-shrink-0" />
-              <p className="text-sm text-gray-700">
-                Anda belum dapat menulis ulasan untuk produk ini. Silakan beli produk terlebih dahulu.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* Review Form */}
-      {showReviewForm && (
-        <ReviewForm
-          productId={productId}
-          customerId={customerId}
-          orderId={orderId}
-          onSuccess={handleReviewSuccess}
-        />
-      )}
 
       {/* Reviews List */}
       <div className="mt-6">

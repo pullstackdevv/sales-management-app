@@ -356,6 +356,14 @@ Route::get('/profile', function () {
     return Inertia::render('Marketplace/Profile');
 })->name('marketplace.profile');
 
+Route::get('/myorder', function () {
+    return Inertia::render('Marketplace/MyOrders');
+})->name('marketplace.myorder');
+
+Route::get('/write-review', function () {
+    return Inertia::render('Marketplace/WriteReview');
+})->name('marketplace.write-review');
+
 // Web Order Routes (for marketplace checkout)
 Route::post('/order/create', [WebOrderController::class, 'createOrder'])->name('marketplace.order.create');
 Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->name('marketplace.order.show');

@@ -63,14 +63,14 @@ export default function ReviewManagement() {
   };
 
   const handleApprove = async (reviewId) => {
-    const confirmed = await showConfirm(
-      'Approve Review?',
+    const result = await showConfirm(
       'This review will be visible on the storefront',
+      'Approve Review?',
       'Yes, Approve',
       'Cancel'
     );
 
-    if (confirmed) {
+    if (result.isConfirmed) {
       try {
         console.log('Approving review:', reviewId);
         const response = await api.post(`/reviews/${reviewId}/approve`);
@@ -118,14 +118,14 @@ export default function ReviewManagement() {
   };
 
   const handleDelete = async (reviewId) => {
-    const confirmed = await showConfirm(
-      'Delete Review?',
+    const result = await showConfirm(
       'This action cannot be undone',
+      'Delete Review?',
       'Yes, Delete',
       'Cancel'
     );
 
-    if (confirmed) {
+    if (result.isConfirmed) {
       try {
         console.log('Deleting review:', reviewId);
         const response = await api.delete(`/reviews/${reviewId}`);
@@ -345,68 +345,96 @@ export default function ReviewManagement() {
       )}
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Status
-            </label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="w-full rounded-lg border-gray-300"
-            >
-              <option value="">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
+      <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 mb-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-600 mb-1 block">Pencarian</label>
+              <div className="relative">
+                <Icon icon="mdi:magnify" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl" />
+                <input
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  placeholder="Cari nama customer, produk, atau isi ulasan..."
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setFilters({
+                  status: '',
+                  rating: '',
+                  search: '',
+                  sort_by: 'created_at',
+                  sort_order: 'desc',
+                  per_page: 15,
+                })}
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Reset Filter
+              </button>
+            </div>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rating
-            </label>
-            <select
-              value={filters.rating}
-              onChange={(e) => setFilters({ ...filters, rating: e.target.value })}
-              className="w-full rounded-lg border-gray-300"
-            >
-              <option value="">All Ratings</option>
-              <option value="5">5 Stars</option>
-              <option value="4">4 Stars</option>
-              <option value="3">3 Stars</option>
-              <option value="2">2 Stars</option>
-              <option value="1">1 Star</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sort By
-            </label>
-            <select
-              value={filters.sort_by}
-              onChange={(e) => setFilters({ ...filters, sort_by: e.target.value })}
-              className="w-full rounded-lg border-gray-300"
-            >
-              <option value="created_at">Date</option>
-              <option value="rating">Rating</option>
-              <option value="status">Status</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search
-            </label>
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              placeholder="Search review text..."
-              className="w-full rounded-lg border-gray-300"
-            />
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="">Semua Status</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Rating</label>
+              <select
+                value={filters.rating}
+                onChange={(e) => setFilters({ ...filters, rating: e.target.value })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="">Semua Rating</option>
+                <option value="5">5 Bintang</option>
+                <option value="4">4 Bintang</option>
+                <option value="3">3 Bintang</option>
+                <option value="2">2 Bintang</option>
+                <option value="1">1 Bintang</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Urutkan</label>
+              <select
+                value={filters.sort_by}
+                onChange={(e) => setFilters({ ...filters, sort_by: e.target.value })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="created_at">Tanggal</option>
+                <option value="rating">Rating</option>
+                <option value="status">Status</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Jumlah / Halaman</label>
+              <select
+                value={filters.per_page}
+                onChange={(e) => setFilters({ ...filters, per_page: Number(e.target.value) })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                {[10, 15, 25, 50].map((size) => (
+                  <option key={size} value={size}>{size} data</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>

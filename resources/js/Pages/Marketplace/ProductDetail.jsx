@@ -770,8 +770,6 @@ export default function ProductDetail() {
                                 <div>
                                     <ReviewSection 
                                         productId={product.id}
-                                        customerId={currentCustomer?.customer_id || null}
-                                        orderId={null}
                                     />
                                 </div>
                             )}

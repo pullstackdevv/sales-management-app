@@ -34,6 +34,15 @@ export default function ProductDetail() {
     const [currentCustomer, setCurrentCustomer] = useState(null);
     const { addToCart: addToCartHook } = useCart();
 
+    // Check URL query parameter for tab
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (tabParam === 'reviews') {
+            setActiveTab('reviews');
+        }
+    }, []);
+
     // Order states
     const [showOrderModal, setShowOrderModal] = useState(false);
     const [orderFormData, setOrderFormData] = useState({

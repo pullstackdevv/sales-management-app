@@ -151,11 +151,11 @@ class ProductReviewController extends Controller
                     ], 403);
                 }
 
-                // Validasi: Order harus sudah processing/paid/shipped/delivered
-                if (!in_array($order->status, ['processing', 'paid', 'shipped', 'delivered'])) {
+                // Validasi: Order harus sudah delivered (diterima)
+                if ($order->status !== 'delivered') {
                     return response()->json([
                         'success' => false,
-                        'message' => 'You can only review products from completed orders'
+                        'message' => 'You can only review products from delivered orders'
                     ], 403);
                 }
             }

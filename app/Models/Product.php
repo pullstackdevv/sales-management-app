@@ -177,7 +177,7 @@ class Product extends Model
         return $query->exists();
     }
 
-    // Cek apakah customer pernah beli produk ini
+    // Cek apakah customer pernah beli produk ini dan sudah diterima
     public function hasBeenPurchasedByCustomer($customerId)
     {
         return \DB::table('order_items')
@@ -185,7 +185,7 @@ class Product extends Model
             ->join('product_variants', 'order_items.product_variant_id', '=', 'product_variants.id')
             ->where('product_variants.product_id', $this->id)
             ->where('orders.customer_id', $customerId)
-            ->whereIn('orders.status', ['processing', 'paid', 'shipped', 'delivered'])
+            ->where('orders.status', 'delivered') // Hanya order yang sudah diterima
             ->exists();
     }
 }

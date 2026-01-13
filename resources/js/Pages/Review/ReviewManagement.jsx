@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
-import { Button, Badge, Modal, Textarea } from "flowbite-react";
 import api from "@/api/axios";
 import { showSuccess, showError, showConfirm } from '@/utils/sweetalert';
 import { useAuth } from "../../contexts/AuthContext";
@@ -73,13 +72,17 @@ export default function ReviewManagement() {
 
     if (confirmed) {
       try {
+        console.log('Approving review:', reviewId);
         const response = await api.post(`/reviews/${reviewId}/approve`);
+        console.log('Approve response:', response.data);
         if (response.data.success) {
           showSuccess('Review has been approved');
           fetchReviews();
           fetchStatistics();
         }
       } catch (err) {
+        console.error('Approve error:', err);
+        console.error('Error response:', err.response);
         showError(err.response?.data?.message || 'Failed to approve review');
       }
     }
@@ -95,9 +98,11 @@ export default function ReviewManagement() {
     if (!selectedReview) return;
 
     try {
+      console.log('Rejecting review:', selectedReview.id, 'Reason:', rejectionReason);
       const response = await api.post(`/reviews/${selectedReview.id}/reject`, {
         rejection_reason: rejectionReason
       });
+      console.log('Reject response:', response.data);
       
       if (response.data.success) {
         showSuccess('Review has been rejected');
@@ -106,6 +111,8 @@ export default function ReviewManagement() {
         fetchStatistics();
       }
     } catch (err) {
+      console.error('Reject error:', err);
+      console.error('Error response:', err.response);
       showError(err.response?.data?.message || 'Failed to reject review');
     }
   };
@@ -120,13 +127,17 @@ export default function ReviewManagement() {
 
     if (confirmed) {
       try {
+        console.log('Deleting review:', reviewId);
         const response = await api.delete(`/reviews/${reviewId}`);
+        console.log('Delete response:', response.data);
         if (response.data.success) {
           showSuccess('Review has been deleted');
           fetchReviews();
           fetchStatistics();
         }
       } catch (err) {
+        console.error('Delete error:', err);
+        console.error('Error response:', err.response);
         showError(err.response?.data?.message || 'Failed to delete review');
       }
     }
@@ -156,12 +167,16 @@ export default function ReviewManagement() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      pending: { color: 'warning', label: 'Pending' },
-      approved: { color: 'success', label: 'Approved' },
-      rejected: { color: 'failure', label: 'Rejected' },
+      pending: { className: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+      approved: { className: 'bg-green-100 text-green-800', label: 'Approved' },
+      rejected: { className: 'bg-red-100 text-red-800', label: 'Rejected' },
     };
     const config = statusConfig[status] || statusConfig.pending;
-    return <Badge color={config.color}>{config.label}</Badge>;
+    return (
+      <span className={`px-2 py-1 text-xs font-semibold rounded ${config.className}`}>
+        {config.label}
+      </span>
+    );
   };
 
   const columns = [
@@ -223,41 +238,41 @@ export default function ReviewManagement() {
       label: 'Actions',
       render: (review) => (
         <div className="flex gap-2">
-          <Button
-            size="xs"
-            color="light"
+          <button
+            className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
             onClick={() => openDetailModal(review)}
+            title="View Details"
           >
             <Icon icon="mdi:eye" className="text-lg" />
-          </Button>
+          </button>
           
           {review.status === 'pending' && hasPermission('reviews.approve') && (
             <>
-              <Button
-                size="xs"
-                color="success"
+              <button
+                className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-100 rounded transition-colors"
                 onClick={() => handleApprove(review.id)}
+                title="Approve"
               >
                 <Icon icon="mdi:check" className="text-lg" />
-              </Button>
-              <Button
-                size="xs"
-                color="failure"
+              </button>
+              <button
+                className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-100 rounded transition-colors"
                 onClick={() => openRejectModal(review)}
+                title="Reject"
               >
                 <Icon icon="mdi:close" className="text-lg" />
-              </Button>
+              </button>
             </>
           )}
           
           {hasPermission('reviews.delete') && (
-            <Button
-              size="xs"
-              color="failure"
+            <button
+              className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-100 rounded transition-colors"
               onClick={() => handleDelete(review.id)}
+              title="Delete"
             >
               <Icon icon="mdi:delete" className="text-lg" />
-            </Button>
+            </button>
           )}
         </div>
       )
@@ -319,7 +334,9 @@ export default function ReviewManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Avg Rating</p>
-                <p className="text-2xl font-bold">{statistics.average_rating?.toFixed(1) || '0.0'}</p>
+                <p className="text-2xl font-bold">
+                  {statistics.average_rating ? Number(statistics.average_rating).toFixed(1) : '0.0'}
+                </p>
               </div>
               <Icon icon="mdi:star-half-full" className="text-3xl text-yellow-500" />
             </div>
@@ -442,106 +459,145 @@ export default function ReviewManagement() {
       </div>
 
       {/* Detail Modal */}
-      <Modal show={showDetailModal} onClose={() => setShowDetailModal(false)} size="2xl">
-        <Modal.Header>Review Detail</Modal.Header>
-        <Modal.Body>
-          {selectedReview && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-                <p className="text-gray-900">{selectedReview.product?.name}</p>
-                <p className="text-sm text-gray-500">SKU: {selectedReview.product?.sku}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-                <p className="text-gray-900">{selectedReview.customer?.name}</p>
-                <p className="text-sm text-gray-500">{selectedReview.customer?.email}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
-                {renderStars(selectedReview.rating)}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Review</label>
-                <p className="text-gray-900 whitespace-pre-wrap">{selectedReview.review_text || '-'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                {getStatusBadge(selectedReview.status)}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Submitted Date</label>
-                <p className="text-gray-900">
-                  {new Date(selectedReview.created_at).toLocaleString('id-ID')}
-                </p>
-              </div>
-              
-              {selectedReview.approved_at && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {selectedReview.status === 'approved' ? 'Approved' : 'Rejected'} Date
-                  </label>
-                  <p className="text-gray-900">
-                    {new Date(selectedReview.approved_at).toLocaleString('id-ID')}
-                  </p>
-                  {selectedReview.approver && (
-                    <p className="text-sm text-gray-500">By: {selectedReview.approver.name}</p>
-                  )}
+      {showDetailModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowDetailModal(false)}></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Review Detail</h3>
+                  <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-500">
+                    <Icon icon="mdi:close" className="text-2xl" />
+                  </button>
                 </div>
-              )}
-              
-              {selectedReview.rejection_reason && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
-                  <p className="text-gray-900">{selectedReview.rejection_reason}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button color="gray" onClick={() => setShowDetailModal(false)}>
-            Close
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Reject Modal */}
-      <Modal show={showRejectModal} onClose={() => setShowRejectModal(false)}>
-        <Modal.Header>Reject Review</Modal.Header>
-        <Modal.Body>
-          <div className="space-y-4">
-            <p className="text-gray-700">
-              Are you sure you want to reject this review?
-            </p>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Rejection Reason (Optional)
-              </label>
-              <Textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Enter reason for rejection..."
-                rows={4}
-              />
+                {selectedReview && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                      <p className="text-gray-900">{selectedReview.product?.name}</p>
+                      <p className="text-sm text-gray-500">SKU: {selectedReview.product?.sku}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+                      <p className="text-gray-900">{selectedReview.customer?.name}</p>
+                      <p className="text-sm text-gray-500">{selectedReview.customer?.email}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
+                      {renderStars(selectedReview.rating)}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Review</label>
+                      <p className="text-gray-900 whitespace-pre-wrap">{selectedReview.review_text || '-'}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      {getStatusBadge(selectedReview.status)}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Submitted Date</label>
+                      <p className="text-gray-900">
+                        {new Date(selectedReview.created_at).toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                    
+                    {selectedReview.approved_at && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {selectedReview.status === 'approved' ? 'Approved' : 'Rejected'} Date
+                        </label>
+                        <p className="text-gray-900">
+                          {new Date(selectedReview.approved_at).toLocaleString('id-ID')}
+                        </p>
+                        {selectedReview.approver && (
+                          <p className="text-sm text-gray-500">By: {selectedReview.approver.name}</p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {selectedReview.rejection_reason && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
+                        <p className="text-gray-900">{selectedReview.rejection_reason}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowDetailModal(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button color="failure" onClick={handleReject}>
-            Reject Review
-          </Button>
-          <Button color="gray" onClick={() => setShowRejectModal(false)}>
-            Cancel
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowRejectModal(false)}></div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Reject Review</h3>
+                  <button onClick={() => setShowRejectModal(false)} className="text-gray-400 hover:text-gray-500">
+                    <Icon icon="mdi:close" className="text-2xl" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <p className="text-gray-700">
+                    Are you sure you want to reject this review?
+                  </p>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rejection Reason (Optional)
+                    </label>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      placeholder="Enter reason for rejection..."
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleReject}
+                >
+                  Reject Review
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowRejectModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </DashboardLayout>
   );

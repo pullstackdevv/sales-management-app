@@ -79,11 +79,11 @@ export default function ReviewSection({ productId, customerId, orderId }) {
             <div className="flex items-center gap-4">
               <div className="text-center">
                 <div className="text-5xl font-bold text-gray-900">
-                  {stats.average_rating.toFixed(1)}
+                  {stats.average_rating ? Number(stats.average_rating).toFixed(1) : '0.0'}
                 </div>
-                <StarRating rating={stats.average_rating} size="md" />
+                <StarRating rating={stats.average_rating || 0} size="md" />
                 <p className="text-sm text-gray-600 mt-2">
-                  Berdasarkan {stats.total_reviews} ulasan
+                  Berdasarkan {stats.total_reviews || 0} ulasan
                 </p>
               </div>
             </div>

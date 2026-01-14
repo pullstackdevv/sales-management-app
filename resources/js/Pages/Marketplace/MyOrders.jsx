@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, router } from '@inertiajs/react';
 import { Package, Clock, CheckCircle, XCircle, Truck, ChevronRight, Search, Phone, Mail, ExternalLink, RefreshCw, LogOut, Star } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import MarketplaceLayout from '@/Layouts/MarketplaceLayout';
 import { formatCurrency } from '@/utils/helpers';
 import customerSession from '@/utils/customerSession';
@@ -603,15 +604,25 @@ const MyOrders = ({ orders: initialOrders, needsCustomerData }) => {
                                                         <p className="text-sm text-gray-600">
                                                             {item.quantity} × {formatCurrency(item.price)}
                                                         </p>
-                                                        {/* Review Button - Only show for delivered orders */}
+                                                        
+                                                        {/* Review Status */}
                                                         {order.status === 'delivered' && item.product_variant?.product?.id && (
-                                                            <Link
-                                                                href={`/write-review?order_id=${order.id}&product_id=${item.product_variant.product.id}`}
-                                                                className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
-                                                            >
-                                                                <Star className="w-3.5 h-3.5" />
-                                                                Tulis Ulasan
-                                                            </Link>
+                                                            <>
+                                                                {item.is_reviewed ? (
+                                                                    <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                                                                        <Icon icon="mdi:check-circle" className="w-3.5 h-3.5" />
+                                                                        Sudah Direview
+                                                                    </span>
+                                                                ) : (
+                                                                    <Link
+                                                                        href={`/write-review?order_id=${order.id}&product_id=${item.product_variant.product.id}`}
+                                                                        className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                                                    >
+                                                                        <Star className="w-3.5 h-3.5" />
+                                                                        Tulis Ulasan
+                                                                    </Link>
+                                                                )}
+                                                            </>
                                                         )}
                                                     </div>
                                                 </div>

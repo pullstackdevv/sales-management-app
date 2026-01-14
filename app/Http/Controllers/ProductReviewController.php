@@ -187,6 +187,15 @@ class ProductReviewController extends Controller
                 'reviewed_at' => now(),
             ]);
 
+            // Mark order item as reviewed
+            if ($request->order_id) {
+                \DB::table('order_items')
+                    ->join('product_variants', 'order_items.product_variant_id', '=', 'product_variants.id')
+                    ->where('order_items.order_id', $request->order_id)
+                    ->where('product_variants.product_id', $request->product_id)
+                    ->update(['order_items.is_reviewed' => true]);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Review submitted successfully. It will be displayed after admin approval.',

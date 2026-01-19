@@ -12,6 +12,8 @@ use App\Models\Shipping;
 use App\Models\StockMovement;
 use App\Enums\StockMovementType;
 use App\Enums\PaymentStatus;
+use App\Services\LoyaltyPointService;
+use App\Models\SalesChannel;
 use App\Http\Requests\Order\StoreRequest;
 use App\Http\Requests\Order\UpdateRequest;
 use Illuminate\Http\Request;
@@ -170,7 +172,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, LoyaltyPointService $loyaltyService): JsonResponse
     {
         // Check permission
         if (!Auth::user()->hasPermission('orders.create')) {
@@ -190,6 +192,7 @@ class OrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
             'shipping_cost' => 'required|numeric|min:0',
+            'discount_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:255',
             'status' => 'nullable|in:pending,processing,paid,shipped,delivered,cancelled',
             'courier_id' => 'nullable|exists:couriers,id',
@@ -219,37 +222,10 @@ class OrderController extends Controller
 
             // Calculate total before discount
             $totalBeforeDiscount = $subtotal + $validated['shipping_cost'];
-
-            // Apply voucher discount if voucher_id is provided
-            $discountAmount = 0;
-            if (isset($validated['voucher_id'])) {
-                $voucher = \App\Models\Voucher::find($validated['voucher_id']);
-                
-                Log::info('OrderController - Voucher validation', [
-                    'voucher_id' => $validated['voucher_id'],
-                    'voucher_found' => $voucher ? true : false,
-                    'voucher_code' => $voucher ? $voucher->code : null,
-                    'voucher_type' => $voucher ? $voucher->type : null,
-                    'total_before_discount' => $totalBeforeDiscount,
-                    'shipping_cost' => $validated['shipping_cost'],
-                    'can_be_used' => $voucher ? $voucher->canBeUsed($totalBeforeDiscount) : false
-                ]);
-                
-                if ($voucher && $voucher->canBeUsed($totalBeforeDiscount)) {
-                    // Pass shipping_cost to calculateDiscount for shipping vouchers
-                    $discountAmount = $voucher->calculateDiscount($totalBeforeDiscount, $validated['shipping_cost']);
-                    
-                    Log::info('OrderController - Voucher discount calculated', [
-                        'voucher_code' => $voucher->code,
-                        'voucher_type' => $voucher->type,
-                        'discount_amount' => $discountAmount,
-                        'discount_type' => $voucher->type,
-                        'discount_value' => $voucher->value,
-                        'shipping_cost' => $validated['shipping_cost']
-                    ]);
-                }
-            } else {
-                Log::info('OrderController - No voucher_id provided in request');
+            // Apply manual discount from request (ignore vouchers for manual orders)
+            $discountAmount = isset($validated['discount_amount']) ? max(0, (float)$validated['discount_amount']) : 0;
+            if ($discountAmount > $totalBeforeDiscount) {
+                $discountAmount = $totalBeforeDiscount;
             }
 
             // Calculate final total price after discount
@@ -270,7 +246,7 @@ class OrderController extends Controller
                 'address_id' => $validated['address_id'],
                 'user_id' => Auth::id(),
                 'sales_channel_id' => $validated['sales_channel_id'] ?? null,
-                'voucher_id' => $validated['voucher_id'] ?? null,
+                'voucher_id' => null,
                 'total_price' => $totalPrice,
                 'discount_amount' => $discountAmount,
                 'shipping_cost' => $validated['shipping_cost'],
@@ -301,7 +277,7 @@ class OrderController extends Controller
                     'variant_label' => $variant->variant_label,
                     'quantity' => $item['quantity'],
                     'price' => $price,
-                    'base_price' => $variant->product->base_price,
+                    'base_price' => $variant->base_price,
                     'subtotal' => $subtotal
                 ]);
 
@@ -316,6 +292,24 @@ class OrderController extends Controller
                     "Order #{$order->order_number} - {$order->customer->name}",
                     $order->id
                 );
+            }
+
+            
+            if (isset($validated['status'])) {
+                $order->update(['status' => $validated['status']]);
+
+                // Sync payment_status for manual orders (no payment_url)
+                if (is_null($order->payment_url)) {
+                    if ($validated['status'] === 'paid') {
+                        $order->update(['payment_status' => PaymentStatus::PAID]);
+                    } elseif ($validated['status'] === 'cancelled') {
+                        $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                    }
+                }
+
+                if (!is_null($order->payment_url) && $validated['status'] === 'cancelled') {
+                    $order->update(['payment_status' => PaymentStatus::CANCELLED]);
+                }
             }
 
             // Create payment record if payment bank is provided (manual payment)
@@ -355,6 +349,8 @@ class OrderController extends Controller
 
             DB::commit();
 
+            $this->attemptAwardPointsForManualOrder($order, $loyaltyService);
+
             // Create notification for new order
             NotificationHelper::newOrder($order->load('customer'));
             
@@ -385,7 +381,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function update(Request $request, Order $order): JsonResponse
+    public function update(Request $request, Order $order, LoyaltyPointService $loyaltyService): JsonResponse
     {
         // Check permission
         if (!Auth::user()->hasPermission('orders.edit')) {
@@ -413,7 +409,9 @@ class OrderController extends Controller
             'proof_image' => 'nullable|string',
             'printed_at' => 'nullable|date',
             'is_dropship' => 'nullable|boolean',
-            'notes' => 'nullable|string|max:255'
+            'notes' => 'nullable|string|max:255',
+            'voucher_id' => 'nullable|exists:vouchers,id',
+            'discount_amount' => 'nullable|numeric|min:0'
         ]);
 
         // Batasi edit order khusus untuk order dengan payment gateway (memiliki payment_url)
@@ -558,7 +556,7 @@ class OrderController extends Controller
                         'variant_label' => $variant->variant_label,
                         'quantity' => (int)$newItem['quantity'],
                         'price' => (float)$newItem['price'],
-                        'base_price' => $variant->product->base_price,
+                        'base_price' => $variant->base_price,
                         'subtotal' => (int)$newItem['quantity'] * (float)$newItem['price']
                     ]);
                     $variant->decrement('stock', (int)$newItem['quantity']);
@@ -582,15 +580,24 @@ class OrderController extends Controller
                 $order->shipping_cost = $validated['shipping_cost'];
             }
             
-            // Calculate final total_price once at the end
+            // Calculate final total with voucher discount once at the end
             $finalSubtotal = $calculatedSubtotal ?? $order->items->sum(function($item) {
                 return $item->quantity * $item->price;
             });
-            
-            $finalTotal = $finalSubtotal + $order->shipping_cost;
-            
+
+            $totalBeforeDiscount = $finalSubtotal + $order->shipping_cost;
+            $discountAmount = isset($validated['discount_amount']) ? max(0, (float)$validated['discount_amount']) : (float)$order->discount_amount;
+            if ($discountAmount > $totalBeforeDiscount) {
+                $discountAmount = $totalBeforeDiscount;
+            }
+
+            $pointDiscount = (float)($order->point_discount ?? 0);
+            $finalTotal = max(0, $totalBeforeDiscount - $discountAmount - $pointDiscount);
+
             $order->update([
-                'total_price' => $finalTotal
+                'total_price' => $finalTotal,
+                'discount_amount' => $discountAmount,
+                'voucher_id' => null
             ]);
 
             // Update status if provided
@@ -686,6 +693,9 @@ class OrderController extends Controller
 
             DB::commit();
 
+            // Attempt to award loyalty points if manual order became paid
+            $this->attemptAwardPointsForManualOrder($order, $loyaltyService);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Order updated successfully',
@@ -744,7 +754,7 @@ class OrderController extends Controller
         }
     }
 
-    public function updateStatus(Request $request, Order $order): JsonResponse
+    public function updateStatus(Request $request, Order $order, LoyaltyPointService $loyaltyService): JsonResponse
     {
         // Check permission
         if (!Auth::user()->hasPermission('orders.update_status')) {
@@ -822,6 +832,8 @@ class OrderController extends Controller
             }
 
             DB::commit();
+
+            $this->attemptAwardPointsForManualOrder($order, $loyaltyService);
 
             return response()->json([
                 'status' => 'success',
@@ -1103,6 +1115,43 @@ class OrderController extends Controller
                 'status' => 'error',
                 'message' => 'Failed to retrieve audit history: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Attempt to award loyalty points for manual orders from WhatsApp
+     */
+    private function attemptAwardPointsForManualOrder(Order $order, LoyaltyPointService $loyaltyService): void
+    {
+        $order->refresh();
+        
+        // Award points if paid OR if status indicates progress (processing/shipped/delivered)
+        // This covers cases where manual orders are updated directly to advanced statuses without explicit payment status update
+        $isPaid = $order->payment_status === PaymentStatus::PAID;
+        $isAdvancedStatus = in_array($order->status, ['processing', 'shipped', 'delivered']);
+        $isValidPaymentStatus = !in_array($order->payment_status, [PaymentStatus::CANCELLED, PaymentStatus::FAILED, PaymentStatus::EXPIRED]);
+
+        if (($isPaid || $isAdvancedStatus) && $isValidPaymentStatus && $order->sales_channel_id) {
+            $salesChannel = SalesChannel::find($order->sales_channel_id);
+            // Use code for more robust check than name
+            if ($salesChannel && strtoupper($salesChannel->code) === 'WHATSAPP') {
+                $order->loadMissing('customer');
+                if ($order->customer && !empty($order->customer->phone)) {
+                    try {
+                        Log::info('Attempting to award loyalty points for manual WhatsApp order', [
+                            'order_id' => $order->id,
+                            'status' => $order->status,
+                            'payment_status' => $order->payment_status
+                        ]);
+                        $loyaltyService->awardPointsForOrder($order);
+                    } catch (\Throwable $th) {
+                        Log::error('Failed to award loyalty points for manual order', [
+                            'order_id' => $order->id,
+                            'message' => $th->getMessage(),
+                        ]);
+                    }
+                }
+            }
         }
     }
 }

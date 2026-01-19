@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MarketplaceSettingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AddressController;
@@ -39,6 +40,9 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\BannerController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TagController;
+use App\Http\Controllers\LoyaltyController;
+use App\Http\Controllers\PointController;
+use App\Http\Controllers\ProductReviewController;
 
 
 
@@ -79,6 +83,13 @@ Route::prefix('courier-rates')->group(function () {
 // Public general settings
 Route::get('general-settings/public', [GeneralSettingController::class, 'publicSettings']);
 
+// Marketplace Settings
+Route::prefix('marketplace-settings')->group(function () {
+    Route::get('/', [MarketplaceSettingController::class, 'index']);
+    Route::post('/', [MarketplaceSettingController::class, 'update']);
+    Route::post('/generate', [MarketplaceSettingController::class, 'generate']);
+});
+
 // Public banners
 Route::get('banners', [BannerController::class, 'index']);
 
@@ -97,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('user-performance', [ReportController::class, 'userPerformance']);
         Route::get('payments', [ReportController::class, 'payments']);
         Route::post('export-sales', [ReportController::class, 'exportSales']);
+        Route::post('fix-base-prices', [ReportController::class, 'fixBasePrices']);
     });
 });
 
@@ -142,11 +154,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->json(Auth::user());
     });
 
-    // Customer routes (protected - sensitive data, full CRUD for admin)
-    // Route::apiResource('customers', CustomerController::class);
-    // Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
-    // Route::get('customers/{customer}/addresses', [CustomerController::class, 'addresses']);
-    // Route::delete('customers/{customer}/addresses/{addressId}', [CustomerController::class, 'deleteAddress']);
+    // Customer routes (protected - sensitive data, admin-only; exclude store/update to keep public endpoints working)
+    Route::apiResource('customers', CustomerController::class)->except(['store', 'update']);
+    Route::post('customers/{customer}/toggle-status', [CustomerController::class, 'toggleStatus']);
+    Route::get('customers/{customer}/point-history', [CustomerController::class, 'getPointHistory']);
 
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
@@ -246,15 +257,73 @@ Route::middleware('auth:sanctum')->group(function () {
     // Courier rates admin API routes (import functionality)
     Route::prefix('courier-rates')->group(function () {
         Route::post('/import', [CourierRateController::class, 'import']);
+        Route::put('/{id}/map-destination', [CourierRateController::class, 'mapDestination']);
+        Route::post('/map', [CourierRateController::class, 'startMapping']);
+        Route::get('/map-status/{jobId}', [CourierRateController::class, 'mapStatus']);
+        Route::get('/active-maps', [CourierRateController::class, 'activeMaps']);
+        // Route::post('/{id}/remap-attempt', [CourierRateController::class, 'remapAttempt']);
+        // Route::post('/remap-batch', [CourierRateController::class, 'remapBatch']);
     });
+
+    Route::post('wilayah/custom-upsert', [WilayahController::class, 'customUpsert']);
 
     // Product tags sync
     Route::post('products/{product}/tags/sync', [ProductController::class, 'syncTags']);
+
+    // Loyalty routes (admin)
+    Route::prefix('loyalty')->group(function () {
+        Route::get('/settings', [LoyaltyController::class, 'getSettings']);
+        Route::post('/settings', [LoyaltyController::class, 'updateSettings']);
+        Route::get('/tiers', [LoyaltyController::class, 'getTiers']);
+        Route::post('/tiers', [LoyaltyController::class, 'storeTier']);
+        Route::get('/tiers/{tier}', [LoyaltyController::class, 'showTier']);
+        Route::put('/tiers/{tier}', [LoyaltyController::class, 'updateTier']);
+        Route::delete('/tiers/{tier}', [LoyaltyController::class, 'destroyTier']);
+        Route::post('/tiers/{tier}/toggle-status', [LoyaltyController::class, 'toggleTierStatus']);
+        Route::get('/summary', [PointController::class, 'getPointsSummary']);
+        Route::get('/customer-points', [PointController::class, 'getAllCustomerPoints']);
+    });
+
+    // Customer points routes (admin)
+    Route::prefix('customers/{customer}/points')->group(function () {
+        Route::get('/', [PointController::class, 'getCustomerPoints']);
+        Route::get('/history', [PointController::class, 'getCustomerHistory']);
+        Route::post('/adjust', [PointController::class, 'adjustPoints']);
+    });
+
+    // Product Review routes (admin)
+    Route::prefix('reviews')->group(function () {
+        Route::get('/', [ProductReviewController::class, 'index']);
+        Route::get('/statistics', [ProductReviewController::class, 'statistics']);
+        Route::get('/{id}', [ProductReviewController::class, 'show']);
+        Route::delete('/{id}', [ProductReviewController::class, 'destroy']);
+        Route::post('/{id}/approve', [ProductReviewController::class, 'approve']);
+        Route::post('/{id}/reject', [ProductReviewController::class, 'reject']);
+    });
 });
 
 // Public voucher routes (for checkout)
 Route::post('vouchers/validate', [VoucherController::class, 'validateVoucher']);
 Route::get('vouchers-active', [VoucherController::class, 'getActiveVouchers']);
+
+// Public loyalty routes (for storefront)
+Route::prefix('loyalty')->group(function () {
+    Route::get('/tiers/active', [LoyaltyController::class, 'getActiveTiers']);
+    Route::get('/redeem-options', [PointController::class, 'getRedeemOptions']);
+    Route::post('/calculate-earn', [PointController::class, 'calculateEarnPoints']);
+    Route::post('/calculate-redeem', [PointController::class, 'calculateRedeemValue']);
+    Route::post('/guest-loyalty', [PointController::class, 'getGuestLoyalty']);
+});
+
+// Public Product Review routes (for storefront)
+Route::prefix('reviews')->group(function () {
+    Route::post('/', [ProductReviewController::class, 'store']); // Submit review
+    Route::put('/{id}', [ProductReviewController::class, 'update']); // Edit pending review
+    Route::post('/can-review', [ProductReviewController::class, 'canReview']); // Check eligibility
+});
+
+// Get reviews for specific product (public)
+Route::get('products/{productId}/reviews', [ProductReviewController::class, 'getProductReviews']);
 
 // Payment Gateway Routes (public access for webhooks and order payment)
 Route::prefix('payment')->name('payment.')->group(function () {

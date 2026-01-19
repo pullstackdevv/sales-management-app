@@ -240,7 +240,7 @@ class RoleController extends Controller
 
     public function getAllPermissions(): JsonResponse
     {
-        $permissions = Permission::orderBy('module')->orderBy('name')->get();
+        $permissions = Permission::orderBy('id')->get();
 
         return response()->json([
             'status' => 'success',

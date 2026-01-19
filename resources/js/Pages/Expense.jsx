@@ -5,6 +5,8 @@ import { Button } from "flowbite-react";
 import DashboardLayout from "../Layouts/DashboardLayout";
 import api from "@/api/axios";
 import Swal from "sweetalert2";
+import { getCurrentDateWIB } from "../utils/helpers";
+
 
 export default function ExpensePage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,25 +17,35 @@ export default function ExpensePage() {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [category, setCategory] = useState("");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(getCurrentDateWIB());
     const [amount, setAmount] = useState(0);
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState("");
     const [errors, setErrors] = useState({});
-    
+
     // Edit states
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingExpense, setEditingExpense] = useState(null);
-    
+
     // Filter states
-    const [filterStartDate, setFilterStartDate] = useState("");
-    const [filterEndDate, setFilterEndDate] = useState("");
-    
+    const monthRange = getCurrentMonthRange();
+
+    const [filterStartDate, setFilterStartDate] = useState(monthRange.start);
+    const [filterEndDate, setFilterEndDate] = useState(monthRange.end);
+    const [filterMonth, setFilterMonth] = useState(() => {
+        return getCurrentDateWIB().slice(0, 7);
+    });
+
+
     // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [perPage, setPerPage] = useState(10);
     const [totalItems, setTotalItems] = useState(0);
+    const [grandTotalAmount, setGrandTotalAmount] = useState(0);
+    const [grandTotalCount, setGrandTotalCount] = useState(0);
+    // ⬇️ TAMBAHKAN
+
 
     const formatRibuan = (num) => {
         if (!num || num === 0) return '';
@@ -47,36 +59,96 @@ export default function ExpensePage() {
 
     const subtotal = amount * qty;
 
+    const normalizeDateInput = (value) => {
+        if (!value) {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+        if (typeof value === 'string') {
+            // If purely YYYY-MM-DD, use as-is (no timezone ambiguity)
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            // If has time component (T or space), parse to local date to avoid UTC shifts
+            if (/^\d{4}-\d{2}-\d{2}[ T].*$/.test(value)) {
+                const dt = new Date(value);
+                if (!isNaN(dt.getTime())) {
+                    const y = dt.getFullYear();
+                    const m = String(dt.getMonth() + 1).padStart(2, '0');
+                    const d = String(dt.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+            }
+        }
+        try {
+            const dt = new Date(value);
+            if (!isNaN(dt.getTime())) {
+                const y = dt.getFullYear();
+                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                const d = String(dt.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+        } catch {}
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
     // Fetch expenses data
     useEffect(() => {
         fetchExpenses(currentPage);
-    }, [currentPage, perPage]);
-    
+        fetchExpenseSummary();
+    }, [currentPage, perPage, filterStartDate, filterEndDate]);
+
     // Handle page change
     const handlePageChange = (page) => {
         setCurrentPage(page);
     };
-    
+
+    const handleExportExcel = async () => {
+        try {
+            const params = {
+                start_date: filterStartDate,
+                end_date: filterEndDate
+            };
+            if (category) params.category = category;
+            const response = await api.post('/expenses/export-excel', params);
+            if (response.data?.status === 'success') {
+                const url = response.data?.data?.url;
+                if (url) window.open(url, '_blank');
+            } else {
+                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Export Excel gagal' });
+            }
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Terjadi kesalahan saat export' });
+        }
+    };
+
     // Handle per page change
     const handlePerPageChange = (newPerPage) => {
         setPerPage(newPerPage);
-        setCurrentPage(1);
+        // setCurrentPage(1);
     };
 
-    const fetchExpenses = async (page = 1) => {
+    const fetchExpenses = async (page = 1, overrideStart = null, overrideEnd = null) => {
         try {
             setLoading(true);
             const params = {
                 page: page,
                 per_page: perPage
             };
-            
+
             // Add date filters if they exist
-            if (filterStartDate) params.start_date = filterStartDate;
-            if (filterEndDate) params.end_date = filterEndDate;
-            
+            const start = overrideStart ?? filterStartDate;
+            const end = overrideEnd ?? filterEndDate;
+            if (start) params.start_date = start;
+            if (end) params.end_date = end;
+
             const response = await api.get('/expenses', { params });
-            
+
             // Handle nested data structure: response.data.data.data
             if (response.data.status === 'success' && response.data.data) {
                 const data = response.data.data;
@@ -111,11 +183,32 @@ export default function ExpensePage() {
         }
     };
 
+    const fetchExpenseSummary = async () => {
+        try {
+            const params = {
+                start_date: filterStartDate,
+                end_date: filterEndDate
+            };
+            if (category) params.category = category;
+            const response = await api.get('/expense-summary', { params });
+            if (response.data.status === 'success' && response.data.data) {
+                setGrandTotalAmount(parseFloat(response.data.data.total_amount || 0));
+                setGrandTotalCount(parseInt(response.data.data.total_expenses || 0));
+            } else {
+                setGrandTotalAmount(0);
+                setGrandTotalCount(0);
+            }
+        } catch (error) {
+            setGrandTotalAmount(0);
+            setGrandTotalCount(0);
+        }
+    };
+
     const resetForm = () => {
         setName("");
         setDescription("");
         setCategory("");
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getCurrentDateWIB());
         setAmount(0);
         setQty(1);
         setNotes("");
@@ -130,7 +223,7 @@ export default function ExpensePage() {
         setName(expense.name);
         setDescription(expense.description || "");
         setCategory(expense.category || "");
-        setDate(expense.expense_date);
+        setDate(normalizeDateInput(expense.expense_date));
         setAmount(expense.amount);
         setQty(expense.quantity);
         setNotes(expense.notes || "");
@@ -152,7 +245,7 @@ export default function ExpensePage() {
         if (result.isConfirmed) {
             try {
                 const response = await api.delete(`/expenses/${expenseId}`);
-                
+
                 if (response.data.status === 'success') {
                     Swal.fire({
                         icon: 'success',
@@ -199,10 +292,10 @@ export default function ExpensePage() {
         };
 
         try {
-            const response = isEditMode 
+            const response = isEditMode
                 ? await api.put(`/expenses/${editingExpense.id}`, expenseData)
                 : await api.post('/expenses', expenseData);
-            
+
             if (response.data.status === 'success') {
                 Swal.fire({
                     icon: 'success',
@@ -226,11 +319,11 @@ export default function ExpensePage() {
             }
         } catch (error) {
             console.error('Error creating expense:', error);
-            
+
             if (error.response?.status === 422) {
                 setErrors(error.response.data.errors || {});
                 const errorMessages = Object.values(error.response.data.errors || {}).flat();
-                
+
                 Swal.fire({
                     icon: 'warning',
                     title: 'Validasi Error',
@@ -286,79 +379,135 @@ export default function ExpensePage() {
 
     // Reset filter
     const resetFilter = () => {
-        setFilterStartDate("");
-        setFilterEndDate("");
+        const range = getCurrentMonthRange();
+        setFilterStartDate(range.start);
+        setFilterEndDate(range.end);
         setCurrentPage(1);
-        fetchExpenses(1);
     };
 
+
     const totalExpenses = Array.isArray(filteredExpenses) ? filteredExpenses.reduce((sum, expense) => sum + parseFloat(expense.total_amount || 0), 0) : 0;
+    function getCurrentMonthRange() {
+        const wibDate = getCurrentDateWIB();
+        const [y, m] = wibDate.split('-').map(Number);
+        
+        const start = new Date(y, m - 1, 1);
+        const end = new Date(y, m, 0);
+
+        const fmt = (d) => {
+             const yy = d.getFullYear();
+             const mm = String(d.getMonth() + 1).padStart(2, '0');
+             const dd = String(d.getDate()).padStart(2, '0');
+             return `${yy}-${mm}-${dd}`;
+        };
+
+        return {
+            start: fmt(start),
+            end: fmt(end),
+        };
+    }
+
 
     return (
         <DashboardLayout>
             <div className="p-6">
                 <h1 className="text-2xl font-bold mb-4">Expense</h1>
 
-                <div className="flex flex-wrap gap-3 items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 mb-4 ">
                     <div className="flex flex-wrap gap-3 items-center">
-                        <select className="border text-sm px-3 py-2 rounded-md">
-                            <option>By Date</option>
-                        </select>
                         <input
-                            type="date"
-                            value={filterStartDate}
-                            onChange={(e) => setFilterStartDate(e.target.value)}
+                            type="month"
+                            value={filterMonth}
+                            onChange={(e) => setFilterMonth(e.target.value)}
                             className="border text-sm px-3 py-2 rounded-md"
-                            placeholder="Tanggal Mulai"
                         />
-                        <input
-                            type="date"
-                            value={filterEndDate}
-                            onChange={(e) => setFilterEndDate(e.target.value)}
-                            className="border text-sm px-3 py-2 rounded-md"
-                            placeholder="Tanggal Akhir"
-                        />
-                        <button 
-                            onClick={applyFilter}
-                            className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-blue-50 border-blue-300 text-blue-600"
-                            title="Filter Data"
+                        <button
+                            onClick={() => {
+                                const [yearStr, monthStr] = filterMonth.split('-');
+                                const year = parseInt(yearStr, 10);
+                                const month = parseInt(monthStr, 10);
+                                const daysInMonth = new Date(year, month, 0).getDate();
+                                const start_date = `${yearStr}-${String(monthStr).padStart(2, '0')}-01`;
+                                const end_date = `${yearStr}-${String(monthStr).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+                                setFilterStartDate(start_date);
+                                setFilterEndDate(end_date);
+                                setCurrentPage(1);
+                                fetchExpenses(1, start_date, end_date);
+                            }}
+                            className="text-sm px-3 py-2 rounded-md bg-amber-500 text-white hover:bg-amber-600"
                         >
-                            <Icon icon="mdi:magnify" />
-                        </button>
-                        <button 
-                            onClick={resetFilter}
-                            className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-red-50 border-red-300 text-red-600"
-                            title="Reset Filter"
-                        >
-                            <Icon icon="mdi:refresh" />
+                            Tampilkan Bulan
                         </button>
                     </div>
 
-                    <div className="flex gap-2">
-                        {/* <Button className="text-sm border border-blue-600 text-blue-600">
-                            <Icon
-                                icon="mdi:download"
-                                className="text-lg mr-1"
+                    <div className="flex flex-wrap gap-3 items-center justify-between ">
+                        <div className="flex flex-wrap gap-3 items-center">
+                            <input
+                                type="date"
+                                value={filterStartDate}
+                                onChange={(e) => setFilterStartDate(e.target.value)}
+                                className="border text-sm px-3 py-2 rounded-md"
+                                placeholder="Tanggal Mulai"
                             />
-                            Unduh Excel
-                        </Button> */}
-                        <Button
-                            onClick={() => setIsModalOpen(true)}
-                            className="bg-blue-600 text-white"
-                        >
-                            <Icon icon="ic:baseline-add" className="mr-1" />
-                            Tambah Pengeluaran
-                        </Button>
+                            <input
+                                type="date"
+                                value={filterEndDate}
+                                onChange={(e) => setFilterEndDate(e.target.value)}
+                                className="border text-sm px-3 py-2 rounded-md"
+                                placeholder="Tanggal Akhir"
+                            />
+                            <button
+                                onClick={applyFilter}
+                                className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-blue-50 border-blue-300 text-blue-600"
+                                title="Filter Data"
+                            >
+                                <Icon icon="mdi:magnify" />
+                            </button>
+                            <button
+                                onClick={resetFilter}
+                                className="text-sm px-3 py-2 border rounded-md hover:bg-gray-100 bg-red-50 border-red-300 text-red-600"
+                                title="Reset Filter"
+                            >
+                                <Icon icon="mdi:refresh" />
+                            </button>
+                        </div>
+                        <div className="flex gap-2">
+                            {/* <Button className="text-sm border border-blue-600 text-blue-600">
+                                <Icon
+                                    icon="mdi:download"
+                                    className="text-lg mr-1"
+                                />
+                                Unduh Excel
+                            </Button> */}
+                            <Button
+                                onClick={handleExportExcel}
+                                className="bg-green-600 text-white"
+                            >
+                                <Icon icon="mdi:file-excel" className="mr-1" />
+                                Unduh Excel
+                            </Button>
+                            <Button
+                                onClick={() => setIsModalOpen(true)}
+                                className="bg-blue-600 text-white"
+                            >
+                                <Icon icon="ic:baseline-add" className="mr-1" />
+                                Tambah Pengeluaran
+                            </Button>
+
+                        </div>
                     </div>
+
+
                 </div>
 
                 <div className="bg-red-100 border border-red-200 rounded-lg p-4 text-sm mb-4">
                     <p className="font-semibold text-red-800">
-                        Total Pengeluaran: {formatCurrency(totalExpenses)}
+
+                        Total Pengeluaran: {formatCurrency(grandTotalAmount)}
                     </p>
                     <p className="text-red-600">
                         Ini adalah total pengeluaran dari list daftar
-                        pengeluaran yang ada.
+                        pengeluaran {grandTotalCount} data yang ada
                     </p>
                 </div>
 
@@ -409,20 +558,20 @@ export default function ExpensePage() {
                                         <td className="px-4 py-3 font-medium">{formatCurrency(expense.total_amount)}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex gap-1">
-                                                <button 
-                                    onClick={() => handleEdit(expense)}
-                                    className="text-blue-600 hover:text-blue-800 p-1"
-                                    title="Edit Pengeluaran"
-                                >
-                                    <Icon icon="mdi:pencil" />
-                                </button>
-                                <button 
-                                    onClick={() => handleDelete(expense.id)}
-                                    className="text-red-600 hover:text-red-800 p-1"
-                                    title="Hapus Pengeluaran"
-                                >
-                                    <Icon icon="mdi:delete" />
-                                </button>
+                                                <button
+                                                    onClick={() => handleEdit(expense)}
+                                                    className="text-blue-600 hover:text-blue-800 p-1"
+                                                    title="Edit Pengeluaran"
+                                                >
+                                                    <Icon icon="mdi:pencil" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(expense.id)}
+                                                    className="text-red-600 hover:text-red-800 p-1"
+                                                    title="Hapus Pengeluaran"
+                                                >
+                                                    <Icon icon="mdi:delete" />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -431,14 +580,14 @@ export default function ExpensePage() {
                         </tbody>
                     </table>
                 </div>
-                
+
                 {/* Pagination */}
                 {totalPages > 1 && (
                     <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                             <span>Menampilkan</span>
-                            <select 
-                                value={perPage} 
+                            <select
+                                value={perPage}
                                 onChange={(e) => handlePerPageChange(Number(e.target.value))}
                                 className="border rounded px-2 py-1 text-sm"
                             >
@@ -449,7 +598,7 @@ export default function ExpensePage() {
                             </select>
                             <span>dari {totalItems} data</span>
                         </div>
-                        
+
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => handlePageChange(1)}
@@ -465,7 +614,7 @@ export default function ExpensePage() {
                             >
                                 <Icon icon="mdi:chevron-left" />
                             </button>
-                            
+
                             {/* Page numbers */}
                             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                 let pageNum;
@@ -478,22 +627,21 @@ export default function ExpensePage() {
                                 } else {
                                     pageNum = currentPage - 2 + i;
                                 }
-                                
+
                                 return (
                                     <button
                                         key={pageNum}
                                         onClick={() => handlePageChange(pageNum)}
-                                        className={`px-3 py-1 text-sm border rounded ${
-                                            currentPage === pageNum
-                                                ? 'bg-blue-600 text-white border-blue-600'
-                                                : 'hover:bg-gray-100'
-                                        }`}
+                                        className={`px-3 py-1 text-sm border rounded ${currentPage === pageNum
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'hover:bg-gray-100'
+                                            }`}
                                     >
                                         {pageNum}
                                     </button>
                                 );
                             })}
-                            
+
                             <button
                                 onClick={() => handlePageChange(currentPage + 1)}
                                 disabled={currentPage === totalPages}
@@ -541,9 +689,8 @@ export default function ExpensePage() {
                                             setName(e.target.value)
                                         }
                                         placeholder="Tulis nama..."
-                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.name ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.name ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                     />
                                     {errors.name && (
                                         <p className="text-red-500 text-xs mt-1">{errors.name[0]}</p>
@@ -557,9 +704,8 @@ export default function ExpensePage() {
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         placeholder="Tulis deskripsi..."
-                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.description ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.description ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         rows={3}
                                     />
                                     {errors.description && (
@@ -575,9 +721,8 @@ export default function ExpensePage() {
                                         value={category}
                                         onChange={(e) => setCategory(e.target.value)}
                                         placeholder="Tulis kategori..."
-                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.category ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.category ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                     />
                                     {errors.category && (
                                         <p className="text-red-500 text-xs mt-1">{errors.category[0]}</p>
@@ -591,9 +736,8 @@ export default function ExpensePage() {
                                         type="date"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
-                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.expense_date ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.expense_date ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                     />
                                     {errors.expense_date && (
                                         <p className="text-red-500 text-xs mt-1">{errors.expense_date[0]}</p>
@@ -609,9 +753,8 @@ export default function ExpensePage() {
                                         onChange={(e) => setAmount(parseRibuan(e.target.value))}
                                         onFocus={() => { if (amount === 0) setAmount(''); }}
                                         placeholder="Rp 0"
-                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.amount ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.amount ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                     />
                                     {errors.amount && (
                                         <p className="text-red-500 text-xs mt-1">{errors.amount[0]}</p>
@@ -627,9 +770,8 @@ export default function ExpensePage() {
                                         onChange={(e) => setQty(Math.max(1, parseRibuan(e.target.value)))}
                                         onFocus={() => { if (qty === 0) setQty(''); }}
                                         placeholder="1"
-                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                            errors.quantity ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.quantity ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                     />
                                     {errors.quantity && (
                                         <p className="text-red-500 text-xs mt-1">{errors.quantity[0]}</p>
@@ -645,9 +787,8 @@ export default function ExpensePage() {
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
                                     placeholder="Tulis keterangan pengeluaran..."
-                                    className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                        errors.notes ? 'border-red-500' : 'border-gray-300'
-                                    }`}
+                                    className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.notes ? 'border-red-500' : 'border-gray-300'
+                                        }`}
                                     rows={3}
                                 />
                                 {errors.notes && (

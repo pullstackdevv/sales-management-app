@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\PointTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,18 +14,7 @@ class CustomerController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        // $customers = Customer::with(['addresses', 'orders' => function($q) {
-        //         $q->select('id', 'customer_id', 'total_amount', 'status', 'created_at')
-        //             ->latest()
-        //             ->limit(5);
-        //     }])
-        //     ->withCount(['orders', 'addresses'])
-        //     ->when($request->search, function($query, $search) {
-        //         $query->where('name', 'like', "%{$search}%")
-        //             ->orWhere('phone', 'like', "%{$search}%")
-        //             ->orWhere('email', 'like', "%{$search}%");
-        //     })
-        $customers = Customer::with(['addresses'])
+        $customers = Customer::with(['addresses', 'loyaltyPoints.tier'])
             ->withCount(['addresses'])
             ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -54,7 +44,7 @@ class CustomerController extends Controller
         }
 
         try {
-            $validated = $request->validate([
+            $rules = [
                 'name' => 'required|string|max:255',
                 'email' => 'nullable|string|email|max:255|unique:customers,email,NULL,id,deleted_at,NULL',
                 'phone' => 'required|string|max:20|unique:customers,phone,NULL,id,deleted_at,NULL',
@@ -72,7 +62,13 @@ class CustomerController extends Controller
                 'addresses.*.address_detail' => 'required|string',
                 'addresses.*.is_default' => 'boolean',
                 'addresses.*.is_dropship' => 'boolean'
-            ], [
+            ];
+
+            if ($request->header('X-Manual-Order') === '1' && $request->input('phone') === '085000000000') {
+                $rules['phone'] = 'required|string|max:20';
+            }
+
+            $validated = $request->validate($rules, [
                 'addresses.required' => 'Alamat pengiriman wajib diisi',
                 'addresses.*.label.required' => 'Label alamat wajib diisi',
                 'addresses.*.recipient_name.required' => 'Nama penerima wajib diisi',
@@ -101,6 +97,9 @@ class CustomerController extends Controller
             $customerData['created_by'] = Auth::id() ?? null; // Allow null for public API
             $customer = Customer::create($customerData);
 
+            // Create loyalty points with default tier for new customer
+            $customer->getLoyaltyPoint();
+
             // Create addresses if provided
             if (isset($validated['addresses']) && !empty($validated['addresses'])) {
                 foreach ($validated['addresses'] as $index => $addressData) {
@@ -124,7 +123,7 @@ class CustomerController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Customer created successfully',
-                'data' => $customer->fresh()->load(['addresses', 'createdBy'])
+                'data' => $customer->fresh()->load(['addresses', 'createdBy', 'loyaltyPoints.tier'])
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -139,15 +138,45 @@ class CustomerController extends Controller
 
     public function show(Customer $customer): JsonResponse
     {
+        $customerData = $customer->load([
+            'addresses',
+            'orders' => function ($q) {
+                $q->with(['items', 'payments', 'shipping'])
+                    ->latest();
+            },
+            'loyaltyPoints.tier'
+        ]);
+
+        // Add loyalty points info
+        $loyaltyInfo = null;
+        if ($customer->loyaltyPoints) {
+            $progress = $customer->loyaltyPoints->getProgressToNextTier();
+            $loyaltyInfo = [
+                'current_points' => $customer->loyaltyPoints->current_points,
+                'lifetime_points' => $customer->loyaltyPoints->lifetime_points,
+                'annual_spend' => $customer->loyaltyPoints->annual_spend,
+                'annual_spend_year' => $customer->loyaltyPoints->annual_spend_year,
+                'tier' => $customer->loyaltyPoints->tier ? [
+                    'id' => $customer->loyaltyPoints->tier->id,
+                    'name' => $customer->loyaltyPoints->tier->name,
+                    'slug' => $customer->loyaltyPoints->tier->slug,
+                    'multiplier' => $customer->loyaltyPoints->tier->multiplier,
+                    'color' => $customer->loyaltyPoints->tier->color,
+                    'icon' => $customer->loyaltyPoints->tier->icon,
+                ] : null,
+                'next_tier' => $progress['next_tier'] ? [
+                    'name' => $progress['next_tier']->name,
+                    'min_annual_spend' => $progress['next_tier']->min_annual_spend,
+                    'remaining' => $progress['remaining'],
+                    'percentage' => $progress['percentage'],
+                ] : null,
+            ];
+        }
+
         return response()->json([
             'status' => 'success',
-            'data' => $customer->load([
-                'addresses',
-                'orders' => function ($q) {
-                    $q->with(['items', 'payments', 'shipping'])
-                        ->latest();
-                }
-            ])
+            'data' => $customerData,
+            'loyalty' => $loyaltyInfo
         ]);
     }
 
@@ -174,7 +203,7 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        $validated = $request->validate([
+        $rules = [
             'name' => 'sometimes|required|string|max:255',
             'email' => 'sometimes|nullable|string|email|max:255|unique:customers,email,' . $customer->id . ',id,deleted_at,NULL',
             'phone' => 'sometimes|required|string|max:20|unique:customers,phone,' . $customer->id . ',id,deleted_at,NULL',
@@ -193,7 +222,11 @@ class CustomerController extends Controller
             'addresses.*.address_detail' => 'required_with:addresses|string',
             'addresses.*.is_default' => 'boolean',
             'addresses.*.is_dropship' => 'boolean'
-        ], [
+        ];
+        if ($request->header('X-Manual-Order') === '1' && $request->input('phone') === '085000000000') {
+            $rules['phone'] = 'sometimes|required|string|max:20';
+        }
+        $validated = $request->validate($rules, [
             'addresses.*.recipient_phone.unique' => 'Nomor telepon sudah terdaftar, gunakan nomor lain'
         ]);
 
@@ -343,7 +376,7 @@ class CustomerController extends Controller
             'province' => 'required|string|max:100',
             'city' => 'required|string|max:100',
             'district' => 'required|string|max:100',
-            'postal_code' => 'required|string|max:10',
+            'postal_code' => 'nullable|string|max:10',
             'is_default' => 'boolean',
             'is_dropship' => 'boolean',
         ]);
@@ -362,7 +395,13 @@ class CustomerController extends Controller
                 $validated['is_default'] = true;
             }
 
-            $address = $customer->addresses()->create($validated);
+            // Map recipient_phone -> phone column in DB
+            $data = $validated;
+            if (isset($data['recipient_phone'])) {
+                $data['phone'] = $data['recipient_phone'];
+                unset($data['recipient_phone']);
+            }
+            $address = $customer->addresses()->create($data);
 
             DB::commit();
 
@@ -408,7 +447,13 @@ class CustomerController extends Controller
                 $customer->addresses()->where('id', '!=', $addressId)->update(['is_default' => false]);
             }
 
-            $address->update($validated);
+            // Map recipient_phone -> phone column in DB on update
+            $data = $validated;
+            if (isset($data['recipient_phone'])) {
+                $data['phone'] = $data['recipient_phone'];
+                unset($data['recipient_phone']);
+            }
+            $address->update($data);
 
             DB::commit();
 
@@ -504,16 +549,33 @@ class CustomerController extends Controller
         ]);
 
         $search = $validated['search'];
+        $normalizedSearch = preg_replace('/[^0-9]/', '', $search);
+        if (preg_match('/^62/', $normalizedSearch)) {
+            $normalizedSearch = preg_replace('/^62/', '0', $normalizedSearch);
+        }
+        if ($normalizedSearch === '085000000000') {
+            return response()->json([
+                'status' => 'success',
+                'data' => []
+            ]);
+        }
 
-        $customers = Customer::where(function($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('phone', 'like', "%{$search}%");
-            })
+        $customers = Customer::where(function ($query) use ($search) {
+            $query->where('name', 'like', "%{$search}%")
+                ->orWhere('phone', 'like', "%{$search}%");
+        })
             ->limit(10)
             ->get(['id', 'name', 'phone', 'email']);
 
+        // Exclude specific phone (085000000000) from marketplace search results
+        $customers = $customers->reject(function ($customer) {
+            $digits = preg_replace('/[^0-9]/', '', (string) $customer->phone);
+            $normalized = preg_replace('/^62/', '0', $digits);
+            return $normalized === '085000000000';
+        })->values();
+
         // Return customers with masked phone/email for privacy
-        $maskedCustomers = $customers->map(function($customer) {
+        $maskedCustomers = $customers->map(function ($customer) {
             return [
                 'id' => $customer->id,
                 'name' => $customer->name,
@@ -558,7 +620,7 @@ class CustomerController extends Controller
             $normalizedCustomerPhone = preg_replace('/^62/', '0', $normalizedCustomerPhone);
             $normalizedInputPhone = preg_replace('/^62/', '0', $normalizedInputPhone);
             $isVerified = $normalizedCustomerPhone === $normalizedInputPhone;
-            
+
             \Log::info('Guest verify phone comparison', [
                 'customer_id' => $customer->id,
                 'customer_phone_raw' => $customer->phone,
@@ -574,7 +636,7 @@ class CustomerController extends Controller
         if (!$isVerified) {
             return response()->json([
                 'status' => 'error',
-                'message' => $validated['verification_type'] === 'phone' 
+                'message' => $validated['verification_type'] === 'phone'
                     ? 'Nomor HP tidak sesuai dengan data customer'
                     : 'Email tidak sesuai dengan data customer'
             ], 403);
@@ -640,7 +702,7 @@ class CustomerController extends Controller
         try {
             // Check if customer already exists
             $existingCustomer = Customer::where('phone', $validated['phone'])
-                ->orWhere(function($query) use ($validated) {
+                ->orWhere(function ($query) use ($validated) {
                     if (!empty($validated['email'])) {
                         $query->where('email', $validated['email']);
                     }
@@ -664,6 +726,9 @@ class CustomerController extends Controller
                 'is_active' => true,
             ]);
 
+            // Create loyalty points with default tier for new customer
+            $customer->getLoyaltyPoint();
+
             // Create addresses if provided
             if (!empty($validated['addresses'])) {
                 foreach ($validated['addresses'] as $index => $addressData) {
@@ -683,7 +748,7 @@ class CustomerController extends Controller
 
             return response()->json([
                 'status' => 'success',
-                'data' => $customer->load('addresses'),
+                'data' => $customer->load(['addresses', 'loyaltyPoints.tier']),
                 'message' => 'Customer berhasil dibuat'
             ], 201);
         } catch (\Exception $e) {
@@ -722,7 +787,7 @@ class CustomerController extends Controller
         try {
             // Find customer and verify ownership
             $customer = Customer::find($customerId);
-            
+
             if (!$customer) {
                 return response()->json([
                     'status' => 'error',
@@ -823,7 +888,7 @@ class CustomerController extends Controller
 
         try {
             $customer = Customer::find($customerId);
-            
+
             if (!$customer) {
                 return response()->json([
                     'status' => 'error',
@@ -853,7 +918,7 @@ class CustomerController extends Controller
 
             // Find and delete the address
             $address = $customer->addresses()->find($addressId);
-            
+
             if (!$address) {
                 return response()->json([
                     'status' => 'error',
@@ -872,6 +937,54 @@ class CustomerController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Gagal menghapus alamat: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get customer point transaction history
+     */
+    public function getPointHistory(Request $request, $customerId): JsonResponse
+    {
+        try {
+            $customer = Customer::with('loyaltyPoints.tier')->find($customerId);
+
+            if (!$customer) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Customer tidak ditemukan'
+                ], 404);
+            }
+
+            $transactions = PointTransaction::where('customer_id', $customerId)
+                ->with(['order', 'createdBy'])
+                ->when($request->type, function ($query, $type) {
+                    if ($type === 'earn') {
+                        $query->earn();
+                    } elseif ($type === 'redeem') {
+                        $query->redeem();
+                    }
+                })
+                ->orderBy('created_at', 'desc')
+                ->paginate($request->per_page ?? 20);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'customer' => [
+                        'id' => $customer->id,
+                        'name' => $customer->name,
+                        'current_points' => $customer->loyaltyPoints?->current_points ?? 0,
+                        'lifetime_points' => $customer->loyaltyPoints?->lifetime_points ?? 0,
+                        'tier' => $customer->loyaltyPoints?->tier,
+                    ],
+                    'transactions' => $transactions
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal memuat riwayat poin: ' . $e->getMessage()
             ], 500);
         }
     }

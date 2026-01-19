@@ -45,11 +45,45 @@ class ProductController extends Controller
                     $q->whereIn('tags.id', $ids);
                 });
             })
+            ->when($request->no_base_price, function($query) {
+                $query->whereHas('variants', function($q) {
+                    $q->whereNull('base_price')->orWhere('base_price', 0);
+                });
+            })
             ->when($request->category, function($query, $category) {
                 $query->where('category', $category);
             })
+            ->when($request->has_discount, function($query, $hasDiscount) {
+                if ($hasDiscount) {
+                    $query->whereHas('variants', function($q) {
+                        $q->whereNotNull('discount_price')->where('discount_price', '>', 0);
+                    });
+                }
+            })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
-                $query->orderBy($sortBy, $request->sort_direction ?? 'asc');
+                $direction = $request->sort_direction ?? 'asc';
+                switch ($sortBy) {
+                    case 'stock':
+                        $query->orderBy(
+                            \DB::raw('(SELECT SUM(stock) FROM product_variants WHERE product_variants.product_id = products.id)'),
+                            $direction
+                        );
+                        break;
+                    case 'price':
+                        $query->orderBy(
+                            \DB::raw('(SELECT MIN(price) FROM product_variants WHERE product_variants.product_id = products.id)'),
+                            $direction
+                        );
+                        break;
+                    case 'name':
+                        $query->orderBy('name', $direction);
+                        break;
+                    case 'created_at':
+                        $query->orderBy('created_at', $direction);
+                        break;
+                    default:
+                        $query->orderBy($sortBy, $direction);
+                }
             }, function ($query) {
                 $query->latest();
             })
@@ -159,6 +193,7 @@ class ProductController extends Controller
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.discount_price' => 'nullable|numeric|min:0',
+            'variants.*.marketplace_price' => 'nullable|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean',
@@ -236,6 +271,7 @@ class ProductController extends Controller
                     'price' => $variant['price'],
                     'base_price' => $variant['base_price'],
                     'discount_price' => $variant['discount_price'] ?? null,
+                    'marketplace_price' => $variant['marketplace_price'] ?? null,
                     'weight' => $variant['weight'] ?? null,
                     'stock' => $variant['stock'],
                     'is_active' => $variant['is_active'] ?? true,
@@ -286,6 +322,11 @@ class ProductController extends Controller
             ], 403);
         }
 
+        if ($request->has('tag_ids') && is_string($request->input('tag_ids'))) {
+            $decodedTagIds = json_decode($request->input('tag_ids'), true);
+            $request->merge(['tag_ids' => is_array($decodedTagIds) ? $decodedTagIds : []]);
+        }
+
         // Custom validation for variants SKU
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -306,6 +347,7 @@ class ProductController extends Controller
             'variants.*.price' => 'required|numeric|min:0',
             'variants.*.base_price' => 'required|numeric|min:0',
             'variants.*.discount_price' => 'nullable|numeric|min:0',
+            'variants.*.marketplace_price' => 'nullable|numeric|min:0',
             'variants.*.weight' => 'nullable|numeric|min:0',
             'variants.*.stock' => 'required|integer|min:0',
             'variants.*.is_active' => 'boolean',
@@ -406,6 +448,7 @@ class ProductController extends Controller
                             'price' => $variant['price'],
                             'base_price' => $isOwner ? $variant['base_price'] : $variantModel->base_price,
                             'discount_price' => $variant['discount_price'] ?? null,
+                            'marketplace_price' => $variant['marketplace_price'] ?? $variantModel->marketplace_price,
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'],
                             'is_active' => $variant['is_active'] ?? true,
@@ -443,6 +486,7 @@ class ProductController extends Controller
                             'price' => $variant['price'],
                             'base_price' => $isOwner ? $variant['base_price'] : 0,
                             'discount_price' => $variant['discount_price'] ?? null,
+                            'marketplace_price' => $variant['marketplace_price'] ?? null,
                             'weight' => $variant['weight'] ?? null,
                             'stock' => $variant['stock'] ?? 0,
                             'is_active' => $variant['is_active'] ?? true,

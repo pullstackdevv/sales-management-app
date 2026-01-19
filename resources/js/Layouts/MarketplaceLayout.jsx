@@ -46,6 +46,24 @@ export default function MarketplaceLayout({ children }) {
         updateIcon('shortcut icon');
     }, [settings?.site_icon_url]);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            if (!window.Tawk_API) {
+                window.Tawk_API = {};
+                window.Tawk_LoadStart = new Date();
+            }
+            const existing = document.querySelector("script[src*='embed.tawk.to/693a796c2a271419893a1894/1jc66kkee']");
+            if (!existing) {
+                const s1 = document.createElement('script');
+                s1.async = true;
+                s1.src = 'https://embed.tawk.to/693a796c2a271419893a1894/1jc66kkee';
+                s1.charset = 'UTF-8';
+                s1.setAttribute('crossorigin','*');
+                document.body.appendChild(s1);
+            }
+        }
+    }, []);
+
     return (
         <AuthProvider>
             <div className="min-h-screen bg-gray-50">
@@ -58,7 +76,6 @@ export default function MarketplaceLayout({ children }) {
                                 <FullLogo />
                             </div>
 
-                            {/* Desktop Navigation - Removed for cleaner look */}
                             {/* Right side icons */}
                             <div className="flex items-center space-x-2 sm:space-x-4">
                                 {/* Pesanan Saya */}
@@ -80,7 +97,14 @@ export default function MarketplaceLayout({ children }) {
                                     )}
                                 </Link>
 
-                                {/* User Profile - Hidden */}
+                                {/* Profile */}
+                                <Link
+                                    href="/profile"
+                                    className="hidden sm:block text-gray-700 hover:text-blue-600 p-2 transition-colors duration-200"
+                                    title="Profil"
+                                >
+                                    <UserCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+                                </Link>
 
                                 {/* Mobile menu button */}
                                 <button
@@ -129,6 +153,14 @@ export default function MarketplaceLayout({ children }) {
                                             {cartCount}
                                         </span>
                                     )}
+                                </Link>
+                                <Link
+                                    href="/profile"
+                                    className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-3 rounded-lg text-base font-medium transition-all duration-200"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    <UserCircle className="h-5 w-5" />
+                                    <span>Profil</span>
                                 </Link>
                             </div>
                         </div>

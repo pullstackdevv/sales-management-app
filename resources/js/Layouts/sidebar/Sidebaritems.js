@@ -115,6 +115,33 @@ const SidebarContent = [
         permission: "customers.view",
     },
     {
+        name: "Loyalty & Rewards",
+        icon: "solar:medal-ribbons-star-outline",
+        id: uniqueId(),
+        permission: "settings.view",
+        children: [
+            {
+                name: "Pengaturan",
+                icon: "solar:settings-outline",
+                id: uniqueId(),
+                url: "/cms/loyalty/settings",
+            },
+            {
+                name: "Tier Membership",
+                icon: "solar:crown-outline",
+                id: uniqueId(),
+                url: "/cms/loyalty/tiers",
+            },
+        ],
+    },
+    {
+        name: "Review & Rating",
+        icon: "solar:star-outline",
+        id: uniqueId(),
+        url: "/cms/reviews",
+        permission: "reviews.view",
+    },
+    {
         name: "Expense",
         icon: "solar:money-bag-outline",
         id: uniqueId(),
@@ -160,14 +187,15 @@ const SidebarContent = [
                 permission: "reports.courier",
                 role: "owner",
             },
+            {
+                name: "Analytics",
+                icon: "solar:chart-line-duotone",
+                id: uniqueId(),
+                url: "/cms/analyzer",
+                permission: "reports.analyzer",
+                role: "owner",
+            },
         ],
-    },
-    {
-        name: "Analyzer",
-        icon: "solar:cpu-outline",
-        id: uniqueId(),
-        url: "/cms/analyzer",
-        permission: "reports.analyzer",
     },
     {
         name: "Setting",

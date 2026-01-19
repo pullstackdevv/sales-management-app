@@ -51,6 +51,8 @@ class WebOrderController extends Controller
                 'items.*.quantity' => 'required|integer|min:1',
                 'shipping_cost' => 'required|numeric|min:0',
                 'voucher_id' => 'nullable|exists:vouchers,id',
+                'redeemed_points' => 'nullable|integer|min:0',
+                'point_discount' => 'nullable|numeric|min:0',
                 'notes' => 'nullable|string|max:1000',
                 'customer_id' => 'nullable|exists:customers,id',
                 'is_dropship' => 'nullable|boolean',
@@ -72,6 +74,7 @@ class WebOrderController extends Controller
                 'address_city' => 'required_without:address_id|string|max:100',
                 'address_province' => 'required_without:address_id|string|max:100',
                 'address_postal_code' => 'nullable|string|regex:/^\d{5}$/',
+                
             ]);
 
             if ($validator->fails()) {
@@ -240,6 +243,21 @@ class WebOrderController extends Controller
                 $totalPrice -= $discountAmount;
             }
 
+            // Apply loyalty point discount if any
+            $pointDiscount = 0;
+            $redeemedPoints = 0;
+            if ($request->redeemed_points && $request->redeemed_points > 0) {
+                $redeemedPoints = (int) $request->redeemed_points;
+                $pointDiscount = (float) ($request->point_discount ?? 0);
+                
+                // Validate point discount doesn't exceed total
+                if ($pointDiscount > $totalPrice) {
+                    $pointDiscount = $totalPrice;
+                }
+                
+                $totalPrice -= $pointDiscount;
+            }
+
             // Create order
             $order = Order::create([
                 'order_number' => 'WEB-' . date('Ymd') . '-' . strtoupper(Str::random(6)),
@@ -248,6 +266,8 @@ class WebOrderController extends Controller
                 'user_id' => $isGuest ? null : $user->id,
                 'total_price' => $totalPrice,
                 'discount_amount' => $discountAmount,
+                'redeemed_points' => $redeemedPoints,
+                'point_discount' => $pointDiscount,
                 'shipping_cost' => $request->shipping_cost,
                 'status' => 'pending',
                 'ordered_at' => now(),
@@ -585,5 +605,38 @@ class WebOrderController extends Controller
                 500
             );
         }
+    }
+
+    public function setCheckoutCustomerSession(Request $request)
+    {
+        $validated = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:30',
+            'email' => 'nullable|email',
+            'customer_id' => 'nullable|exists:customers,id',
+            'address_id' => 'nullable|exists:customer_addresses,id',
+        ]);
+
+        if ($validated->fails()) {
+            return ResponseFormatter::error('Validation Error', $validated->errors(), 422);
+        }
+
+        $payload = [
+            'name' => $request->name,
+            'phone' => $request->phone,
+            'email' => $request->email,
+            'customer_id' => $request->customer_id,
+            'address_id' => $request->address_id,
+        ];
+
+        $request->session()->put('checkout.customer', $payload);
+
+        return ResponseFormatter::success('Checkout customer session set', $payload);
+    }
+
+    public function clearCheckoutCustomerSession(Request $request)
+    {
+        $request->session()->forget('checkout.customer');
+        return ResponseFormatter::success('Checkout customer session cleared', []);
     }
 }

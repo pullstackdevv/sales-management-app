@@ -4,6 +4,7 @@ import DashboardLayout from "../../Layouts/DashboardLayout";
 import { Icon } from "@iconify/react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { getCurrentDateWIB } from "../../utils/helpers";
 import { usePage, router } from '@inertiajs/react';
 
 export default function EditOrder() {
@@ -16,8 +17,10 @@ export default function EditOrder() {
         sales_channel_id: '',
         origin_setting_id: '',
         shipping_cost: 0,
+        manual_discount: 0,
+        point_discount: 0,
         notes: '',
-        order_date: new Date().toISOString().split('T')[0],
+        order_date: getCurrentDateWIB(),
         status: 'pending',
         payment_bank_id: '',
         courier: '',
@@ -71,6 +74,11 @@ export default function EditOrder() {
         return parseInt(str.toString().replace(/\./g, '')) || 0;
     };
 
+    const formatIDR = (num) => {
+        const n = Number(num || 0);
+        return n.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    };
+
     // Fetch existing order data
     const fetchOrder = async () => {
         setLoading(prev => ({ ...prev, order: true }));
@@ -90,14 +98,18 @@ export default function EditOrder() {
                 address_id: order.address_id,
                 sales_channel_id: order.sales_channel_id ? order.sales_channel_id.toString() : '',
                 shipping_cost: parseFloat(order.shipping_cost) || 0,
+                manual_discount: parseFloat(order.discount_amount) || 0,
+                point_discount: parseFloat(order.point_discount) || 0,
                 notes: order.notes || '',
-                order_date: order.order_date ? order.order_date.split(' ')[0] : new Date().toISOString().split('T')[0],
+                order_date: order.order_date ? order.order_date.split(' ')[0] : getCurrentDateWIB(),
                 status: order.status || 'pending',
                 payment_bank_id: paymentBankId,
                 courier: (order.shipping && order.shipping.courier_id) ? order.shipping.courier_id : '',
                 service_type: (order.shipping && order.shipping.service_type) ? order.shipping.service_type : '',
                 origin_setting_id: order.origin_setting_id ? String(order.origin_setting_id) : ''
             });
+
+          
             
             // Set order items with complete variant details
             setOrderItems(order.items?.map(item => ({
@@ -204,8 +216,13 @@ export default function EditOrder() {
             if (response.data.status === 'success' && response.data.data) {
                 // Handle paginated response - access the actual data array
                 const banksData = response.data.data.data || response.data.data;
-                setPaymentBanks(Array.isArray(banksData) ? banksData : []);
-                console.log('🏦 [EditOrder] Payment banks set to state:', banksData);
+                // Filter out Website Payment (Client-side hardcode filtering)
+                const filteredBanks = Array.isArray(banksData) 
+                    ? banksData.filter(bank => bank.bank_name.toLowerCase() !== 'website payment') 
+                    : [];
+                    
+                setPaymentBanks(filteredBanks);
+                console.log('🏦 [EditOrder] Payment banks set to state:', filteredBanks);
             } else {
                 setPaymentBanks(Array.isArray(response.data) ? response.data : []);
                 console.log('🏦 [EditOrder] Payment banks fallback set to state:', response.data);
@@ -291,6 +308,7 @@ export default function EditOrder() {
             const updatedItems = [...orderItems];
             updatedItems[existingItemIndex].quantity += 1;
             updatedItems[existingItemIndex].variant_stock = additionalAvailable - 1;
+            updatedItems[existingItemIndex].price = (variant.discount_price && Number(variant.discount_price) > 0) ? Number(variant.discount_price) : Number(variant.price);
             setOrderItems(updatedItems);
         } else {
             if (variant.stock <= 0) {
@@ -312,7 +330,7 @@ export default function EditOrder() {
                 variant_weight: variant.weight,
                 variant_stock: Math.max(0, (variant.stock || 0) - 1),
                 quantity: 1,
-                price: variant.price
+                price: (variant.discount_price && Number(variant.discount_price) > 0) ? Number(variant.discount_price) : Number(variant.price)
             };
             setOrderItems(prev => [...prev, newItem]);
         }
@@ -324,7 +342,7 @@ export default function EditOrder() {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0);
+        return calculateSubtotal() + (parseFloat(formData.shipping_cost) || 0) - (parseFloat(formData.manual_discount) || 0) - (parseFloat(formData.point_discount) || 0);
     };
 
     const calculateTotalWeight = () => {
@@ -512,12 +530,14 @@ export default function EditOrder() {
                     price: item.price
                 })),
                 shipping_cost: formData.shipping_cost,
+                discount_amount: formData.manual_discount,
                 notes: formData.notes,
                 status: formData.status,
                 payment_bank_id: formData.payment_bank_id || null,
                 courier_id: formData.courier || null,
                 courier_rate_id: typeof selectedRateIndex === 'number' && courierRates[selectedRateIndex]?.id ? courierRates[selectedRateIndex].id : null,
-                service_type: formData.service_type || null
+                service_type: formData.service_type || null,
+                voucher_id: null
             };
             
             console.log('EditOrder - Sending data:', {
@@ -989,6 +1009,22 @@ console.log(formData)
                                 )}
                             </div>
 
+                            {!isWebOrder() && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Diskon Manual (opsional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="0"
+                                  value={formatRupiah(formData.manual_discount)}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, manual_discount: parseRupiah(e.target.value) }))}
+                                  className={`w-full px-3 py-2 border rounded-lg ${errors.discount_amount ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.discount_amount && (
+                                  <p className="text-red-500 text-xs mt-1">{Array.isArray(errors.discount_amount) ? errors.discount_amount[0] : errors.discount_amount}</p>
+                                )}
+                              </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Kurir
@@ -1071,7 +1107,14 @@ console.log(formData)
                                                             <span className="text-sm text-gray-500">Stok: {variant.stock}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium">Rp {variant.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                                            {variant.discount_price && Number(variant.discount_price) > 0 ? (
+                                                                <div className="flex flex-col items-end mr-2">
+                                                                    <span className="text-sm font-medium text-red-600">Rp {formatIDR(variant.discount_price)}</span>
+                                                                    <span className="text-xs text-gray-400 line-through">Rp {formatIDR(variant.price)}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-sm font-medium">Rp {formatIDR(variant.price)}</span>
+                                                            )}
                                                             <button
                                                                 onClick={() => handleAddProduct(product, variant)}
                                                                 disabled={variant.stock <= 0 || (originalOrder?.sales_channel && originalOrder.sales_channel.code === 'website')}
@@ -1112,7 +1155,7 @@ console.log(formData)
                                             <div className="flex-1">
                                                 <h4 className="font-medium">{item.product_name}</h4>
                                                 <p className="text-sm text-gray-500">{item.variant_name}</p>
-                                                <p className="text-sm font-medium text-blue-600">Rp {item.price?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                                <p className="text-sm font-medium text-blue-600">Rp {formatIDR(item.price)}</p>
                                             </div>
                                             
                                             <div className="flex items-center gap-3">
@@ -1195,6 +1238,7 @@ console.log(formData)
                         <div className="bg-white p-4 rounded-lg border space-y-4">
                             <h3 className="font-medium mb-4">Ringkasan Order</h3>
                             
+                            
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-700">Subtotal ({orderItems.length} item)</span>
                                 <span className="text-sm font-medium">Rp {calculateSubtotal().toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
@@ -1204,6 +1248,20 @@ console.log(formData)
                                 <span className="text-sm text-gray-700">Ongkos Kirim</span>
                                 <span className="text-sm font-medium">Rp {formData.shipping_cost.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
+
+                            {(parseFloat(formData.manual_discount) || 0) > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-700">Diskon Manual</span>
+                                    <span className="text-sm font-medium text-green-600">- Rp {Number(formData.manual_discount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                </div>
+                            )}
+
+                            {(parseFloat(formData.point_discount) || 0) > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-700">Diskon Poin Loyalty</span>
+                                    <span className="text-sm font-medium text-green-600">- Rp {Number(formData.point_discount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                                </div>
+                            )}
                             
                             <div className="flex justify-between pt-4 border-t font-semibold text-lg">
                                 <span>TOTAL</span>

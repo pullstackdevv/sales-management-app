@@ -16,7 +16,9 @@ import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import { checkoutSession } from '@/utils/checkoutSession';
+import customerSession from '@/utils/customerSession';
 import { useCart } from '@/hooks/useCart';
+import ReviewSection from '@/components/Review/ReviewSection';
 
 export default function ProductDetail() {
     const { id } = usePage().props;
@@ -29,7 +31,17 @@ export default function ProductDetail() {
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [currentImage, setCurrentImage] = useState(null);
     const [imageLoading, setImageLoading] = useState(false);
+    const [currentCustomer, setCurrentCustomer] = useState(null);
     const { addToCart: addToCartHook } = useCart();
+
+    // Check URL query parameter for tab
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabParam = urlParams.get('tab');
+        if (tabParam === 'reviews') {
+            setActiveTab('reviews');
+        }
+    }, []);
 
     // Order states
     const [showOrderModal, setShowOrderModal] = useState(false);
@@ -53,6 +65,13 @@ export default function ProductDetail() {
         submitting: false
     });
     const [orderErrors, setOrderErrors] = useState({});
+
+    useEffect(() => {
+        const sessionCustomer = customerSession.get();
+        if (sessionCustomer?.customer_id) {
+            setCurrentCustomer(sessionCustomer);
+        }
+    }, []);
 
     useEffect(() => {
         if (id) {
@@ -551,6 +570,12 @@ export default function ProductDetail() {
                                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-normal text-gray-800 leading-tight">
                                     {product.name}
                                 </h1>
+                                {/* Sales Count */}
+                                {product.sales_count > 0 && (
+                                    <div className="text-sm text-gray-500 mt-2">
+                                        Terjual {product.sales_count}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Price */}
@@ -701,7 +726,8 @@ export default function ProductDetail() {
                         <div className="border-b border-gray-100">
                             <nav className="flex space-x-6 px-4 sm:px-4">
                                 {[
-                                    { id: 'description', label: 'Deskripsi' }
+                                    { id: 'description', label: 'Deskripsi' },
+                                    { id: 'reviews', label: 'Ulasan & Rating' }
                                 ].map((tab) => (
                                     <button
                                         key={tab.id}
@@ -743,6 +769,14 @@ export default function ProductDetail() {
                                             </ul>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {activeTab === 'reviews' && (
+                                <div>
+                                    <ReviewSection 
+                                        productId={product.id}
+                                    />
                                 </div>
                             )}
                         </div>

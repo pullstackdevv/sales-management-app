@@ -42,19 +42,11 @@ export default function RoleSettings() {
     }
   };
 
-  // Desired module order for permissions grouping
-  const moduleOrder = [
-    'dashboard',
-    'orders',
-    'products',
-    'stock',
-    'vouchers',
-    'promotions',
-    'customers',
-    'expenses',
-    'reports',
-    'settings',
-  ];
+  const moduleOrder = [...new Set(availablePermissions.map((p) => p.module))].sort((a, b) => {
+    const firstPermissionA = availablePermissions.find((p) => p.module === a);
+    const firstPermissionB = availablePermissions.find((p) => p.module === b);
+    return (firstPermissionA?.id || 0) - (firstPermissionB?.id || 0);
+  });
 
   const resetForm = () => {
     setFormData({

@@ -8,6 +8,7 @@ use App\Helpers\ResponseFormatter;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
+use App\Services\LoyaltyPointService;
 use App\Helpers\NotificationHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,9 +19,11 @@ class XenditController extends Controller
 {
     private $secretKey;
     private $baseUrl;
+    private LoyaltyPointService $loyaltyPointService;
 
     public function __construct()
     {
+        $this->loyaltyPointService = app(LoyaltyPointService::class);
         $this->secretKey = config('services.xendit.secret_key');
         $this->baseUrl = config('services.xendit.is_production') 
             ? 'https://api.xendit.co' 
@@ -124,9 +127,19 @@ class XenditController extends Controller
 
             // Prepare description with discount info if applicable
             $description = 'Order Payment - ' . $order->order_number;
+            $discountInfo = [];
+            
             if ($order->voucher && $order->discount_amount > 0) {
                 $discountType = $order->voucher->type === 'shipping' ? 'Diskon Ongkir' : 'Diskon';
-                $description .= ' (' . $discountType . ': ' . $order->voucher->code . ' -Rp' . number_format((float)$order->discount_amount, 0, ',', '.') . ')';
+                $discountInfo[] = $discountType . ': ' . $order->voucher->code . ' -Rp' . number_format((float)$order->discount_amount, 0, ',', '.');
+            }
+            
+            if ($order->point_discount && $order->point_discount > 0) {
+                $discountInfo[] = 'Diskon Poin: ' . $order->redeemed_points . ' poin -Rp' . number_format((float)$order->point_discount, 0, ',', '.');
+            }
+            
+            if (!empty($discountInfo)) {
+                $description .= ' (' . implode(', ', $discountInfo) . ')';
             }
 
             // Prepare invoice data
@@ -151,22 +164,37 @@ class XenditController extends Controller
                     'address_id' => $order->address_id,
                     'voucher_code' => $order->voucher ? $order->voucher->code : null,
                     'voucher_type' => $order->voucher ? $order->voucher->type : null,
-                    'discount_amount' => $order->discount_amount
+                    'discount_amount' => $order->discount_amount,
+                    'redeemed_points' => $order->redeemed_points ?? 0,
+                    'point_discount' => $order->point_discount ?? 0
                 ]
             ];
             
-            // Add discount as negative fee (Xendit supports this)
+            // Add discounts as negative fees (Xendit supports this)
+            $fees = [];
+            
+            // Voucher discount
             if ($order->voucher && $order->discount_amount > 0) {
                 $discountLabel = $order->voucher->type === 'shipping' 
                     ? 'Shipping Discount - ' . $order->voucher->code
                     : 'Voucher Discount - ' . $order->voucher->code;
                     
-                $invoiceData['fees'] = [
-                    [
-                        'type' => $discountLabel,
-                        'value' => -(int) $order->discount_amount
-                    ]
+                $fees[] = [
+                    'type' => $discountLabel,
+                    'value' => -(int) $order->discount_amount
                 ];
+            }
+            
+            // Point discount
+            if ($order->point_discount && $order->point_discount > 0) {
+                $fees[] = [
+                    'type' => 'Point Discount - ' . $order->redeemed_points . ' poin',
+                    'value' => -(int) $order->point_discount
+                ];
+            }
+            
+            if (!empty($fees)) {
+                $invoiceData['fees'] = $fees;
             }
 
             // Create invoice via Xendit API
@@ -261,6 +289,16 @@ class XenditController extends Controller
                 $order->update(['status' => 'processing']);
                 WebOrderController::updateVoucherUsedCount($order->id);
                 
+                // Award loyalty points
+                $this->loyaltyPointService->awardPointsForOrder($order);
+                
+                // Increment sales count for each product
+                foreach ($order->items as $item) {
+                    if ($item->productVariant && $item->productVariant->product) {
+                        $item->productVariant->product->increment('sales_count', $item->quantity);
+                    }
+                }
+                
                 // Create payment received notification
                 NotificationHelper::paymentReceived($order->load(['customer', 'address']));
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
@@ -337,6 +375,16 @@ class XenditController extends Controller
                     if ($paymentStatus === PaymentStatus::PAID) {
                         $order->update(['status' => 'processing']);
                         WebOrderController::updateVoucherUsedCount($order->id);
+                        
+                        // Award loyalty points
+                        $this->loyaltyPointService->awardPointsForOrder($order);
+                        
+                        // Increment sales count for each product
+                        foreach ($order->items as $item) {
+                            if ($item->productVariant && $item->productVariant->product) {
+                                $item->productVariant->product->increment('sales_count', $item->quantity);
+                            }
+                        }
                         
                         // Create payment received notification
                         NotificationHelper::paymentReceived($order->load(['customer', 'address']));

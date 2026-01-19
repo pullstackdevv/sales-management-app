@@ -115,7 +115,7 @@ export default function ProductCategoryData() {
             <Head title="Kategori Produk" />
             
             <div className="min-h-screen bg-gray-50 p-6">
-                <div className="max-w-7xl mx-auto">
+                <div className="max-w-screen mx-auto">
                     {/* Header */}
                     <div className="flex justify-between items-center mb-6">
                         <div>

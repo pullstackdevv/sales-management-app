@@ -8,7 +8,7 @@ import Swal from "sweetalert2";
 export default function AddCustomer() {
     const [loading, setLoading] = useState(false);
     const [searchingCity, setSearchingCity] = useState(false);
-    
+
     // Form states
     const [formData, setFormData] = useState({
         full_name: "",
@@ -18,7 +18,7 @@ export default function AddCustomer() {
         other_contact: "",
         category: "Pelanggan"
     });
-    
+
     // Address states
     const [addresses, setAddresses] = useState([
         {
@@ -36,16 +36,16 @@ export default function AddCustomer() {
         }
     ]);
     const [activeAddressIndex, setActiveAddressIndex] = useState(0);
-    
+
     // City search states
     const [cityQuery, setCityQuery] = useState("");
     const [cityResults, setCityResults] = useState([]);
     const [showCityDropdown, setShowCityDropdown] = useState(false);
     const [cachedRegencies, setCachedRegencies] = useState([]);
-    
+
     // Validation errors
     const [errors, setErrors] = useState({});
-    
+
     // Handle input changes
     const handleInputChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -69,7 +69,7 @@ export default function AddCustomer() {
             )));
         }
     };
-    
+
     // Handle address changes
     const handleAddressChange = (field, value, index = activeAddressIndex) => {
         // Sanitize postal code input: numeric only, max 5 digits, optional
@@ -87,7 +87,7 @@ export default function AddCustomer() {
             return;
         }
 
-        setAddresses(prev => prev.map((addr, i) => 
+        setAddresses(prev => prev.map((addr, i) =>
             i === index ? { ...addr, [field]: value } : addr
         ));
         // Clear error when user starts typing (per-address keys)
@@ -119,17 +119,17 @@ export default function AddCustomer() {
     // Remove address
     const removeAddress = (index) => {
         if (addresses.length === 1) return; // Don't allow removing the last address
-        
+
         const addressToRemove = addresses[index];
         const newAddresses = addresses.filter((_, i) => i !== index);
-        
+
         // If removing default address, make first address default
         if (addressToRemove.is_default && newAddresses.length > 0) {
             newAddresses[0].is_default = true;
         }
-        
+
         setAddresses(newAddresses);
-        
+
         // Adjust active index
         if (activeAddressIndex >= newAddresses.length) {
             setActiveAddressIndex(newAddresses.length - 1);
@@ -145,32 +145,32 @@ export default function AddCustomer() {
             is_default: i === index
         })));
     };
-    
+
     // Load all regencies on component mount
-     useEffect(() => {
-         const loadAllRegencies = async () => {
-             if (cachedRegencies.length > 0) return; // Already loaded
-             
-             try {
-                 const response = await api.get('/wilayah/regencies');
-                 
-                 if (response.data.status === 'success') {
-                     setCachedRegencies(response.data.data);
-                 } else {
-                     console.error('Error loading regencies:', response.data.message);
-                 }
-             } catch (error) {
-                 console.error('Error loading regencies:', error);
-             }
-         };
-         
-         loadAllRegencies();
-     }, [cachedRegencies.length]);
-     
-     // Debounced city search
+    useEffect(() => {
+        const loadAllRegencies = async () => {
+            if (cachedRegencies.length > 0) return; // Already loaded
+
+            try {
+                const response = await api.get('/wilayah/regencies');
+
+                if (response.data.status === 'success') {
+                    setCachedRegencies(response.data.data);
+                } else {
+                    console.error('Error loading regencies:', response.data.message);
+                }
+            } catch (error) {
+                console.error('Error loading regencies:', error);
+            }
+        };
+
+        loadAllRegencies();
+    }, [cachedRegencies.length]);
+
+    // Debounced city search
     const searchTimeoutRef = useRef(null);
     const abortControllerRef = useRef(null);
-    
+
     const debouncedCitySearch = useCallback(async (query) => {
         if (query.length < 2) {
             setCityResults([]);
@@ -194,7 +194,7 @@ export default function AddCustomer() {
             setSearchingCity(false);
         }
     }, []);
-    
+
     // City search with debouncing
     const handleCitySearch = (e) => {
         const query = e.target.value;
@@ -211,18 +211,18 @@ export default function AddCustomer() {
             [`district_${activeAddressIndex}`]: null,
             [`province_${activeAddressIndex}`]: null
         }));
-        
+
         // Clear previous timeout
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
-        
+
         // Set new timeout for debouncing
         searchTimeoutRef.current = setTimeout(() => {
             debouncedCitySearch(query);
         }, 300); // 300ms delay
     };
-    
+
     // Select city from dropdown
     const selectCity = (city) => {
         setCityQuery(city.name);
@@ -240,7 +240,7 @@ export default function AddCustomer() {
             [`province_${activeAddressIndex}`]: null
         }));
     };
-    
+
     // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -248,11 +248,11 @@ export default function AddCustomer() {
                 setShowCityDropdown(false);
             }
         };
-        
+
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-    
+
     // Helper: detect if an address has any meaningful data entered
     const hasAnyAddressData = (address) => {
         // Only consider meaningful location/detail fields
@@ -268,18 +268,18 @@ export default function AddCustomer() {
     // Form validation
     const validateForm = () => {
         const newErrors = {};
-        
+
         // Required fields validation
         if (!formData.full_name.trim()) {
             newErrors.full_name = 'Nama lengkap wajib diisi';
         }
-        
+
         if (!formData.phone.trim()) {
             newErrors.phone = 'Nomor telepon wajib diisi';
         } else if (!/^08[0-9]{8,11}$/.test(formData.phone)) {
             newErrors.phone = 'Format nomor telepon tidak valid (contoh: 081234567890)';
         }
-        
+
         // Only validate addresses if user has entered any address data
         const addressesToValidate = addresses.filter(hasAnyAddressData);
         if (addressesToValidate.length > 0) {
@@ -306,21 +306,21 @@ export default function AddCustomer() {
                 addresses[0].is_default = true;
             }
         }
-        
+
         // Email validation (optional but must be valid if provided)
         if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
             newErrors.email = 'Format email tidak valid';
         }
-        
+
         setErrors(newErrors);
         return { isValid: Object.keys(newErrors).length === 0, errors: newErrors };
     };
-    
+
     console.log(formData);
     // Handle form submission
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         const { isValid, errors: validationErrors } = validateForm();
         if (!isValid) {
             // Build a readable error list
@@ -349,9 +349,9 @@ export default function AddCustomer() {
             });
             return;
         }
-        
+
         setLoading(true);
-        
+
         try {
             // Prepare addresses payload only if user entered any address data
             const addressesToSend = addresses.filter(hasAnyAddressData);
@@ -365,24 +365,26 @@ export default function AddCustomer() {
                 category: formData.category,
                 ...(addressesToSend.length > 0
                     ? {
-                addresses: addressesToSend.map(address => ({
-                    label: address.label,
-                    recipient_name: address.recipient_name || formData.full_name,
-                    recipient_phone: address.recipient_phone || formData.phone,
-                    is_dropship: !!address.is_dropship,
-                    province: address.province,
-                    city: address.city,
-                    district: address.district,
-                    postal_code: address.postal_code || null,
-                    address_detail: address.address_detail,
-                    is_default: address.is_default,
-                }))
-              }
-                : {})
+                        addresses: addressesToSend.map(address => ({
+                            label: address.label,
+                            recipient_name: address.recipient_name || formData.full_name,
+                            recipient_phone: address.recipient_phone || formData.phone,
+                            is_dropship: !!address.is_dropship,
+                            province: address.province,
+                            city: address.city,
+                            district: address.district,
+                            postal_code: address.postal_code || null,
+                            address_detail: address.address_detail,
+                            is_default: address.is_default,
+                        }))
+                    }
+                    : {})
             };
             console.log(customerData);
-            const response = await api.post('/customers', customerData);
-            
+            const isExemptPhone = (formData.phone || '').replace(/\s/g, '') === '085000000000';
+            const config = isExemptPhone ? { headers: { 'X-Manual-Order': '1' } } : undefined;
+            const response = await api.post('/customers', customerData, config);
+
             if (response.data.status === 'success') {
                 await Swal.fire({
                     icon: 'success',
@@ -390,7 +392,7 @@ export default function AddCustomer() {
                     text: 'Customer berhasil ditambahkan',
                     confirmButtonColor: '#3B82F6'
                 });
-                
+
                 // Redirect to customer list or reset form
                 window.location.href = '/cms/customer/data';
             } else {
@@ -408,7 +410,7 @@ export default function AddCustomer() {
                 const apiErrors = error.response.data.errors;
                 if (apiErrors) {
                     if (Array.isArray(apiErrors)) {
-                        const entries = apiErrors.map((e, i) => [e.field || `Error ${i+1}`, e.message || JSON.stringify(e)]);
+                        const entries = apiErrors.map((e, i) => [e.field || `Error ${i + 1}`, e.message || JSON.stringify(e)]);
                         listHtml = buildListHtml(entries);
                         const phoneErr = apiErrors.find(e => (e.field === 'phone') && e.message);
                         errorMessage = phoneErr?.message || 'Mohon periksa kembali data yang Anda masukkan';
@@ -459,9 +461,8 @@ export default function AddCustomer() {
                                         Kategori Customer <span className="text-red-500">*</span>
                                     </label>
                                     <select
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                            errors.category ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.category ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         value={formData.category}
                                         onChange={(e) => handleInputChange('category', e.target.value)}
                                     >
@@ -473,16 +474,15 @@ export default function AddCustomer() {
                                         <p className="text-red-500 text-xs mt-1">{errors.category}</p>
                                     )}
                                 </div>
-                                
+
                                 <div>
                                     <label className="text-sm font-medium">
                                         Nama Lengkap <span className="text-red-500">*</span>
                                     </label>
-                                    <input 
+                                    <input
                                         type="text"
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                            errors.full_name ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.full_name ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         value={formData.full_name}
                                         onChange={(e) => {
                                             handleInputChange('full_name', e.target.value);
@@ -505,11 +505,10 @@ export default function AddCustomer() {
                                     <label className="text-sm font-medium">
                                         No. HP / Telepon <span className="text-red-500">*</span>
                                     </label>
-                                    <input 
+                                    <input
                                         type="tel"
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm pl-10 ${
-                                            errors.phone ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm pl-10 ${errors.phone ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         value={formData.phone}
                                         onChange={(e) => {
                                             handleInputChange('phone', e.target.value);
@@ -534,11 +533,10 @@ export default function AddCustomer() {
                                     <label className="text-sm font-medium">
                                         Email
                                     </label>
-                                    <input 
+                                    <input
                                         type="email"
-                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                            errors.email ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                        className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors.email ? 'border-red-500' : 'border-gray-300'
+                                            }`}
                                         value={formData.email}
                                         onChange={(e) => handleInputChange('email', e.target.value)}
                                         placeholder="email@example.com"
@@ -552,7 +550,7 @@ export default function AddCustomer() {
                                     <label className="text-sm font-medium">
                                         ID Line
                                     </label>
-                                    <input 
+                                    <input
                                         type="text"
                                         className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
                                         value={formData.line_id}
@@ -565,7 +563,7 @@ export default function AddCustomer() {
                                     <label className="text-sm font-medium">
                                         Other Contact
                                     </label>
-                                    <input 
+                                    <input
                                         type="text"
                                         className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
                                         value={formData.other_contact}
@@ -575,7 +573,7 @@ export default function AddCustomer() {
                                 </div>
 
                             </div>
-                            
+
                             {/* Multi-Address Management */}
                             <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mt-6">
                                 <div className="flex justify-between items-center mb-4">
@@ -588,7 +586,7 @@ export default function AddCustomer() {
                                         + Tambah Alamat
                                     </button>
                                 </div>
-                                
+
                                 {/* Address Tabs */}
                                 {addresses.length > 1 && (
                                     <div className="flex space-x-2 mb-4 border-b">
@@ -597,11 +595,10 @@ export default function AddCustomer() {
                                                 key={index}
                                                 type="button"
                                                 onClick={() => setActiveAddressIndex(index)}
-                                                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                                                    activeAddressIndex === index
+                                                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${activeAddressIndex === index
                                                         ? 'border-blue-500 text-blue-600'
                                                         : 'border-transparent text-gray-500 hover:text-gray-700'
-                                                }`}
+                                                    }`}
                                             >
                                                 {address.label || `Alamat ${index + 1}`}
                                                 {address.is_default && (
@@ -613,7 +610,7 @@ export default function AddCustomer() {
                                         ))}
                                     </div>
                                 )}
-                                
+
                                 {/* Address Actions */}
                                 {addresses.length > 0 && (
                                     <div className="flex justify-between items-center mb-4">
@@ -646,14 +643,14 @@ export default function AddCustomer() {
                                         )}
                                     </div>
                                 )}
-                                
+
                                 {/* Additional Address Form Fields */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="text-sm font-medium">
                                             Nama Penerima
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
                                             className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
                                             value={addresses[activeAddressIndex]?.recipient_name || ''}
@@ -661,12 +658,12 @@ export default function AddCustomer() {
                                             placeholder="Nama penerima"
                                         />
                                     </div>
-                                    
+
                                     <div>
                                         <label className="text-sm font-medium">
                                             No. HP Penerima
                                         </label>
-                                        <input 
+                                        <input
                                             type="tel"
                                             className="w-full mt-1 border border-gray-300 rounded px-3 py-2 text-sm"
                                             value={addresses[activeAddressIndex]?.recipient_phone || ''}
@@ -685,7 +682,7 @@ export default function AddCustomer() {
                                     />
                                     <span className="text-sm">Alamat Pesanan dropship</span>
                                 </div>
-                                
+
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="relative city-search-container">
@@ -696,13 +693,12 @@ export default function AddCustomer() {
                                         <div className="relative">
                                             <input
                                                 type="text"
-                                                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                                    errors[`city_${activeAddressIndex}`]
+                                                className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`city_${activeAddressIndex}`]
                                                         ? 'border-red-500'
                                                         : (addresses[activeAddressIndex]?.district && addresses[activeAddressIndex]?.city)
                                                             ? 'border-green-500 bg-green-50'
                                                             : 'border-gray-300'
-                                                }`}
+                                                    }`}
                                                 placeholder="Ketik nama kecamatan ..."
                                                 value={cityQuery}
                                                 onChange={handleCitySearch}
@@ -774,16 +770,15 @@ export default function AddCustomer() {
                                             <p className="text-red-500 text-xs mt-1">{errors[`city_${activeAddressIndex}`]}</p>
                                         )}
                                     </div>
-                                    
+
                                     <div>
                                         <label className="text-sm font-medium">
                                             Kode Pos (opsional)
                                         </label>
-                                        <input 
+                                        <input
                                             type="text"
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${
-                                                errors[`postal_code_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm ${errors[`postal_code_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={addresses[activeAddressIndex]?.postal_code || ''}
                                             onChange={(e) => handleAddressChange('postal_code', e.target.value)}
                                             placeholder="12345"
@@ -798,10 +793,9 @@ export default function AddCustomer() {
                                         <label className="text-sm font-medium">
                                             Alamat Lengkap <span className="text-red-500">*</span>
                                         </label>
-                                        <textarea 
-                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm min-h-[80px] ${
-                                                errors[`address_detail_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
-                                            }`}
+                                        <textarea
+                                            className={`w-full mt-1 border rounded px-3 py-2 text-sm min-h-[80px] ${errors[`address_detail_${activeAddressIndex}`] ? 'border-red-500' : 'border-gray-300'
+                                                }`}
                                             value={addresses[activeAddressIndex]?.address_detail || ''}
                                             onChange={(e) => handleAddressChange('address_detail', e.target.value)}
                                             placeholder="Masukkan alamat lengkap (nama jalan, nomor rumah, RT/RW, dll)"
@@ -815,7 +809,7 @@ export default function AddCustomer() {
                         </form>
 
                         <div className="mt-6 flex gap-3">
-                            <button 
+                            <button
                                 type="submit"
                                 onClick={handleSubmit}
                                 disabled={loading}
@@ -826,7 +820,7 @@ export default function AddCustomer() {
                                 )}
                                 {loading ? 'Menyimpan...' : 'Simpan Customer'}
                             </button>
-                            <button 
+                            <button
                                 type="button"
                                 onClick={() => window.history.back()}
                                 className="px-5 py-2 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
@@ -853,7 +847,7 @@ export default function AddCustomer() {
                                 resi melekat pada customer dropship tersebut.
                             </p>
                         </div>
-                        
+
                         <div className="bg-blue-50 p-4 rounded-lg text-sm">
                             <div className="flex items-center gap-2 mb-2">
                                 <Icon icon="mdi:information" className="text-blue-600" />

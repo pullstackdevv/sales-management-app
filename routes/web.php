@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\LoyaltyController;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
@@ -175,6 +176,10 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
             return Inertia::render('Settings/index', ['activeMenu' => 'general']);
         })->name('settings.general');
 
+        Route::get('/settings/marketplace', function () {
+            return Inertia::render('Settings/index', ['activeMenu' => 'marketplace']);
+        })->name('settings.marketplace');
+
         Route::get('/settings/order', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'order']);
         })->name('settings.order');
@@ -226,6 +231,15 @@ Route::middleware([Authenticate::class, HandleInertiaRequests::class, \App\Http\
         Route::get('/settings/api', function () {
             return Inertia::render('Settings/index', ['activeMenu' => 'api']);
         })->name('settings.api');
+
+        // Loyalty & Rewards (Menu Terpisah)
+        Route::get('/loyalty/settings', [LoyaltyController::class, 'settingsPage'])->name('loyalty.settings');
+        Route::get('/loyalty/tiers', [LoyaltyController::class, 'tierPage'])->name('loyalty.tiers');
+
+        // Review Management
+        Route::get('/reviews', function () {
+            return Inertia::render('Review/ReviewManagement');
+        })->name('reviews.index');
 
         // User management routes
         Route::get('/settings/users/create', function () {
@@ -342,9 +356,21 @@ Route::get('/profile', function () {
     return Inertia::render('Marketplace/Profile');
 })->name('marketplace.profile');
 
+Route::get('/myorder', function () {
+    return Inertia::render('Marketplace/MyOrders');
+})->name('marketplace.myorder');
+
+Route::get('/write-review', function () {
+    return Inertia::render('Marketplace/WriteReview');
+})->name('marketplace.write-review');
+
 // Web Order Routes (for marketplace checkout)
 Route::post('/order/create', [WebOrderController::class, 'createOrder'])->name('marketplace.order.create');
 Route::get('/order/{orderNumber}', [WebOrderController::class, 'getOrder'])->name('marketplace.order.show');
+
+// Checkout customer session (server-side)
+Route::post('/checkout/session/customer', [WebOrderController::class, 'setCheckoutCustomerSession'])->name('checkout.session.customer');
+Route::post('/checkout/session/clear', [WebOrderController::class, 'clearCheckoutCustomerSession'])->name('checkout.session.clear');
 
 // Track Orders (public - for all customers)
 Route::get('/track-orders', [WebOrderController::class, 'trackOrdersPage'])->name('marketplace.track-orders');

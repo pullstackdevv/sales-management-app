@@ -93,6 +93,21 @@ const EditVoucher = ({ voucherId }) => {
                 end_date: data.valid_until,
                 is_active: data.is_active || true
             };
+
+            // Fix for percentage voucher maximum_discount
+            if (apiData.type === 'percentage') {
+                const maxDisc = apiData.maximum_discount ? Number(apiData.maximum_discount) : 0;
+                apiData.maximum_discount = maxDisc > 0 ? maxDisc : null;
+            } else {
+                 apiData.maximum_discount = null;
+            }
+
+            // Ensure value is handled correctly for all types
+            if (apiData.type === 'free_sample' || apiData.type === 'shipping_free_sample') {
+                apiData.value = apiData.value ? Number(apiData.value) : 1;
+            } else {
+                apiData.value = Number(apiData.value);
+            }
             
             // Remove the old field names
             delete apiData.valid_from;
@@ -313,7 +328,7 @@ const EditVoucher = ({ voucherId }) => {
                                 {voucherType !== "free_sample" && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            {voucherType === "shipping" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
+                                            {voucherType === "shipping" || voucherType === "shipping_free_sample" ? "Nilai Potongan Ongkir *" : "Nilai Diskon *"}
                                         </label>
                                         <div className="relative">
                                             {(voucherType === "fixed" || voucherType === "shipping") && (

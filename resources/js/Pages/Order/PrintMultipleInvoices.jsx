@@ -197,7 +197,7 @@ const PrintMultipleInvoices = () => {
       </div>
     );
   }
-
+  const itemsFontClassFor = (count) => (count <= 3 ? 'text-lg' : count <= 6 ? 'text-base' : count <= 10 ? 'text-sm' : 'text-xs');
   return (
     <>
       <Head title="Print Multiple Invoices" />
@@ -237,23 +237,23 @@ const PrintMultipleInvoices = () => {
             <div key={inv.id} className="bg-white shadow-lg rounded-lg p-6 print-page">
               <div className="border-2 border-black">
                 <div className="grid grid-cols-3 border-b-2 border-black">
-                  <div className="border-r-2 border-black p-4 font-bold text-lg">
+                  <div className="border-r-2 border-black p-4 font-bold text-xl">
                     {inv.courier_name || 'KURIR'}
                   </div>
-                  <div className="border-r-2 border-black p-4 font-bold text-lg text-center">
+                  <div className="border-r-2 border-black p-4 font-bold text-xl text-center">
                     {(inv.service_type || 'SERVICE').toString().toUpperCase()}
                   </div>
-                  <div className="p-4 font-bold text-lg text-center">
+                  <div className="p-4 font-bold text-xl text-center">
                     {inv.total_weight ? `${inv.total_weight}kg` : '0.5kg'}
                   </div>
                 </div>
 
                 <div className="border-b-2 border-black p-4">
-                  <div className="font-bold">No Pesanan: {inv.invoice_number || inv.id}</div>
+                  <div className="font-bold text-xl">No Pesanan: {inv.invoice_number || inv.id}</div>
                 </div>
 
                 <div className="border-b-2 border-black p-4">
-                  <div className="font-bold">
+                  <div className="font-bold text-xl">
                     Pengirim: {inv.shipping_address?.is_dropship
                       ? `${inv.customer?.name || 'Customer'} - ${inv.customer?.phone || '083867000077'}`
                       : `${inv.company?.name || 'SALEPARFUM'} - ${inv.company?.phone || '083867000077'}`}
@@ -261,20 +261,21 @@ const PrintMultipleInvoices = () => {
                 </div>
 
                 <div className="border-b-2 border-black p-4">
-                  <div className="font-bold">
+                  <div className="font-bold text-xl">
                     Kepada: {inv.shipping_address?.recipient_name || 'Customer'} ({inv.shipping_address?.phone || '-'})
                   </div>
                 </div>
 
                 <div className="border-b-2 border-black p-4">
-                  <div className="font-bold mb-2">Alamat:</div>
-                  <div className="text-sm leading-relaxed">
+                  <div className="font-bold text-xl mb-2">Alamat:</div>
+                  <div className="text-lg leading-relaxed">
                     {inv.shipping_address ? (
                       <>
                         {inv.shipping_address.address_detail}<br />
-                        {inv.shipping_address.city}, {inv.shipping_address.province} {inv.shipping_address.postal_code}<br />
-                        {inv.shipping_address.district && `${inv.shipping_address.district}`}<br />
-                        {inv.shipping_address.phone && `${inv.shipping_address.phone}`}
+                        {inv.shipping_address.district && `${inv.shipping_address.district}`} ,
+                        {inv.shipping_address.city}, {inv.shipping_address.province}
+                        , {inv.shipping_address.postal_code}
+                        {inv.shipping_address.phone && ` (${inv.shipping_address.phone})`}
                       </>
                     ) : (
                       <>Alamat tidak tersedia</>
@@ -283,8 +284,8 @@ const PrintMultipleInvoices = () => {
                 </div>
 
                 <div className="border-b-2 border-black p-4">
-                  <div className="font-bold mb-2">Paket:</div>
-                  <div className="text-sm">
+                  <div className="font-bold text-xl mb-2">Paket:</div>
+                  <div className={itemsFontClassFor(inv.items?.length ?? 1)}>
                     {inv.items?.map((item, idx) => (
                       <div key={idx} className="mb-1">
                         • {item.product_name} {item.description && `- ${item.description}`} (Qty: {item.quantity})
@@ -295,8 +296,8 @@ const PrintMultipleInvoices = () => {
 
                 {(inv.voucher || (inv.discount_amount || 0) > 0) && (
                   <div className="border-b-2 border-black p-4">
-                    <div className="font-bold mb-2">Catatan Voucher:</div>
-                    <div className="text-sm">
+                    <div className="font-bold text-xl mb-2">{inv.voucher ? 'Catatan Voucher' : 'Diskon Manual'}</div>
+                    <div className="text-lg">
                       {inv.voucher
                         ? `Voucher ${inv.voucher.code} • ${inv.voucher.type.toUpperCase()} • Nilai: ${Number(inv.voucher.value).toLocaleString('id-ID')}`
                         : `Diskon: Rp ${Number(Math.round(inv.discount_amount || 0)).toLocaleString('id-ID')}`}
@@ -305,26 +306,26 @@ const PrintMultipleInvoices = () => {
                 )}
 
                 <div className="p-4">
-                  <div className="font-bold text-lg">
+                  <div className="font-bold text-xl">
                     Total: Rp{Number(Math.round(inv.total_amount || 0)).toLocaleString('id-ID')}
                   </div>
                 </div>
 
                 {inv.notes && (
                   <div className="p-4">
-                    <div className="font-bold mb-2">Catatan:</div>
+                    <div className="text-xl font-bold mb-2">Catatan:</div>
                     <div className="bg-gray-50 p-4 rounded">
-                      <p className="text-gray-700">{inv.notes}</p>
+                      <p className="text-gray-700 text-lg">{inv.notes}</p>
                     </div>
                   </div>
                 )}
               </div>
-               <div className="pt-6 mt-4 ">
-                  <div className="text-center text-gray-600">
-                    <p>Terima kasih atas kepercayaan Anda!</p>
-                    <p className="text-sm mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                  </div>
+              <div className="pt-6 mt-4 ">
+                <div className="text-center text-gray-600">
+                  <p className="text-xl">Terima kasih atas kepercayaan Anda!</p>
+                  <p className="text-lg mt-2">Invoice ini dibuat secara otomatis pada {new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
                 </div>
+              </div>
             </div>
           ))}
         </div>

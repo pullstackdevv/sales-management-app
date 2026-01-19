@@ -4,10 +4,12 @@ import DashboardLayout from '@/Layouts/DashboardLayout.jsx';
 import { ChevronLeft, MessageCircle, Copy, Settings, Eye, Truck, ExternalLink, RefreshCw, DollarSign, Briefcase, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api/axios';
+import { useAuth } from '@/contexts/AuthContext';
 import PaymentHistoryModal from '../../components/ui/modal/PaymentHistoryModal';
 import OrderHistoryModal from '../../components/ui/modal/OrderHistoryModal';
 
 export default function OrderDetail({ auth, order }) {
+    const { isOwner, user } = useAuth();
     const formatRupiah = (value) => {
         const num = typeof value === 'number' ? value : parseFloat(value || 0);
         return num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
@@ -57,6 +59,10 @@ export default function OrderDetail({ auth, order }) {
     const handleCopyOrderDetails = () => {
         if (!orderData) return;
 
+        const paymentStatusStr = String(orderData?.payment_status || '').toLowerCase();
+        const orderStatusStr = String(orderData?.status || '').toLowerCase();
+        const effectivePaymentStatus = (!isWebOrder() && paymentStatusStr === 'pending' && orderStatusStr === 'paid') ? 'paid' : paymentStatusStr;
+
         const orderDetails = `
 Order #${orderData.order_number || orderData.id}
 Tanggal: ${new Date(orderData.created_at).toLocaleDateString('id-ID')}
@@ -72,7 +78,7 @@ ${orderData.items?.map(item =>
 Ongkir: Rp${formatRupiah(orderData.shipping_cost)}
 Total: Rp${formatRupiah(orderData.total_price)}
 
-Status: ${getStatusLabel(orderData.payment_status)}
+Status: ${getStatusLabel(effectivePaymentStatus)}
 Kurir: ${orderData.shipping?.courier?.name || 'Kurir'} - ${orderData.shipping?.service_type || 'Reguler'}
 Resi: ${orderData.shipping?.tracking_number || '-'}
         `;
@@ -136,6 +142,8 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                 return 'Gagal';
             case 'cancelled':
                 return 'Dibatalkan';
+            case 'expired':
+                return 'Kedaluarsa';
             default:
                 return 'Tidak Diketahui';
         }
@@ -175,10 +183,35 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
         );
     }
 
-    // Calculate totals with base_price from order_items table
     const totalSellingPrice = orderData.items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
-    // const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
-    // const profit = totalSellingPrice - totalProductCost;
+    const voucherDiscountAmount = orderData?.voucher?.type === 'percentage'
+        ? Math.floor(totalSellingPrice * ((orderData?.voucher?.value || 0) / 100))
+        : (orderData?.voucher?.value || 0);
+    const manualDiscount = orderData?.discount_amount || 0;
+    const pointDiscount = parseFloat(orderData?.point_discount || 0);
+    const netSales = Math.max(totalSellingPrice - voucherDiscountAmount - manualDiscount - pointDiscount, 0);
+    const totalProductCost = orderData.items?.reduce((sum, item) => sum + ((item.base_price || 0) * item.quantity), 0) || 0;
+    const grossProfit = netSales - totalProductCost;
+    let paidAmount = orderData.payments?.reduce((sum, p) => sum + (p.amount_paid || 0), 0) || 0;
+    if (isWebOrder() && orderData.payment_status === 'paid') {
+        paidAmount = orderData.total_price || 0;
+    }
+    const outstanding = Math.max((orderData.total_price || 0) );
+    const paymentStatusStr = String(orderData?.payment_status || '').toLowerCase();
+    const orderStatusStr = String(orderData?.status || '').toLowerCase();
+    const effectivePaymentStatus = (!isWebOrder() && paymentStatusStr === 'pending' && ['paid','shipped','processing','delivered'].includes(orderStatusStr)) ? 'paid' :
+                                 (!isWebOrder() && paymentStatusStr === 'pending' && orderStatusStr === 'cancelled') ? 'cancelled' :
+                                 paymentStatusStr;
+    const isPaymentInactive = ['cancelled','expired'].includes(effectivePaymentStatus);
+    const finance = {
+        revenue: isPaymentInactive ? 0 : (orderData.total_price || 0),
+        totalSellingPrice: isPaymentInactive ? 0 : totalSellingPrice,
+        netSales: isPaymentInactive ? 0 : netSales,
+        totalProductCost: isPaymentInactive ? 0 : totalProductCost,
+        grossProfit: isPaymentInactive ? 0 : grossProfit,
+        receivable: effectivePaymentStatus === 'pending' ? outstanding : 0,
+    };
+    const canViewFinance = isOwner || (user?.id === orderData?.user_id);
 
     return (
         <DashboardLayout user={auth.user}>
@@ -255,8 +288,8 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                         <p className="text-sm text-gray-600 mb-2">Status bayar & Total Bayar</p>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center space-x-2">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(orderData.payment_status)}`}>
-                                                    {getStatusLabel(orderData.payment_status)}
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(effectivePaymentStatus)}`}>
+                                                    {getStatusLabel(effectivePaymentStatus)}
                                                 </span>
                                                 <div className="text-sm text-gray-600">
                                                     <div>{new Date(orderData.created_at).toLocaleDateString('id-ID')}</div>
@@ -350,7 +383,12 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                                 <p>{orderData.address.address_detail}</p>
                                                 <p>{orderData.address.district}, {orderData.address.city}, {orderData.address.province} {orderData.address.postal_code}</p>
                                                 <p>Telp: {orderData.address.phone || orderData.customer?.phone || '-'}</p>
-                                                {orderData.address.is_dropship && (<p className="text-xs text-gray-500">Dropship</p>)}
+                                                {orderData.address.is_dropship && (
+                                                    <>
+                                                        <p className="text-xs text-gray-500">Dropship</p>
+                                                        <p>Pemesan: {orderData.customer?.name || '-'}</p>
+                                                    </>
+                                                )}
                                             </div>
                                         </>
                                     ) : (
@@ -374,86 +412,114 @@ Resi: ${orderData.shipping?.tracking_number || '-'}
                                 </div> */}
                             </div>
 
-                    
+
                         </div>
 
                         {/* Right Column - Products */}
-                        <div className="bg-white p-6 rounded-lg shadow-sm">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-semibold">Produk</h3>
-                                <p className="text-sm text-gray-600">Total Produk: {orderData.items?.length || 0}</p>
-                            </div>
+                        <div className="flex flex-col">
+                            <div className='bg-white p-6 rounded-lg shadow-sm'>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-lg font-semibold">Produk</h3>
+                                    <p className="text-sm text-gray-600">Total Produk: {orderData.items?.length || 0}</p>
+                                </div>
 
-                            <div className="space-y-4">
-                                {orderData.items?.map((item, index) => (
-                                    <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
-                                        <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                                            {item.product_variant?.product?.image ? (
-                                                <img
-                                                    src={`/storage/${item.product_variant.product.image}`}
-                                                    alt={item.product_variant.product.name}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <span className="text-gray-400 text-xs">No Image</span>
-                                            )}
+                                <div className="space-y-4">
+                                    {orderData.items?.map((item, index) => (
+                                        <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
+                                            <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                                                {item.product_variant?.product?.image ? (
+                                                    <img
+                                                        src={`/storage/${item.product_variant.product.image}`}
+                                                        alt={item.product_variant.product.name}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">No Image</span>
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="font-medium">{item.product_name_snapshot || item.product_variant?.product?.name || '-'}</h4>
+                                                <p className="text-sm text-gray-600">{item.variant_label && `(${item.variant_label})`}</p>
+                                                <p className="text-sm text-gray-600">{item.quantity} x Rp{formatRupiah(item.price)}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold">Rp{formatRupiah(item.subtotal)}</p>
+                                            </div>
                                         </div>
-                                        <div className="flex-1">
-                                            <h4 className="font-medium">{item.product_name_snapshot || item.product_variant?.product?.name || '-'}</h4>
-                                            <p className="text-sm text-gray-600">{item.variant_label && `(${item.variant_label})`}</p>
-                                            <p className="text-sm text-gray-600">{item.quantity} x Rp{formatRupiah(item.price)}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-bold">Rp{formatRupiah(item.subtotal)}</p>
-                                        </div>
-                                    </div>
-                                )) || (
-                                        <div className="text-center py-8 text-gray-500">
-                                            Tidak ada produk
-                                        </div>
-                                    )}
-                            </div>
+                                    )) || (
+                                            <div className="text-center py-8 text-gray-500">
+                                                Tidak ada produk
+                                            </div>
+                                        )}
+                                </div>
 
-                            {/* Total Section */}
-                            <div className="mt-6 pt-4 border-t">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span>Subtotal Produk</span>
-                                        <span>Rp{formatRupiah(totalSellingPrice)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span>{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</span>
-                                        <span>Rp{formatRupiah(orderData.shipping_cost)}</span>
-                                    </div>
-                                    {orderData.voucher?.code && (
+                                {/* Total Section */}
+                                <div className="mt-6 pt-4 border-t">
+                                    <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
-                                            <span>Voucher {orderData.voucher.code}</span>
-                                            <span>{orderData.voucher.type === 'percentage' ? `${orderData.voucher.value}%` : `Rp${formatRupiah(orderData.voucher.value)}`}</span>
+                                            <span>Subtotal Produk</span>
+                                            <span>Rp{formatRupiah(totalSellingPrice)}</span>
                                         </div>
-                                    )}
-                                    <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                                        <span>TOTAL</span>
-                                        <span>Rp{formatRupiah(orderData.total_price)}</span>
+                                        {/* Financial summary moved to its own card below */}
+                                        <div className="flex justify-between text-sm">
+                                            <span>{orderData.shipping?.courier?.name || 'Kurir'} - {orderData.shipping?.service_type || 'Reguler'}</span>
+                                            <span>Rp{formatRupiah(orderData.shipping_cost)}</span>
+                                        </div>
+                                        {orderData.voucher?.code ? (
+                                            <>
+                                                <div className="flex justify-between text-sm">
+                                                    <span>Voucher {orderData.voucher.code}</span>
+                                                    <span>
+                                                        {orderData.voucher.type === 'percentage' && `${orderData.voucher.value}%`}
+                                                        {orderData.voucher.type === 'fixed' && `- Rp${formatRupiah(orderData.voucher.value)}`}
+                                                        {(orderData.voucher.type === 'shipping' || orderData.voucher.type === 'shipping_free_sample') && (
+                                                            `- Rp${formatRupiah(orderData.voucher.value)} (Ongkir)`
+                                                        )}
+                                                        {orderData.voucher.type === 'free_sample' && 'Free Product'}
+                                                    </span>
+                                                </div>
+                                                {(orderData.voucher.type === 'free_sample' || orderData.voucher.type === 'shipping_free_sample') && (
+                                                    <div className="flex justify-between text-sm text-green-600">
+                                                        <span>Bonus: {orderData.voucher.free_product_name}</span>
+                                                        <span>Gratis</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : orderData.discount_amount > 0 ? (
+                                            <div className="flex justify-between text-sm">
+                                                <span>Diskon Manual</span>
+                                                <span>- Rp{formatRupiah(orderData.discount_amount)}</span>
+                                            </div>
+                                        ) : null}
+                                        {pointDiscount > 0 && (
+                                            <div className="flex justify-between text-sm">
+                                                <span>Diskon Poin Loyalty</span>
+                                                <span>- Rp{formatRupiah(pointDiscount)}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                                            <span>TOTAL</span>
+                                            <span>Rp{formatRupiah(orderData.total_price)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                        <Briefcase className="w-4 h-4 text-gray-600" />
-                                        <span className="text-sm text-gray-700">Biaya Produk</span>
+                            {canViewFinance && (
+                                <div className="mt-6 bg-white p-6 rounded-lg shadow-sm">
+                                    <h3 className="text-lg font-semibold mb-4">Ringkasan Finansial</h3>
+                                    <div className="space-y-2 text-sm">
+                                        {/* <div className="flex justify-between"><span>Pendapatan</span><span>Rp{formatRupiah(finance.revenue)}</span></div> */}
+                                        <div className="flex justify-between"><span>Penjualan Kotor</span><span>Rp{formatRupiah(finance.revenue)}</span></div>
+                                        <div className="flex justify-between"><span>Penjualan Bersih</span><span>Rp{formatRupiah(finance.netSales)}</span></div>
+                                        <div className="flex justify-between"><span>HPP</span><span>Rp{formatRupiah(finance.totalProductCost)}</span></div>
+                                        <div className="flex justify-between"><span>Laba Kotor</span><span>Rp{formatRupiah(finance.grossProfit)}</span></div>
+                                        <div className="flex justify-between"><span>Piutang</span><span>Rp{formatRupiah(finance.receivable)}</span></div>
                                     </div>
-                                    <span className="font-medium">Rp{formatRupiah(totalProductCost)}</span>
+                                    {['cancelled', 'expired'].includes(String(orderData.payment_status || '').toLowerCase()) && (
+                                        <p className="mt-2 text-xs text-gray-500">Status pembayaran {String(orderData.payment_status).toLowerCase()}. Nilai finansial ditampilkan 0.</p>
+                                    )}
                                 </div>
-                                <div className="flex items-center justify-between mt-2">
-                                    <div className="flex items-center space-x-2">
-                                        <TrendingUp className="w-4 h-4 text-gray-600" />
-                                        <span className="text-sm text-gray-700">Profit</span>
-                                    </div>
-                                    <span className="font-semibold">Rp{formatRupiah(profit)}</span>
-                                </div>
-                            </div> */}
+                            )}
                         </div>
                     </div>
                 </div>

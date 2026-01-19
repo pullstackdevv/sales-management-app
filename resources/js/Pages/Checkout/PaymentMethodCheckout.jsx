@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, CheckCircle, CreditCard } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, CreditCard, RefreshCw, MessageCircle } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
 import { formatCurrency } from '../../utils/helpers';
@@ -22,10 +22,19 @@ const PaymentMethodCheckout = () => {
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [loadingVoucher, setLoadingVoucher] = useState(false);
 
+  // Loyalty points states
+  const [loyaltyPoints, setLoyaltyPoints] = useState(null);
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [pointDiscount, setPointDiscount] = useState(0);
+  const [redeemOptions, setRedeemOptions] = useState([]);
+
   // Promotion states
   const [promotions, setPromotions] = useState([]);
   const [loadingPromotions, setLoadingPromotions] = useState(false);
   const [notes, setNotes] = useState('');
+  const [settings, setSettings] = useState(null);
+
 
   useEffect(() => {
     // Ambil data checkout dari session
@@ -50,11 +59,39 @@ const PaymentMethodCheckout = () => {
 
   // Separate useEffect to fetch courier rates after checkoutData is set
   useEffect(() => {
+    console.log('UseEffect triggered - checkoutData:', checkoutData);
     if (checkoutData && checkoutData.customer) {
+      console.log('Fetching courier rates, promotions, and loyalty points...');
       fetchCourierRates();
       fetchActivePromotions();
+      
+      // Fetch loyalty points immediately
+      const customerId = checkoutData.customer.customer_id || checkoutData.customer.id;
+      console.log('Initial loyalty fetch - customer_id:', customerId);
+      if (customerId) {
+        fetchLoyaltyPoints();
+      }
+    } else {
+      console.log('Skipping fetch - checkoutData or customer missing:', {
+        hasCheckoutData: !!checkoutData,
+        hasCustomer: !!checkoutData?.customer
+      });
     }
   }, [checkoutData]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await axios.get('/api/general-settings/public');
+        if (res.data?.success) setSettings(res.data.data);
+        console.log(res)
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
+  }, []);
+
 
   // Function to fetch courier rates from API
   const fetchCourierRates = async () => {
@@ -289,11 +326,99 @@ const PaymentMethodCheckout = () => {
     }
   };
 
+  // Function to fetch customer loyalty points
+  const fetchLoyaltyPoints = async () => {
+    // Try to get customer_id from various sources
+    const customerId = checkoutData?.customer?.customer_id || 
+                      checkoutData?.customer?.id;
+    
+    console.log('Fetching loyalty points - customer data:', {
+      hasCheckoutData: !!checkoutData,
+      hasCustomer: !!checkoutData?.customer,
+      customer: checkoutData?.customer,
+      customerId: customerId
+    });
+
+    if (!customerId) {
+      console.log('No customer_id available for loyalty points');
+      return;
+    }
+
+    setLoadingLoyalty(true);
+    try {
+      const orderTotal = checkoutData.product.subtotal + shippingCost;
+      
+      console.log('Calling loyalty API with:', {
+        customerId,
+        orderTotal
+      });
+      
+      const response = await axios.get(`/api/loyalty/redeem-options?customer_id=${customerId}&order_total=${orderTotal}`);
+      
+      console.log('Loyalty API response:', response.data);
+      
+      if (response.data) {
+        setLoyaltyPoints({
+          current: response.data.customer_points || 0,
+          redeemValue: response.data.redeem_value || 1000,
+          minRedeem: response.data.min_redeem || 0,
+          maxPercentage: response.data.max_percentage || 20,
+          maxDiscount: response.data.max_discount || 0
+        });
+        setRedeemOptions(response.data.options || []);
+        console.log('Loyalty points loaded successfully:', {
+          current: response.data.customer_points,
+          options: response.data.options
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching loyalty points:', error);
+      console.error('Error details:', error.response?.data);
+    } finally {
+      setLoadingLoyalty(false);
+    }
+  };
+
+  // Refetch loyalty when shipping cost changes
+  useEffect(() => {
+    const customerId = checkoutData?.customer?.customer_id || checkoutData?.customer?.id;
+    if (customerId && shippingCost >= 0) {
+      console.log('Refetching loyalty points due to shipping cost change:', shippingCost);
+      fetchLoyaltyPoints();
+    }
+  }, [shippingCost]);
+
+  // Function to apply point redemption
+  const applyPointRedemption = (points) => {
+    if (!loyaltyPoints || points <= 0) return;
+
+    const discount = Math.min(
+      points * loyaltyPoints.redeemValue,
+      loyaltyPoints.maxDiscount || Infinity
+    );
+
+    setPointsToRedeem(points);
+    setPointDiscount(discount);
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Poin Berhasil Diterapkan!',
+      text: `${points} poin ditukar menjadi diskon ${formatCurrency(discount)}`,
+      confirmButtonColor: '#3b82f6'
+    });
+  };
+
+  // Function to remove point redemption
+  const removePointRedemption = () => {
+    setPointsToRedeem(0);
+    setPointDiscount(0);
+  };
+
   // Calculate total including shipping and discount
   const calculateTotal = () => {
     if (!checkoutData || !checkoutData.product) return 0;
     const subtotal = checkoutData.product.subtotal + shippingCost;
-    return subtotal - voucherDiscount;
+    return subtotal - voucherDiscount - pointDiscount;
   };
 
   // Function to validate and apply voucher
@@ -390,12 +515,11 @@ const PaymentMethodCheckout = () => {
 
       // Check if this is from MultiProductCheckout
       if (checkoutData.product.multiProducts && Array.isArray(checkoutData.product.multiProducts)) {
-        // Multi-product checkout from MultiProductCheckout
         items = checkoutData.product.multiProducts.map(product => ({
-          product_variant_id: product.variant_id || product.product_id, // Use variant_id if available, otherwise product_id
+          product_variant_id: product.variant_id,
           quantity: parseInt(product.quantity) || 1,
           price: product.price
-        }));
+        })).filter(p => !!p.product_variant_id);
       } else if (checkoutData.product.selectedVariants && Object.keys(checkoutData.product.selectedVariants).length > 0) {
         // Multiple variants selected (single product with multiple variants)
         items = Object.values(checkoutData.product.selectedVariants).map(({ variant, quantity }) => ({
@@ -411,16 +535,27 @@ const PaymentMethodCheckout = () => {
           price: checkoutData.product.variant.price
         }];
       } else {
-        // No variant (base product)
-        items = [{
-          product_variant_id: checkoutData.product.id,
-          quantity: parseInt(checkoutData.product.quantity) || 1,
-          price: checkoutData.product.price
-        }];
+        setSubmitting(false);
+        Swal.fire({
+          icon: 'warning',
+          title: 'Varian Produk Diperlukan',
+          text: 'Silakan pilih varian produk sebelum melanjutkan ke pembayaran.',
+          confirmButtonColor: '#3b82f6'
+        });
+        return;
       }
 
-      // Debug: Log the final items array
-      console.log('Final items array:', items);
+      const hasInvalid = items.some(i => !i.product_variant_id || Number.isNaN(Number(i.product_variant_id)));
+      if (hasInvalid || items.length === 0) {
+        setSubmitting(false);
+        Swal.fire({
+          icon: 'error',
+          title: 'Produk Tidak Valid',
+          text: 'Terjadi kesalahan pada data produk. Pastikan setiap produk memiliki varian yang benar.',
+          confirmButtonColor: '#3b82f6'
+        });
+        return;
+      }
 
       const addressId = checkoutData.customer.address_id;
       const addresses = checkoutData.customer.addresses || [];
@@ -450,6 +585,8 @@ const PaymentMethodCheckout = () => {
         items: items.map(p => ({ product_variant_id: p.product_variant_id, quantity: p.quantity })),
         shipping_cost: shippingCost,
         voucher_id: appliedVoucher ? appliedVoucher.id : null,
+        redeemed_points: pointsToRedeem,
+        point_discount: pointDiscount,
         notes: (notes || '').trim() ? (notes || '').trim() : '-',
         guest_email: guestEmail,
         guest_phone: guestPhone,
@@ -609,6 +746,7 @@ const PaymentMethodCheckout = () => {
     );
   }
 
+
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
@@ -731,8 +869,18 @@ const PaymentMethodCheckout = () => {
                     <span className="font-medium">Rp {checkoutData.product.subtotal.toLocaleString('id-ID')}</span>
                   </div>
 
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Ongkos Kirim</span>
+                  <div className="flex justify-between text-sm items-center">
+                    <span className="text-gray-600 flex items-center gap-2">
+                      Ongkos Kirim
+                      <button
+                        onClick={fetchCourierRates}
+                        disabled={loadingShipping}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                        title="Reload Ongkir"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingShipping ? 'animate-spin' : ''}`} />
+                      </button>
+                    </span>
                     <span className="font-medium">
                       {loadingShipping ? (
                         <span className="text-xs text-gray-400">Menghitung...</span>
@@ -742,50 +890,71 @@ const PaymentMethodCheckout = () => {
                     </span>
                   </div>
 
-                  {/* Promotions Section */}
+                  {/* Promotions Section - Compact */}
                   {promotions.length > 0 && (
-                    <div className="border-t pt-3 mt-3">
-                      <div className="mb-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-2">
-                          🎉 Promosi Aktif
-                        </label>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="border-t pt-2 mt-2">
+                      <details className="group">
+                        <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 hover:text-orange-600">
+                          <span>🎉 Promosi Aktif ({promotions.length})</span>
+                          <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div className="mt-2 space-y-1.5 max-h-32 overflow-y-auto">
                           {promotions.map((promo) => (
-                            <div
-                              key={promo.id}
-                              className="p-3 bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg"
-                            >
-                              <div className="flex items-start gap-2">
-                                <span className="text-orange-600 text-sm">🏷️</span>
-                                <div className="flex-1">
-                                  <p className="text-xs font-bold text-orange-900 mb-1">
-                                    {promo.title}
-                                  </p>
-                                  <p className="text-xs text-orange-800 leading-relaxed">
-                                    {promo.description}
-                                  </p>
-                                  {(promo.start_date || promo.end_date) && (
-                                    <div className="mt-2 text-xs text-orange-700">
-                                      <span className="font-medium">Periode: </span>
-                                      {promo.start_date && new Date(promo.start_date).toLocaleDateString('id-ID', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric'
-                                      })}
-                                      {promo.start_date && promo.end_date && ' - '}
-                                      {promo.end_date && new Date(promo.end_date).toLocaleDateString('id-ID', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric'
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                            <div key={promo.id} className="p-2 bg-orange-50 border border-orange-200 rounded">
+                              <p className="text-xs font-semibold text-orange-900">{promo.title}</p>
+                              <p className="text-xs text-orange-700 line-clamp-2">{promo.description}</p>
                             </div>
                           ))}
                         </div>
-                      </div>
+                      </details>
+                    </div>
+                  )}
+
+                  {/* Loyalty Points Section */}
+                  {loyaltyPoints && loyaltyPoints.current > 0 && (
+                    <div className="border-t pt-2 mt-2">
+                      {pointsToRedeem === 0 ? (
+                        <details className="group">
+                          <summary className="flex items-center justify-between cursor-pointer text-xs font-medium text-gray-600 hover:text-purple-600">
+                            <span>💎 Tukar Poin ({loyaltyPoints.current} poin)</span>
+                            <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                          </summary>
+                          <div className="mt-2 space-y-1.5">
+                            <div className="text-xs text-purple-600 mb-1">
+                              1 poin = {formatCurrency(loyaltyPoints.redeemValue)}
+                            </div>
+                            {redeemOptions.length > 0 && (
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {redeemOptions.map((option) => (
+                                  <button
+                                    key={option.points}
+                                    onClick={() => applyPointRedemption(option.points)}
+                                    disabled={!option.is_available || loadingLoyalty}
+                                    className={`px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                                      option.is_available
+                                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    <div>{option.points} poin</div>
+                                    <div className="text-xs opacity-90">-{formatCurrency(option.discount)}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      ) : (
+                        <div className="bg-purple-50 border border-purple-200 rounded p-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-xs font-medium text-purple-800">💎 {pointsToRedeem} Poin</div>
+                              <div className="text-xs text-purple-600">-{formatCurrency(pointDiscount)}</div>
+                            </div>
+                            <button onClick={removePointRedemption} className="text-xs text-red-600 hover:text-red-800">✕</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -864,6 +1033,13 @@ const PaymentMethodCheckout = () => {
                         {appliedVoucher?.type === 'shipping' ? 'Diskon Ongkir' : 'Diskon Voucher'}
                       </span>
                       <span className="font-medium">-Rp {voucherDiscount.toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+
+                  {pointDiscount > 0 && (
+                    <div className="flex justify-between text-purple-600 text-sm">
+                      <span>Diskon Poin ({pointsToRedeem} poin)</span>
+                      <span className="font-medium">-Rp {pointDiscount.toLocaleString('id-ID')}</span>
                     </div>
                   )}
 
@@ -956,7 +1132,7 @@ const PaymentMethodCheckout = () => {
                   </div>
 
                   <hr className="my-3" />
-                  
+
                   <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
                     <span className="text-blue-600">Rp {calculateTotal().toLocaleString('id-ID')}</span>
@@ -976,20 +1152,42 @@ const PaymentMethodCheckout = () => {
 
 
 
-                <button
-                  onClick={handleContinue}
-                  disabled={submitting}
-                  className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {submitting ? (
-                    'Memproses...'
-                  ) : (
-                    <>
-                      Lanjutkan ke Pembayaran
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </button>
+                {/* Button Logic */}
+                {courierRates.length === 0 && !loadingShipping && shippingCost === 0 ? (
+                  <button
+                    onClick={() => {
+                      const waUrl = settings?.social_whatsapp_url 
+                        ? (settings.social_whatsapp_url.includes('?') 
+                            ? settings.social_whatsapp_url 
+                            : `${settings.social_whatsapp_url}?text=${encodeURIComponent('Halo Admin, saya mau order tapi ongkir tidak muncul')}`)
+                        : 'https://wa.me/6283867000077?text=Halo%20Admin,%20saya%20mau%20order%20tapi%20ongkir%20tidak%20muncul';
+                      window.open(waUrl, '_blank');
+                    }}
+                    className="w-full bg-green-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center justify-center"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Hubungi Admin (Ongkir Tidak Tersedia)
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleContinue}
+                    disabled={submitting || loadingShipping || loadingVoucher}
+                    className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {submitting ? (
+                      'Memproses...'
+                    ) : loadingShipping ? (
+                      'Menghitung Ongkir...'
+                    ) : loadingVoucher ? (
+                      'Memvalidasi Voucher...'
+                    ) : (
+                      <>
+                        Lanjutkan ke Pembayaran
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

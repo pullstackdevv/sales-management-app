@@ -28,15 +28,61 @@ export default function ProductData() {
   const [stockHistoryModal, setStockHistoryModal] = useState({ isOpen: false, variant: null });
   const [stockAdjustmentModal, setStockAdjustmentModal] = useState({ isOpen: false, variant: null });
 
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedTag, setSelectedTag] = useState("");
+  const [filterNoBasePrice, setFilterNoBasePrice] = useState(false);
+  const [filterHasDiscount, setFilterHasDiscount] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
+  const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [marketplaceSettings, setMarketplaceSettings] = useState(null);
+  const [generating, setGenerating] = useState(false);
+
+
+  // Fetch categories and tags on mount
+  useEffect(() => {
+    const fetchFiltersAndSettings = async () => {
+      try {
+        const [catRes, tagRes, settingsRes] = await Promise.all([
+          api.get('/product-categories?per_page=1000&is_active=1'),
+          api.get('/tags?per_page=1000&is_active=1'),
+          api.get('/marketplace-settings')
+        ]);
+        setCategories(catRes.data.data.data || []);
+        setTags(tagRes.data.data.data || []);
+        if (settingsRes.data?.success) {
+            setMarketplaceSettings(settingsRes.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      }
+    };
+    fetchFiltersAndSettings();
+  }, []);
+
   // Fetch products from API
-  const fetchProducts = async (searchTerm = "", categoryFilter = "", page = 1) => {
+  const fetchProducts = async (page = 1, overrides = {}) => {
     try {
       setLoading(true);
+      
+      // Determine values to use (override or current state)
+      const searchTerm = overrides.search !== undefined ? overrides.search : search;
+      const catFilter = overrides.category !== undefined ? overrides.category : selectedCategory;
+      const tagFilter = overrides.tag !== undefined ? overrides.tag : selectedTag;
+      const noBasePriceFilter = overrides.noBasePrice !== undefined ? overrides.noBasePrice : filterNoBasePrice;
+      const hasDiscountFilter = overrides.hasDiscount !== undefined ? overrides.hasDiscount : filterHasDiscount;
+      const currentSort = overrides.sort !== undefined ? overrides.sort : sortConfig;
+
       const params = {
         page,
         per_page: 10,
         ...(searchTerm && { search: searchTerm }),
-        ...(categoryFilter && { category: categoryFilter })
+        ...(catFilter && { category_ids: catFilter }),
+        ...(tagFilter && { tag_ids: tagFilter }),
+        ...(noBasePriceFilter && { no_base_price: 1 }),
+        ...(hasDiscountFilter && { has_discount: 1 }),
+        sort_by: currentSort.key,
+        sort_direction: currentSort.direction
       };
 
       const response = await api.get("/products", { params });
@@ -69,7 +115,7 @@ export default function ProductData() {
           showConfirmButton: false,
           timer: 1500
         });
-        fetchProducts(search, category); // Refresh data
+        fetchProducts(pagination?.current_page || 1); // Refresh data
       } catch (error) {
         console.error("Error deleting product:", error);
         Swal.fire({
@@ -85,7 +131,7 @@ export default function ProductData() {
   const handleSearch = (e) => {
     const searchTerm = e.target.value;
     setSearch(searchTerm);
-    fetchProducts(searchTerm, category);
+    fetchProducts(1, { search: searchTerm });
   };
 
   const handleImportClick = () => {
@@ -135,7 +181,7 @@ export default function ProductData() {
           } else {
             Swal.fire({ icon: "success", title: "Berhasil", text: `Impor produk selesai. Imported: ${importedCount || 0}` });
           }
-          fetchProducts(search, category);
+          fetchProducts(pagination?.current_page || 1);
         } else if (status === "failed") {
           clearInterval(interval);
           setImporting(false);
@@ -194,13 +240,13 @@ export default function ProductData() {
   };
 
   const handleStockAdjustmentSuccess = () => {
-    fetchProducts(search, category); // Refresh data
+    fetchProducts(pagination?.current_page || 1); // Refresh data
   };
 
   const handlePageChange = (page) => {
     const last = pagination?.last_page || 1;
     const target = Math.max(1, Math.min(page, last));
-    fetchProducts(search, category, target);
+    fetchProducts(target);
   };
 
   const getPageSlots = (current, last) => {
@@ -218,7 +264,7 @@ export default function ProductData() {
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(1);
   }, []);
 
   // Format currency
@@ -230,6 +276,137 @@ export default function ProductData() {
     }).format(amount);
   };
 
+  const handleShowMarketplaceBreakdown = (variant) => {
+    if (!marketplaceSettings) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Gagal memuat setting marketplace. Silakan refresh halaman.'
+        });
+        return;
+    }
+
+    const price = parseFloat(variant.marketplace_price || 0);
+    if (price <= 0) return;
+
+    // Parse settings
+    const adminRate = parseFloat(marketplaceSettings.marketplace_admin_fee || 0) / 100;
+    const insuranceRate = parseFloat(marketplaceSettings.marketplace_insurance_fee || 0) / 100;
+    const promoRate = parseFloat(marketplaceSettings.marketplace_promo_fee || 0) / 100;
+    const promoMax = parseFloat(marketplaceSettings.marketplace_promo_fee_max || 0);
+    const shippingRate = parseFloat(marketplaceSettings.marketplace_shipping_fee || 0) / 100;
+    const shippingMax = parseFloat(marketplaceSettings.marketplace_shipping_fee_max || 0);
+    const processFee = parseFloat(marketplaceSettings.marketplace_process_fee || 0);
+
+    // Calculate fees based on marketplace price
+    const adminFee = price * adminRate;
+    const insuranceFee = price * insuranceRate;
+    const promoFee = Math.min(price * promoRate, promoMax);
+    const shippingFee = Math.min(price * shippingRate, shippingMax);
+    
+    const fmt = (n) => `Rp ${Math.round(n).toLocaleString('id-ID')}`;
+
+    Swal.fire({
+      title: 'Rincian Harga Marketplace',
+      html: `
+        <div class="text-sm text-left font-sans">
+          <p class="mb-4 text-center text-lg">Harga Marketplace: <b>${fmt(price)}</b></p>
+          <div class="overflow-x-auto w-full">
+            <table class="w-full border-collapse border border-gray-300">
+              <thead class="bg-yellow-300 text-black">
+                <tr>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">HARGA MARKETPLACE</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">ADMIN ${parseFloat(marketplaceSettings.marketplace_admin_fee)}%</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">PREMI ASURANSI</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">FEE PROMO XTRA</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">FEE ONGKIR XTRA</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">PROSES PESANAN</th>
+                  <th class="p-2 border border-gray-400 text-xs font-bold text-center">HARGA TOTAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="text-center bg-white text-black">
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(price)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(adminFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(insuranceFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(promoFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(shippingFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(processFee)}</td>
+                  <td class="p-2 border border-gray-300 font-medium">${fmt(price - adminFee - insuranceFee - promoFee - shippingFee - processFee)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-4 text-xs text-gray-500 text-center">
+            *Perhitungan berdasarkan harga marketplace saat ini dan setting variabel marketplace.
+          </p>
+        </div>
+      `,
+      width: '800px',
+      confirmButtonText: 'Tutup',
+      confirmButtonColor: '#3b82f6',
+      customClass: {
+        container: 'font-sans'
+      }
+    });
+  };
+
+  const generateMarketplacePrices = async () => {
+    const result = await Swal.fire({
+      title: "Generate Marketplace Prices?",
+      text: "Ini akan menghitung ulang harga marketplace untuk semua produk berdasarkan setting saat ini.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Ya, Generate",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      setGenerating(true);
+      try {
+        const res = await api.post("/marketplace-settings/generate");
+        if (res.data?.success) {
+          Swal.fire("Berhasil", res.data.message, "success");
+          fetchProducts(pagination?.current_page || 1); // Refresh data
+        }
+      } catch (e) {
+        console.error(e);
+        const msg = e.response?.data?.message || "Gagal generate harga";
+        Swal.fire("Error", msg, "error");
+      } finally {
+        setGenerating(false);
+      }
+    }
+  };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+    fetchProducts(1, { sort: { key, direction } });
+  };
+
+  const SortHeader = ({ label, sortKey }) => (
+  <button 
+    onClick={() => handleSort(sortKey)}
+    className="flex items-center gap-2 hover:text-gray-800 transition-colors focus:outline-none group"
+  >
+    <span className="font-medium">{label}</span>
+    <div className="flex items-center gap-1 text-gray-400 group-hover:text-gray-600">
+      <Icon 
+        icon="mdi:arrow-up"
+        className={`text-sm transition-colors ${sortConfig.key === sortKey && sortConfig.direction === 'asc' ? "text-blue-600" : ""}`} 
+      />
+      <Icon 
+        icon="mdi:arrow-down" 
+        className={`text-sm transition-colors ${sortConfig.key === sortKey && sortConfig.direction === 'desc' ? "text-blue-600" : ""}`} 
+      />
+    </div>
+  </button>
+  );
+
   return (
     <DashboardLayout>
       <div className="p-6">
@@ -237,6 +414,16 @@ export default function ProductData() {
           <h1 className="text-2xl font-semibold">Produk</h1>
 
           <div className="flex gap-2">
+            {hasPermission('products.edit') && (
+              <button 
+                className="text-sm border-2 border-green-600 text-green-600 px-3 py-1 rounded-md hover:bg-green-50 flex items-center gap-1"
+                onClick={generateMarketplacePrices}
+                disabled={generating}
+              >
+                {generating ? <Icon icon="eos-icons:loading" /> : <Icon icon="material-symbols:sync" />}
+                {generating ? "Proses..." : "Sync Marketplace Price"}
+              </button>
+            )}
             {hasPermission('products.import') && (
               <button className="text-sm border-2 px-3 py-1 rounded-md hover:bg-gray-100" onClick={handleImportClick} disabled={importing}>
                 {importing ? "Mengimpor..." : "Impor Produk"}
@@ -258,26 +445,104 @@ export default function ProductData() {
           </div>
         </div>
 
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Cari nama, SKU, atau scan barcode..."
-            className="w-full border px-4 py-2 rounded-md text-sm"
-            value={search}
-            onChange={handleSearch}
-          />
+        <div className="mb-4 space-y-3">
+         
+          <div className="flex flex-wrap gap-4 items-center">
+            {/* Category Filter */}
+            <select 
+                className="border px-4 py-2 rounded-md text-sm min-w-[200px] bg-white"
+                value={selectedCategory}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCategory(val);
+                    fetchProducts(1, { category: val });
+                }}
+            >
+                <option value="">Semua Kategori</option>
+                {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+            </select>
+
+            {/* Tag Filter */}
+            <select 
+                className="border px-4 py-2 rounded-md text-sm min-w-[200px] bg-white"
+                value={selectedTag}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedTag(val);
+                    fetchProducts(1, { tag: val });
+                }}
+            >
+                <option value="">Semua Tag</option>
+                {tags.map(tag => (
+                    <option key={tag.id} value={tag.id}>{tag.name}</option>
+                ))}
+            </select>
+
+             {/* No Base Price Filter */}
+             <label className="flex items-center gap-2 text-sm cursor-pointer select-none bg-white border px-3 py-2 rounded-md hover:bg-gray-50">
+                <input 
+                    type="checkbox" 
+                    checked={filterNoBasePrice}
+                    onChange={(e) => {
+                        const val = e.target.checked;
+                        setFilterNoBasePrice(val);
+                        fetchProducts(1, { noBasePrice: val });
+                    }}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                />
+                <span className={filterNoBasePrice ? "font-medium text-blue-600" : "text-gray-700"}>
+                  Tanpa Harga Modal
+                </span>
+             </label>
+
+             {/* Has Discount Filter */}
+             <label className="flex items-center gap-2 text-sm cursor-pointer select-none bg-white border px-3 py-2 rounded-md hover:bg-gray-50">
+                <input 
+                    type="checkbox" 
+                    checked={filterHasDiscount}
+                    onChange={(e) => {
+                        const val = e.target.checked;
+                        setFilterHasDiscount(val);
+                        fetchProducts(1, { hasDiscount: val });
+                    }}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                />
+                <span className={filterHasDiscount ? "font-medium text-blue-600" : "text-gray-700"}>
+                  Sedang Diskon
+                </span>
+             </label>
+          </div>
+           <div className="flex gap-4">
+            <input
+              type="text"
+              placeholder="Cari nama, SKU, atau scan barcode..."
+              className="w-full border px-4 py-2 rounded-md text-sm"
+              value={search}
+              onChange={handleSearch}
+            />
+          </div>
         </div>
 
         <div className="bg-white rounded-md shadow-sm divide-y">
           <div className="grid grid-cols-12 items-center px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50">
             <div className="col-span-1">Gambar</div>
-            <div className="col-span-3">Produk & Harga</div>
-            <div className="col-span-1">Stok</div>
+            <div className="col-span-3 flex items-center gap-4">
+                <SortHeader label="Produk" sortKey="name" />
+                <span className="text-gray-300">|</span>
+                <SortHeader label="Harga" sortKey="price" />
+            </div>
+            <div className="col-span-1">
+                <SortHeader label="Stok" sortKey="stock" />
+            </div>
             <div className="col-span-1">Varian</div>
             <div className="col-span-2">Kategori</div>
             <div className="col-span-1">Tag</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-1">Storefront</div>
+            <div className="col-span-1">
+                <SortHeader label="Storefront" sortKey="is_storefront" />
+            </div>
             <div className="col-span-1 flex justify-center">Aksi</div>
           </div>
 
@@ -340,13 +605,22 @@ export default function ProductData() {
                               : `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`
                           ) : 'Belum ada harga'}
                         </p>
-                        {canViewBasePrice && minBasePrice > 0 && (
-                          <p className="text-gray-500 text-xs">
-                            Modal: {minBasePrice === maxBasePrice
-                              ? formatCurrency(minBasePrice)
-                              : `${formatCurrency(minBasePrice)} - ${formatCurrency(maxBasePrice)}`
-                            }
-                          </p>
+                        {canViewBasePrice && product.variants?.length > 0 && (
+                          <div className="text-gray-500 text-xs mt-1 flex items-center gap-1">
+                            <span>Modal:</span>
+                            {minBasePrice > 0 ? (
+                              <span>
+                                {minBasePrice === maxBasePrice
+                                  ? formatCurrency(minBasePrice)
+                                  : `${formatCurrency(minBasePrice)} - ${formatCurrency(maxBasePrice)}`
+                                }
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 border border-red-200">
+                                Belum diset
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                       {product.description && (
@@ -460,6 +734,7 @@ export default function ProductData() {
                               <th className="px-3 py-2">SKU</th>
                               {canViewBasePrice && (<th className="px-3 py-2">Harga Modal</th>)}
                               <th className="px-3 py-2">Harga Jual</th>
+                              <th className="px-3 py-2">Harga Marketplace</th>
                               {canViewBasePrice && (<th className="px-3 py-2">Margin</th>)}
                               <th className="px-3 py-2">Stok</th>
                               <th className="px-3 py-2">Status</th>
@@ -496,10 +771,27 @@ export default function ProductData() {
                                   <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2 text-gray-600">
-                                      {variant.base_price > 0 ? formatCurrency(variant.base_price) : '-'}
+                                      {variant.base_price > 0 ? (
+                                        formatCurrency(variant.base_price)
+                                      ) : (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-800 border border-red-200">
+                                          Belum diset
+                                        </span>
+                                      )}
                                     </td>
                                   )}
                                   <td className="px-3 py-2 font-medium">{formatCurrency(variant.price)}</td>
+                                  <td className="px-3 py-2">
+                                    {variant.marketplace_price ? (
+                                      <button 
+                                        onClick={() => handleShowMarketplaceBreakdown(variant)}
+                                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-left"
+                                        title="Klik untuk melihat rincian"
+                                      >
+                                        {formatCurrency(variant.marketplace_price)}
+                                      </button>
+                                    ) : '-'}
+                                  </td>
                                   {canViewBasePrice && (
                                     <td className="px-3 py-2">
                                       {variant.base_price > 0 ? (

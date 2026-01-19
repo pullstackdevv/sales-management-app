@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
 use App\Helpers\NotificationHelper;
+use App\Services\LoyaltyPointService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +20,7 @@ class PaymentController extends Controller
     private $paymentGateway;
     private $secretKey;
     private $baseUrl;
+    private LoyaltyPointService $loyaltyPointService;
 
     public function __construct()
     {
@@ -37,6 +39,8 @@ class PaymentController extends Controller
                 ? 'https://api.xendit.co'
                 : 'https://api.xendit.co';
         }
+
+        $this->loyaltyPointService = app(LoyaltyPointService::class);
     }
 
     /**
@@ -278,13 +282,23 @@ class PaymentController extends Controller
             ];
         }
 
-        // Add discount as negative item if applicable
+        // Add voucher discount as negative item if applicable
         if ($order->voucher && $order->discount_amount > 0) {
             $items[] = [
-                'id' => 'discount',
+                'id' => 'voucher_discount',
                 'price' => -(int) $order->discount_amount,
                 'quantity' => 1,
                 'name' => $order->voucher->type === 'shipping' ? 'Shipping Discount' : 'Voucher Discount'
+            ];
+        }
+
+        // Add point discount as negative item if applicable
+        if ($order->point_discount && $order->point_discount > 0) {
+            $items[] = [
+                'id' => 'point_discount',
+                'price' => -(int) $order->point_discount,
+                'quantity' => 1,
+                'name' => 'Point Discount - ' . $order->redeemed_points . ' poin'
             ];
         }
 
@@ -293,6 +307,8 @@ class PaymentController extends Controller
             'final_amount' => $order->total_price,
             'voucher_code' => $order->voucher ? $order->voucher->code : null,
             'voucher_type' => $order->voucher ? $order->voucher->type : null,
+            'redeemed_points' => $order->redeemed_points ?? 0,
+            'point_discount' => $order->point_discount ?? 0,
             'items_count' => count($items)
         ]);
 
@@ -424,6 +440,15 @@ class PaymentController extends Controller
         if ($paymentStatus === PaymentStatus::PAID) {
             $order->update(['status' => 'processing']);
             WebOrderController::updateVoucherUsedCount($order->id);
+            $this->redeemLoyaltyPoints($order);
+            $this->awardLoyaltyPoints($order);
+            
+            // Increment sales count for each product
+            foreach ($order->items as $item) {
+                if ($item->productVariant && $item->productVariant->product) {
+                    $item->productVariant->product->increment('sales_count', $item->quantity);
+                }
+            }
             
             // Create payment received notification
             NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -488,6 +513,15 @@ class PaymentController extends Controller
         if ($paymentStatus === PaymentStatus::PAID) {
             $order->update(['status' => 'processing']);
             WebOrderController::updateVoucherUsedCount($order->id);
+            $this->redeemLoyaltyPoints($order);
+            $this->awardLoyaltyPoints($order);
+            
+            // Increment sales count for each product
+            foreach ($order->items as $item) {
+                if ($item->productVariant && $item->productVariant->product) {
+                    $item->productVariant->product->increment('sales_count', $item->quantity);
+                }
+            }
             
             // Create payment received notification
             NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -550,12 +584,10 @@ class PaymentController extends Controller
 
         if ($response->successful()) {
             $invoiceData = $response->json();
-            $status = $invoiceData['status'];
-
+            $status = $invoiceData['status'] ?? null;
             $paymentStatus = $this->mapXenditStatus($status);
 
             if ($order->payment_status !== $paymentStatus) {
-                // Update payment status
                 $order->update([
                     'payment_status' => $paymentStatus,
                     'status' => $paymentStatus === PaymentStatus::PAID ? 'processing' : $order->status
@@ -563,6 +595,15 @@ class PaymentController extends Controller
 
                 if ($paymentStatus === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    $this->redeemLoyaltyPoints($order);
+                    $this->awardLoyaltyPoints($order);
+                    
+                    // Increment sales count for each product
+                    foreach ($order->items as $item) {
+                        if ($item->productVariant && $item->productVariant->product) {
+                            $item->productVariant->product->increment('sales_count', $item->quantity);
+                        }
+                    }
                     
                     // Create payment received notification
                     NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -574,6 +615,7 @@ class PaymentController extends Controller
                         ->where('type', StockMovementType::IN)
                         ->where('note', 'like', "Cancel Order #{$order->order_number}%")
                         ->exists();
+
                     if (!$alreadyRestocked) {
                         if ($order->status !== 'cancelled') {
                             $order->update(['status' => 'cancelled']);
@@ -621,7 +663,11 @@ class PaymentController extends Controller
 
             // Get transaction status
             $transactionData = \Midtrans\Transaction::status($order->order_number);
-            $status = $transactionData->transaction_status ?? null;
+            if (is_array($transactionData)) {
+                $status = $transactionData['transaction_status'] ?? null;
+            } else {
+                $status = $transactionData->transaction_status ?? null;
+            }
 
             $paymentStatusFromGateway = $this->mapMidtransStatus($status);
 
@@ -645,6 +691,15 @@ class PaymentController extends Controller
 
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    $this->redeemLoyaltyPoints($order);
+                    $this->awardLoyaltyPoints($order);
+                    
+                    // Increment sales count for each product
+                    foreach ($order->items as $item) {
+                        if ($item->productVariant && $item->productVariant->product) {
+                            $item->productVariant->product->increment('sales_count', $item->quantity);
+                        }
+                    }
                     
                     // Create payment received notification
                     NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -738,6 +793,65 @@ class PaymentController extends Controller
                 return PaymentStatus::CANCELLED;
             default:
                 return PaymentStatus::PENDING;
+        }
+    }
+
+    private function awardLoyaltyPoints(Order $order): void
+    {
+        try {
+            $this->loyaltyPointService->awardPointsForOrder($order);
+        } catch (\Throwable $th) {
+            Log::error('Failed to award loyalty points for order', [
+                'order_id' => $order->id,
+                'message' => $th->getMessage(),
+            ]);
+        }
+    }
+
+    private function redeemLoyaltyPoints(Order $order): void
+    {
+        if (!$order->redeemed_points || $order->redeemed_points <= 0) {
+            return;
+        }
+
+        try {
+            $customerPoint = \App\Models\CustomerPoint::where('customer_id', $order->customer_id)->first();
+            
+            if (!$customerPoint) {
+                Log::warning('Customer point not found for redemption', [
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                ]);
+                return;
+            }
+
+            // Redeem points
+            $transaction = $customerPoint->redeemPoints(
+                $order->redeemed_points,
+                $order->id,
+                "Points redeemed for order {$order->order_number}"
+            );
+
+            if (!$transaction) {
+                Log::error('Failed to redeem points - insufficient balance', [
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                    'redeemed_points' => $order->redeemed_points,
+                    'current_points' => $customerPoint->current_points,
+                ]);
+            } else {
+                Log::info('Loyalty points redeemed successfully', [
+                    'order_id' => $order->id,
+                    'customer_id' => $order->customer_id,
+                    'redeemed_points' => $order->redeemed_points,
+                    'point_discount' => $order->point_discount,
+                ]);
+            }
+        } catch (\Throwable $th) {
+            Log::error('Failed to redeem loyalty points for order', [
+                'order_id' => $order->id,
+                'message' => $th->getMessage(),
+            ]);
         }
     }
 }

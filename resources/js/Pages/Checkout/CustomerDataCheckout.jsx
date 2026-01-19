@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, Plus, X, User, MapPin, Phone, Mail, UserPlus, Search, Trash2 } from 'lucide-react';
 import MarketplaceLayout from '../../Layouts/MarketplaceLayout';
 import checkoutSession from '../../utils/checkoutSession';
+import customerSession from '../../utils/customerSession';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import api from '../../api/axios';
@@ -95,6 +96,18 @@ const CustomerDataCheckout = () => {
   const [productData, setProductData] = useState(null);
   const [errors, setErrors] = useState({});
 
+  const syncServerCustomerSession = async (data) => {
+    try {
+      await api.post('/checkout/session/customer', {
+        name: data.name || '',
+        phone: data.recipient_phone || data.whatsapp || data.phone || '',
+        email: data.email || '',
+        customer_id: data.customer_id || null,
+        address_id: data.address_id || null,
+      });
+    } catch (e) {}
+  };
+
   // Mask phone number to show only the last 4 digits
   const maskPhone = (phone) => {
     if (!phone) return '';
@@ -139,8 +152,22 @@ const CustomerDataCheckout = () => {
 
     setProductData(checkoutData.product);
 
-    // Jika sudah ada data customer, isi form
-    if (checkoutData.customer) {
+    // Check customerSession first (priority)
+    const customerSessionData = customerSession.get();
+    if (customerSessionData && customerSessionData.customer_id) {
+      // Customer already logged in via customerSession
+      setCustomerType('existing');
+      setSelectedCustomer({
+        id: customerSessionData.customer_id,
+        customer_id: customerSessionData.customer_id,
+        name: customerSessionData.name,
+        phone: customerSessionData.phone,
+        email: customerSessionData.email,
+        whatsapp: customerSessionData.phone
+      });
+      fetchCustomerAddressesFromSession(customerSessionData.customer_id);
+    } else if (checkoutData.customer) {
+      // Fallback to checkoutSession customer data
       if (checkoutData.customer.customer_id) {
         // Existing customer
         setCustomerType('existing');
@@ -172,6 +199,17 @@ const CustomerDataCheckout = () => {
           address_detail: checkoutData.customer.address || ''
         });
       }
+      // Sync minimal server session even if address belum terpilih
+      try {
+        const base = customerSessionData || checkoutData.customer;
+        syncServerCustomerSession({
+          customer_id: base.customer_id || base.id,
+          name: base.name || '',
+          email: base.email || '',
+          phone: base.phone || base.whatsapp || '',
+          address_id: base.address_id || null,
+        });
+      } catch (e) {}
     }
   }, []);
 
@@ -192,10 +230,95 @@ const CustomerDataCheckout = () => {
         const checkoutData = checkoutSession.get();
         if (checkoutData.customer && checkoutData.customer.address_id) {
           setSelectedAddressId(checkoutData.customer.address_id);
+          const selectedAddress = addresses.find(a => a.id == checkoutData.customer.address_id) || null;
+          const base = checkoutData.customer;
+          const customerPayload = {
+            customer_id: base.customer_id || base.id,
+            name: base.name || '',
+            email: base.email || '',
+            phone: base.phone || base.whatsapp || '',
+            whatsapp: base.whatsapp || base.phone || '',
+            address_id: checkoutData.customer.address_id,
+            address: selectedAddress?.address_detail || '',
+            city: selectedAddress?.city || '',
+            district: selectedAddress?.district || '',
+            province: selectedAddress?.province || '',
+            postal_code: selectedAddress?.postal_code || '',
+            recipient_name: selectedAddress?.recipient_name || base.name || '',
+            recipient_phone: selectedAddress?.recipient_phone || selectedAddress?.phone || base.phone || base.whatsapp || '',
+            addresses: addresses,
+          };
+          checkoutSession.updateStep('customer', customerPayload);
+          syncServerCustomerSession(customerPayload);
         } else if (addresses.length > 0) {
           // Auto-select first address if no specific address selected
           const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
           setSelectedAddressId(defaultAddress.id);
+          const base = selectedCustomer || {};
+          const customerPayload = {
+            customer_id: base.id || base.customer_id || customerId,
+            name: base.name || '',
+            email: base.email || '',
+            phone: base.phone || base.whatsapp || '',
+            whatsapp: base.whatsapp || base.phone || '',
+            address_id: defaultAddress.id,
+            address: defaultAddress.address_detail || '',
+            city: defaultAddress.city || '',
+            district: defaultAddress.district || '',
+            province: defaultAddress.province || '',
+            postal_code: defaultAddress.postal_code || '',
+            recipient_name: defaultAddress.recipient_name || base.name || '',
+            recipient_phone: defaultAddress.recipient_phone || defaultAddress.phone || base.phone || base.whatsapp || '',
+            addresses: addresses,
+          };
+          checkoutSession.updateStep('customer', customerPayload);
+          syncServerCustomerSession(customerPayload);
+        } else {
+          // Fallback: try guest-verify to fetch full customer with addresses
+          const base = checkoutData.customer || {};
+          const verificationType = base.phone ? 'phone' : (base.email ? 'email' : null);
+          const verificationValue = base.phone || base.email || null;
+          if (verificationType && verificationValue) {
+            try {
+              const verifyRes = await api.post('/customers/guest-verify', {
+                customer_id: customerId,
+                verification_type: verificationType,
+                verification_value: verificationValue
+              });
+              if (verifyRes.data?.status === 'success' && verifyRes.data?.data) {
+                const vc = verifyRes.data.data;
+                const vAddresses = (vc.addresses || []).map(addr => ({
+                  ...addr,
+                  recipient_phone: addr.recipient_phone ?? addr.phone ?? ''
+                }));
+                setCustomerAddresses(vAddresses);
+                if (vAddresses.length > 0) {
+                  const defaultAddress = vAddresses.find(a => a.is_default) || vAddresses[0];
+                  setSelectedAddressId(defaultAddress.id);
+                  const customerPayload = {
+                    customer_id: vc.id,
+                    name: vc.name || '',
+                    email: vc.email || '',
+                    phone: vc.phone || '',
+                    whatsapp: vc.phone || '',
+                    address_id: defaultAddress.id,
+                    address: defaultAddress.address_detail || '',
+                    city: defaultAddress.city || '',
+                    district: defaultAddress.district || '',
+                    province: defaultAddress.province || '',
+                    postal_code: defaultAddress.postal_code || '',
+                    recipient_name: defaultAddress.recipient_name || vc.name || '',
+                    recipient_phone: defaultAddress.recipient_phone || defaultAddress.phone || vc.phone || '',
+                    addresses: vAddresses,
+                  };
+                  checkoutSession.updateStep('customer', customerPayload);
+                  syncServerCustomerSession(customerPayload);
+                }
+              }
+            } catch (e) {
+              // ignore verify fallback errors
+            }
+          }
         }
       }
     } catch (error) {
@@ -308,6 +431,18 @@ const CustomerDataCheckout = () => {
       if (response.data.status === 'success' && response.data.data) {
         const verifiedCustomer = response.data.data;
         
+        // Save to customerSession for global use (Profile, MyOrders, etc)
+        customerSession.setVerified(
+          verifiedCustomer.id,
+          verificationMethod,
+          verificationValue.trim(),
+          {
+            name: verifiedCustomer.name,
+            email: verifiedCustomer.email,
+            phone: verifiedCustomer.phone
+          }
+        );
+        
         // Verified, proceed with customer selection
         setSelectedCustomer(verifiedCustomer);
         setSearchTerm(verifiedCustomer.name);
@@ -324,6 +459,25 @@ const CustomerDataCheckout = () => {
           // Auto-select default address or first address
           const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
           setSelectedAddressId(defaultAddress.id);
+
+          const customerPayload = {
+            customer_id: verifiedCustomer.id,
+            name: verifiedCustomer.name,
+            email: verifiedCustomer.email || '',
+            phone: verifiedCustomer.phone || '',
+            whatsapp: verifiedCustomer.phone || '',
+            address_id: defaultAddress.id,
+            address: defaultAddress.address_detail || '',
+            city: defaultAddress.city || '',
+            district: defaultAddress.district || '',
+            province: defaultAddress.province || '',
+            postal_code: defaultAddress.postal_code || '',
+            recipient_name: defaultAddress.recipient_name || verifiedCustomer.name || '',
+            recipient_phone: defaultAddress.recipient_phone || defaultAddress.phone || verifiedCustomer.phone || '',
+            addresses: addresses,
+          };
+          checkoutSession.updateStep('customer', customerPayload);
+          syncServerCustomerSession(customerPayload);
         } else {
           setCustomerAddresses([]);
         }
@@ -912,7 +1066,7 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: '',
       city: '',
-      province: ''
+      province: '',
     }));
 
     // Clear related errors
@@ -941,7 +1095,7 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: location.district_name || '',
       city: location.regency_name,
-      province: location.province_name
+      province: location.province_name,
     }));
 
     setShowLocationDropdown(false);
@@ -958,7 +1112,7 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: '',
       city: '',
-      province: ''
+      province: '',
     }));
 
     // Clear related errors
@@ -1015,7 +1169,7 @@ const CustomerDataCheckout = () => {
       ...prev,
       district: location.district_name || '',
       city: location.regency_name,
-      province: location.province_name
+      province: location.province_name,
     }));
 
     setShowModalLocationDropdown(false);
@@ -1135,66 +1289,11 @@ const CustomerDataCheckout = () => {
           }]
         };
 
-        const csrfToken = document.querySelector('meta[name="csrf-token"]');
-
-        // Get auth token from localStorage or session
-        const authToken = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-
-        const response = await fetch('/api/customers', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            ...(csrfToken && { 'X-CSRF-TOKEN': csrfToken.getAttribute('content') }),
-            ...(authToken && { 'Authorization': `Bearer ${authToken}` })
-          },
-          body: JSON.stringify(newCustomerData)
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('API Error:', errorData);
-
-          // Handle validation errors (422)
-          if (response.status === 422 && errorData.errors) {
-            const validationErrors = {};
-            Object.keys(errorData.errors).forEach(key => {
-              // Convert backend field names to frontend field names
-              if (key.startsWith('addresses.0.')) {
-                const fieldName = key.replace('addresses.0.', '');
-                if (fieldName === 'recipient_name') validationErrors.recipient_name = errorData.errors[key][0];
-                else if (fieldName === 'recipient_phone') validationErrors.recipient_phone = errorData.errors[key][0];
-                else validationErrors[fieldName] = errorData.errors[key][0];
-              } else {
-                validationErrors[key] = errorData.errors[key][0];
-              }
-            });
-
-            setErrors(validationErrors);
-
-            const phoneError = validationErrors.phone;
-            Swal.fire({
-              icon: 'error',
-              // title: 'Data Tidak Lengkap',
-              // text: 'Mohon lengkapi semua field yang diperlukan',
-              title: phoneError ? 'Nomor Telepon Sudah Terdaftar' : 'Data Tidak Lengkap',
-              text: phoneError || 'Mohon lengkapi semua field yang diperlukan',
-              confirmButtonColor: '#3b82f6'
-            });
-            return;
-          }
-
-          throw new Error(`Gagal membuat customer baru: ${errorData.message || response.statusText}`);
+        const result = await api.post('/customers', newCustomerData);
+        if (!(result?.data?.data)) {
+          throw new Error(result?.data?.message || 'Response data is missing');
         }
-
-        const result = await response.json();
-        console.log('API Response:', result);
-
-        if (!result.data) {
-          throw new Error('Response data is missing');
-        }
-
-        const createdCustomer = result.data;
+        const createdCustomer = result.data.data;
 
         if (!createdCustomer.addresses || createdCustomer.addresses.length === 0) {
           throw new Error('No addresses found in created customer');
@@ -1207,6 +1306,7 @@ const CustomerDataCheckout = () => {
           customer_id: createdCustomer.id,
           name: createdCustomer.name,
           email: createdCustomer.email,
+          phone: createdCustomer.phone,
           whatsapp: createdCustomer.phone,
           address_id: primaryAddress?.id || null,
           address: primaryAddress?.address_detail || '',
@@ -1215,9 +1315,23 @@ const CustomerDataCheckout = () => {
           province: primaryAddress?.province || '',
           postal_code: primaryAddress?.postal_code || '',
           recipient_name: primaryAddress?.recipient_name || createdCustomer.name,
-          recipient_phone: primaryAddress?.phone || createdCustomer.phone,
+          recipient_phone: (primaryAddress?.recipient_phone || primaryAddress?.phone || createdCustomer.phone),
           addresses: createdCustomer.addresses
         };
+
+        // Save new customer to customerSession for Profile and MyOrders pages
+        customerSession.setVerified(
+          createdCustomer.id,
+          'phone',
+          createdCustomer.phone,
+          {
+            id: createdCustomer.id,
+            name: createdCustomer.name,
+            email: createdCustomer.email,
+            phone: createdCustomer.phone,
+            loyalty_points: createdCustomer.loyalty_points || null
+          }
+        );
       } else {
         const selectedAddress = customerAddresses.find(addr => addr.id == selectedAddressId);
         customerData = {
@@ -1245,6 +1359,7 @@ const CustomerDataCheckout = () => {
       const success = checkoutSession.updateStep('customer', customerData);
 
       if (success) {
+        try { await syncServerCustomerSession(customerData); } catch (e) {}
         // Debug: Verify data saved correctly
         const savedData = checkoutSession.get();
         console.log('Verified saved checkout data:', savedData);

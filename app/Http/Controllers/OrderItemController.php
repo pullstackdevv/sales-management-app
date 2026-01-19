@@ -75,6 +75,7 @@ class OrderItemController extends Controller
 
             $item = $order->items()->create([
                 ...$validated,
+                'base_price' => $variant->base_price,
                 'subtotal' => $validated['quantity'] * $validated['price'],
                 'created_by' => Auth::id()
             ]);
@@ -150,6 +151,7 @@ class OrderItemController extends Controller
 
             $item->update([
                 ...$validated,
+                'base_price' => $item->base_price ?? $item->productVariant->base_price,
                 'subtotal' => ($validated['quantity'] ?? $item->quantity) * ($validated['price'] ?? $item->price),
                 'updated_by' => Auth::id()
             ]);

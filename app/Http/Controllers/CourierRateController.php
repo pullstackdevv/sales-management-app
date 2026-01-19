@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\CourierRate;
 use App\Models\Courier;
 use App\Jobs\ImportCourierRatesJob;
+use App\Models\Wilayah;
+use App\Services\WilayahMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -254,6 +256,31 @@ class CourierRateController extends Controller
      */
     private function applyFilters(Builder $query, Request $request): void
     {
+        $maps = null;
+        $resolvedByCode = false;
+
+        if ($request->has('province') || $request->has('city') || $request->has('district')) {
+            $maps = WilayahMatcher::buildMaps();
+            $match = WilayahMatcher::matchCodes(
+                $request->get('province'),
+                $request->get('city'),
+                $request->get('district'),
+                $maps
+            );
+            if ($match['matched']) {
+                if (!empty($match['district']['kode'])) {
+                    $query->where('destination_district_code', $match['district']['kode']);
+                    $resolvedByCode = true;
+                }
+                if (!empty($match['regency']['kode'])) {
+                    $query->where('destination_regency_code', $match['regency']['kode']);
+                }
+                if (!empty($match['province']['kode'])) {
+                    $query->where('destination_province_code', $match['province']['kode']);
+                }
+            }
+        }
+
         // Courier filter
         if ($request->has('courier_id')) {
             $query->where('courier_id', $request->courier_id);
@@ -266,7 +293,7 @@ class CourierRateController extends Controller
         }
 
         // Location filters
-        if ($request->has('province')) {
+        if ($request->has('province') && !$resolvedByCode) {
             $provinceVariants = $this->normalizeProvinceVariants($request->province);
             $query->where(function ($q) use ($provinceVariants) {
                 foreach ($provinceVariants as $pv) {
@@ -275,7 +302,7 @@ class CourierRateController extends Controller
             });
         }
 
-        if ($request->has('city')) {
+        if ($request->has('city') && !$resolvedByCode) {
             $cityVariants = $this->normalizeCityVariants($request->city);
             $query->where(function ($q) use ($cityVariants) {
                 foreach ($cityVariants as $cv) {
@@ -284,7 +311,7 @@ class CourierRateController extends Controller
             });
         }
 
-        if ($request->has('district')) {
+        if ($request->has('district') && !$resolvedByCode) {
             $district = $request->district;
             
             // Clean and normalize district name for flexible search
@@ -338,6 +365,16 @@ class CourierRateController extends Controller
         if ($request->has('is_available')) {
             $query->where('is_available', $request->boolean('is_available'));
         }
+
+        // Match status filter
+        if ($request->has('match_status')) {
+            $status = strtolower($request->get('match_status'));
+            if ($status === 'matched') {
+                $query->whereNotNull('destination_district_code');
+            } else if ($status === 'unmatched') {
+                $query->whereNull('destination_district_code');
+            }
+        }
     }
 
     /**
@@ -348,6 +385,24 @@ class CourierRateController extends Controller
      */
     private function transformRate(CourierRate $rate): array
     {
+        // Resolve official wilayah names when codes are present
+        $matchedProvinceName = null;
+        $matchedRegencyName = null;
+        $matchedDistrictName = null;
+
+        if (!empty($rate->destination_province_code)) {
+            $p = Wilayah::where('kode', $rate->destination_province_code)->first();
+            $matchedProvinceName = $p?->nama;
+        }
+        if (!empty($rate->destination_regency_code)) {
+            $r = Wilayah::where('kode', $rate->destination_regency_code)->first();
+            $matchedRegencyName = $r?->nama;
+        }
+        if (!empty($rate->destination_district_code)) {
+            $d = Wilayah::where('kode', $rate->destination_district_code)->first();
+            $matchedDistrictName = $d?->nama;
+        }
+
         return [
             'id' => $rate->id,
             'courier' => [
@@ -362,8 +417,14 @@ class CourierRateController extends Controller
             ],
             'destination' => [
                 'province' => $rate->destination_province,
+                'province_code' => $rate->destination_province_code,
+                'province_matched_name' => $matchedProvinceName,
                 'city' => $rate->destination_city,
-                'district' => $rate->destination_district
+                'city_code' => $rate->destination_regency_code,
+                'city_matched_name' => $matchedRegencyName,
+                'district' => $rate->destination_district,
+                'district_code' => $rate->destination_district_code,
+                'district_matched_name' => $matchedDistrictName,
             ],
             'service' => [
                 'type' => $rate->service_type,
@@ -380,6 +441,7 @@ class CourierRateController extends Controller
                 'estimated_days' => $rate->estimated_days,
                 'etd_days' => $rate->etd_days
             ],
+            'matched' => !is_null($rate->destination_district_code),
             'availability' => [
                 'is_available' => $rate->is_available,
                 'effective_date' => $rate->effective_date ? $rate->effective_date->format('Y-m-d') : null,
@@ -496,7 +558,8 @@ class CourierRateController extends Controller
             // Validate request
             $validator = Validator::make($request->all(), [
                 'file' => 'required|file|mimetypes:application/zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel|max:10240', // Max 10MB
-                'courier_id' => 'nullable|integer|exists:couriers,id'
+                'courier_id' => 'nullable|integer|exists:couriers,id',
+                'remap_existing' => 'nullable|boolean'
             ]);
 
             if ($validator->fails()) {
@@ -509,6 +572,7 @@ class CourierRateController extends Controller
 
             $file = $request->file('file');
             $courierId = $request->input('courier_id');
+            $remapExisting = (bool) $request->input('remap_existing', true);
             $userId = Auth::id();
             
             // Additional file validation
@@ -522,7 +586,7 @@ class CourierRateController extends Controller
             $jobId = uniqid('import_', true);
             
             // Dispatch the import job
-            ImportCourierRatesJob::dispatch($filePath, $courierId, $userId, $jobId);
+            ImportCourierRatesJob::dispatch($filePath, $courierId, $userId, $jobId, $remapExisting);
             
             // Store initial job status
             cache()->put("import_job_{$jobId}", [
@@ -530,6 +594,7 @@ class CourierRateController extends Controller
                 'status' => 'queued',
                 'message' => 'Import job has been queued for processing',
                 'courier_id' => $courierId,
+                'remap_existing' => $remapExisting,
                 'created_at' => now()->toISOString()
             ], now()->addHours(24));
             
@@ -653,6 +718,73 @@ class CourierRateController extends Controller
         }
     }
 
+    public function mapDestination(Request $request, int $id): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'district_code' => 'required|string',
+                'regency_code' => 'nullable|string',
+                'province_code' => 'nullable|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $rate = CourierRate::with('courier')->findOrFail($id);
+
+            $districtCode = \App\Services\WilayahMatcher::canonicalDistrictCode($request->get('district_code'));
+            if (!$districtCode) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kode kecamatan tidak valid'
+                ], 422);
+            }
+
+            $district = \App\Models\Wilayah::where('kode', $districtCode)->first();
+            if (!$district) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Kecamatan tidak ditemukan dalam referensi wilayah'
+                ], 404);
+            }
+
+            $regencyCode = $request->get('regency_code');
+            if (!$regencyCode) {
+                $regencyCode = substr($districtCode, 0, 5);
+            }
+
+            $provinceCode = $request->get('province_code');
+            if (!$provinceCode) {
+                $provinceCode = explode('.', $regencyCode)[0];
+            }
+
+            $rate->update([
+                'destination_province_code' => $provinceCode,
+                'destination_regency_code' => $regencyCode,
+                'destination_district_code' => $districtCode,
+            ]);
+
+            $rate = $rate->fresh('courier');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kode wilayah tujuan berhasil diperbarui',
+                'data' => $this->transformRate($rate)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperbarui kode wilayah tujuan',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Check import job status
      *
@@ -751,4 +883,13 @@ class CourierRateController extends Controller
             ], 500);
         }
     }
+
+    
+
+    
+
+    
+
+    
+    
 }

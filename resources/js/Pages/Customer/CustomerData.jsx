@@ -18,6 +18,10 @@ export default function CustomerData() {
     const [customerToDelete, setCustomerToDelete] = useState(null);
     const [showAddressModal, setShowAddressModal] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [showPointHistoryModal, setShowPointHistoryModal] = useState(false);
+    const [pointHistoryData, setPointHistoryData] = useState(null);
+    const [loadingPointHistory, setLoadingPointHistory] = useState(false);
+    const [pointHistoryFilter, setPointHistoryFilter] = useState('all');
 
     const loadCustomers = async (page = 1, search = "") => {
         try {
@@ -126,6 +130,48 @@ export default function CustomerData() {
         setShowAddressModal(true);
     };
 
+    const handleViewPointHistory = async (customer) => {
+        setSelectedCustomer(customer);
+        setShowPointHistoryModal(true);
+        setLoadingPointHistory(true);
+        setPointHistoryFilter('all');
+        
+        try {
+            const response = await api.get(`/customers/${customer.id}/point-history`);
+            if (response.data.status === 'success') {
+                setPointHistoryData(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error loading point history:', error);
+            showError('Gagal memuat riwayat poin');
+        } finally {
+            setLoadingPointHistory(false);
+        }
+    };
+
+    const loadPointHistoryWithFilter = async (type) => {
+        if (!selectedCustomer) return;
+        
+        setLoadingPointHistory(true);
+        try {
+            const params = type !== 'all' ? { type } : {};
+            const response = await api.get(`/customers/${selectedCustomer.id}/point-history`, { params });
+            if (response.data.status === 'success') {
+                setPointHistoryData(response.data.data);
+            }
+        } catch (error) {
+            console.error('Error loading point history:', error);
+            showError('Gagal memuat riwayat poin');
+        } finally {
+            setLoadingPointHistory(false);
+        }
+    };
+
+    const handleFilterChange = (type) => {
+        setPointHistoryFilter(type);
+        loadPointHistoryWithFilter(type);
+    };
+
     return (
         <DashboardLayout>
             <div className="p-6">
@@ -171,10 +217,11 @@ export default function CustomerData() {
                 <div className="bg-white rounded-md shadow-sm divide-y">
                     <div className="grid grid-cols-12 items-center px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50">
                         <div className="col-span-2">Nama</div>
-                        <div className="col-span-2">Kategori</div>
+                        <div className="col-span-1">Tier</div>
+                        <div className="col-span-1">Points</div>
                         <div className="col-span-2">Telepon</div>
-                        <div className="col-span-5">Alamat</div>
-                        <div className="col-span-1 text-right">Aksi</div>
+                        <div className="col-span-4">Alamat</div>
+                        <div className="col-span-2 text-right">Aksi</div>
                     </div>
 
                     {customers.map((customer, idx) => {
@@ -190,6 +237,9 @@ export default function CustomerData() {
                         const phoneNumber = customer.phone?.replace(/^0/, "62");
                         const waLink = `https://wa.me/${phoneNumber}`;
                         const isClickable = hasPermission('customers.view');
+
+                        const tier = customer.loyalty_points?.tier;
+                        const points = customer.loyalty_points?.current_points ?? 0;
 
                         return (
                             <div
@@ -211,10 +261,33 @@ export default function CustomerData() {
                                     </span>
                                 </div>
 
-                                <div className="col-span-2">
-                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                                        Customer
-                                    </span>
+                                <div className="col-span-1">
+                                    {tier ? (
+                                        <span 
+                                            className="text-xs px-2 py-1 rounded-full font-medium"
+                                            style={{
+                                                backgroundColor: tier.color + '20',
+                                                color: tier.color
+                                            }}
+                                        >
+                                            {tier.name}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-400">-</span>
+                                    )}
+                                </div>
+
+                                <div className="col-span-1">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleViewPointHistory(customer);
+                                        }}
+                                        className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                                        title="Klik untuk lihat detail poin"
+                                    >
+                                        {points.toLocaleString('id-ID')}
+                                    </button>
                                 </div>
 
                                 <div className="col-span-2 flex items-center gap-1 text-green-600">
@@ -415,6 +488,173 @@ export default function CustomerData() {
                         <div className="flex justify-end mt-6">
                             <button
                                 onClick={() => setShowAddressModal(false)}
+                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                            >
+                                Tutup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Point History */}
+            {showPointHistoryModal && selectedCustomer && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800">
+                                    Riwayat Poin - {pointHistoryData?.customer?.name || selectedCustomer.name}
+                                </h3>
+                                {pointHistoryData?.customer && (
+                                    <div className="flex gap-4 mt-2 text-sm">
+                                        <div>
+                                            <span className="text-gray-600">Poin Saat Ini: </span>
+                                            <span className="font-semibold text-blue-600">
+                                                {pointHistoryData.customer.current_points.toLocaleString('id-ID')}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-600">Total Poin: </span>
+                                            <span className="font-semibold text-gray-800">
+                                                {pointHistoryData.customer.lifetime_points.toLocaleString('id-ID')}
+                                            </span>
+                                        </div>
+                                        {pointHistoryData.customer.tier && (
+                                            <div>
+                                                <span className="text-gray-600">Tier: </span>
+                                                <span 
+                                                    className="text-xs px-2 py-1 rounded-full font-medium"
+                                                    style={{
+                                                        backgroundColor: pointHistoryData.customer.tier.color + '20',
+                                                        color: pointHistoryData.customer.tier.color
+                                                    }}
+                                                >
+                                                    {pointHistoryData.customer.tier.name}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setShowPointHistoryModal(false)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <Icon icon="mdi:close" className="text-xl" />
+                            </button>
+                        </div>
+
+                        {/* Filter Tabs */}
+                        <div className="flex gap-2 mb-4 border-b">
+                            <button
+                                onClick={() => handleFilterChange('all')}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                    pointHistoryFilter === 'all'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-800'
+                                }`}
+                            >
+                                Semua
+                            </button>
+                            <button
+                                onClick={() => handleFilterChange('earn')}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                    pointHistoryFilter === 'earn'
+                                        ? 'border-green-600 text-green-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-800'
+                                }`}
+                            >
+                                Poin Masuk
+                            </button>
+                            <button
+                                onClick={() => handleFilterChange('redeem')}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                    pointHistoryFilter === 'redeem'
+                                        ? 'border-red-600 text-red-600'
+                                        : 'border-transparent text-gray-600 hover:text-gray-800'
+                                }`}
+                            >
+                                Poin Keluar
+                            </button>
+                        </div>
+
+                        {/* Transaction List */}
+                        {loadingPointHistory ? (
+                            <div className="flex justify-center items-center py-12">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                        ) : pointHistoryData?.transactions?.data?.length > 0 ? (
+                            <div className="space-y-3">
+                                {pointHistoryData.transactions.data.map((transaction) => {
+                                    const isEarn = transaction.type === 'earn';
+                                    const isRedeem = transaction.type === 'redeem';
+                                    const bgColor = isEarn ? 'bg-green-50' : isRedeem ? 'bg-red-50' : 'bg-blue-50';
+                                    const textColor = isEarn ? 'text-green-700' : isRedeem ? 'text-red-700' : 'text-blue-700';
+                                    const iconColor = isEarn ? 'text-green-600' : isRedeem ? 'text-red-600' : 'text-blue-600';
+                                    
+                                    return (
+                                        <div
+                                            key={transaction.id}
+                                            className={`border rounded-lg p-4 ${bgColor} border-gray-200`}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Icon 
+                                                            icon={isEarn ? 'mdi:arrow-down-circle' : isRedeem ? 'mdi:arrow-up-circle' : 'mdi:swap-horizontal-circle'} 
+                                                            className={`text-xl ${iconColor}`}
+                                                        />
+                                                        <span className={`font-semibold ${textColor}`}>
+                                                            {isEarn ? 'Poin Masuk' : isRedeem ? 'Poin Keluar' : 'Penyesuaian'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm text-gray-700 mb-1">
+                                                        {transaction.description}
+                                                    </p>
+                                                    {transaction.order && (
+                                                        <p className="text-xs text-gray-600">
+                                                            Order: #{transaction.order.order_number}
+                                                            {transaction.order_amount && (
+                                                                <span className="ml-2">
+                                                                    (Rp {parseFloat(transaction.order_amount).toLocaleString('id-ID')})
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        {new Date(transaction.created_at).toLocaleString('id-ID', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className={`text-lg font-bold ${textColor}`}>
+                                                        {transaction.points > 0 ? '+' : ''}{transaction.points.toLocaleString('id-ID')}
+                                                    </div>
+                                                    <div className="text-xs text-gray-600">
+                                                        Saldo: {transaction.balance_after.toLocaleString('id-ID')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12 text-gray-500">
+                                <Icon icon="mdi:inbox" className="text-5xl mx-auto mb-2 text-gray-400" />
+                                <p>Belum ada riwayat transaksi poin</p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end mt-6">
+                            <button
+                                onClick={() => setShowPointHistoryModal(false)}
                                 className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                             >
                                 Tutup

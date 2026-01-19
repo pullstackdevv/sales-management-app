@@ -17,6 +17,7 @@ vendor
 /public/hot
 /public/storage
 
+<<<<<<< HEAD
 # IDE
 .idea
 .vscode
@@ -35,3 +36,8 @@ yarn-error.log
 # PHP
 composer.phar
 *.log
+# Ignore all .md files except README.md
+*.md
+!README.md
+!CORS_RATE_LIMITER.md
+doc

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaBoxOpen, FaUser, FaCrown } from "react-icons/fa";
+import { FaBoxOpen, FaUser, FaCrown, FaMapMarkerAlt, FaStream, FaUserTie } from "react-icons/fa";
 import DashboardLayout from "../../Layouts/DashboardLayout";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
@@ -12,6 +12,9 @@ export default function Analyzer() {
         totalProducts: 0,
         bestSellers: [],
         bestCustomers: [],
+        topLocations: [],
+        topChannels: [],
+        topAdmins: [],
         chartData: {
             categories: [],
             data: []
@@ -19,16 +22,22 @@ export default function Analyzer() {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     useEffect(() => {
         fetchAnalyzerData();
     }, []);
 
-    const fetchAnalyzerData = async () => {
+    const fetchAnalyzerData = async (start_date = '', end_date = '') => {
         try {
             setLoading(true);
 
-            const response = await api.get('/analyzer');
+            const params = {};
+            if (start_date) params.start_date = start_date;
+            if (end_date) params.end_date = end_date;
+
+            const response = await api.get('/analyzer', { params });
 
             if (response.data.success) {
                 const data = response.data.data;
@@ -38,6 +47,9 @@ export default function Analyzer() {
                     totalProducts: data.summary.totalProducts,
                     bestSellers: data.bestSellers,
                     bestCustomers: data.bestCustomers,
+                    topLocations: data.topLocations || [],
+                    topChannels: data.topChannels || [],
+                    topAdmins: data.topAdmins || [],
                     chartData: data.chartData
                 });
             } else {
@@ -63,7 +75,31 @@ export default function Analyzer() {
     return (
         <DashboardLayout>
              <div className="text-gray-800" style={{maxWidth: '99%'}}>
-            <h1 className="text-xl font-bold mb-6">Analyzer</h1>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-xl font-bold">Analyzer</h1>
+                <div className="flex items-center gap-3">
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Tanggal Mulai"
+                    />
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Tanggal Akhir"
+                    />
+                    <button
+                        onClick={() => fetchAnalyzerData(startDate, endDate)}
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition-colors"
+                    >
+                        Cari Laporan
+                    </button>
+                </div>
+            </div>
 
             {/* Loading State */}
             {loading && (
@@ -177,6 +213,61 @@ export default function Analyzer() {
                                         >
                                             {i + 1}
                                         </span>
+                                        {item.name}
+                                    </span>
+                                    <span>{item.value}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
+
+            {!loading && !error && (
+                <div className="grid md:grid-cols-3 gap-6 mt-6">
+                    <div className="bg-white rounded shadow p-4">
+                        <h2 className="font-semibold mb-3 flex items-center gap-2">
+                            <FaMapMarkerAlt className="text-red-500" /> Lokasi Customer Teratas
+                        </h2>
+                        <ul className="text-sm text-gray-700 space-y-1">
+                            {(analyzerData.topLocations || []).map((item, i) => (
+                                <li key={i} className={`flex justify-between items-center border-b py-1 transition hover:bg-red-50 rounded ${i===0? 'font-bold':''}`}>
+                                    <span className="flex items-center gap-2">
+                                        <span className={`inline-block w-6 text-center rounded-full ${i===0?'bg-red-400 text-white': i===1?'bg-gray-300':'bg-red-200'}`}>{i+1}</span>
+                                        {item.name}
+                                    </span>
+                                    <span>{item.value}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="bg-white rounded shadow p-4">
+                        <h2 className="font-semibold mb-3 flex items-center gap-2">
+                            <FaStream className="text-purple-500" /> Channel Teratas (Pendapatan)
+                        </h2>
+                        <ul className="text-sm text-gray-700 space-y-1">
+                            {(analyzerData.topChannels || []).map((item, i) => (
+                                <li key={i} className={`flex justify-between items-center border-b py-1 transition hover:bg-purple-50 rounded ${i===0? 'font-bold':''}`}>
+                                    <span className="flex items-center gap-2">
+                                        <span className={`inline-block w-6 text-center rounded-full ${i===0?'bg-purple-400 text-white': i===1?'bg-gray-300':'bg-purple-200'}`}>{i+1}</span>
+                                        {item.name}
+                                    </span>
+                                    <span>{item.value}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="bg-white rounded shadow p-4">
+                        <h2 className="font-semibold mb-3 flex items-center gap-2">
+                            <FaUserTie className="text-green-500" /> Admin Teratas (Pendapatan)
+                        </h2>
+                        <ul className="text-sm text-gray-700 space-y-1">
+                            {(analyzerData.topAdmins || []).map((item, i) => (
+                                <li key={i} className={`flex justify-between items-center border-b py-1 transition hover:bg-green-50 rounded ${i===0? 'font-bold':''}`}>
+                                    <span className="flex items-center gap-2">
+                                        <span className={`inline-block w-6 text-center rounded-full ${i===0?'bg-green-400 text-white': i===1?'bg-gray-300':'bg-green-200'}`}>{i+1}</span>
                                         {item.name}
                                     </span>
                                     <span>{item.value}</span>

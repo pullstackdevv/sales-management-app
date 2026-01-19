@@ -638,6 +638,13 @@ const Homepage = () => {
                             </div>
                         )}
 
+                        {/* Sales Count */}
+                        {product.sales_count > 0 && (
+                            <div className="text-[10px] text-gray-500 mb-1">
+                                Terjual {product.sales_count}
+                            </div>
+                        )}
+
                         {/* Price */}
                         <div className="flex flex-col gap-0.5 ">
                             {variantInfo?.hasDiscount ? (
@@ -701,6 +708,12 @@ const Homepage = () => {
                                             {c.name}
                                         </span>
                                     ))}
+                                </div>
+                            )}
+                            {/* Sales Count */}
+                            {product.sales_count > 0 && (
+                                <div className="text-[10px] text-gray-500 mb-1">
+                                    Terjual {product.sales_count}
                                 </div>
                             )}
                             <div className="flex items-center gap-2">
@@ -1042,7 +1055,7 @@ const BannerRotator = ({ bannerUrls }) => {
 
     return (
         <div className="relative group">
-            <div className="relative overflow-hidden rounded-xl shadow-lg h-[120px] lg:h-[250px]">
+            <div className="relative overflow-hidden rounded-xl shadow-lg w-full aspect-[4/1]">
                 <img
                     key={`current-${index}`}
                     src={bannerUrls[index]}

@@ -41,6 +41,7 @@ class ProductResource extends JsonResource
             'image' => $this->image,
             'is_active' => $this->is_active,
             'is_storefront' => $this->is_storefront,
+            'sales_count' => $this->sales_count ?? 0,
             
             // Price information from variants
             'price' => $this->min_price, // Minimum selling price from variants

@@ -16,6 +16,7 @@ class Product extends Model
         'category',
         'category_id',
         'description',
+        'sales_count',
         'image',
         'is_active',
         'is_storefront',
@@ -56,6 +57,16 @@ class Product extends Model
     public function tags()
     {
         return $this->belongsToMany(Tag::class, 'product_tag');
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function approvedReviews()
+    {
+        return $this->hasMany(ProductReview::class)->where('status', 'approved');
     }
 
     // Helper method to get the minimum selling price from variants
@@ -129,5 +140,53 @@ class Product extends Model
         }
 
         return number_format($minMargin, 1) . '% - ' . number_format($maxMargin, 1) . '%';
+    }
+
+    // Sales Counter - hitung total produk terjual dari order sukses
+    public function getTotalSoldAttribute()
+    {
+        return \DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('product_variants', 'order_items.product_variant_id', '=', 'product_variants.id')
+            ->where('product_variants.product_id', $this->id)
+            ->whereIn('orders.status', ['paid', 'shipped', 'delivered'])
+            ->sum('order_items.quantity');
+    }
+
+    // Average rating dari review yang approved
+    public function getAverageRatingAttribute()
+    {
+        return $this->approvedReviews()->avg('rating') ?? 0;
+    }
+
+    // Total review yang approved
+    public function getTotalReviewsAttribute()
+    {
+        return $this->approvedReviews()->count();
+    }
+
+    // Cek apakah customer sudah pernah review produk ini
+    public function hasBeenReviewedByCustomer($customerId, $orderId = null)
+    {
+        $query = $this->reviews()
+            ->where('customer_id', $customerId);
+        
+        if ($orderId) {
+            $query->where('order_id', $orderId);
+        }
+        
+        return $query->exists();
+    }
+
+    // Cek apakah customer pernah beli produk ini dan sudah diterima
+    public function hasBeenPurchasedByCustomer($customerId)
+    {
+        return \DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('product_variants', 'order_items.product_variant_id', '=', 'product_variants.id')
+            ->where('product_variants.product_id', $this->id)
+            ->where('orders.customer_id', $customerId)
+            ->where('orders.status', 'delivered') // Hanya order yang sudah diterima
+            ->exists();
     }
 }

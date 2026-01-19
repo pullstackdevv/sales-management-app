@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { 
     ArrowLeft, 
-    PlusCircle, 
     Pencil, 
     CheckCircle, 
     Info, 
@@ -206,29 +205,19 @@ function LoyaltyTiers() {
     return (
         <DashboardLayout>
             <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <Link
-                                href="/cms/loyalty/settings"
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                <ArrowLeft className="w-5 h-5" />
-                            </Link>
-                            <h1 className="text-2xl font-bold">Tier Membership</h1>
-                        </div>
-                        <p className="text-gray-500">
-                            Kelola tier membership berdasarkan belanja tahunan customer
-                        </p>
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-1">
+                        <Link
+                            href="/cms/loyalty/settings"
+                            className="text-gray-500 hover:text-gray-700"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </Link>
+                        <h1 className="text-2xl font-bold">Tier Membership</h1>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => handleOpenModal()}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
-                    >
-                        <PlusCircle className="w-5 h-5" />
-                        Tambah Tier
-                    </button>
+                    <p className="text-gray-500">
+                        Kelola tier membership berdasarkan belanja tahunan customer
+                    </p>
                 </div>
 
                 {/* Tier Cards */}
@@ -326,17 +315,9 @@ function LoyaltyTiers() {
                             <h3 className="text-lg font-medium text-gray-600 mb-2">
                                 Belum ada tier membership
                             </h3>
-                            <p className="text-gray-500 mb-4">
-                                Tambahkan tier untuk mengatur level membership customer
+                            <p className="text-gray-500">
+                                Tier membership akan ditampilkan di sini
                             </p>
-                            <button
-                                type="button"
-                                onClick={() => handleOpenModal()}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 mx-auto"
-                            >
-                                <PlusCircle className="w-5 h-5" />
-                                Tambah Tier Pertama
-                            </button>
                         </div>
                     )}
                 </div>
@@ -370,7 +351,7 @@ function LoyaltyTiers() {
                             {/* Modal Header */}
                             <div className="flex items-center justify-between p-4 border-b">
                                 <h3 className="text-lg font-semibold">
-                                    {editingTier ? "Edit Tier" : "Tambah Tier Baru"}
+                                    Edit Tier
                                 </h3>
                                 <button
                                     onClick={handleCloseModal}

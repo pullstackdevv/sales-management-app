@@ -16,6 +16,7 @@ class Product extends Model
         'category',
         'category_id',
         'description',
+        'sales_count',
         'image',
         'is_active',
         'is_storefront',

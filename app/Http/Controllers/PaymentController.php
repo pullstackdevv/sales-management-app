@@ -443,6 +443,13 @@ class PaymentController extends Controller
             $this->redeemLoyaltyPoints($order);
             $this->awardLoyaltyPoints($order);
             
+            // Increment sales count for each product
+            foreach ($order->items as $item) {
+                if ($item->productVariant && $item->productVariant->product) {
+                    $item->productVariant->product->increment('sales_count', $item->quantity);
+                }
+            }
+            
             // Create payment received notification
             NotificationHelper::paymentReceived($order->load(['customer', 'address']));
         } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
@@ -508,6 +515,13 @@ class PaymentController extends Controller
             WebOrderController::updateVoucherUsedCount($order->id);
             $this->redeemLoyaltyPoints($order);
             $this->awardLoyaltyPoints($order);
+            
+            // Increment sales count for each product
+            foreach ($order->items as $item) {
+                if ($item->productVariant && $item->productVariant->product) {
+                    $item->productVariant->product->increment('sales_count', $item->quantity);
+                }
+            }
             
             // Create payment received notification
             NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -583,6 +597,13 @@ class PaymentController extends Controller
                     WebOrderController::updateVoucherUsedCount($order->id);
                     $this->redeemLoyaltyPoints($order);
                     $this->awardLoyaltyPoints($order);
+                    
+                    // Increment sales count for each product
+                    foreach ($order->items as $item) {
+                        if ($item->productVariant && $item->productVariant->product) {
+                            $item->productVariant->product->increment('sales_count', $item->quantity);
+                        }
+                    }
                     
                     // Create payment received notification
                     NotificationHelper::paymentReceived($order->load(['customer', 'address']));
@@ -672,6 +693,13 @@ class PaymentController extends Controller
                     WebOrderController::updateVoucherUsedCount($order->id);
                     $this->redeemLoyaltyPoints($order);
                     $this->awardLoyaltyPoints($order);
+                    
+                    // Increment sales count for each product
+                    foreach ($order->items as $item) {
+                        if ($item->productVariant && $item->productVariant->product) {
+                            $item->productVariant->product->increment('sales_count', $item->quantity);
+                        }
+                    }
                     
                     // Create payment received notification
                     NotificationHelper::paymentReceived($order->load(['customer', 'address']));

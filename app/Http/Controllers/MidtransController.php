@@ -8,6 +8,7 @@ use App\Helpers\ResponseFormatter;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
+use App\Services\LoyaltyPointService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,12 @@ use App\Helpers\NotificationHelper;
 
 class MidtransController extends Controller
 {
+    private LoyaltyPointService $loyaltyPointService;
+
+    public function __construct()
+    {
+        $this->loyaltyPointService = app(LoyaltyPointService::class);
+    }
     /**
      * Create payment for order
      */
@@ -211,6 +218,16 @@ class MidtransController extends Controller
                 $order->update(['status' => 'paid']);
                 WebOrderController::updateVoucherUsedCount($order->id);
                 
+                // Award loyalty points
+                $this->loyaltyPointService->awardPointsForOrder($order);
+                
+                // Increment sales count for each product
+                foreach ($order->items as $item) {
+                    if ($item->productVariant && $item->productVariant->product) {
+                        $item->productVariant->product->increment('sales_count', $item->quantity);
+                    }
+                }
+                
                 // Create payment received notification
                 NotificationHelper::paymentReceived($order->load(['customer', 'address']));
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
@@ -301,6 +318,16 @@ class MidtransController extends Controller
                 if ($paymentStatusFromGateway === PaymentStatus::PAID) {
                     $order->update(['status' => 'paid']);
                     WebOrderController::updateVoucherUsedCount($order->id);
+                    
+                    // Award loyalty points
+                    $this->loyaltyPointService->awardPointsForOrder($order);
+                    
+                    // Increment sales count for each product
+                    foreach ($order->items as $item) {
+                        if ($item->productVariant && $item->productVariant->product) {
+                            $item->productVariant->product->increment('sales_count', $item->quantity);
+                        }
+                    }
                     
                     // Create payment received notification
                     NotificationHelper::paymentReceived($order->load(['customer', 'address']));

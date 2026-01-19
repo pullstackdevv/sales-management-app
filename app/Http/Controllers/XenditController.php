@@ -8,6 +8,7 @@ use App\Helpers\ResponseFormatter;
 use App\Models\Order;
 use App\Models\StockMovement;
 use App\Http\Controllers\WebOrderController;
+use App\Services\LoyaltyPointService;
 use App\Helpers\NotificationHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,9 +19,11 @@ class XenditController extends Controller
 {
     private $secretKey;
     private $baseUrl;
+    private LoyaltyPointService $loyaltyPointService;
 
     public function __construct()
     {
+        $this->loyaltyPointService = app(LoyaltyPointService::class);
         $this->secretKey = config('services.xendit.secret_key');
         $this->baseUrl = config('services.xendit.is_production') 
             ? 'https://api.xendit.co' 
@@ -286,6 +289,16 @@ class XenditController extends Controller
                 $order->update(['status' => 'processing']);
                 WebOrderController::updateVoucherUsedCount($order->id);
                 
+                // Award loyalty points
+                $this->loyaltyPointService->awardPointsForOrder($order);
+                
+                // Increment sales count for each product
+                foreach ($order->items as $item) {
+                    if ($item->productVariant && $item->productVariant->product) {
+                        $item->productVariant->product->increment('sales_count', $item->quantity);
+                    }
+                }
+                
                 // Create payment received notification
                 NotificationHelper::paymentReceived($order->load(['customer', 'address']));
             } elseif (in_array($paymentStatus, [PaymentStatus::FAILED, PaymentStatus::EXPIRED, PaymentStatus::CANCELLED])) {
@@ -362,6 +375,16 @@ class XenditController extends Controller
                     if ($paymentStatus === PaymentStatus::PAID) {
                         $order->update(['status' => 'processing']);
                         WebOrderController::updateVoucherUsedCount($order->id);
+                        
+                        // Award loyalty points
+                        $this->loyaltyPointService->awardPointsForOrder($order);
+                        
+                        // Increment sales count for each product
+                        foreach ($order->items as $item) {
+                            if ($item->productVariant && $item->productVariant->product) {
+                                $item->productVariant->product->increment('sales_count', $item->quantity);
+                            }
+                        }
                         
                         // Create payment received notification
                         NotificationHelper::paymentReceived($order->load(['customer', 'address']));

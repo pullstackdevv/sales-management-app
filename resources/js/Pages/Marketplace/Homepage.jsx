@@ -638,6 +638,13 @@ const Homepage = () => {
                             </div>
                         )}
 
+                        {/* Sales Count */}
+                        {product.sales_count > 0 && (
+                            <div className="text-[10px] text-gray-500 mb-1">
+                                Terjual {product.sales_count}
+                            </div>
+                        )}
+
                         {/* Price */}
                         <div className="flex flex-col gap-0.5 ">
                             {variantInfo?.hasDiscount ? (
@@ -701,6 +708,12 @@ const Homepage = () => {
                                             {c.name}
                                         </span>
                                     ))}
+                                </div>
+                            )}
+                            {/* Sales Count */}
+                            {product.sales_count > 0 && (
+                                <div className="text-[10px] text-gray-500 mb-1">
+                                    Terjual {product.sales_count}
                                 </div>
                             )}
                             <div className="flex items-center gap-2">

@@ -570,6 +570,12 @@ export default function ProductDetail() {
                                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-normal text-gray-800 leading-tight">
                                     {product.name}
                                 </h1>
+                                {/* Sales Count */}
+                                {product.sales_count > 0 && (
+                                    <div className="text-sm text-gray-500 mt-2">
+                                        Terjual {product.sales_count}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Price */}
